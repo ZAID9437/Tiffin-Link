@@ -62,50 +62,6 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isKitchenOnline, setIsKitchenOnline] = useState(true);
 
-  // Real-time Database Badge Counters
-  const [liveRequestsCount, setLiveRequestsCount] = useState(0);
-  const [newOrdersCount, setNewOrdersCount] = useState(0);
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-
-  useEffect(() => {
-    const fetchBadgeCounts = async () => {
-      try {
-        // 1. Fetch live requests count
-        const reqRes = await fetch('http://localhost:5000/api/requests');
-        const reqJson = await reqRes.json();
-        if (reqJson.success && Array.isArray(reqJson.data)) {
-          setLiveRequestsCount(reqJson.data.filter(r => r.status === 'pending').length);
-        } else {
-          setLiveRequestsCount(0);
-        }
-
-        // 2. Fetch new orders count
-        const ordRes = await fetch('http://localhost:5000/api/orders');
-        const ordJson = await ordRes.json();
-        if (ordJson.success && Array.isArray(ordJson.data)) {
-          setNewOrdersCount(ordJson.data.filter(o => o.status === 'New').length);
-        } else {
-          setNewOrdersCount(0);
-        }
-
-        // 3. Fetch notifications count
-        const notifRes = await fetch('http://localhost:5000/api/notifications');
-        const notifJson = await notifRes.json();
-        if (notifJson.success && Array.isArray(notifJson.data)) {
-          setUnreadNotificationsCount(notifJson.data.filter(n => !n.isRead).length);
-        } else {
-          setUnreadNotificationsCount(0);
-        }
-      } catch (err) {
-        console.error('Error fetching real-time badge counts from MongoDB:', err);
-      }
-    };
-
-    fetchBadgeCounts();
-    const interval = setInterval(fetchBadgeCounts, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
   const toggleSubMenu = (menu) => {
     setExpandedMenus(prev => ({
       ...prev,
@@ -355,11 +311,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                     <Zap size={17} className="text-amber-500 group-hover:text-amber-600" />
                     <span className="font-extrabold">Live Requests</span>
                   </div>
-                  {liveRequestsCount > 0 ? (
-                    <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-full animate-pulse">
-                      {liveRequestsCount}
-                    </span>
-                  ) : null}
+                  <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-full">3</span>
                 </button>
               </div>
 
@@ -404,11 +356,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                           <Inbox size={14} />
                           <span>New Orders</span>
                         </div>
-                        {newOrdersCount > 0 ? (
-                          <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[9px] font-black rounded-full animate-pulse">
-                            {newOrdersCount}
-                          </span>
-                        ) : null}
+                        <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[9px] font-black rounded-full">1</span>
                       </button>
 
                       <button 
@@ -630,11 +578,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                     <Bell size={17} />
                     <span>Notifications</span>
                   </div>
-                  {unreadNotificationsCount > 0 ? (
-                    <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-full">
-                      {unreadNotificationsCount}
-                    </span>
-                  ) : null}
+                  <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-full">3</span>
                 </button>
               </div>
 

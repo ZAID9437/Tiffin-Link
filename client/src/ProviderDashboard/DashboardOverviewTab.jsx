@@ -52,25 +52,18 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
         const res = await fetch('http://localhost:5000/api/requests');
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          const pendingList = json.data.filter(r => r.status === 'pending');
-          setStats(prev => ({ ...prev, liveRequestsCount: pendingList.length }));
-          if (pendingList.length > 0) {
-            const req = pendingList[0];
-            setLiveRequest({
-              id: req._id || 'REQ-1092',
-              customerName: req.customerName || 'Rahul Shah',
-              customerPhone: req.customerPhone || '+91 98765 12345',
-              items: `${req.quantity || 1} × ${req.mealType || 'Veg Tiffin'}`,
-              time: `${req.date || 'Today'} • ${req.time || '5:00 PM'}`,
-              distance: `${req.distance || '1.8 km'} • ${req.deliveryType || 'Delivery'}`,
-              price: req.budget || 120,
-              secondsLeft: 60
-            });
-          } else {
-            setLiveRequest(null);
-          }
+          const req = json.data[0];
+          setLiveRequest({
+            id: req._id || 'REQ-1092',
+            customerName: req.customerName || 'Rahul Shah',
+            customerPhone: req.customerPhone || '+91 98765 12345',
+            items: `${req.quantity || 1} × ${req.mealType || 'Veg Tiffin'}`,
+            time: `${req.date || 'Today'} • ${req.time || '5:00 PM'}`,
+            distance: `${req.distance || '1.8 km'} • ${req.deliveryType || 'Delivery'}`,
+            price: req.budget || 120,
+            secondsLeft: 60
+          });
         } else {
-          setStats(prev => ({ ...prev, liveRequestsCount: 0 }));
           setLiveRequest(null);
         }
       } catch (err) {
@@ -79,7 +72,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     };
 
     fetchRealRequests();
-    const interval = setInterval(fetchRealRequests, 3000);
+    const interval = setInterval(fetchRealRequests, 4000);
     return () => clearInterval(interval);
   }, []);
 
@@ -211,9 +204,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
             </span>
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
           </div>
-          <div className="text-3xl font-black text-[#111827]">
-            {stats.liveRequestsCount.toString().padStart(2, '0')}
-          </div>
+          <div className="text-3xl font-black text-[#111827]">03</div>
           <div className="text-[11px] text-amber-700 font-bold mt-2">Requires immediate response</div>
         </div>
 
