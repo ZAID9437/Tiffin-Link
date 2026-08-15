@@ -84,14 +84,14 @@ const DEFAULT_DELIVERY_REQUESTS = [
     deliveryAddress: { street: '701 Iscon Elegance, Prahlad Nagar', city: 'Ahmedabad', lat: 23.0380, lng: 72.5580 },
     pickupAddress: { street: 'Shreeji Tiffin Kitchen, Satellite', city: 'Ahmedabad', lat: 23.0300, lng: 72.5650 },
     assignedDriver: {
-      driverId: '',
-      name: '',
-      phone: '',
-      rating: 0,
-      vehicleNo: '',
+      driverId: 'DRV-103',
+      name: 'Vikram Singh',
+      phone: '+91 98251 77889',
+      rating: 4.7,
+      vehicleNo: 'GJ-01-EF-8890',
       location: { lat: 23.0300, lng: 72.5650 }
     },
-    status: 'Searching Drivers',
+    status: 'Driver Assigned',
     distanceKm: 2.5,
     etaMinutes: 15,
     amount: 150,
@@ -130,6 +130,47 @@ const DEFAULT_DELIVERY_REQUESTS = [
   }
 ];
 
+// Helper to step driver GPS coordinates in MongoDB
+const updateLiveGpsInDatabase = async (requests) => {
+  try {
+    for (const req of requests) {
+      if (req.status === 'Out for Delivery' || req.status === 'Picked Up') {
+        const currentLat = req.assignedDriver?.location?.lat || 23.0280;
+        const currentLng = req.assignedDriver?.location?.lng || 72.5670;
+        
+        const targetLat = req.deliveryAddress?.lat || 23.0225;
+        const targetLng = req.deliveryAddress?.lng || 72.5714;
+
+        // Step coordinates towards destination
+        const nextLat = currentLat + (targetLat - currentLat) * 0.08;
+        const nextLng = currentLng + (targetLng - currentLng) * 0.08;
+
+        const currentEta = req.etaMinutes || 18;
+        const nextEta = Math.max(2, currentEta - 1);
+        const currentDist = req.distanceKm || 3.2;
+        const nextDist = Math.max(0.3, Number((currentDist - 0.2).toFixed(1)));
+
+        req.assignedDriver.location = { lat: nextLat, lng: nextLng };
+        req.etaMinutes = nextEta;
+        req.distanceKm = nextDist;
+
+        await DeliveryRequest.updateOne(
+          { _id: req._id },
+          {
+            $set: {
+              'assignedDriver.location': { lat: nextLat, lng: nextLng },
+              etaMinutes: nextEta,
+              distanceKm: nextDist
+            }
+          }
+        );
+      }
+    }
+  } catch (err) {
+    console.error('Error updating live GPS in DB:', err);
+  }
+};
+
 // @desc    Get all delivery requests for provider
 // @route   GET /api/delivery/requests
 const getDeliveryRequests = async (req, res) => {
@@ -140,10 +181,12 @@ const getDeliveryRequests = async (req, res) => {
       let requests = await DeliveryRequest.find({ providerEmail: userEmail }).sort({ requestedAt: -1 });
 
       if (requests.length === 0) {
-        // Reset collection with diverse drivers if empty
         await DeliveryRequest.deleteMany({ providerEmail: userEmail });
         requests = await DeliveryRequest.insertMany(DEFAULT_DELIVERY_REQUESTS);
       }
+
+      // Step live GPS coordinates in MongoDB
+      await updateLiveGpsInDatabase(requests);
 
       return res.json({
         success: true,
@@ -172,7 +215,6 @@ const createDeliveryRequest = async (req, res) => {
     const requestId = `#DEL-${Math.floor(1000 + Math.random() * 9000)}`;
     const pickupOtp = String(Math.floor(1000 + Math.random() * 9000));
 
-    // Dynamic Swiggy/Zomato style driver assignment (cycling through available drivers)
     const selectedDriver = NEARBY_AVAILABLE_DRIVERS[dispatchCounter % NEARBY_AVAILABLE_DRIVERS.length];
     dispatchCounter++;
 
@@ -238,7 +280,6 @@ const assignDriver = async (req, res) => {
   try {
     const { requestId, driverId } = req.body;
     
-    // Cycle or match requested driver
     let selectedDriver = NEARBY_AVAILABLE_DRIVERS.find(d => d.driverId === driverId);
     if (!selectedDriver) {
       selectedDriver = NEARBY_AVAILABLE_DRIVERS[dispatchCounter % NEARBY_AVAILABLE_DRIVERS.length];
