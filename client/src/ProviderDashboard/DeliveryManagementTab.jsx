@@ -174,19 +174,19 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
 
   // Safe Helper to get driver details without crashing
   const getDriverInfo = (item) => {
-    if (!item) return { name: 'Rahul Sharma', phone: '+91 98251 44556', rating: 4.8, vehicleNo: 'Bike GJ-01-AB-1029' };
-    if (item.assignedDriver && typeof item.assignedDriver === 'object' && item.assignedDriver.name) {
+    if (!item) return null;
+    if (item.assignedDriver && typeof item.assignedDriver === 'object' && item.assignedDriver.name && item.assignedDriver.name.trim() !== '') {
       return item.assignedDriver;
     }
-    if (item.deliveryPartnerName) {
+    if (item.deliveryPartnerName && item.deliveryPartnerName.trim() !== '') {
       return {
         name: item.deliveryPartnerName,
         phone: item.deliveryPartnerPhone || '+91 98251 44556',
         rating: 4.8,
-        vehicleNo: 'Bike GJ-01-AB-1029'
+        vehicleNo: 'Bike'
       };
     }
-    return { name: 'Rahul Sharma', phone: '+91 98251 44556', rating: 4.8, vehicleNo: 'Bike GJ-01-AB-1029' };
+    return null;
   };
 
   // Confirm Pickup Action
@@ -568,24 +568,27 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
 
                       {/* Delivery Partner */}
                       <td className="py-3.5 px-4">
-                        {driver?.name ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-emerald-100 text-[#0A8B5F] flex items-center justify-center font-black text-xs">
-                              {driver.name.charAt(0)}
-                            </div>
-                            <div>
-                              <div className="text-[#111827] font-extrabold flex items-center gap-1">
-                                <span>{driver.name}</span>
-                                <span className="text-[10px] text-amber-600 flex items-center">★ {driver.rating || 4.8}</span>
+                        {(() => {
+                          const d = getDriverInfo(item);
+                          return d && d.name ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-emerald-100 text-[#0A8B5F] flex items-center justify-center font-black text-xs">
+                                {d.name.charAt(0)}
                               </div>
-                              <div className="text-[10px] text-[#6B7280] font-normal">{driver.vehicleNo || 'Bike'}</div>
+                              <div>
+                                <div className="text-[#111827] font-extrabold flex items-center gap-1">
+                                  <span>{d.name}</span>
+                                  <span className="text-[10px] text-amber-600 flex items-center">★ {d.rating || 4.8}</span>
+                                </div>
+                                <div className="text-[10px] text-[#6B7280] font-normal">{d.vehicleNo || 'Bike'}</div>
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-amber-700 font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-200">
-                            Unassigned
-                          </span>
-                        )}
+                          ) : (
+                            <span className="text-[11px] text-amber-700 font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-200">
+                              Unassigned
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* Delivery Status Badge */}
@@ -786,7 +789,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
 
               {/* Real-Time Driver Marker (Driven by MongoDB status and GPS distance) */}
               {(() => {
-                const targetDriver = getDriverInfo(selectedDelivery);
+                const targetDriver = getDriverInfo(selectedDelivery) || { name: 'Rahul Sharma', rating: 4.8, vehicleNo: 'Bike GJ-01-AB-1029' };
                 const statusNorm = selectedDelivery ? normalizeStatus(selectedDelivery.status) : 'Delivered';
                 
                 let t = 0.45;
@@ -841,12 +844,12 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
 
           {/* Bottom Live Driver Info & Action Bar */}
           {(() => {
-            const targetDriver = getDriverInfo(selectedDelivery);
+            const targetDriver = getDriverInfo(selectedDelivery) || { name: 'Rahul Sharma', rating: 4.8, vehicleNo: 'Bike GJ-01-AB-1029' };
             return (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 z-10 bg-black/80 backdrop-blur-md p-3 rounded-xl border border-white/20 shadow-md">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center font-black text-sm border border-white/40 shadow-xs">
-                    {targetDriver.name.charAt(0)}
+                    {targetDriver.name ? targetDriver.name.charAt(0) : 'D'}
                   </div>
                   <div>
                     <div className="text-xs font-black text-white flex items-center gap-2">
@@ -997,7 +1000,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
               </div>
 
               {(() => {
-                const targetDriver = getDriverInfo(pickupTarget);
+                const targetDriver = getDriverInfo(pickupTarget) || { name: 'Assigned Driver', phone: '+91 98251 44556', rating: 4.8, vehicleNo: 'Bike' };
                 return (
                   <>
                     <div className="text-sm font-black text-[#111827]">
