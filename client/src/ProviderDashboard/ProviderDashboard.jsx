@@ -41,7 +41,7 @@ import NotificationsTab from './NotificationsTab';
 import SettingsTab from './SettingsTab';
 import HelpSupportTab from './HelpSupportTab';
 
-export default function ProviderDashboard({ currentUser, onLogout }) {
+export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [expandedMenus, setExpandedMenus] = useState({
     tiffins: true,
@@ -94,7 +94,7 @@ export default function ProviderDashboard({ currentUser, onLogout }) {
         case 'notifications':
           return <NotificationsTab onNavigateTab={setActiveTab} />;
         case 'settings':
-          return <SettingsTab currentUser={currentUser} />;
+          return <SettingsTab currentUser={currentUser} onUpdateUser={onUpdateUser} />;
         case 'help':
           return <HelpSupportTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
         default:

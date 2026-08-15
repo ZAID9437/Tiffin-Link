@@ -77,7 +77,7 @@ const INITIAL_SETTINGS = {
   }
 };
 
-export default function SettingsTab({ currentUser }) {
+export default function SettingsTab({ currentUser, onUpdateUser }) {
   const [activeSection, setActiveSection] = useState('account');
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -102,15 +102,7 @@ export default function SettingsTab({ currentUser }) {
       const res = await fetch(`http://localhost:5000/api/settings/provider?email=${encodeURIComponent(email)}`);
       const json = await res.json();
       if (json.success && json.settings) {
-        setSettings(prev => ({
-          ...prev,
-          ...json.settings,
-          account: {
-            ...prev.account,
-            name: currentUser?.name || json.settings.account?.name || prev.account.name,
-            email: currentUser?.email || json.settings.account?.email || prev.account.email
-          }
-        }));
+        setSettings(json.settings);
       }
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -141,16 +133,17 @@ export default function SettingsTab({ currentUser }) {
 
       const json = await res.json();
       if (json.success) {
-        // Sync local storage user profile so header name updates immediately
-        if (currentUser) {
-          const updatedUserObj = {
-            ...currentUser,
-            name: settings.account?.name || currentUser.name,
-            email: settings.account?.email || currentUser.email,
-            phone: settings.account?.phone || currentUser.phone,
-            avatar: settings.account?.avatarUrl || currentUser.avatar
-          };
-          localStorage.setItem('tiffinlink_user', JSON.stringify(updatedUserObj));
+        const updatedUserObj = {
+          ...currentUser,
+          name: settings.account?.name || currentUser?.name,
+          email: settings.account?.email || currentUser?.email,
+          phone: settings.account?.phone || currentUser?.phone,
+          avatar: settings.account?.avatarUrl || currentUser?.avatar
+        };
+
+        localStorage.setItem('tiffinlink_user', JSON.stringify(updatedUserObj));
+        if (onUpdateUser) {
+          onUpdateUser(updatedUserObj);
         }
 
         showToast('✓ Account & Provider settings saved to database successfully!');

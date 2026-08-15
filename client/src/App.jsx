@@ -437,7 +437,14 @@ export default function App() {
   if (currentUser?.role === 'provider') {
     return (
       <div className="app-layout">
-        <ProviderDashboard currentUser={currentUser} onLogout={handleLogout} />
+        <ProviderDashboard 
+          currentUser={currentUser} 
+          onLogout={handleLogout} 
+          onUpdateUser={(updatedUser) => {
+            setCurrentUser(updatedUser);
+            localStorage.setItem('tiffinlink_user', JSON.stringify(updatedUser));
+          }}
+        />
       </div>
     );
   }
