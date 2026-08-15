@@ -1,0 +1,145 @@
+/* TiffinLink Premium Design Tokens & Global CSS */
+
+/* Global text selection reset */
+body,
+html,
+#root {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Re-enable text selection for form inputs and textareas */
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Premium Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F4F7F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C5DDD2;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0A8B5F;
+}
+
+/* Parallax GPU Acceleration */
+.parallax-img {
+  will-change: transform;
+  transform: translate3d(0, 0, 0) scale(1.25);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+video {
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* ===================================================
+   TiffinLink Ultra-Premium Food-Tech Animated UI System
+   =================================================== */
+
+@keyframes slideUpFade {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes scaleIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes drawPath {
+  0% {
+    stroke-dashoffset: 1000;
+  }
+
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animated-chart-line {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: drawPath 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes skeletonPulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.animate-skeleton {
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+/* Card Hover Elevation */
+.food-card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.food-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -6px rgba(10, 139, 95, 0.08), 0 4px 8px -4px rgba(0, 0, 0, 0.03);
+  border-color: #C5DDD2;
+}
+
+/* Premium Focus Rings */
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #0A8B5F !important;
+  box-shadow: 0 0 0 3px rgba(10, 139, 95, 0.12) !important;
+}
