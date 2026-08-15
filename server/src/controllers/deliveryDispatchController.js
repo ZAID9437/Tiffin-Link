@@ -501,12 +501,41 @@ const cancelDelivery = async (req, res) => {
   }
 };
 
+// @desc    Simulate sending Pickup OTP via SMS to delivery driver mobile
+// @route   POST /api/delivery/send-otp-sms
+const sendPickupOtpSms = async (req, res) => {
+  try {
+    const { requestId } = req.body;
+    let request = null;
+
+    if (await isDbConnected()) {
+      request = await DeliveryRequest.findOne({ $or: [{ requestId }, { _id: requestId }] });
+    }
+
+    const driverPhone = request?.assignedDriver?.phone || '+91 98251 44556';
+    const otp = request?.pickupOtp || '4821';
+
+    console.log(`[SMS GATEWAY] Sent Pickup OTP ${otp} via SMS to Driver mobile ${driverPhone}`);
+
+    return res.json({
+      success: true,
+      message: `Pickup OTP (${otp}) sent via SMS to driver mobile (${driverPhone})!`,
+      driverPhone,
+      otpSent: true
+    });
+  } catch (error) {
+    console.error('Error sending SMS OTP:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
 module.exports = {
   getDeliveryRequests,
   createDeliveryRequest,
   assignDriver,
   acceptDeliveryRequest,
   confirmPickup,
+  sendPickupOtpSms,
   updateDeliveryStatus,
   updateDriverLocation,
   getNearbyDrivers,

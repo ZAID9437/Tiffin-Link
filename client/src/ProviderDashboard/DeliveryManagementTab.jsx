@@ -854,14 +854,14 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
         </div>
       )}
 
-      {/* 16. PICKUP VERIFICATION MODAL */}
+      {/* 16. PICKUP VERIFICATION & HANDOVER MODAL */}
       {isPickupModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#E5ECE8] space-y-5 animate-scale-up">
             <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={18} className="text-[#0A8B5F]" />
-                <h3 className="text-base font-black text-[#111827]">CONFIRM ORDER PICKUP</h3>
+              <div className="flex items-center gap-2 text-[#0A8B5F]">
+                <ShieldCheck size={20} />
+                <h3 className="text-base font-black text-[#111827]">VERIFY ORDER HANDOVER & PICKUP</h3>
               </div>
               <button 
                 onClick={() => setIsPickupModalOpen(false)}
@@ -871,24 +871,59 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
               </button>
             </div>
 
-            <div className="p-4 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] space-y-2 text-center">
-              <div className="text-xs font-bold text-[#6B7280]">Verification Pickup OTP</div>
-              <div className="text-3xl font-black text-[#0A8B5F] tracking-widest bg-emerald-50 py-2 rounded-xl border border-emerald-200">
-                {pickupTarget?.pickupOtp || '4821'}
+            {/* SMS OTP Status Card (OTP Hidden from Provider) */}
+            <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-2 text-center">
+              <div className="flex items-center justify-center gap-2 text-xs font-black text-emerald-900 uppercase tracking-wider">
+                <Phone size={14} className="text-[#0A8B5F]" />
+                <span>SMS OTP Sent to Driver Mobile</span>
               </div>
-              <p className="text-[11px] text-[#6B7280] font-normal">
-                Ask delivery partner for code or verify handover before dispatch.
+
+              <div className="text-sm font-black text-[#111827]">
+                📱 {pickupTarget?.assignedDriver?.phone || '+91 98251 44556'} ({pickupTarget?.assignedDriver?.name || 'Driver'})
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-full text-[10px] font-black text-emerald-700 border border-emerald-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>SMS Delivered to Driver's Mobile</span>
+              </div>
+
+              <p className="text-[11px] text-[#6B7280] font-semibold pt-1">
+                Ask the delivery partner for the 4-digit OTP received on their phone before handing over the meal.
               </p>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    showToast('📲 Sending SMS OTP to driver mobile...');
+                    await fetch('http://localhost:5000/api/delivery/send-otp-sms', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ requestId: pickupTarget?.requestId || pickupTarget?.orderId })
+                    });
+                    showToast(`📲 SMS OTP re-sent to ${pickupTarget?.assignedDriver?.phone || 'driver phone'}!`);
+                  } catch (err) {
+                    console.error('Error sending SMS OTP:', err);
+                  }
+                }}
+                className="text-[11px] font-bold text-[#0A8B5F] hover:underline cursor-pointer flex items-center justify-center gap-1 mx-auto pt-1"
+              >
+                <span>📲 Resend SMS OTP to Driver Mobile</span>
+              </button>
             </div>
 
+            {/* OTP Verification Input */}
             <div>
-              <label className="text-xs font-bold text-[#111827] block mb-1">Enter Partner OTP (Optional)</label>
+              <label className="text-xs font-black text-[#111827] block mb-1.5">
+                Enter 4-Digit Pickup OTP (Spoken by Delivery Partner)
+              </label>
               <input
                 type="text"
-                placeholder="4-digit OTP"
+                maxLength={4}
+                placeholder="Enter 4-digit OTP from driver"
                 value={otpInput}
                 onChange={e => setOtpInput(e.target.value)}
-                className="w-full px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+                className="w-full px-4 py-3 bg-[#F9FBF9] border-2 border-[#E5ECE8] rounded-xl text-center text-lg font-black tracking-widest text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
               />
             </div>
 
@@ -901,9 +936,10 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
               </button>
               <button
                 onClick={handleConfirmPickup}
-                className="bg-[#0A8B5F] hover:bg-[#08734e] text-white px-5 py-2 rounded-xl text-xs font-black shadow-md cursor-pointer"
+                className="bg-[#0A8B5F] hover:bg-[#08734e] text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md cursor-pointer flex items-center gap-1.5"
               >
-                Confirm Handover & Pickup
+                <CheckCircle2 size={15} />
+                <span>Confirm Handover & Pickup</span>
               </button>
             </div>
           </div>

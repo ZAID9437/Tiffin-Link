@@ -7,6 +7,7 @@ const {
   acceptDeliveryRequest,
   assignDriver,
   confirmPickup,
+  sendPickupOtpSms,
   updateDeliveryStatus,
   updateDriverLocation,
   getNearbyDrivers,
@@ -20,6 +21,7 @@ router.post('/dispatch', createDeliveryRequest);
 router.post('/accept', acceptDeliveryRequest);
 router.post('/assign', assignDriver);
 router.post('/confirm-pickup', confirmPickup);
+router.post('/send-otp-sms', sendPickupOtpSms);
 router.post('/status', updateDeliveryStatus);
 router.post('/location', updateDriverLocation);
 router.get('/drivers/nearby', getNearbyDrivers);
