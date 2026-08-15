@@ -209,7 +209,7 @@ export default function OrdersTab({ initialStatus = 'All' }) {
       {/* Top Module Navigation Bar */}
       <div className="bg-white rounded-2xl p-4 shadow-xs border border-[#E5ECE8] flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2 overflow-x-auto">
-          {['All', 'New', 'Preparing', 'Ready', 'Completed', 'Cancelled'].map(stg => (
+          {['All', 'New', 'Preparing', 'Ready', 'Delivery', 'Completed', 'Cancelled'].map(stg => (
             <button 
               key={stg}
               onClick={() => { setActiveStatusTab(stg); setCurrentPage(1); }}
@@ -217,7 +217,7 @@ export default function OrdersTab({ initialStatus = 'All' }) {
                 activeStatusTab === stg ? 'bg-[#0A8B5F] text-white shadow-xs' : 'text-[#6B7280] hover:bg-[#F9FBF9]'
               }`}
             >
-              {stg === 'All' ? 'All Orders' : stg} {stg === 'New' && newOrdersCount > 0 ? `(${newOrdersCount})` : ''}
+              {stg === 'All' ? 'All Orders' : (stg === 'Delivery' ? '🚴 Delivery' : stg)} {stg === 'New' && newOrdersCount > 0 ? `(${newOrdersCount})` : ''}
             </button>
           ))}
         </div>

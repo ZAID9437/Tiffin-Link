@@ -27,16 +27,27 @@ import {
   CircleHelp, 
   UserCircle,
   Tag,
-  ChefHat
+  ChefHat,
+  Zap,
+  Repeat,
+  Store,
+  MapPin,
+  Calendar,
+  Truck
 } from 'lucide-react';
 
 import DashboardOverviewTab from './DashboardOverviewTab';
+import LiveRequestsTab from './LiveRequestsTab';
 import MyTiffinsTab from './MyTiffinsTab';
 import OrdersTab from './OrdersTab';
 import CustomersTab from './CustomersTab';
+import SubscriptionsTab from './SubscriptionsTab';
 import EarningsTab from './EarningsTab';
 import ReviewsTab from './ReviewsTab';
 import AnalyticsTab from './AnalyticsTab';
+import CapacityTab from './CapacityTab';
+import ServiceAreaTab from './ServiceAreaTab';
+import ScheduleTab from './ScheduleTab';
 import NotificationsTab from './NotificationsTab';
 import SettingsTab from './SettingsTab';
 import HelpSupportTab from './HelpSupportTab';
@@ -49,6 +60,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
   });
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isKitchenOnline, setIsKitchenOnline] = useState(true);
 
   const toggleSubMenu = (menu) => {
     setExpandedMenus(prev => ({
@@ -62,6 +74,8 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
       switch (activeTab) {
         case 'dashboard':
           return <DashboardOverviewTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
+        case 'requests':
+          return <LiveRequestsTab onNavigateTab={setActiveTab} onAcceptRequest={() => setActiveTab('orders-preparing')} />;
         case 'tiffins':
           return <MyTiffinsTab key="all" initialSubView="all" onNavigateTab={setActiveTab} />;
         case 'add-tiffin':
@@ -79,18 +93,28 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
           return <OrdersTab initialStatus="Preparing" />;
         case 'orders-ready':
           return <OrdersTab initialStatus="Ready" />;
+        case 'orders-delivery':
+          return <OrdersTab initialStatus="Delivery" />;
         case 'orders-completed':
           return <OrdersTab initialStatus="Completed" />;
         case 'orders-cancelled':
           return <OrdersTab initialStatus="Cancelled" />;
         case 'customers':
           return <CustomersTab />;
-        case 'earnings':
-          return <EarningsTab />;
+        case 'subscriptions':
+          return <SubscriptionsTab />;
         case 'reviews':
           return <ReviewsTab />;
+        case 'earnings':
+          return <EarningsTab />;
         case 'analytics':
           return <AnalyticsTab />;
+        case 'capacity':
+          return <CapacityTab />;
+        case 'service-area':
+          return <ServiceAreaTab />;
+        case 'schedule':
+          return <ScheduleTab />;
         case 'notifications':
           return <NotificationsTab onNavigateTab={setActiveTab} />;
         case 'settings':
@@ -114,7 +138,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
   return (
     <div className="min-h-screen bg-[#F4F7F5] font-sans antialiased text-[#111827] selection:bg-[#0A8B5F] selection:text-white flex flex-col">
       
-      {/* TOP NAVIGATION BAR (READ-ONLY LOCKED) */}
+      {/* TOP NAVIGATION BAR */}
       <header className="h-16 bg-white border-b border-[#E5ECE8] px-4 md:px-6 flex items-center justify-between sticky top-0 z-40 shadow-2xs">
         
         {/* Left Branding & Mobile Toggle */}
@@ -128,7 +152,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
 
           <a href="#" className="flex items-center gap-2.5 text-decoration-none">
             <div className="w-9 h-9 rounded-xl bg-[#0A8B5F] text-white flex items-center justify-center font-black text-lg shadow-sm">
-              T
+              🍱
             </div>
             <div className="flex flex-col">
               <span className="font-extrabold text-base tracking-tight text-[#111827] leading-none">
@@ -188,7 +212,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
               </div>
               <div className="hidden lg:flex flex-col text-left">
                 <span className="text-xs font-bold text-[#111827] leading-tight">
-                  {currentUser?.name || "Mansuri Kitchen"}
+                  {currentUser?.name || "Xoxo Men"}
                 </span>
                 <span className="text-[10px] text-[#6B7280] font-semibold">Home Kitchen Provider</span>
               </div>
@@ -198,8 +222,8 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
             {isProfileDropdownOpen && (
               <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-[#E5ECE8] py-1.5 z-50 animate-scale-in text-xs font-medium">
                 <div className="px-4 py-2 border-b border-[#E5ECE8]">
-                  <p className="font-bold text-[#111827]">{currentUser?.name || "Mansuri Kitchen"}</p>
-                  <p className="text-[10px] text-[#6B7280] truncate">{currentUser?.email || "provider@tiffinlink.com"}</p>
+                  <p className="font-bold text-[#111827]">{currentUser?.name || "Xoxo Men"}</p>
+                  <p className="text-[10px] text-[#6B7280] truncate">{currentUser?.email || "menxoxo50@gmail.com"}</p>
                 </div>
 
                 <button 
@@ -236,7 +260,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
       {/* DASHBOARD LAYOUT BODY (FULL SCREEN EDGE-TO-EDGE) */}
       <div className="flex-1 flex w-full min-h-[calc(100vh-64px)]">
         
-        {/* HIGH-DENSITY FLUSH PROVIDER SIDEBAR (NO SIDE GAPS) */}
+        {/* HIGH-DENSITY FLUSH PROVIDER SIDEBAR */}
         <aside className={`
           fixed md:sticky top-16 left-0 z-30 w-64 bg-white border-r border-[#E5ECE8] p-4 
           h-[calc(100vh-64px)] overflow-y-auto transform transition-transform duration-200 ease-in-out md:transform-none flex flex-col justify-between shrink-0
@@ -248,34 +272,150 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
             <div className="p-3 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] space-y-1">
               <div className="flex items-center gap-2 text-xs font-black text-[#111827]">
                 <span className="w-2 h-2 rounded-full bg-[#0A8B5F] animate-pulse" />
-                <span>TiffinLink PROVIDER</span>
+                <span>🍱 TiffinLink</span>
               </div>
-              <div className="text-xs font-black text-[#0A8B5F] truncate">
-                {currentUser?.name || "Mansuri Kitchen"}
+              <div className="text-[10px] text-[#6B7280] font-bold uppercase tracking-wider">PROVIDER PARTNER</div>
+              <div className="pt-1.5 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-xs font-black text-[#0A8B5F] truncate">{currentUser?.name || "Xoxo Men"}</span>
               </div>
-              <div className="text-[10px] text-[#6B7280] font-bold">Home Kitchen Provider</div>
+              <div className="text-[10px] text-[#6B7280]">Home Kitchen Provider</div>
             </div>
 
             {/* Navigation Groups */}
             <div className="space-y-1">
               
-              {/* SECTION: MAIN */}
+              {/* GROUP 1: OVERVIEW */}
               <div>
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">MAIN</div>
+                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">OVERVIEW</div>
+                
                 <button 
                   onClick={() => { setActiveTab('dashboard'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
                     activeTab === 'dashboard' ? 'bg-[#0A8B5F] text-white shadow-xs' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
                   }`}
                 >
-                  <LayoutDashboard size={17} />
-                  <span>Dashboard</span>
+                  <div className="flex items-center gap-3">
+                    <LayoutDashboard size={17} />
+                    <span>Dashboard</span>
+                  </div>
+                </button>
+
+                <button 
+                  onClick={() => { setActiveTab('requests'); setIsMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                    activeTab === 'requests' ? 'bg-amber-500 text-white shadow-xs' : 'text-amber-700 hover:bg-amber-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Zap size={17} className="text-amber-500 group-hover:text-amber-600" />
+                    <span className="font-extrabold">Live Requests</span>
+                  </div>
+                  <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-full">3</span>
                 </button>
               </div>
 
-              {/* SECTION: FOOD MANAGEMENT */}
+              {/* GROUP 2: ORDERS */}
               <div className="pt-2">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">FOOD MANAGEMENT</div>
+                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">ORDERS</div>
+                <div>
+                  <div 
+                    onClick={() => toggleSubMenu('orders')}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all cursor-pointer ${
+                      activeTab.startsWith('orders') ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 font-bold text-xs">
+                      <ShoppingBag size={17} />
+                      <span>Orders</span>
+                    </div>
+                    <ChevronDown size={14} className={`transition-transform duration-200 ${expandedMenus.orders ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {expandedMenus.orders && (
+                    <div className="pl-6 pr-1 py-1 space-y-0.5">
+                      <button 
+                        onClick={() => { setActiveTab('orders-all'); setIsMobileSidebarOpen(false); }}
+                        className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                          activeTab === 'orders' || activeTab === 'orders-all' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <ListOrdered size={14} />
+                          <span>All Orders</span>
+                        </div>
+                      </button>
+                      
+                      <button 
+                        onClick={() => { setActiveTab('orders-new'); setIsMobileSidebarOpen(false); }}
+                        className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                          activeTab === 'orders-new' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Inbox size={14} />
+                          <span>New Orders</span>
+                        </div>
+                        <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[9px] font-black rounded-full">1</span>
+                      </button>
+
+                      <button 
+                        onClick={() => { setActiveTab('orders-preparing'); setIsMobileSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                          activeTab === 'orders-preparing' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
+                        }`}
+                      >
+                        <Utensils size={14} />
+                        <span>Preparing</span>
+                      </button>
+
+                      <button 
+                        onClick={() => { setActiveTab('orders-ready'); setIsMobileSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                          activeTab === 'orders-ready' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
+                        }`}
+                      >
+                        <BadgeCheck size={14} />
+                        <span>Ready</span>
+                      </button>
+
+                      <button 
+                        onClick={() => { setActiveTab('orders-delivery'); setIsMobileSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                          activeTab === 'orders-delivery' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
+                        }`}
+                      >
+                        <Truck size={14} />
+                        <span>Delivery</span>
+                      </button>
+
+                      <button 
+                        onClick={() => { setActiveTab('orders-completed'); setIsMobileSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                          activeTab === 'orders-completed' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
+                        }`}
+                      >
+                        <CheckCircle size={14} />
+                        <span>Completed</span>
+                      </button>
+
+                      <button 
+                        onClick={() => { setActiveTab('orders-cancelled'); setIsMobileSidebarOpen(false); }}
+                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                          activeTab === 'orders-cancelled' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
+                        }`}
+                      >
+                        <CircleX size={14} />
+                        <span>Cancelled</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* GROUP 3: FOOD */}
+              <div className="pt-2">
+                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">FOOD</div>
                 <div>
                   <div 
                     onClick={() => toggleSubMenu('tiffins')}
@@ -333,85 +473,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                 </div>
               </div>
 
-              {/* SECTION: ORDER MANAGEMENT */}
-              <div className="pt-2">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">ORDER MANAGEMENT</div>
-                <div>
-                  <div 
-                    onClick={() => toggleSubMenu('orders')}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all cursor-pointer ${
-                      activeTab.startsWith('orders') ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 font-bold text-xs">
-                      <ShoppingBag size={17} />
-                      <span>Orders</span>
-                    </div>
-                    <ChevronDown size={14} className={`transition-transform duration-200 ${expandedMenus.orders ? 'rotate-180' : ''}`} />
-                  </div>
-
-                  {expandedMenus.orders && (
-                    <div className="pl-6 pr-1 py-1 space-y-0.5">
-                      <button 
-                        onClick={() => { setActiveTab('orders-all'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                          activeTab === 'orders' || activeTab === 'orders-all' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                        }`}
-                      >
-                        <ListOrdered size={14} />
-                        <span>All Orders</span>
-                      </button>
-                      <button 
-                        onClick={() => { setActiveTab('orders-new'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                          activeTab === 'orders-new' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                        }`}
-                      >
-                        <Inbox size={14} />
-                        <span>New Orders</span>
-                      </button>
-                      <button 
-                        onClick={() => { setActiveTab('orders-preparing'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                          activeTab === 'orders-preparing' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                        }`}
-                      >
-                        <Utensils size={14} />
-                        <span>Preparing</span>
-                      </button>
-                      <button 
-                        onClick={() => { setActiveTab('orders-ready'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                          activeTab === 'orders-ready' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                        }`}
-                      >
-                        <BadgeCheck size={14} />
-                        <span>Ready</span>
-                      </button>
-                      <button 
-                        onClick={() => { setActiveTab('orders-completed'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                          activeTab === 'orders-completed' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                        }`}
-                      >
-                        <CheckCircle size={14} />
-                        <span>Completed</span>
-                      </button>
-                      <button 
-                        onClick={() => { setActiveTab('orders-cancelled'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                          activeTab === 'orders-cancelled' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                        }`}
-                      >
-                        <CircleX size={14} />
-                        <span>Cancelled</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* SECTION: CUSTOMERS */}
+              {/* GROUP 4: CUSTOMERS */}
               <div className="pt-2">
                 <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">CUSTOMERS</div>
                 <button 
@@ -425,6 +487,16 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                 </button>
 
                 <button 
+                  onClick={() => { setActiveTab('subscriptions'); setIsMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                    activeTab === 'subscriptions' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
+                  }`}
+                >
+                  <Repeat size={17} />
+                  <span>Subscriptions</span>
+                </button>
+
+                <button 
                   onClick={() => { setActiveTab('reviews'); setIsMobileSidebarOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
                     activeTab === 'reviews' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
@@ -435,7 +507,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                 </button>
               </div>
 
-              {/* SECTION: BUSINESS */}
+              {/* GROUP 5: BUSINESS */}
               <div className="pt-2">
                 <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">BUSINESS</div>
                 <button 
@@ -459,21 +531,58 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                 </button>
               </div>
 
-              {/* SECTION: COMMUNICATION */}
+              {/* GROUP 6: OPERATIONS */}
+              <div className="pt-2">
+                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">OPERATIONS</div>
+                <button 
+                  onClick={() => { setActiveTab('capacity'); setIsMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                    activeTab === 'capacity' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
+                  }`}
+                >
+                  <Store size={17} />
+                  <span>Kitchen Capacity</span>
+                </button>
+
+                <button 
+                  onClick={() => { setActiveTab('service-area'); setIsMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                    activeTab === 'service-area' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
+                  }`}
+                >
+                  <MapPin size={17} />
+                  <span>Service Area</span>
+                </button>
+
+                <button 
+                  onClick={() => { setActiveTab('schedule'); setIsMobileSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                    activeTab === 'schedule' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
+                  }`}
+                >
+                  <Calendar size={17} />
+                  <span>Schedule</span>
+                </button>
+              </div>
+
+              {/* GROUP 7: COMMUNICATION */}
               <div className="pt-2">
                 <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">COMMUNICATION</div>
                 <button 
                   onClick={() => { setActiveTab('notifications'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${
                     activeTab === 'notifications' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
                   }`}
                 >
-                  <Bell size={17} />
-                  <span>Notifications</span>
+                  <div className="flex items-center gap-3">
+                    <Bell size={17} />
+                    <span>Notifications</span>
+                  </div>
+                  <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-full">3</span>
                 </button>
               </div>
 
-              {/* SECTION: SYSTEM */}
+              {/* GROUP 8: SYSTEM */}
               <div className="pt-2">
                 <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">SYSTEM</div>
                 <button 
@@ -501,8 +610,22 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
 
           </div>
 
-          {/* Sidebar Footer Account & Logout */}
-          <div className="pt-4 border-t border-[#E5ECE8]">
+          {/* Sidebar Footer Online Switch & Logout */}
+          <div className="pt-4 border-t border-[#E5ECE8] space-y-2">
+            <div className="p-3 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-black">
+                <span className={`w-2 h-2 rounded-full ${isKitchenOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+                <span>{isKitchenOnline ? 'ACCEPTING' : 'OFFLINE'}</span>
+              </div>
+
+              <button
+                onClick={() => setIsKitchenOnline(!isKitchenOnline)}
+                className="text-[10px] text-[#0A8B5F] hover:underline font-bold cursor-pointer"
+              >
+                {isKitchenOnline ? '[ Go Offline ]' : '[ Go Online ]'}
+              </button>
+            </div>
+
             <button 
               onClick={onLogout}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
@@ -522,3 +645,4 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
     </div>
   );
 }
+
