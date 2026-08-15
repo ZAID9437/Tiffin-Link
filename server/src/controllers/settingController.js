@@ -13,7 +13,8 @@ const getProviderSettings = async (req, res) => {
     const userEmail = req.query.email || req.headers['x-provider-email'] || 'menxoxo50@gmail.com';
 
     if (await isDbConnected()) {
-      // Find provider record in MongoDB by email or latest active
+      // Find user and provider records in MongoDB by email
+      const realUser = await User.findOne({ email: userEmail.trim().toLowerCase() });
       let realProvider = await Provider.findOne({ email: userEmail });
       if (!realProvider) {
         realProvider = await Provider.findOne({ email: { $exists: true, $ne: '' } }).sort({ createdAt: -1 }) || await Provider.findOne();
@@ -25,9 +26,9 @@ const getProviderSettings = async (req, res) => {
       const defaultDynamicSettings = {
         providerId: pId,
         account: {
-          name: realProvider?.fullName || realProvider?.name || 'Zaid Mansuri',
-          email: realProvider?.email || userEmail,
-          phone: realProvider?.mobile || '+91 98765 43210',
+          name: realProvider?.fullName || realProvider?.name || realUser?.name || 'Zaid Mansuri',
+          email: realProvider?.email || realUser?.email || userEmail,
+          phone: realProvider?.mobile || realUser?.phone || '+91 1234567890',
           avatarUrl: realProvider?.image || '/assets/provider_1.png',
           accountStatus: 'Verified Active'
         },
@@ -88,17 +89,26 @@ const getProviderSettings = async (req, res) => {
       if (!settings) {
         settings = await ProviderSetting.create(defaultDynamicSettings);
       } else {
-        // Sync setting data with MongoDB Provider record
+        // Sync setting data directly with MongoDB Provider & User records
         settings = settings.toObject ? settings.toObject() : settings;
-        if (realProvider) {
-          settings.account.name = settings.account.name || realProvider.fullName || realProvider.name;
-          settings.account.email = settings.account.email || realProvider.email;
-          settings.account.phone = settings.account.phone || realProvider.mobile;
-          settings.business.providerName = settings.business.providerName || realProvider.businessName || realProvider.name;
-          settings.business.openingTime = settings.business.openingTime || realProvider.opens || '10:00';
-          settings.business.closingTime = settings.business.closingTime || realProvider.closes || '12:00';
-          settings.payments.bankName = settings.payments.bankName || realProvider.bankName;
-          settings.payments.accountNumber = settings.payments.accountNumber || realProvider.accountNumber;
+        if (realProvider || realUser) {
+          if (realProvider?.mobile || realUser?.phone) {
+            settings.account.phone = realProvider?.mobile || realUser?.phone;
+          }
+          if (realProvider?.fullName || realProvider?.name || realUser?.name) {
+            settings.account.name = realProvider?.fullName || realProvider?.name || realUser?.name;
+          }
+          if (realProvider?.email || realUser?.email) {
+            settings.account.email = realProvider?.email || realUser?.email;
+          }
+          if (realProvider?.businessName) {
+            settings.business.providerName = realProvider.businessName;
+          }
+          if (realProvider?.opens) settings.business.openingTime = realProvider.opens;
+          if (realProvider?.closes) settings.business.closingTime = realProvider.closes;
+          if (realProvider?.bankName) settings.payments.bankName = realProvider.bankName;
+          if (realProvider?.accountNumber) settings.payments.accountNumber = realProvider.accountNumber;
+          if (realProvider?.image) settings.account.avatarUrl = realProvider.image;
         }
       }
 
