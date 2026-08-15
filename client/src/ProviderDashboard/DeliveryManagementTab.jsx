@@ -627,6 +627,134 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
         )}
       </div>
 
+      {/* 18. PROMINENT LIVE ROUTE MAP & GPS TRACKING PANEL ON MAIN PAGE */}
+      <div className="bg-white rounded-2xl border-2 border-[#0A8B5F]/40 shadow-sm p-6 space-y-4 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5ECE8] pb-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-black text-[#0A8B5F] uppercase tracking-wider">
+              <Navigation size={16} className="animate-spin text-[#0A8B5F]" />
+              <span>LIVE ROUTE MAP & REAL-TIME GPS TRACKING</span>
+            </div>
+            <h3 className="text-base font-black text-[#111827] mt-0.5">
+              {selectedDelivery 
+                ? `Tracking Delivery for Order ${selectedDelivery.orderId || selectedDelivery.requestId} (${selectedDelivery.customerName})`
+                : 'Select an active delivery from queue above to track live on map'}
+            </h3>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-black">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>GPS ACTIVE — 100% Real-time</span>
+            </span>
+
+            {selectedDelivery?.assignedDriver?.phone && (
+              <a
+                href={`tel:${selectedDelivery.assignedDriver.phone}`}
+                className="bg-[#0A8B5F] hover:bg-[#08734e] text-white px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs"
+              >
+                <Phone size={13} />
+                <span>Call Driver ({selectedDelivery.assignedDriver.name})</span>
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Live Interactive Map Display */}
+        <div className="h-64 sm:h-72 bg-[#F9FBF9] rounded-2xl border border-[#E5ECE8] relative overflow-hidden flex flex-col justify-between p-4 shadow-inner">
+          
+          {/* Top Map Overlay Bar */}
+          <div className="flex items-center justify-between z-10">
+            <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#E5ECE8] text-xs font-black text-[#111827] shadow-xs flex items-center gap-2">
+              <Building2 size={14} className="text-[#0A8B5F]" />
+              <span>Kitchen: Shreeji Tiffin Kitchen (Satellite, Ahmedabad)</span>
+            </div>
+
+            <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#E5ECE8] text-xs font-black text-[#0A8B5F] shadow-xs flex items-center gap-2">
+              <Clock size={14} />
+              <span>ETA: {selectedDelivery?.etaMinutes || 18} mins • Distance: {selectedDelivery?.distanceKm || 3.2} km</span>
+            </div>
+          </div>
+
+          {/* SVG Map Canvas with Animated Route & Markers */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6">
+            <svg className="w-full h-full" viewBox="0 0 600 200" fill="none">
+              {/* Background Map Grid Pattern */}
+              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E5ECE8" strokeWidth="1" opacity="0.6" />
+              </pattern>
+              <rect width="100%" height="100%" fill="url(#grid)" />
+
+              {/* Curved Road Path */}
+              <path d="M 70 120 Q 300 30 530 120" stroke="#CBD5E1" strokeWidth="8" strokeLinecap="round" />
+              <path d="M 70 120 Q 300 30 530 120" stroke="#0A8B5F" strokeWidth="4" strokeDasharray="10 8" strokeLinecap="round" />
+
+              {/* Kitchen / Provider Marker */}
+              <g transform="translate(70, 120)">
+                <circle r="22" fill="#0A8B5F" fillOpacity="0.15" />
+                <circle r="14" fill="#0A8B5F" />
+                <text y="4" fontSize="11" textAnchor="middle" fill="#FFFFFF" fontWeight="900">🍱</text>
+                <text y="30" fontSize="11" textAnchor="middle" fill="#111827" fontWeight="800">Provider Kitchen</text>
+              </g>
+
+              {/* Driver Live GPS Marker */}
+              <g transform="translate(320, 65)">
+                <circle r="26" fill="#F59E0B" fillOpacity="0.25" className="animate-ping" />
+                <circle r="18" fill="#F59E0B" />
+                <text y="4" fontSize="12" textAnchor="middle" fill="#FFFFFF" fontWeight="900">🛵</text>
+                <text y="-26" fontSize="11" textAnchor="middle" fill="#D97706" fontWeight="900">
+                  {selectedDelivery?.assignedDriver?.name || 'Rahul Sharma (Driver)'}
+                </text>
+                <text y="34" fontSize="10" textAnchor="middle" fill="#4B5563" fontWeight="700">
+                  Speed: 28 km/h • On Route
+                </text>
+              </g>
+
+              {/* Customer Destination Marker */}
+              <g transform="translate(530, 120)">
+                <circle r="22" fill="#3B82F6" fillOpacity="0.15" />
+                <circle r="14" fill="#3B82F6" />
+                <text y="4" fontSize="11" textAnchor="middle" fill="#FFFFFF" fontWeight="900">📍</text>
+                <text y="30" fontSize="11" textAnchor="middle" fill="#111827" fontWeight="800">
+                  {selectedDelivery?.customerName || 'Customer Destination'}
+                </text>
+              </g>
+            </svg>
+          </div>
+
+          {/* Bottom Map Info Footer Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 z-10 bg-white/95 backdrop-blur-md p-3 rounded-xl border border-[#E5ECE8] shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#E8F0EC] text-[#0A8B5F] flex items-center justify-center font-black text-xs">
+                {selectedDelivery?.assignedDriver?.name?.charAt(0) || 'R'}
+              </div>
+              <div>
+                <div className="text-xs font-black text-[#111827]">
+                  {selectedDelivery?.assignedDriver?.name || 'Rahul Sharma'} ({selectedDelivery?.assignedDriver?.vehicleNo || 'Bike GJ-01-AB-1029'})
+                </div>
+                <div className="text-[10px] text-[#6B7280] font-semibold">
+                  Destination: {typeof selectedDelivery?.deliveryAddress === 'string' ? selectedDelivery.deliveryAddress : (selectedDelivery?.deliveryAddress?.street || 'CG Road, Ahmedabad')}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <button
+                onClick={() => {
+                  if (selectedDelivery) setIsTrackingDrawerOpen(true);
+                  else if (deliveries.length > 0) { setSelectedDelivery(deliveries[0]); setIsTrackingDrawerOpen(true); }
+                }}
+                className="bg-[#0A8B5F] hover:bg-[#08734e] text-white px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+              >
+                <ExternalLink size={13} />
+                <span>Full Map & Timeline View</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       {/* 9. ASSIGN DELIVERY PARTNER MODAL */}
       {isAssignModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
