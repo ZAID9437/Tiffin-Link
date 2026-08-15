@@ -1264,6 +1264,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
             {/* Actions Footer */}
             <div className="pt-4 border-t border-[#E5ECE8] flex items-center justify-between">
               <button
+                type="button"
                 onClick={() => setIsTrackingDrawerOpen(false)}
                 className="px-4 py-2 border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#4B5563] hover:bg-[#F9FBF9] cursor-pointer"
               >
@@ -1272,6 +1273,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
               
               {normalizeStatus(selectedDelivery.status) === 'Failed / Cancelled' && (
                 <button
+                  type="button"
                   onClick={() => handleRetryDelivery(selectedDelivery.requestId)}
                   className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer"
                 >
@@ -1288,3 +1290,48 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
     </div>
   );
 }
+
+// React Error Boundary to prevent any blank page crashes
+class DeliveryErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Delivery Management Error Boundary caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 bg-white rounded-2xl border-2 border-red-200 text-center space-y-4 max-w-lg mx-auto my-12 shadow-xl animate-fade-in">
+          <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+            <AlertTriangle size={30} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-gray-900">Something went wrong</h3>
+            <p className="text-xs text-gray-600 mt-1">The pickup confirmation or delivery view encountered a temporary display error.</p>
+          </div>
+          <div className="bg-red-50 p-3 rounded-xl text-xs font-mono text-red-800 border border-red-200 overflow-x-auto text-left">
+            {this.state.error?.toString() || 'Unknown rendering error'}
+          </div>
+          <button
+            type="button"
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="px-6 py-2.5 bg-[#0A8B5F] hover:bg-[#08734e] text-white rounded-xl text-xs font-black shadow-md cursor-pointer inline-flex items-center gap-2"
+          >
+            <RotateCcw size={14} />
+            <span>Try Again & Recover Page</span>
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
