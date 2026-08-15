@@ -158,6 +158,15 @@ export default function OrdersTab({ initialStatus = 'All' }) {
   // Unique Tiffin Names for Filter
   const uniqueTiffins = Array.from(new Set(orders.map(o => o.tiffinName)));
 
+  // Helper to check if an order has a delivery assignment/partner
+  const isDeliveryOrder = (o) => {
+    if (!o) return false;
+    if (o.status === 'Delivery') return true;
+    if (o.deliveryPartnerName && o.deliveryPartnerName.trim() !== '') return true;
+    if (o.deliveryStatus && o.deliveryStatus !== 'Unassigned') return true;
+    return false;
+  };
+
   // Filtering & Sorting Logic
   const filteredOrders = orders.filter(o => {
     const q = searchQuery.toLowerCase();
@@ -167,7 +176,10 @@ export default function OrdersTab({ initialStatus = 'All' }) {
       (o.customerPhone && o.customerPhone.toLowerCase().includes(q)) ||
       (o.tiffinName && o.tiffinName.toLowerCase().includes(q));
 
-    const matchesStatus = activeStatusTab === 'All' || o.status === activeStatusTab;
+    const matchesStatus = activeStatusTab === 'All' 
+      ? true 
+      : (activeStatusTab === 'Delivery' ? isDeliveryOrder(o) : o.status === activeStatusTab);
+
     const matchesPayment = paymentFilter === 'All' || o.paymentStatus === paymentFilter;
     const matchesTiffin = tiffinFilter === 'All' || o.tiffinName === tiffinFilter;
 
@@ -194,6 +206,7 @@ export default function OrdersTab({ initialStatus = 'All' }) {
   const totalOrdersCount = orders.length;
   const preparingOrdersCount = orders.filter(o => o.status === 'Preparing').length;
   const readyOrdersCount = orders.filter(o => o.status === 'Ready').length;
+  const deliveryOrdersCount = orders.filter(isDeliveryOrder).length;
   const completedOrdersCount = orders.filter(o => o.status === 'Completed').length;
 
   return (
@@ -510,6 +523,7 @@ export default function OrdersTab({ initialStatus = 'All' }) {
                 <option value="New">New</option>
                 <option value="Preparing">Preparing</option>
                 <option value="Ready">Ready</option>
+                <option value="Delivery">Delivery</option>
                 <option value="Completed">Completed</option>
                 <option value="Cancelled">Cancelled</option>
               </select>
