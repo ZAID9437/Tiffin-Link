@@ -25,17 +25,23 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
   const providerName = currentUser?.name || 'Xoxo Men';
 
   const [stats, setStats] = useState({
-    liveRequestsCount: 3,
-    todaysOrdersCount: 12,
-    revenueToday: 4280,
-    rating: 4.8
+    liveRequestsCount: 0,
+    todaysOrdersCount: 0,
+    revenueToday: 0,
+    rating: 4.8,
+    reviewCount: 0
   });
 
-  const [todaysOrders, setTodaysOrders] = useState([
-    { id: '#1027', customer: 'Rahul Shah', items: 'Veg Tiffin × 2', time: '5:00 PM', amount: 240, status: 'Preparing', statusBg: 'bg-amber-100 text-amber-800 border-amber-200' },
-    { id: '#1028', customer: 'Amit Verma', items: 'Jain Meal × 1', time: '5:30 PM', amount: 130, status: 'Ready', statusBg: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-    { id: '#1029', customer: 'Neha Patel', items: 'North Indian × 2', time: '7:00 PM', amount: 300, status: 'Delivery Assigned', statusBg: 'bg-blue-100 text-blue-800 border-blue-200' }
-  ]);
+  const [todaysOrders, setTodaysOrders] = useState([]);
+  const [kitchenCapacity, setKitchenCapacity] = useState({
+    maxMeals: 40,
+    cookedMeals: 0
+  });
+  const [deliveryCounts, setDeliveryCounts] = useState({
+    ready: 0,
+    assigned: 0,
+    searching: 0
+  });
 
   const [liveRequest, setLiveRequest] = useState(null);
 
@@ -45,34 +51,106 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
 
   const [toastMessage, setToastMessage] = useState(null);
 
-  // Poll database for real pending meal requests
+  // Poll MongoDB Database for Real Dashboard Data
   useEffect(() => {
-    const fetchRealRequests = async () => {
+    const fetchDashboardDataFromDb = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/requests');
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          const req = json.data[0];
-          setLiveRequest({
-            id: req._id || 'REQ-1092',
-            customerName: req.customerName || 'Rahul Shah',
-            customerPhone: req.customerPhone || '+91 98765 12345',
-            items: `${req.quantity || 1} × ${req.mealType || 'Veg Tiffin'}`,
-            time: `${req.date || 'Today'} • ${req.time || '5:00 PM'}`,
-            distance: `${req.distance || '1.8 km'} • ${req.deliveryType || 'Delivery'}`,
-            price: req.budget || 120,
-            secondsLeft: 60
+        // 1. Fetch Orders from MongoDB
+        const ordRes = await fetch('http://localhost:5000/api/orders');
+        const ordJson = await ordRes.json();
+        
+        if (ordJson.success && Array.isArray(ordJson.data)) {
+          const allOrders = ordJson.data;
+
+          // Todays Orders Count
+          const todaysCount = allOrders.length;
+
+          // Revenue Today
+          const revToday = allOrders
+            .filter(o => o.status !== 'Cancelled')
+            .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+
+          // Active Orders for Table (Top 5 active/recent)
+          const activeOrdersFormatted = allOrders.slice(0, 5).map(o => {
+            let statusBg = 'bg-gray-100 text-gray-800 border-gray-200';
+            if (o.status === 'Preparing') statusBg = 'bg-amber-100 text-amber-800 border-amber-200';
+            if (o.status === 'Ready') statusBg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+            if (o.status === 'New') statusBg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
+            if (o.deliveryPartnerName) statusBg = 'bg-blue-100 text-blue-800 border-blue-200';
+
+            return {
+              id: o.orderId || '#1027',
+              customer: o.customerName || 'Customer',
+              items: `${o.tiffinName || 'Tiffin Meal'} × ${o.quantity || 1}`,
+              time: o.createdAt ? new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '5:00 PM',
+              amount: o.totalAmount || 120,
+              status: o.deliveryPartnerName ? `Partner: ${o.deliveryPartnerName}` : o.status,
+              statusBg
+            };
           });
-        } else {
-          setLiveRequest(null);
+
+          setTodaysOrders(activeOrdersFormatted);
+
+          // Kitchen Capacity Calculation
+          const totalCooked = allOrders
+            .filter(o => o.status !== 'Cancelled')
+            .reduce((sum, o) => sum + (Number(o.quantity) || 1), 0);
+
+          setKitchenCapacity(prev => ({ ...prev, cookedMeals: totalCooked }));
+
+          // Delivery Status Widget Counts
+          const rdy = allOrders.filter(o => o.status === 'Ready').length;
+          const asg = allOrders.filter(o => o.deliveryPartnerName && o.deliveryPartnerName.trim() !== '').length;
+          const src = allOrders.filter(o => o.status === 'Ready' && (!o.deliveryPartnerName || o.deliveryPartnerName.trim() === '')).length;
+
+          setDeliveryCounts({ ready: rdy, assigned: asg, searching: src });
+
+          setStats(prev => ({
+            ...prev,
+            todaysOrdersCount: todaysCount,
+            revenueToday: revToday
+          }));
         }
+
+        // 2. Fetch Live Requests from MongoDB
+        const reqRes = await fetch('http://localhost:5000/api/requests');
+        const reqJson = await reqRes.json();
+        if (reqJson.success && Array.isArray(reqJson.data)) {
+          const pendingList = reqJson.data.filter(r => r.status === 'pending');
+          setStats(prev => ({ ...prev, liveRequestsCount: pendingList.length }));
+
+          if (pendingList.length > 0) {
+            const req = pendingList[0];
+            setLiveRequest({
+              id: req._id || 'REQ-1092',
+              customerName: req.customerName || 'Rahul Shah',
+              customerPhone: req.customerPhone || '+91 98765 12345',
+              items: `${req.quantity || 1} × ${req.mealType || 'Veg Tiffin'}`,
+              time: `${req.date || 'Today'} • ${req.time || '5:00 PM'}`,
+              distance: `${req.distance || '1.8 km'} • ${req.deliveryType || 'Delivery'}`,
+              price: req.budget || 120,
+              secondsLeft: 60
+            });
+          } else {
+            setLiveRequest(null);
+          }
+        }
+
+        // 3. Fetch Reviews Rating from MongoDB
+        const revRes = await fetch('http://localhost:5000/api/reviews');
+        const revJson = await revRes.json();
+        if (revJson.success && Array.isArray(revJson.data) && revJson.data.length > 0) {
+          const avg = (revJson.data.reduce((sum, r) => sum + (r.rating || 5), 0) / revJson.data.length).toFixed(1);
+          setStats(prev => ({ ...prev, rating: Number(avg), reviewCount: revJson.data.length }));
+        }
+
       } catch (err) {
-        console.error('Error fetching live requests from MongoDB:', err);
+        console.error('Error fetching dashboard data from MongoDB:', err);
       }
     };
 
-    fetchRealRequests();
-    const interval = setInterval(fetchRealRequests, 4000);
+    fetchDashboardDataFromDb();
+    const interval = setInterval(fetchDashboardDataFromDb, 4000);
     return () => clearInterval(interval);
   }, []);
 
@@ -109,7 +187,6 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     setToastMessage('✓ Live Request Accepted! Creating order in database & navigating to Preparing...');
 
     try {
-      // 1. Post new order to MongoDB tiffinlink.orders
       await fetch('http://localhost:5000/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,7 +205,6 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
         })
       });
 
-      // 2. Mark request as accepted in MongoDB
       if (activeReq.id && activeReq.id.length > 10) {
         await fetch(`http://localhost:5000/api/requests/${activeReq.id}`, {
           method: 'PUT',
@@ -189,7 +265,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
         </div>
       </div>
 
-      {/* Top 4 Stat Cards */}
+      {/* Top 4 Stat Cards (Dynamic from MongoDB) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Live Requests */}
@@ -204,38 +280,55 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
             </span>
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
           </div>
-          <div className="text-3xl font-black text-[#111827]">03</div>
+          <div className="text-3xl font-black text-[#111827]">
+            {(stats.liveRequestsCount || 0).toString().padStart(2, '0')}
+          </div>
           <div className="text-[11px] text-amber-700 font-bold mt-2">Requires immediate response</div>
         </div>
 
         {/* Orders Today */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs">
+        <div 
+          onClick={() => onNavigateTab('orders')}
+          className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs cursor-pointer hover:border-[#0A8B5F] transition-all"
+        >
           <div className="flex items-center gap-2 text-[11px] font-bold text-[#6B7280] uppercase tracking-wider mb-2">
             <ShoppingBag size={15} className="text-[#0A8B5F]" />
             <span>Orders Today</span>
           </div>
-          <div className="text-3xl font-black text-[#111827]">12</div>
-          <div className="text-[11px] text-[#0A8B5F] font-semibold mt-2">📈 +15% vs yesterday</div>
+          <div className="text-3xl font-black text-[#111827]">
+            {stats.todaysOrdersCount}
+          </div>
+          <div className="text-[11px] text-[#0A8B5F] font-semibold mt-2">📈 Live MongoDB sync</div>
         </div>
 
         {/* Earned Today */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs">
+        <div 
+          onClick={() => onNavigateTab('earnings')}
+          className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs cursor-pointer hover:border-[#0A8B5F] transition-all"
+        >
           <div className="flex items-center gap-2 text-[11px] font-bold text-[#6B7280] uppercase tracking-wider mb-2">
             <TrendingUp size={15} className="text-[#0A8B5F]" />
             <span>Earned Today</span>
           </div>
-          <div className="text-3xl font-black text-[#111827]">₹4,280</div>
+          <div className="text-3xl font-black text-[#111827]">
+            ₹{stats.revenueToday.toLocaleString('en-IN')}
+          </div>
           <div className="text-[11px] text-[#0A8B5F] font-semibold mt-2">Ready for withdrawal</div>
         </div>
 
         {/* Provider Rating */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs">
+        <div 
+          onClick={() => onNavigateTab('reviews')}
+          className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs cursor-pointer hover:border-amber-500 transition-all"
+        >
           <div className="flex items-center gap-2 text-[11px] font-bold text-[#6B7280] uppercase tracking-wider mb-2">
             <Star size={15} className="text-amber-500 fill-amber-500" />
             <span>Kitchen Rating</span>
           </div>
-          <div className="text-3xl font-black text-[#111827]">4.8 ★</div>
-          <div className="text-[11px] text-[#6B7280] font-medium mt-2">Based on 126 reviews</div>
+          <div className="text-3xl font-black text-[#111827]">{stats.rating} ★</div>
+          <div className="text-[11px] text-[#6B7280] font-medium mt-2">
+            {stats.reviewCount > 0 ? `Based on ${stats.reviewCount} reviews` : 'Top Rated Home Kitchen'}
+          </div>
         </div>
 
       </div>
@@ -250,7 +343,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
             </div>
             <span className="px-3 py-1 bg-amber-500 text-white text-xs font-black rounded-lg flex items-center gap-1">
               <Clock size={13} />
-              <span>00:{liveRequest.secondsLeft.toString().padStart(2, '0')}</span>
+              <span>00:{(liveRequest.secondsLeft || 60).toString().padStart(2, '0')}</span>
             </span>
           </div>
 
@@ -289,7 +382,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
       {/* Middle Row: Today's Orders & Operational Widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Left: Today's Orders Table (7 Cols) */}
+        {/* Left: Today's Active Orders Table (7 Cols) */}
         <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
             <h3 className="text-base font-black text-[#111827]">Today's Active Orders</h3>
@@ -302,25 +395,33 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
             </button>
           </div>
 
-          <div className="space-y-3">
-            {todaysOrders.map(ord => (
-              <div key={ord.id} className="p-4 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs text-[#0A8B5F]">{ord.id}</span>
-                    <span className="font-extrabold text-xs text-[#111827]">{ord.customer}</span>
+          {todaysOrders.length === 0 ? (
+            <div className="p-8 text-center text-[#6B7280] space-y-2">
+              <ShoppingBag size={24} className="mx-auto text-[#0A8B5F]" />
+              <div className="font-extrabold text-[#111827]">No active orders right now</div>
+              <p className="text-[11px]">When customers place new orders, they will show up here live.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {todaysOrders.map(ord => (
+                <div key={ord.id} className="p-4 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs text-[#0A8B5F]">{ord.id}</span>
+                      <span className="font-extrabold text-xs text-[#111827]">{ord.customer}</span>
+                    </div>
+                    <div className="text-[11px] text-[#6B7280] mt-0.5">{ord.items} • {ord.time}</div>
                   </div>
-                  <div className="text-[11px] text-[#6B7280] mt-0.5">{ord.items} • {ord.time}</div>
-                </div>
 
-                <div className="text-right space-y-1">
-                  <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-lg border ${ord.statusBg}`}>
-                    {ord.status}
-                  </span>
+                  <div className="text-right space-y-1">
+                    <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-lg border ${ord.statusBg}`}>
+                      {ord.status}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right: Operational Capacity & Delivery Status Widgets (5 Cols) */}
@@ -335,11 +436,14 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
 
             <div className="space-y-1">
               <div className="flex justify-between text-xs font-black">
-                <span>32 / 40 meals</span>
-                <span className="text-[#0A8B5F]">8 remaining</span>
+                <span>{kitchenCapacity.cookedMeals} / {kitchenCapacity.maxMeals} meals</span>
+                <span className="text-[#0A8B5F]">{Math.max(0, kitchenCapacity.maxMeals - kitchenCapacity.cookedMeals)} remaining</span>
               </div>
               <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden p-0.5 border border-[#E5ECE8]">
-                <div className="h-full bg-[#0A8B5F] rounded-full" style={{ width: '80%' }} />
+                <div 
+                  className="h-full bg-[#0A8B5F] rounded-full transition-all duration-500" 
+                  style={{ width: `${Math.min(100, Math.round((kitchenCapacity.cookedMeals / kitchenCapacity.maxMeals) * 100))}%` }} 
+                />
               </div>
             </div>
           </div>
@@ -353,17 +457,17 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 text-emerald-800">
-                <span>● 3 orders ready for pickup</span>
+                <span>● {deliveryCounts.ready} orders ready for pickup</span>
                 <span className="font-black">Ready</span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-lg bg-blue-50 text-blue-800">
-                <span>● 2 delivery partners assigned</span>
+                <span>● {deliveryCounts.assigned} delivery partners assigned</span>
                 <span className="font-black">Assigned</span>
               </div>
 
               <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50 text-amber-800">
-                <span>● 1 awaiting partner arrival</span>
+                <span>● {deliveryCounts.searching} awaiting partner arrival</span>
                 <span className="font-black">Searching</span>
               </div>
             </div>
@@ -376,4 +480,3 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     </div>
   );
 }
-
