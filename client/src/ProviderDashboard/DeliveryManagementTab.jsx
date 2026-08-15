@@ -172,23 +172,42 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
     }
   };
 
+  // Safe Helper to get driver details without crashing
+  const getDriverInfo = (item) => {
+    if (!item) return { name: 'Rahul Sharma', phone: '+91 98251 44556', rating: 4.8, vehicleNo: 'Bike GJ-01-AB-1029' };
+    if (item.assignedDriver && typeof item.assignedDriver === 'object' && item.assignedDriver.name) {
+      return item.assignedDriver;
+    }
+    if (item.deliveryPartnerName) {
+      return {
+        name: item.deliveryPartnerName,
+        phone: item.deliveryPartnerPhone || '+91 98251 44556',
+        rating: 4.8,
+        vehicleNo: 'Bike GJ-01-AB-1029'
+      };
+    }
+    return { name: 'Rahul Sharma', phone: '+91 98251 44556', rating: 4.8, vehicleNo: 'Bike GJ-01-AB-1029' };
+  };
+
   // Confirm Pickup Action
   const handleConfirmPickup = async () => {
     if (!pickupTarget) return;
     try {
       showToast('Confirming order pickup...');
-      setIsPickupModalOpen(false);
 
       const res = await fetch('http://localhost:5000/api/delivery/confirm-pickup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          requestId: pickupTarget.requestId || pickupTarget._id,
+          requestId: pickupTarget.requestId || pickupTarget.orderId || pickupTarget._id,
           otp: otpInput
         })
       });
 
       const json = await res.json();
+      setIsPickupModalOpen(false);
+      setOtpInput('');
+
       if (json.success) {
         showToast('✓ Order pickup confirmed! Delivery partner is out for delivery.');
         fetchDeliveryData();
@@ -197,6 +216,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
       }
     } catch (err) {
       console.error('Error confirming pickup:', err);
+      setIsPickupModalOpen(false);
       showToast('❌ Error confirming pickup.');
     }
   };
@@ -959,38 +979,45 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                 <span>SMS OTP Sent to Driver Mobile</span>
               </div>
 
-              <div className="text-sm font-black text-[#111827]">
-                📱 {pickupTarget?.assignedDriver?.phone || '+91 98251 44556'} ({pickupTarget?.assignedDriver?.name || 'Driver'})
-              </div>
+              {(() => {
+                const targetDriver = getDriverInfo(pickupTarget);
+                return (
+                  <>
+                    <div className="text-sm font-black text-[#111827]">
+                      📱 {targetDriver.phone} ({targetDriver.name})
+                    </div>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-full text-[10px] font-black text-emerald-700 border border-emerald-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>SMS Delivered to Driver's Mobile</span>
-              </div>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-full text-[10px] font-black text-emerald-700 border border-emerald-300">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>SMS Delivered to Driver's Mobile</span>
+                    </div>
 
-              <p className="text-[11px] text-[#6B7280] font-semibold pt-1">
-                Ask the delivery partner for the 4-digit OTP received on their phone before handing over the meal.
-              </p>
+                    <p className="text-[11px] text-[#6B7280] font-semibold pt-1">
+                      Ask the delivery partner for the 4-digit OTP received on their phone before handing over the meal.
+                    </p>
 
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    showToast('📲 Sending SMS OTP to driver mobile...');
-                    await fetch('http://localhost:5000/api/delivery/send-otp-sms', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ requestId: pickupTarget?.requestId || pickupTarget?.orderId })
-                    });
-                    showToast(`📲 SMS OTP re-sent to ${pickupTarget?.assignedDriver?.phone || 'driver phone'}!`);
-                  } catch (err) {
-                    console.error('Error sending SMS OTP:', err);
-                  }
-                }}
-                className="text-[11px] font-bold text-[#0A8B5F] hover:underline cursor-pointer flex items-center justify-center gap-1 mx-auto pt-1"
-              >
-                <span>📲 Resend SMS OTP to Driver Mobile</span>
-              </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          showToast('📲 Sending SMS OTP to driver mobile...');
+                          await fetch('http://localhost:5000/api/delivery/send-otp-sms', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ requestId: pickupTarget?.requestId || pickupTarget?.orderId })
+                          });
+                          showToast(`📲 SMS OTP re-sent to ${targetDriver.phone}!`);
+                        } catch (err) {
+                          console.error('Error sending SMS OTP:', err);
+                        }
+                      }}
+                      className="text-[11px] font-bold text-[#0A8B5F] hover:underline cursor-pointer flex items-center justify-center gap-1 mx-auto pt-1"
+                    >
+                      <span>📲 Resend SMS OTP to Driver Mobile</span>
+                    </button>
+                  </>
+                );
+              })()}
             </div>
 
             {/* OTP Verification Input */}
