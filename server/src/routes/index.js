@@ -15,6 +15,7 @@ const requestRoutes = require('./requestRoutes');
 const contactRoutes = require('./contactRoutes');
 const settingRoutes = require('./settingRoutes');
 const supportRoutes = require('./supportRoutes');
+const subscriptionRoutes = require('./subscriptionRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/providers', providerRoutes);
@@ -30,5 +31,7 @@ router.use('/support', supportRoutes);
 router.use('/delivery', deliveryRoutes);
 router.use('/requests', requestRoutes);
 router.use('/contact', contactRoutes);
+router.use('/subscriptions', subscriptionRoutes);
 
 module.exports = router;
+

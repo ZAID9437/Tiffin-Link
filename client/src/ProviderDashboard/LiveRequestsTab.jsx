@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Zap, Clock, MapPin, CheckCircle2, XCircle, Utensils, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function LiveRequestsTab({ onNavigateTab, onAcceptRequest }) {
-  const [requests, setRequests] = useState([
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [toastMsg, setToastMsg] = useState('');
+
+  const initialMockRequests = [
     {
       id: 'REQ-1092',
       customerName: 'Rahul Shah',
       customerPhone: '+91 98765 12345',
-      items: [
-        { name: 'Gujarati Veg Special Thali', qty: 2, price: 120 }
-      ],
+      items: [{ name: 'Gujarati Veg Special Thali', qty: 2, price: 120 }],
       totalAmount: 240,
       distance: '1.8 km',
       deliveryTime: 'Today • 5:00 PM',
@@ -34,18 +36,46 @@ export default function LiveRequestsTab({ onNavigateTab, onAcceptRequest }) {
       id: 'REQ-1094',
       customerName: 'Amit Verma',
       customerPhone: '+91 97654 32109',
-      items: [
-        { name: 'North Indian Deluxe Tiffin', qty: 3, price: 150 }
-      ],
+      items: [{ name: 'North Indian Deluxe Tiffin', qty: 3, price: 150 }],
       totalAmount: 450,
       distance: '3.1 km',
       deliveryTime: 'Today • 7:00 PM',
       secondsLeft: 180,
       status: 'pending'
     }
-  ]);
+  ];
 
-  const [toastMsg, setToastMsg] = useState('');
+  useEffect(() => {
+    fetchLiveRequests();
+  }, []);
+
+  const fetchLiveRequests = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('http://localhost:5000/api/requests');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        setRequests(json.data.map((r, i) => ({
+          id: r._id ? `REQ-${r._id.slice(-4).toUpperCase()}` : `REQ-109${i+2}`,
+          customerName: r.customerName || 'Nearby Customer',
+          customerPhone: r.customerPhone || '+91 98765 43210',
+          items: [{ name: r.mealType || 'Veg Special Thali', qty: 1, price: r.budget || 120 }],
+          totalAmount: r.budget || 120,
+          distance: r.location || '1.8 km',
+          deliveryTime: `${r.date || 'Today'} • ${r.time || '5:00 PM'}`,
+          secondsLeft: 120,
+          status: 'pending'
+        })));
+      } else {
+        setRequests(initialMockRequests);
+      }
+    } catch (err) {
+      console.error('Error fetching live requests:', err);
+      setRequests(initialMockRequests);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {

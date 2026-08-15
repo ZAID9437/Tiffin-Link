@@ -1,60 +1,62 @@
-import React, { useState } from 'react';
-import { Repeat, Calendar, Clock, User, CheckCircle2, Search, Filter, ShieldCheck, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Repeat, Calendar, Clock, User, CheckCircle2, Search, Filter, ShieldCheck, ChevronRight, PauseCircle, PlayCircle, RefreshCw } from 'lucide-react';
 
 export default function SubscriptionsTab() {
-  const [subscribers] = useState([
-    {
-      id: 'SUB-801',
-      customerName: 'Rahul Shah',
-      email: 'rahul.shah@gmail.com',
-      phone: '+91 98765 12345',
-      plan: 'Lunch • Monday to Friday',
-      mealType: 'Gujarati Veg Thali',
-      pricePerMeal: 120,
-      nextMeal: 'Tomorrow • 12:30 PM',
-      address: 'B-402, Shivalik Towers, Satellite, Ahmedabad',
-      status: 'Active'
-    },
-    {
-      id: 'SUB-802',
-      customerName: 'Neha Verma',
-      email: 'neha.v@gmail.com',
-      phone: '+91 98123 45678',
-      plan: 'Dinner • Everyday (7 Days)',
-      mealType: 'Jain Special Thali',
-      pricePerMeal: 130,
-      nextMeal: 'Today • 7:30 PM',
-      address: '12, Goyal Intercity, Drive-In Road, Ahmedabad',
-      status: 'Active'
-    },
-    {
-      id: 'SUB-803',
-      customerName: 'Amit Trivedi',
-      email: 'trivedi.a@gmail.com',
-      phone: '+91 97654 32109',
-      plan: 'Lunch & Dinner • Mon to Sat',
-      mealType: 'North Indian Deluxe Thali',
-      pricePerMeal: 150,
-      nextMeal: 'Today • 8:00 PM',
-      address: 'A-10, Dev Aurum, Anandnagar, Ahmedabad',
-      status: 'Active'
-    },
-    {
-      id: 'SUB-804',
-      customerName: 'Karan Patel',
-      email: 'karan.p@gmail.com',
-      phone: '+91 96543 21098',
-      plan: 'Lunch • Monday to Friday',
-      mealType: 'Veg Mini Tiffin',
-      pricePerMeal: 90,
-      nextMeal: 'Tomorrow • 1:00 PM',
-      address: '501, Titanium City Center, Prahaladnagar, Ahmedabad',
-      status: 'Paused'
-    }
-  ]);
-
+  const [subscribers, setSubscribers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSub, setSelectedSub] = useState(null);
+  const [toastMsg, setToastMsg] = useState('');
+
+  useEffect(() => {
+    fetchSubscriptions();
+  }, []);
+
+  const fetchSubscriptions = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('http://localhost:5000/api/subscriptions');
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setSubscribers(json.data.map(s => ({
+          id: s.subId || s._id,
+          dbId: s._id,
+          customerName: s.customerName,
+          email: s.customerEmail,
+          phone: s.customerPhone,
+          plan: s.plan,
+          mealType: s.mealType,
+          pricePerMeal: s.pricePerMeal,
+          nextMeal: s.nextMeal,
+          address: s.address,
+          status: s.status
+        })));
+      }
+    } catch (err) {
+      console.error('Error fetching subscriptions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (sub) => {
+    const nextStatus = sub.status === 'Active' ? 'Paused' : 'Active';
+    setSubscribers(prev => prev.map(s => s.id === sub.id ? { ...s, status: nextStatus } : s));
+    setToastMsg(`✓ Subscription #${sub.id} is now ${nextStatus}`);
+    setTimeout(() => setToastMsg(''), 3500);
+
+    if (sub.dbId) {
+      try {
+        await fetch(`http://localhost:5000/api/subscriptions/${sub.dbId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: nextStatus })
+        });
+      } catch (err) {
+        console.error('Error updating subscription in MongoDB:', err);
+      }
+    }
+  };
 
   const filtered = subscribers.filter(s => 
     s.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
