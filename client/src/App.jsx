@@ -100,73 +100,8 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  // Anti-debugging blocking removed to allow standard browser inspect and right-click
   useEffect(() => {
-    const handleContextMenu = (e) => {
-      e.preventDefault();
-    };
-    document.addEventListener('contextmenu', handleContextMenu);
-
-    const handleKeyDown = (e) => {
-      const isInput = e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea';
-
-      // Block F12
-      if (e.key === 'F12') {
-        e.preventDefault();
-        return false;
-      }
-
-      // Block Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
-      if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
-        e.preventDefault();
-        return false;
-      }
-
-      // Block Ctrl+U
-      if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) {
-        e.preventDefault();
-        return false;
-      }
-
-      // Block Ctrl+C, Ctrl+X, Ctrl+V outside input fields
-      if (e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'x' || e.key === 'X' || e.key === 'v' || e.key === 'V')) {
-        if (!isInput) {
-          e.preventDefault();
-          return false;
-        }
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-
-    const handleCopy = (e) => {
-      const isInput = e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea';
-      if (!isInput) {
-        e.preventDefault();
-      }
-    };
-    const handleCut = (e) => {
-      const isInput = e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea';
-      if (!isInput) {
-        e.preventDefault();
-      }
-    };
-    const handlePaste = (e) => {
-      const isInput = e.target.tagName.toLowerCase() === 'input' || e.target.tagName.toLowerCase() === 'textarea';
-      if (!isInput) {
-        e.preventDefault();
-      }
-    };
-    
-    document.addEventListener('copy', handleCopy);
-    document.addEventListener('cut', handleCut);
-    document.addEventListener('paste', handlePaste);
-
-    return () => {
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('copy', handleCopy);
-      document.removeEventListener('cut', handleCut);
-      document.removeEventListener('paste', handlePaste);
-    };
   }, []);
 
   // Toast Notification state
