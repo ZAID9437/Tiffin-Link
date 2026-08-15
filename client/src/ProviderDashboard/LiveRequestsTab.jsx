@@ -93,11 +93,38 @@ export default function LiveRequestsTab({ onNavigateTab, onAcceptRequest }) {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleAccept = (id) => {
+  const handleAccept = async (id) => {
+    const targetReq = requests.find(r => r.id === id);
     setRequests(prev => prev.filter(r => r.id !== id));
-    setToastMsg(`✓ Request #${id} accepted! Moved to Preparing orders.`);
-    setTimeout(() => setToastMsg(''), 3500);
-    if (onAcceptRequest) onAcceptRequest(id);
+    setToastMsg(`✓ Request #${id} accepted! Saving to database & moving to Preparing orders...`);
+
+    try {
+      await fetch('http://localhost:5000/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: targetReq?.customerName || 'Rahul Shah',
+          customerPhone: targetReq?.customerPhone || '+91 98765 12345',
+          customerAddress: 'B-402, Shivalik Towers, Satellite, Ahmedabad',
+          tiffinName: targetReq?.items?.[0]?.name || 'Gujarati Veg Special Thali',
+          tiffinCategory: 'Gujarati',
+          tiffinImage: '/assets/provider_1.png',
+          quantity: targetReq?.items?.[0]?.qty || 2,
+          unitPrice: targetReq?.items?.[0]?.price || 120,
+          distanceKm: 1.8,
+          paymentStatus: 'Paid',
+          status: 'Preparing'
+        })
+      });
+    } catch (err) {
+      console.error('Error creating accepted order in MongoDB:', err);
+    }
+
+    setTimeout(() => {
+      setToastMsg('');
+      if (onAcceptRequest) onAcceptRequest(id);
+      if (onNavigateTab) onNavigateTab('orders-preparing');
+    }, 1000);
   };
 
   const handleDecline = (id) => {
