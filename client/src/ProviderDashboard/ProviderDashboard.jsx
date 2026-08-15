@@ -50,6 +50,7 @@ import ServiceAreaTab from './ServiceAreaTab';
 import ScheduleTab from './ScheduleTab';
 import NotificationsTab from './NotificationsTab';
 import SettingsTab from './SettingsTab';
+import DeliveryManagementTab from './DeliveryManagementTab';
 import HelpSupportTab from './HelpSupportTab';
 
 export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser }) {
@@ -94,7 +95,8 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         case 'orders-ready':
           return <OrdersTab initialStatus="Ready" />;
         case 'orders-delivery':
-          return <OrdersTab initialStatus="Delivery" />;
+        case 'delivery':
+          return <DeliveryManagementTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
         case 'orders-completed':
           return <OrdersTab initialStatus="Completed" />;
         case 'orders-cancelled':

@@ -30,6 +30,7 @@ import {
   Receipt,
   FileText
 } from 'lucide-react';
+import DeliveryManagementTab from './DeliveryManagementTab';
 
 export default function OrdersTab({ initialStatus = 'All' }) {
   const [orders, setOrders] = useState([]);
@@ -208,6 +209,10 @@ export default function OrdersTab({ initialStatus = 'All' }) {
   const readyOrdersCount = orders.filter(o => o.status === 'Ready').length;
   const deliveryOrdersCount = orders.filter(isDeliveryOrder).length;
   const completedOrdersCount = orders.filter(o => o.status === 'Completed').length;
+
+  if (activeStatusTab === 'Delivery') {
+    return <DeliveryManagementTab />;
+  }
 
   return (
     <div className="space-y-6 animate-slide-up relative">
