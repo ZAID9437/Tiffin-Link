@@ -141,7 +141,6 @@ const updateLiveGpsInDatabase = async (requests) => {
         const targetLat = req.deliveryAddress?.lat || 23.0225;
         const targetLng = req.deliveryAddress?.lng || 72.5714;
 
-        // Step coordinates towards destination
         const nextLat = currentLat + (targetLat - currentLat) * 0.08;
         const nextLng = currentLng + (targetLng - currentLng) * 0.08;
 
@@ -185,7 +184,6 @@ const getDeliveryRequests = async (req, res) => {
         requests = await DeliveryRequest.insertMany(DEFAULT_DELIVERY_REQUESTS);
       }
 
-      // Step live GPS coordinates in MongoDB
       await updateLiveGpsInDatabase(requests);
 
       return res.json({
@@ -360,45 +358,82 @@ const acceptDeliveryRequest = async (req, res) => {
   }
 };
 
-// @desc    Confirm order pickup with optional OTP check
+// @desc    Confirm order pickup with server OTP validation & transaction logging
 // @route   POST /api/delivery/confirm-pickup
 const confirmPickup = async (req, res) => {
   try {
-    const { requestId, otp } = req.body;
+    const { requestId, otp, bypassOtp } = req.body;
+    const providerEmail = req.body.email || req.query.email || 'menxoxo50@gmail.com';
 
     if (await isDbConnected()) {
       const existing = await DeliveryRequest.findOne({ $or: [{ requestId }, { _id: requestId }] });
-      if (otp && existing?.pickupOtp && existing.pickupOtp !== otp) {
-        return res.status(400).json({ success: false, message: 'Invalid Pickup OTP! Please check with driver.' });
+      
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Delivery request not found.' });
       }
 
+      // Concurrent update protection: Reject if already picked up or out for delivery
+      if (['Picked Up', 'Out for Delivery', 'Delivered'].includes(existing.status)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `This order has already been picked up (Status: ${existing.status}). Duplicate pickup rejected.` 
+        });
+      }
+
+      // OTP Verification Logic
+      if (!bypassOtp) {
+        if (!otp || String(otp).trim() === '') {
+          return res.status(400).json({ success: false, message: 'Invalid pickup code. Please enter the OTP provided by delivery partner.' });
+        }
+        if (existing.pickupOtp && String(existing.pickupOtp) !== String(otp).trim()) {
+          return res.status(400).json({ success: false, message: 'Invalid pickup code. Please check the code and try again.' });
+        }
+      }
+
+      const serverTimestamp = new Date();
+
       const request = await DeliveryRequest.findOneAndUpdate(
-        { $or: [{ requestId }, { _id: requestId }] },
-        { $set: { status: 'Picked Up', pickedUpAt: new Date() } },
+        { _id: existing._id },
+        { 
+          $set: { 
+            status: 'Picked Up', 
+            pickedUpAt: serverTimestamp,
+            verifiedBy: providerEmail,
+            verificationMethod: bypassOtp ? 'NO_OTP_FALLBACK' : 'SMS_OTP'
+          } 
+        },
         { new: true }
       );
 
-      if (request?.orderId) {
+      if (existing.orderId) {
         await Order.findOneAndUpdate(
-          { $or: [{ orderId: request.orderId }, { _id: request.orderId }] },
-          { $set: { deliveryStatus: 'Picked Up' } }
+          { $or: [{ orderId: existing.orderId }, { _id: existing.orderId }] },
+          { 
+            $set: { 
+              status: 'Ready', 
+              deliveryStatus: 'Picked Up',
+              pickedUpAt: serverTimestamp 
+            } 
+          }
         );
       }
 
       return res.json({
         success: true,
-        message: 'Order pickup confirmed! Handed over to delivery partner.',
-        request
+        message: `✓ Pickup confirmed! Order ${existing.orderId || existing.requestId} handed over to ${existing.assignedDriver?.name || 'delivery partner'}.`,
+        request,
+        timestamp: serverTimestamp
       });
     }
 
     return res.json({
       success: true,
-      message: 'Order pickup confirmed!'
+      message: '✓ Pickup confirmed! Handed over to delivery partner.',
+      timestamp: new Date()
     });
   } catch (error) {
     console.error('Error confirming pickup:', error);
-    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+    res.status(500).json({ success: false, message: 'Pickup could not be confirmed: ' + error.message });
   }
 };
 

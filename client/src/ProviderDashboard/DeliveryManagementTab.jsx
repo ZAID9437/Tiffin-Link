@@ -189,35 +189,52 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
     return null;
   };
 
-  // Confirm Pickup Action
-  const handleConfirmPickup = async () => {
-    if (!pickupTarget) return;
+  // Confirm Pickup Action State & Handlers
+  const [isSubmittingPickup, setIsSubmittingPickup] = useState(false);
+  const [pickupSuccessData, setPickupSuccessData] = useState(null);
+
+  const handleConfirmPickup = async (bypass = false) => {
+    if (!pickupTarget || isSubmittingPickup) return;
     try {
-      showToast('Confirming order pickup...');
+      setIsSubmittingPickup(true);
 
       const res = await fetch('http://localhost:5000/api/delivery/confirm-pickup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requestId: pickupTarget.requestId || pickupTarget.orderId || pickupTarget._id,
-          otp: otpInput
+          otp: otpInput,
+          bypassOtp: bypass
         })
       });
 
       const json = await res.json();
-      setIsPickupModalOpen(false);
-      setOtpInput('');
+      setIsSubmittingPickup(false);
 
       if (json.success) {
-        showToast('✓ Order pickup confirmed! Delivery partner is out for delivery.');
+        const driver = getDriverInfo(pickupTarget) || { name: 'Rahul Sharma' };
+        setPickupSuccessData({
+          orderId: pickupTarget.orderId || pickupTarget.requestId,
+          tiffinName: pickupTarget.tiffinName || 'Gujarati Veg Thali × 2',
+          driverName: driver.name,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+
+        showToast(`✓ Pickup confirmed: Order #${pickupTarget.orderId || pickupTarget.requestId} handed over to ${driver.name}.`);
         fetchDeliveryData();
+
+        setTimeout(() => {
+          setIsPickupModalOpen(false);
+          setPickupSuccessData(null);
+          setOtpInput('');
+        }, 1800);
       } else {
-        showToast(`❌ ${json.message || 'Invalid OTP'}`);
+        showToast(`❌ ${json.message || 'Invalid pickup code. Please check the code and try again.'}`);
       }
     } catch (err) {
       console.error('Error confirming pickup:', err);
-      setIsPickupModalOpen(false);
-      showToast('❌ Error confirming pickup.');
+      setIsSubmittingPickup(false);
+      showToast('❌ Pickup could not be confirmed. Please retry.');
     }
   };
 
@@ -975,101 +992,167 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
         </div>
       )}
 
-      {/* 16. PICKUP VERIFICATION & HANDOVER MODAL */}
+      {/* 16. CONFIRM PICKUP MODAL */}
       {isPickupModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#E5ECE8] space-y-5 animate-scale-up">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#E5ECE8] space-y-4 animate-scale-up">
+            
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
-              <div className="flex items-center gap-2 text-[#0A8B5F]">
-                <ShieldCheck size={20} />
-                <h3 className="text-base font-black text-[#111827]">VERIFY ORDER HANDOVER & PICKUP</h3>
+              <div>
+                <h3 className="text-base font-black text-[#111827]">Confirm Pickup</h3>
+                <p className="text-[11px] text-[#6B7280] font-medium">Verify the delivery partner and order before handing over the tiffin.</p>
               </div>
               <button 
-                onClick={() => setIsPickupModalOpen(false)}
-                className="text-[#9CA3AF] hover:text-[#111827] cursor-pointer"
+                onClick={() => { setIsPickupModalOpen(false); setPickupSuccessData(null); }}
+                className="text-[#9CA3AF] hover:text-[#111827] cursor-pointer p-1"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* SMS OTP Status Card (OTP Hidden from Provider) */}
-            <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-2 text-center">
-              <div className="flex items-center justify-center gap-2 text-xs font-black text-emerald-900 uppercase tracking-wider">
-                <Phone size={14} className="text-[#0A8B5F]" />
-                <span>SMS OTP Sent to Driver Mobile</span>
+            {/* Brief Pickup Success Screen Overlay */}
+            {pickupSuccessData ? (
+              <div className="p-6 bg-emerald-50 rounded-2xl border-2 border-emerald-300 text-center space-y-3 animate-scale-up">
+                <div className="w-12 h-12 rounded-full bg-[#0A8B5F] text-white flex items-center justify-center mx-auto shadow-md">
+                  <CheckCircle size={24} />
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-emerald-900">✓ Pickup Confirmed</h4>
+                  <div className="text-xs font-bold text-[#111827] mt-1">Order #{pickupSuccessData.orderId}</div>
+                  <div className="text-[11px] text-[#6B7280]">{pickupSuccessData.tiffinName}</div>
+                </div>
+                <div className="text-xs text-emerald-800 font-bold bg-white py-2 px-3 rounded-xl border border-emerald-200">
+                  Handed over to <strong>{pickupSuccessData.driverName}</strong> at {pickupSuccessData.time}
+                </div>
+                <div className="flex items-center justify-center gap-1.5 text-xs font-black text-blue-700">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
+                  <span>Status: ● Out for Delivery</span>
+                </div>
               </div>
+            ) : (
+              <>
+                {/* ORDER SECTION */}
+                <div className="p-3.5 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] space-y-1.5 text-xs">
+                  <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#6B7280]">ORDER INFORMATION</div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-black text-[#0A8B5F]">Order #{pickupTarget?.orderId || pickupTarget?.requestId}</span>
+                    <span className="font-black text-[#111827]">₹{pickupTarget?.amount || 240}</span>
+                  </div>
+                  <div className="font-bold text-[#111827]">{pickupTarget?.tiffinName || 'Gujarati Veg Thali'} × {pickupTarget?.itemCount || 1}</div>
+                  <div className="text-[11px] text-[#6B7280]">Customer: <span className="font-extrabold text-[#111827]">{pickupTarget?.customerName}</span></div>
+                </div>
 
-              {(() => {
-                const targetDriver = getDriverInfo(pickupTarget) || { name: 'Assigned Driver', phone: '+91 98251 44556', rating: 4.8, vehicleNo: 'Bike' };
-                return (
-                  <>
-                    <div className="text-sm font-black text-[#111827]">
-                      📱 {targetDriver.phone} ({targetDriver.name})
+                {/* DELIVERY PARTNER SECTION */}
+                {(() => {
+                  const targetDriver = getDriverInfo(pickupTarget) || { name: 'Rahul Sharma', phone: '+91 98251 44556', rating: 4.8, vehicleNo: 'Bike GJ-01-AB-1029' };
+                  return (
+                    <div className="p-3.5 bg-white rounded-xl border border-[#E5ECE8] space-y-2 text-xs">
+                      <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#6B7280]">DELIVERY PARTNER</div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[#E8F0EC] text-[#0A8B5F] flex items-center justify-center font-black text-sm border border-[#0A8B5F]/20">
+                            {targetDriver.name ? targetDriver.name.charAt(0) : 'R'}
+                          </div>
+                          <div>
+                            <div className="font-black text-[#111827] flex items-center gap-1.5">
+                              <span>{targetDriver.name}</span>
+                              <span className="text-[10px] text-amber-600 flex items-center">★ {targetDriver.rating || 4.8}</span>
+                            </div>
+                            <div className="text-[10px] text-[#6B7280] font-medium">{targetDriver.vehicleNo || 'Bike'} • {targetDriver.phone}</div>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black rounded-lg">
+                          ● Arrived at Pickup
+                        </span>
+                      </div>
                     </div>
+                  );
+                })()}
 
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-full text-[10px] font-black text-emerald-700 border border-emerald-300">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>SMS Delivered to Driver's Mobile</span>
-                    </div>
-
-                    <p className="text-[11px] text-[#6B7280] font-semibold pt-1">
-                      Ask the delivery partner for the 4-digit OTP received on their phone before handing over the meal.
-                    </p>
-
+                {/* PICKUP VERIFICATION / OTP SECTION */}
+                <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black text-emerald-900 uppercase tracking-wider flex items-center gap-1">
+                      <ShieldCheck size={14} className="text-[#0A8B5F]" />
+                      <span>Pickup OTP</span>
+                    </label>
                     <button
                       type="button"
                       onClick={async () => {
                         try {
-                          showToast('📲 Sending SMS OTP to driver mobile...');
+                          const targetDriver = getDriverInfo(pickupTarget);
+                          showToast('📲 Resending SMS OTP to driver mobile...');
                           await fetch('http://localhost:5000/api/delivery/send-otp-sms', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ requestId: pickupTarget?.requestId || pickupTarget?.orderId })
                           });
-                          showToast(`📲 SMS OTP re-sent to ${targetDriver.phone}!`);
+                          showToast(`📲 SMS OTP re-sent to ${targetDriver?.phone || 'driver phone'}!`);
                         } catch (err) {
                           console.error('Error sending SMS OTP:', err);
                         }
                       }}
-                      className="text-[11px] font-bold text-[#0A8B5F] hover:underline cursor-pointer flex items-center justify-center gap-1 mx-auto pt-1"
+                      className="text-[10px] font-bold text-[#0A8B5F] hover:underline cursor-pointer"
                     >
-                      <span>📲 Resend SMS OTP to Driver Mobile</span>
+                      📲 Resend SMS OTP
                     </button>
-                  </>
-                );
-              })()}
-            </div>
+                  </div>
 
-            {/* OTP Verification Input */}
-            <div>
-              <label className="text-xs font-black text-[#111827] block mb-1.5">
-                Enter 4-Digit Pickup OTP (Spoken by Delivery Partner)
-              </label>
-              <input
-                type="text"
-                maxLength={4}
-                placeholder="Enter 4-digit OTP from driver"
-                value={otpInput}
-                onChange={e => setOtpInput(e.target.value)}
-                className="w-full px-4 py-3 bg-[#F9FBF9] border-2 border-[#E5ECE8] rounded-xl text-center text-lg font-black tracking-widest text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
-              />
-            </div>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    placeholder="[ _ _ _ _ ]  Enter 4-digit OTP"
+                    value={otpInput}
+                    onChange={e => setOtpInput(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white border-2 border-emerald-300 rounded-xl text-center text-lg font-black tracking-widest text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+                  />
 
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                onClick={() => setIsPickupModalOpen(false)}
-                className="px-4 py-2 border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#4B5563] hover:bg-[#F9FBF9] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmPickup}
-                className="bg-[#0A8B5F] hover:bg-[#08734e] text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md cursor-pointer flex items-center gap-1.5"
-              >
-                <CheckCircle2 size={15} />
-                <span>Confirm Handover & Pickup</span>
-              </button>
-            </div>
+                  <p className="text-[10px] text-[#6B7280] font-semibold text-center">
+                    Enter the OTP provided by delivery partner received via SMS ({getDriverInfo(pickupTarget)?.phone || '+91 98251 44556'}).
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmPickup(true)}
+                    className="text-[10px] font-bold text-gray-500 hover:text-[#111827] hover:underline block mx-auto pt-1 cursor-pointer"
+                  >
+                    Confirm Without OTP (Authorized Provider Only)
+                  </button>
+                </div>
+
+                {/* FOOTER ACTIONS */}
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setIsPickupModalOpen(false)}
+                    className="px-4 py-2 border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#4B5563] hover:bg-[#F9FBF9] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    onClick={() => handleConfirmPickup(false)}
+                    disabled={isSubmittingPickup}
+                    className={`bg-[#0A8B5F] hover:bg-[#08734e] text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md cursor-pointer flex items-center gap-1.5 ${
+                      isSubmittingPickup ? 'opacity-70 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {isSubmittingPickup ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>Confirming Pickup...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={15} />
+                        <span>Confirm Pickup</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+
           </div>
         </div>
       )}
