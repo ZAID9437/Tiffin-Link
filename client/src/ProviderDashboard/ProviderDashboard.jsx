@@ -233,13 +233,13 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         </div>
       </header>
 
-      {/* DASHBOARD LAYOUT BODY */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto p-4 md:p-6 gap-6">
+      {/* DASHBOARD LAYOUT BODY (FULL SCREEN EDGE-TO-EDGE) */}
+      <div className="flex-1 flex w-full min-h-[calc(100vh-64px)]">
         
-        {/* NEW HIGH-DENSITY PROVIDER SIDEBAR */}
+        {/* HIGH-DENSITY FLUSH PROVIDER SIDEBAR (NO SIDE GAPS) */}
         <aside className={`
-          fixed md:static inset-y-0 left-0 z-30 w-60 md:w-64 bg-white rounded-2xl border border-[#E5ECE8] p-4 shadow-xs
-          transform transition-transform duration-200 ease-in-out md:transform-none flex flex-col justify-between shrink-0 h-fit sticky top-20
+          fixed md:sticky top-16 left-0 z-30 w-64 bg-white border-r border-[#E5ECE8] p-4 
+          h-[calc(100vh-64px)] overflow-y-auto transform transition-transform duration-200 ease-in-out md:transform-none flex flex-col justify-between shrink-0
           ${isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}
         `}>
           <div className="space-y-4">
@@ -514,7 +514,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         </aside>
 
         {/* MAIN TAB CONTENT CONTAINER */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 bg-[#F4F6F8] min-w-0 p-6 md:p-8 overflow-y-auto min-h-[calc(100vh-64px)]">
           {renderActiveTabContent()}
         </main>
 
