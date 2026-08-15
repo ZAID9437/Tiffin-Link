@@ -694,7 +694,8 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
         )}
       </div>
 
-      {/* 18. PROMINENT LIVE ROUTE MAP & GPS TRACKING PANEL ON MAIN PAGE */}
+      {/* 18. PROMINENT LIVE ROUTE MAP & GPS TRACKING PANEL ON MAIN PAGE (COMMENTED OUT AS REQUESTED) */}
+      {/*
       <div className="bg-white rounded-2xl border-2 border-[#0A8B5F]/40 shadow-sm p-6 space-y-4 relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5ECE8] pb-4">
           <div>
@@ -727,10 +728,8 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
           </div>
         </div>
 
-        {/* Live Interactive Google Maps Styled Display */}
         <div className="h-72 sm:h-80 bg-[#1F2937] rounded-2xl border-2 border-[#0A8B5F]/40 relative overflow-hidden flex flex-col justify-between p-4 shadow-xl">
           
-          {/* Real Map Tiles Layer Background */}
           <div className="absolute inset-0 z-0 overflow-hidden">
             {mapLayer === 'satellite' ? (
               <div 
@@ -743,11 +742,9 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                 style={{ backgroundImage: `url('https://images.unsplash.com/photo-1569336415962-a4bd9f69c07b?auto=format&fit=crop&w=1200&q=80')` }}
               />
             )}
-            {/* Dark/Light Map Gradient Overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
           </div>
 
-          {/* Top Map Controls & Status Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 z-10">
             <div className="bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 text-xs font-black text-white shadow-md flex items-center gap-2">
               <Building2 size={14} className="text-emerald-400" />
@@ -755,7 +752,6 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Map Layer Toggle (Roadmap vs Satellite) */}
               <div className="bg-black/75 backdrop-blur-md p-1 rounded-xl border border-white/20 flex items-center gap-1 shadow-md">
                 <button
                   type="button"
@@ -787,14 +783,11 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
             </div>
           </div>
 
-          {/* Real-Time Moving GPS Route SVG Canvas (100% MongoDB Driven) */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6 z-5">
             <svg className="w-full h-full" viewBox="0 0 600 200" fill="none">
-              {/* Animated Glowing GPS Road Path */}
               <path d="M 70 140 Q 250 40 530 140" stroke="#10B981" strokeWidth="6" strokeLinecap="round" strokeOpacity="0.4" />
               <path d="M 70 140 Q 250 40 530 140" stroke="#34D399" strokeWidth="3" strokeDasharray="8 6" strokeLinecap="round" className="animate-pulse" />
 
-              {/* Kitchen Pin (Provider) */}
               <g transform="translate(70, 140)">
                 <circle r="22" fill="#10B981" fillOpacity="0.3" className="animate-ping" />
                 <circle r="15" fill="#059669" stroke="#FFFFFF" strokeWidth="2" />
@@ -804,7 +797,6 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                 </text>
               </g>
 
-              {/* Real-Time Driver Marker (Driven by MongoDB status and GPS distance) */}
               {(() => {
                 const targetDriver = getDriverInfo(selectedDelivery) || { name: 'Rahul Sharma', rating: 4.8, vehicleNo: 'Bike GJ-01-AB-1029' };
                 const statusNorm = selectedDelivery ? normalizeStatus(selectedDelivery.status) : 'Delivered';
@@ -819,7 +811,6 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                   t = Math.min(0.88, Math.max(0.2, 1 - dist / 4.5));
                 }
 
-                // Bezier Q(70,140, 250,40, 530,140)
                 const currentX = (1 - t) * (1 - t) * 70 + 2 * (1 - t) * t * 250 + t * t * 530;
                 const currentY = (1 - t) * (1 - t) * 140 + 2 * (1 - t) * t * 40 + t * t * 140;
 
@@ -829,7 +820,6 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                     <circle r="18" fill="#F59E0B" stroke="#FFFFFF" strokeWidth="2.5" />
                     <text y="5" fontSize="13" textAnchor="middle" fill="#FFFFFF" fontWeight="900">🛵</text>
                     
-                    {/* Live Driver Floating Card */}
                     <g transform="translate(0, -32)">
                       <rect x="-80" y="-18" width="160" height="24" rx="12" fill="#111827" fillOpacity="0.9" stroke="#F59E0B" strokeWidth="1.5" />
                       <text y="-2" fontSize="10" textAnchor="middle" fill="#FBBF24" fontWeight="900">
@@ -847,7 +837,6 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                 );
               })()}
 
-              {/* Customer Destination Pin */}
               <g transform="translate(530, 140)">
                 <circle r="22" fill="#3B82F6" fillOpacity="0.3" className="animate-ping" />
                 <circle r="15" fill="#2563EB" stroke="#FFFFFF" strokeWidth="2" />
@@ -859,7 +848,6 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
             </svg>
           </div>
 
-          {/* Bottom Live Driver Info & Action Bar */}
           {(() => {
             const targetDriver = getDriverInfo(selectedDelivery) || { name: 'Rahul Sharma', rating: 4.8, vehicleNo: 'Bike GJ-01-AB-1029' };
             return (
@@ -905,6 +893,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
 
         </div>
       </div>
+      */}
 
       {/* 9. SWIGGY/ZOMATO AUTOMATIC DELIVERY PARTNER DISPATCH MODAL */}
       {isAssignModalOpen && (
