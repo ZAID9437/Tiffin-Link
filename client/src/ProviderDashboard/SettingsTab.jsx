@@ -123,16 +123,39 @@ export default function SettingsTab({ currentUser }) {
     if (e) e.preventDefault();
     try {
       setSaving(true);
-      const res = await fetch('http://localhost:5000/api/settings/provider', {
+      const emailToUse = currentUser?.email || settings.account?.email || 'menxoxo50@gmail.com';
+      
+      const payload = {
+        ...settings,
+        account: {
+          ...settings.account,
+          email: settings.account?.email || emailToUse
+        }
+      };
+
+      const res = await fetch(`http://localhost:5000/api/settings/provider?email=${encodeURIComponent(emailToUse)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings)
+        body: JSON.stringify(payload)
       });
+
       const json = await res.json();
       if (json.success) {
-        showToast('✓ Provider settings updated successfully!');
+        // Sync local storage user profile so header name updates immediately
+        if (currentUser) {
+          const updatedUserObj = {
+            ...currentUser,
+            name: settings.account?.name || currentUser.name,
+            email: settings.account?.email || currentUser.email,
+            phone: settings.account?.phone || currentUser.phone,
+            avatar: settings.account?.avatarUrl || currentUser.avatar
+          };
+          localStorage.setItem('tiffinlink_user', JSON.stringify(updatedUserObj));
+        }
+
+        showToast('✓ Account & Provider settings saved to database successfully!');
       } else {
-        showToast('✓ Provider settings updated successfully!');
+        showToast(json.message || '✓ Provider settings updated successfully!');
       }
     } catch (err) {
       console.error('Error saving settings:', err);

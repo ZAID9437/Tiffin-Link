@@ -1,5 +1,6 @@
 const ProviderSetting = require('../models/ProviderSetting');
 const Provider = require('../models/Provider');
+const User = require('../models/User');
 const Tiffin = require('../models/Tiffin');
 const { ensureConnected } = require('../config/db');
 
@@ -25,7 +26,7 @@ const getProviderSettings = async (req, res) => {
         providerId: pId,
         account: {
           name: realProvider?.fullName || realProvider?.name || 'Zaid Mansuri',
-          email: realProvider?.email || 'provider@tiffinlink.com',
+          email: realProvider?.email || userEmail,
           phone: realProvider?.mobile || '+91 98765 43210',
           avatarUrl: realProvider?.image || '/assets/provider_1.png',
           accountStatus: 'Verified Active'
@@ -140,20 +141,33 @@ const updateProviderSettings = async (req, res) => {
         { new: true, upsert: true }
       );
 
+      // Extract form values safely
+      const newBizName = updatedData.business?.providerName;
+      const newFullName = updatedData.account?.name;
+      const newEmail = updatedData.account?.email || userEmail;
+      const newPhone = updatedData.account?.phone;
+      const newDesc = updatedData.business?.description;
+      const newOpens = updatedData.business?.openingTime;
+      const newCloses = updatedData.business?.closingTime;
+      const newAddress = updatedData.business?.address;
+      const newCity = updatedData.business?.city;
+      const newAvatar = updatedData.account?.avatarUrl;
+      const newKitchenPhoto = updatedData.business?.kitchenPhoto || newAvatar;
+      const newBankName = updatedData.payments?.bankName;
+      const newAccNum = updatedData.payments?.accountNumber;
+      const newIfsc = updatedData.payments?.ifscCode;
+      const newUpi = updatedData.payments?.upiId;
+
+      // Update User collection document for this specific user ONLY
+      if (newEmail) {
+        const userUpdate = {};
+        if (newFullName) userUpdate.name = newFullName;
+        if (newPhone) userUpdate.phone = newPhone;
+        await User.findOneAndUpdate({ email: newEmail.trim().toLowerCase() }, { $set: userUpdate });
+      }
+
       // Dynamically update ONLY this provider's document in MongoDB
       if (realProvider) {
-        const newBizName = updatedData.business?.providerName;
-        const newFullName = updatedData.account?.name;
-        const newEmail = updatedData.account?.email;
-        const newPhone = updatedData.account?.phone;
-        const newDesc = updatedData.business?.description;
-        const newOpens = updatedData.business?.openingTime;
-        const newCloses = updatedData.business?.closingTime;
-        const newAddress = updatedData.business?.address;
-        const newCity = updatedData.business?.city;
-        const newAvatar = updatedData.account?.avatarUrl;
-        const newKitchenPhoto = updatedData.business?.kitchenPhoto || newAvatar;
-
         const providerUpdate = {};
         if (newBizName) {
           providerUpdate.name = newBizName;
@@ -174,12 +188,12 @@ const updateProviderSettings = async (req, res) => {
           providerUpdate.kitchenPhotos = newKitchenPhoto || newAvatar;
         }
 
-        if (newAddress && newCity) {
+        if (newAddress || newCity) {
           providerUpdate.address = {
-            street: newAddress,
-            city: newCity,
+            street: newAddress || realProvider.address?.street || '',
+            city: newCity || realProvider.address?.city || '',
             houseNo: '',
-            locality: updatedData.business?.serviceArea || '',
+            locality: updatedData.business?.serviceArea || realProvider.address?.locality || '',
             pincode: '',
             isLocationPinned: true
           };
@@ -192,7 +206,12 @@ const updateProviderSettings = async (req, res) => {
       return res.json({
         success: true,
         message: 'Provider settings updated successfully!',
-        settings
+        settings,
+        user: {
+          name: newFullName,
+          email: newEmail,
+          phone: newPhone
+        }
       });
     }
     return res.json({
@@ -210,3 +229,4 @@ module.exports = {
   getProviderSettings,
   updateProviderSettings
 };
+
