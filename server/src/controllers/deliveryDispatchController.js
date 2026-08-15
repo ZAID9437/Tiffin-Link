@@ -1,15 +1,21 @@
 const DeliveryRequest = require('../models/DeliveryRequest');
 const Order = require('../models/Order');
+const User = require('../models/User');
 const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
 
+// Diverse Dynamic Delivery Partners Collection
 const NEARBY_AVAILABLE_DRIVERS = [
   { driverId: 'DRV-101', name: 'Rahul Sharma', phone: '+91 98251 44556', rating: 4.9, vehicleNo: 'GJ-01-AB-1029', distanceKm: 0.8, status: 'AVAILABLE', activeDeliveries: 0, vehicle: 'Bike' },
   { driverId: 'DRV-102', name: 'Arjun Patel', phone: '+91 98251 11223', rating: 4.8, vehicleNo: 'GJ-01-CD-4589', distanceKm: 1.2, status: 'AVAILABLE', activeDeliveries: 1, vehicle: 'Scooter' },
-  { driverId: 'DRV-103', name: 'Vikram Singh', phone: '+91 98251 77889', rating: 4.7, vehicleNo: 'GJ-01-EF-8890', distanceKm: 1.9, status: 'BUSY', activeDeliveries: 2, vehicle: 'Bike' },
-  { driverId: 'DRV-104', name: 'Sanjay Mehta', phone: '+91 98251 99000', rating: 4.6, vehicleNo: 'GJ-01-GH-3344', distanceKm: 2.4, status: 'OFFLINE', activeDeliveries: 0, vehicle: 'EV Scooter' }
+  { driverId: 'DRV-103', name: 'Vikram Singh', phone: '+91 98251 77889', rating: 4.7, vehicleNo: 'GJ-01-EF-8890', distanceKm: 1.9, status: 'AVAILABLE', activeDeliveries: 0, vehicle: 'Bike' },
+  { driverId: 'DRV-104', name: 'Jayesh Parmar', phone: '+91 98251 99000', rating: 4.85, vehicleNo: 'GJ-01-GH-3344', distanceKm: 1.5, status: 'AVAILABLE', activeDeliveries: 0, vehicle: 'EV Bike' },
+  { driverId: 'DRV-105', name: 'Karan Shah', phone: '+91 98123 66778', rating: 4.95, vehicleNo: 'GJ-01-JK-5566', distanceKm: 2.1, status: 'AVAILABLE', activeDeliveries: 0, vehicle: 'Activa' },
+  { driverId: 'DRV-106', name: 'Devang Solanki', phone: '+91 99798 22334', rating: 4.75, vehicleNo: 'GJ-01-LM-9900', distanceKm: 2.6, status: 'AVAILABLE', activeDeliveries: 0, vehicle: 'Pulsar' }
 ];
+
+let dispatchCounter = 0;
 
 const DEFAULT_DELIVERY_REQUESTS = [
   {
@@ -104,11 +110,11 @@ const DEFAULT_DELIVERY_REQUESTS = [
     deliveryAddress: { street: 'A-101 Green Acres, Satellite', city: 'Ahmedabad', lat: 23.0280, lng: 72.5100 },
     pickupAddress: { street: 'Shreeji Tiffin Kitchen, Satellite', city: 'Ahmedabad', lat: 23.0300, lng: 72.5650 },
     assignedDriver: {
-      driverId: 'DRV-101',
-      name: 'Rahul Sharma',
-      phone: '+91 98251 44556',
-      rating: 4.9,
-      vehicleNo: 'GJ-01-AB-1029',
+      driverId: 'DRV-104',
+      name: 'Jayesh Parmar',
+      phone: '+91 98251 99000',
+      rating: 4.85,
+      vehicleNo: 'GJ-01-GH-3344',
       location: { lat: 23.0280, lng: 72.5100 }
     },
     status: 'Delivered',
@@ -134,6 +140,8 @@ const getDeliveryRequests = async (req, res) => {
       let requests = await DeliveryRequest.find({ providerEmail: userEmail }).sort({ requestedAt: -1 });
 
       if (requests.length === 0) {
+        // Reset collection with diverse drivers if empty
+        await DeliveryRequest.deleteMany({ providerEmail: userEmail });
         requests = await DeliveryRequest.insertMany(DEFAULT_DELIVERY_REQUESTS);
       }
 
@@ -155,7 +163,7 @@ const getDeliveryRequests = async (req, res) => {
   }
 };
 
-// @desc    Create new delivery dispatch request when food is ready
+// @desc    Create new delivery dispatch request with Dynamic Driver Matching
 // @route   POST /api/delivery/dispatch
 const createDeliveryRequest = async (req, res) => {
   try {
@@ -164,7 +172,9 @@ const createDeliveryRequest = async (req, res) => {
     const requestId = `#DEL-${Math.floor(1000 + Math.random() * 9000)}`;
     const pickupOtp = String(Math.floor(1000 + Math.random() * 9000));
 
-    const closestDriver = NEARBY_AVAILABLE_DRIVERS[0];
+    // Dynamic Swiggy/Zomato style driver assignment (cycling through available drivers)
+    const selectedDriver = NEARBY_AVAILABLE_DRIVERS[dispatchCounter % NEARBY_AVAILABLE_DRIVERS.length];
+    dispatchCounter++;
 
     const newRequestData = {
       requestId,
@@ -177,20 +187,21 @@ const createDeliveryRequest = async (req, res) => {
       deliveryAddress: typeof deliveryAddress === 'object' ? deliveryAddress : { street: deliveryAddress || 'Ahmedabad', city: 'Ahmedabad', lat: 23.0225, lng: 72.5714 },
       pickupAddress: { street: 'Shreeji Tiffin Kitchen, Satellite', city: 'Ahmedabad', lat: 23.0300, lng: 72.5650 },
       assignedDriver: {
-        driverId: closestDriver.driverId,
-        name: closestDriver.name,
-        phone: closestDriver.phone,
-        rating: closestDriver.rating,
-        vehicleNo: closestDriver.vehicleNo,
+        driverId: selectedDriver.driverId,
+        name: selectedDriver.name,
+        phone: selectedDriver.phone,
+        rating: selectedDriver.rating,
+        vehicleNo: selectedDriver.vehicleNo,
         location: { lat: 23.0280, lng: 72.5670 }
       },
-      status: 'Searching Drivers',
-      distanceKm: closestDriver.distanceKm,
+      status: 'Driver Assigned',
+      distanceKm: selectedDriver.distanceKm,
       etaMinutes: 12,
       amount: amount || 240,
       itemCount: itemCount || 1,
       pickupOtp,
-      requestedAt: new Date()
+      requestedAt: new Date(),
+      acceptedAt: new Date()
     };
 
     if (await isDbConnected()) {
@@ -199,20 +210,20 @@ const createDeliveryRequest = async (req, res) => {
       if (orderId) {
         await Order.findOneAndUpdate(
           { $or: [{ orderId }, { _id: orderId }] },
-          { $set: { status: 'Ready', deliveryStatus: 'Searching', deliveryPartnerName: closestDriver.name } }
+          { $set: { status: 'Ready', deliveryStatus: 'Assigned', deliveryPartnerName: selectedDriver.name, deliveryPartnerPhone: selectedDriver.phone } }
         );
       }
 
       return res.json({
         success: true,
-        message: 'Delivery request created! Finding nearby drivers...',
+        message: `Delivery request created! Automatically assigned to ${selectedDriver.name}.`,
         request
       });
     }
 
     return res.json({
       success: true,
-      message: 'Delivery request created! Finding nearby drivers...',
+      message: `Delivery request created! Automatically assigned to ${selectedDriver.name}.`,
       request: newRequestData
     });
   } catch (error) {
@@ -226,7 +237,13 @@ const createDeliveryRequest = async (req, res) => {
 const assignDriver = async (req, res) => {
   try {
     const { requestId, driverId } = req.body;
-    const selectedDriver = NEARBY_AVAILABLE_DRIVERS.find(d => d.driverId === driverId) || NEARBY_AVAILABLE_DRIVERS[0];
+    
+    // Cycle or match requested driver
+    let selectedDriver = NEARBY_AVAILABLE_DRIVERS.find(d => d.driverId === driverId);
+    if (!selectedDriver) {
+      selectedDriver = NEARBY_AVAILABLE_DRIVERS[dispatchCounter % NEARBY_AVAILABLE_DRIVERS.length];
+      dispatchCounter++;
+    }
 
     if (await isDbConnected()) {
       const request = await DeliveryRequest.findOneAndUpdate(
