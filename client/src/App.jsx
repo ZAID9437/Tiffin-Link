@@ -33,6 +33,7 @@ import ScrollMarquee from './components/ScrollMarquee';
 import ScrollRopeIndicator from './components/ScrollRopeIndicator';
 import LoginModal from './components/LoginModal';
 import DemoModal from './components/DemoModal';
+import CookieConsentModal from './components/CookieConsentModal';
 
 import { CheckCircle2 } from 'lucide-react';
 
@@ -77,6 +78,7 @@ export default function App() {
   const [isBecomeProviderModalOpen, setIsBecomeProviderModalOpen] = useState(false);
   const [isBecomeDeliveryPartnerModalOpen, setIsBecomeDeliveryPartnerModalOpen] = useState(false);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
+  const [isCookieConsentModalOpen, setIsCookieConsentModalOpen] = useState(false);
   const [preloaderFinished, setPreloaderFinished] = useState(false);
 
   // Simple state-based router using window.location.hash
@@ -528,6 +530,7 @@ export default function App() {
       {/* Footer */}
       <Footer 
         onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)}
+        onOpenCookieConsentModal={() => setIsCookieConsentModalOpen(true)}
       />
 
       {/* Interactive Modals */}
@@ -555,6 +558,11 @@ export default function App() {
       <DemoModal 
         isOpen={isDemoModalOpen} 
         onClose={() => setIsDemoModalOpen(false)}
+      />
+
+      <CookieConsentModal 
+        isOpenOverride={isCookieConsentModalOpen}
+        onCloseOverride={() => setIsCookieConsentModalOpen(false)}
       />
 
       {/* Toast Alerts */}

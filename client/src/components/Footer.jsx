@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function Footer({ onOpenBecomeProviderModal }) {
+export default function Footer({ onOpenBecomeProviderModal, onOpenCookieConsentModal }) {
   const handleBackToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -63,6 +63,14 @@ export default function Footer({ onOpenBecomeProviderModal }) {
             <ul className="space-y-4 font-label-caps text-label-caps">
               <li><a className="hover:opacity-50 transition-opacity" href="#privacy">PRIVACY</a></li>
               <li><a className="hover:opacity-50 transition-opacity" href="#terms">TERMS</a></li>
+              <li>
+                <button 
+                  onClick={onOpenCookieConsentModal} 
+                  className="hover:opacity-50 transition-opacity text-left cursor-pointer uppercase text-clay-earth font-bold flex items-center gap-1"
+                >
+                  <span>🍪 COOKIES & SESSIONS</span>
+                </button>
+              </li>
             </ul>
           </div>
         </div>

@@ -176,6 +176,16 @@ const login = async (req, res) => {
       user.lastLogin = new Date();
       await user.save();
 
+      // Set HTTP-Only auth token cookie and session user
+      res.cookie('tiffinlink_token', accessToken, {
+        httpOnly: true,
+        secure: false,
+        maxAge: 24 * 60 * 60 * 1000
+      });
+      if (req.session) {
+        req.session.user = formatUserPayload(user);
+      }
+
       return res.json({
         success: true,
         message: 'Logged in successfully.',
@@ -270,6 +280,13 @@ const logout = async (req, res) => {
       } catch (e) {
         // Token already expired/invalid
       }
+    }
+
+    // Clear session cookies & destroy session
+    res.clearCookie('tiffinlink_token');
+    res.clearCookie('tiffinlink_session');
+    if (req.session) {
+      req.session.destroy();
     }
 
     return res.json({ success: true, message: 'Logged out successfully' });
