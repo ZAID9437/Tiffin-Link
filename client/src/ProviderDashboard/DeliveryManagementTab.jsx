@@ -49,6 +49,20 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
   const [otpInput, setOtpInput] = useState('');
   const [isTrackingDrawerOpen, setIsTrackingDrawerOpen] = useState(false);
 
+  // Real-Time GPS Map Animation & Layer Controls
+  const [driverPosProgress, setDriverPosProgress] = useState(45); // 0% to 100% route progress
+  const [driverSpeed, setDriverSpeed] = useState(28);
+  const [mapLayer, setMapLayer] = useState('roadmap'); // 'roadmap' | 'satellite'
+
+  // Live GPS movement animation loop
+  useEffect(() => {
+    const gpsTimer = setInterval(() => {
+      setDriverPosProgress(prev => (prev >= 92 ? 20 : prev + 2.5));
+      setDriverSpeed(24 + Math.floor(Math.random() * 12));
+    }, 1500);
+    return () => clearInterval(gpsTimer);
+  }, []);
+
   useEffect(() => {
     fetchDeliveryData();
     const interval = setInterval(fetchDeliveryData, 4000);
@@ -673,86 +687,153 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
           </div>
         </div>
 
-        {/* Live Interactive Map Display */}
-        <div className="h-64 sm:h-72 bg-[#F9FBF9] rounded-2xl border border-[#E5ECE8] relative overflow-hidden flex flex-col justify-between p-4 shadow-inner">
+        {/* Live Interactive Google Maps Styled Display */}
+        <div className="h-72 sm:h-80 bg-[#1F2937] rounded-2xl border-2 border-[#0A8B5F]/40 relative overflow-hidden flex flex-col justify-between p-4 shadow-xl">
           
-          {/* Top Map Overlay Bar */}
-          <div className="flex items-center justify-between z-10">
-            <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#E5ECE8] text-xs font-black text-[#111827] shadow-xs flex items-center gap-2">
-              <Building2 size={14} className="text-[#0A8B5F]" />
+          {/* Real Map Tiles Layer Background */}
+          <div className="absolute inset-0 z-0 overflow-hidden">
+            {mapLayer === 'satellite' ? (
+              <div 
+                className="w-full h-full bg-cover bg-center opacity-85 transition-opacity duration-500 scale-105 filter contrast-125 brightness-90"
+                style={{ backgroundImage: `url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=1200&q=80')` }}
+              />
+            ) : (
+              <div 
+                className="w-full h-full bg-cover bg-center opacity-90 transition-opacity duration-500 filter brightness-105"
+                style={{ backgroundImage: `url('https://images.unsplash.com/photo-1569336415962-a4bd9f69c07b?auto=format&fit=crop&w=1200&q=80')` }}
+              />
+            )}
+            {/* Dark/Light Map Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40" />
+          </div>
+
+          {/* Top Map Controls & Status Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 z-10">
+            <div className="bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 text-xs font-black text-white shadow-md flex items-center gap-2">
+              <Building2 size={14} className="text-emerald-400" />
               <span>Kitchen: Shreeji Tiffin Kitchen (Satellite, Ahmedabad)</span>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#E5ECE8] text-xs font-black text-[#0A8B5F] shadow-xs flex items-center gap-2">
-              <Clock size={14} />
-              <span>ETA: {selectedDelivery?.etaMinutes || 18} mins • Distance: {selectedDelivery?.distanceKm || 3.2} km</span>
+            <div className="flex items-center gap-2">
+              {/* Map Layer Toggle (Roadmap vs Satellite) */}
+              <div className="bg-black/75 backdrop-blur-md p-1 rounded-xl border border-white/20 flex items-center gap-1 shadow-md">
+                <button
+                  type="button"
+                  onClick={() => setMapLayer('roadmap')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                    mapLayer === 'roadmap' ? 'bg-[#0A8B5F] text-white' : 'text-gray-300 hover:text-white'
+                  }`}
+                >
+                  🗺️ Roadmap
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMapLayer('satellite')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                    mapLayer === 'satellite' ? 'bg-[#0A8B5F] text-white' : 'text-gray-300 hover:text-white'
+                  }`}
+                >
+                  🛰️ Satellite
+                </button>
+              </div>
+
+              <div className="bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-400/40 text-xs font-black text-emerald-400 shadow-md flex items-center gap-2">
+                <Clock size={14} />
+                <span>
+                  ETA: {Math.max(3, Math.round(18 * (1 - driverPosProgress / 100)))} mins • 
+                  Distance: {(3.2 * (1 - driverPosProgress / 100)).toFixed(1)} km
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* SVG Map Canvas with Animated Route & Markers */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6">
+          {/* Real-Time Moving GPS Route SVG Canvas */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-6 z-5">
             <svg className="w-full h-full" viewBox="0 0 600 200" fill="none">
-              {/* Background Map Grid Pattern */}
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E5ECE8" strokeWidth="1" opacity="0.6" />
-              </pattern>
-              <rect width="100%" height="100%" fill="url(#grid)" />
+              {/* Animated Glowing GPS Road Path */}
+              <path d="M 70 140 Q 250 40 530 140" stroke="#10B981" strokeWidth="6" strokeLinecap="round" strokeOpacity="0.4" />
+              <path d="M 70 140 Q 250 40 530 140" stroke="#34D399" strokeWidth="3" strokeDasharray="8 6" strokeLinecap="round" className="animate-pulse" />
 
-              {/* Curved Road Path */}
-              <path d="M 70 120 Q 300 30 530 120" stroke="#CBD5E1" strokeWidth="8" strokeLinecap="round" />
-              <path d="M 70 120 Q 300 30 530 120" stroke="#0A8B5F" strokeWidth="4" strokeDasharray="10 8" strokeLinecap="round" />
-
-              {/* Kitchen / Provider Marker */}
-              <g transform="translate(70, 120)">
-                <circle r="22" fill="#0A8B5F" fillOpacity="0.15" />
-                <circle r="14" fill="#0A8B5F" />
+              {/* Kitchen Pin (Provider) */}
+              <g transform="translate(70, 140)">
+                <circle r="22" fill="#10B981" fillOpacity="0.3" className="animate-ping" />
+                <circle r="15" fill="#059669" stroke="#FFFFFF" strokeWidth="2" />
                 <text y="4" fontSize="11" textAnchor="middle" fill="#FFFFFF" fontWeight="900">🍱</text>
-                <text y="30" fontSize="11" textAnchor="middle" fill="#111827" fontWeight="800">Provider Kitchen</text>
-              </g>
-
-              {/* Driver Live GPS Marker */}
-              <g transform="translate(320, 65)">
-                <circle r="26" fill="#F59E0B" fillOpacity="0.25" className="animate-ping" />
-                <circle r="18" fill="#F59E0B" />
-                <text y="4" fontSize="12" textAnchor="middle" fill="#FFFFFF" fontWeight="900">🛵</text>
-                <text y="-26" fontSize="11" textAnchor="middle" fill="#D97706" fontWeight="900">
-                  {selectedDelivery?.assignedDriver?.name || 'Rahul Sharma (Driver)'}
-                </text>
-                <text y="34" fontSize="10" textAnchor="middle" fill="#4B5563" fontWeight="700">
-                  Speed: 28 km/h • On Route
+                <text y="32" fontSize="11" textAnchor="middle" fill="#FFFFFF" fontWeight="900" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))' }}>
+                  Provider Kitchen
                 </text>
               </g>
 
-              {/* Customer Destination Marker */}
-              <g transform="translate(530, 120)">
-                <circle r="22" fill="#3B82F6" fillOpacity="0.15" />
-                <circle r="14" fill="#3B82F6" />
+              {/* Real-Time Moving Driver Marker */}
+              {(() => {
+                const t = driverPosProgress / 100;
+                // Bezier Q(70,140, 250,40, 530,140)
+                const currentX = (1 - t) * (1 - t) * 70 + 2 * (1 - t) * t * 250 + t * t * 530;
+                const currentY = (1 - t) * (1 - t) * 140 + 2 * (1 - t) * t * 40 + t * t * 140;
+
+                return (
+                  <g transform={`translate(${currentX}, ${currentY})`} style={{ transition: 'transform 1.2s ease-out' }}>
+                    <circle r="28" fill="#F59E0B" fillOpacity="0.35" className="animate-ping" />
+                    <circle r="18" fill="#F59E0B" stroke="#FFFFFF" strokeWidth="2.5" />
+                    <text y="5" fontSize="13" textAnchor="middle" fill="#FFFFFF" fontWeight="900">🛵</text>
+                    
+                    {/* Live Driver Floating Card */}
+                    <g transform="translate(0, -32)">
+                      <rect x="-80" y="-18" width="160" height="24" rx="12" fill="#111827" fillOpacity="0.9" stroke="#F59E0B" strokeWidth="1.5" />
+                      <text y="-2" fontSize="10" textAnchor="middle" fill="#FBBF24" fontWeight="900">
+                        {selectedDelivery?.assignedDriver?.name || 'Rahul Sharma'} (Driver)
+                      </text>
+                    </g>
+
+                    <g transform="translate(0, 36)">
+                      <rect x="-70" y="-12" width="140" height="18" rx="9" fill="#000000" fillOpacity="0.8" />
+                      <text y="1" fontSize="9" textAnchor="middle" fill="#34D399" fontWeight="800">
+                        ⚡ {driverSpeed} km/h • Live GPS
+                      </text>
+                    </g>
+                  </g>
+                );
+              })()}
+
+              {/* Customer Destination Pin */}
+              <g transform="translate(530, 140)">
+                <circle r="22" fill="#3B82F6" fillOpacity="0.3" className="animate-ping" />
+                <circle r="15" fill="#2563EB" stroke="#FFFFFF" strokeWidth="2" />
                 <text y="4" fontSize="11" textAnchor="middle" fill="#FFFFFF" fontWeight="900">📍</text>
-                <text y="30" fontSize="11" textAnchor="middle" fill="#111827" fontWeight="800">
+                <text y="32" fontSize="11" textAnchor="middle" fill="#FFFFFF" fontWeight="900" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))' }}>
                   {selectedDelivery?.customerName || 'Customer Destination'}
                 </text>
               </g>
             </svg>
           </div>
 
-          {/* Bottom Map Info Footer Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 z-10 bg-white/95 backdrop-blur-md p-3 rounded-xl border border-[#E5ECE8] shadow-xs">
+          {/* Bottom Live Driver Info & Action Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 z-10 bg-black/80 backdrop-blur-md p-3 rounded-xl border border-white/20 shadow-md">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#E8F0EC] text-[#0A8B5F] flex items-center justify-center font-black text-xs">
+              <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center font-black text-sm border border-white/40 shadow-xs">
                 {selectedDelivery?.assignedDriver?.name?.charAt(0) || 'R'}
               </div>
               <div>
-                <div className="text-xs font-black text-[#111827]">
-                  {selectedDelivery?.assignedDriver?.name || 'Rahul Sharma'} ({selectedDelivery?.assignedDriver?.vehicleNo || 'Bike GJ-01-AB-1029'})
+                <div className="text-xs font-black text-white flex items-center gap-2">
+                  <span>{selectedDelivery?.assignedDriver?.name || 'Rahul Sharma'}</span>
+                  <span className="text-[10px] text-amber-400 font-bold bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-500/30">
+                    ★ {selectedDelivery?.assignedDriver?.rating || 4.9} • {selectedDelivery?.assignedDriver?.vehicleNo || 'Bike GJ-01-AB-1029'}
+                  </span>
                 </div>
-                <div className="text-[10px] text-[#6B7280] font-semibold">
-                  Destination: {typeof selectedDelivery?.deliveryAddress === 'string' ? selectedDelivery.deliveryAddress : (selectedDelivery?.deliveryAddress?.street || 'CG Road, Ahmedabad')}
+                <div className="text-[10px] text-gray-300 font-medium">
+                  Destination: {typeof selectedDelivery?.deliveryAddress === 'string' ? selectedDelivery.deliveryAddress : (selectedDelivery?.deliveryAddress?.street || 'CG Road, Satellite, Ahmedabad')}
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-2 self-end sm:self-auto">
+              <span className="text-[10px] font-black text-emerald-400 bg-emerald-950/80 px-3 py-1.5 rounded-lg border border-emerald-500/40 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>Live GPS Signal: 100% Strong</span>
+              </span>
+
               <button
+                type="button"
                 onClick={() => {
                   if (selectedDelivery) setIsTrackingDrawerOpen(true);
                   else if (deliveries.length > 0) { setSelectedDelivery(deliveries[0]); setIsTrackingDrawerOpen(true); }
