@@ -37,14 +37,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     { id: '#1029', customer: 'Neha Patel', items: 'North Indian × 2', time: '7:00 PM', amount: 300, status: 'Delivery Assigned', statusBg: 'bg-blue-100 text-blue-800 border-blue-200' }
   ]);
 
-  const [liveRequest, setLiveRequest] = useState({
-    id: 'REQ-1092',
-    items: '2 × Veg Tiffin',
-    time: 'Today • 5:00 PM',
-    distance: '1.8 km • Delivery',
-    price: 120,
-    secondsLeft: 42
-  });
+  const [liveRequest, setLiveRequest] = useState(null);
 
   const [acceptingOrders, setAcceptingOrders] = useState(() => {
     return localStorage.getItem('tiffinlink_provider_accepting_orders') !== 'false';
@@ -52,14 +45,35 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
 
   const [toastMessage, setToastMessage] = useState(null);
 
+  // Poll database for real pending meal requests
   useEffect(() => {
-    const timer = setInterval(() => {
-      setLiveRequest(prev => prev ? {
-        ...prev,
-        secondsLeft: prev.secondsLeft > 0 ? prev.secondsLeft - 1 : 0
-      } : null);
-    }, 1000);
-    return () => clearInterval(timer);
+    const fetchRealRequests = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/requests');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          const req = json.data[0];
+          setLiveRequest({
+            id: req._id || 'REQ-1092',
+            customerName: req.customerName || 'Rahul Shah',
+            customerPhone: req.customerPhone || '+91 98765 12345',
+            items: `${req.quantity || 1} × ${req.mealType || 'Veg Tiffin'}`,
+            time: `${req.date || 'Today'} • ${req.time || '5:00 PM'}`,
+            distance: `${req.distance || '1.8 km'} • ${req.deliveryType || 'Delivery'}`,
+            price: req.budget || 120,
+            secondsLeft: 60
+          });
+        } else {
+          setLiveRequest(null);
+        }
+      } catch (err) {
+        console.error('Error fetching live requests from MongoDB:', err);
+      }
+    };
+
+    fetchRealRequests();
+    const interval = setInterval(fetchRealRequests, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleToggleAcceptingOrders = async () => {
@@ -89,29 +103,41 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
   };
 
   const handleAcceptLiveRequest = async () => {
+    if (!liveRequest) return;
+    const activeReq = liveRequest;
     setLiveRequest(null);
     setToastMessage('✓ Live Request Accepted! Creating order in database & navigating to Preparing...');
 
     try {
+      // 1. Post new order to MongoDB tiffinlink.orders
       await fetch('http://localhost:5000/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerName: 'Rahul Shah',
-          customerPhone: '+91 98765 12345',
+          customerName: activeReq.customerName || 'Rahul Shah',
+          customerPhone: activeReq.customerPhone || '+91 98765 12345',
           customerAddress: 'B-402, Shivalik Towers, Satellite, Ahmedabad',
-          tiffinName: 'Gujarati Veg Special Thali',
+          tiffinName: activeReq.items || 'Gujarati Veg Special Thali',
           tiffinCategory: 'Gujarati',
           tiffinImage: '/assets/provider_1.png',
           quantity: 2,
-          unitPrice: 120,
+          unitPrice: activeReq.price || 120,
           distanceKm: 1.8,
           paymentStatus: 'Paid',
           status: 'Preparing'
         })
       });
+
+      // 2. Mark request as accepted in MongoDB
+      if (activeReq.id && activeReq.id.length > 10) {
+        await fetch(`http://localhost:5000/api/requests/${activeReq.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'accepted' })
+        });
+      }
     } catch (err) {
-      console.error('Error creating accepted order in MongoDB:', err);
+      console.error('Error accepting live request:', err);
     }
 
     setTimeout(() => {

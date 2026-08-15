@@ -47,6 +47,8 @@ export default function LiveRequestsTab({ onNavigateTab, onAcceptRequest }) {
 
   useEffect(() => {
     fetchLiveRequests();
+    const interval = setInterval(fetchLiveRequests, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchLiveRequests = async () => {
@@ -54,24 +56,25 @@ export default function LiveRequestsTab({ onNavigateTab, onAcceptRequest }) {
       setLoading(true);
       const res = await fetch('http://localhost:5000/api/requests');
       const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+      if (json.success && Array.isArray(json.data)) {
         setRequests(json.data.map((r, i) => ({
           id: r._id ? `REQ-${r._id.slice(-4).toUpperCase()}` : `REQ-109${i+2}`,
+          dbId: r._id,
           customerName: r.customerName || 'Nearby Customer',
           customerPhone: r.customerPhone || '+91 98765 43210',
-          items: [{ name: r.mealType || 'Veg Special Thali', qty: 1, price: r.budget || 120 }],
-          totalAmount: r.budget || 120,
+          items: [{ name: r.mealType || 'Veg Special Thali', qty: r.quantity || 1, price: r.budget || 120 }],
+          totalAmount: (r.quantity || 1) * (r.budget || 120),
           distance: r.location || '1.8 km',
           deliveryTime: `${r.date || 'Today'} • ${r.time || '5:00 PM'}`,
           secondsLeft: 120,
           status: 'pending'
         })));
       } else {
-        setRequests(initialMockRequests);
+        setRequests([]);
       }
     } catch (err) {
-      console.error('Error fetching live requests:', err);
-      setRequests(initialMockRequests);
+      console.error('Error fetching live requests from MongoDB:', err);
+      setRequests([]);
     } finally {
       setLoading(false);
     }
