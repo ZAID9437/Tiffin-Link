@@ -66,6 +66,14 @@ const providerSettingSchema = new mongoose.Schema({
     dateFormat: { type: String, default: 'DD/MM/YYYY' },
     timezone: { type: String, default: 'Asia/Kolkata (IST)' }
   },
+  serviceAreaSettings: {
+    deliveryMode: { type: String, default: 'Radius Based' },
+    deliveryRadius: { type: Number, default: 5 },
+    minOrderAmount: { type: Number, default: 150 },
+    deliveryFee: { type: Number, default: 30 },
+    freeDeliveryAbove: { type: Number, default: 500 },
+    acceptOrdersOnlyInsideArea: { type: Boolean, default: true }
+  },
   updatedAt: {
     type: Date,
     default: Date.now
