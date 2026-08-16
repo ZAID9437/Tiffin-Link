@@ -166,12 +166,38 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide customer name, tiffin name, and unit price' });
     }
 
-    // Capacity Auto-Stop Validation Check
+    // Schedule & Capacity Validation Check
     if (await isDbConnected()) {
       try {
+        const KitchenSchedule = require('../models/KitchenSchedule');
         const ProviderSetting = require('../models/ProviderSetting');
         const KitchenCapacity = require('../models/KitchenCapacity');
-        
+
+        // 1. Kitchen Schedule Check
+        const schedDoc = await KitchenSchedule.findOne({ providerId: 'prov_1' });
+        if (schedDoc) {
+          const now = new Date();
+          const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          const currentDayName = daysOfWeek[now.getDay()];
+          const todayConfig = schedDoc.weeklySchedule?.find(d => d.day === currentDayName);
+          if (todayConfig && !todayConfig.isOpen) {
+            return res.status(400).json({
+              success: false,
+              message: `Kitchen is closed today (${currentDayName}) according to kitchen schedule.`
+            });
+          }
+
+          const dateFormatted = `${now.getDate()} ${now.toLocaleString('en', { month: 'short' })}`;
+          const specialOverride = schedDoc.specialDates?.find(sd => sd.date.toLowerCase() === dateFormatted.toLowerCase());
+          if (specialOverride && specialOverride.status === 'CLOSED') {
+            return res.status(400).json({
+              success: false,
+              message: `Kitchen is closed today for ${specialOverride.reason || 'Holiday'}.`
+            });
+          }
+        }
+
+        // 2. Capacity Auto-Stop Validation Check
         const settings = await ProviderSetting.findOne({ providerId: 'prov_1' });
         const maxDaily = settings?.tiffin?.maxDailyLimit ?? 50;
         const autoStop = settings?.tiffin?.autoPauseLimit ?? true;

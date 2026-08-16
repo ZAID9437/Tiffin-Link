@@ -19,6 +19,7 @@ const subscriptionRoutes = require('./subscriptionRoutes');
 const otpRoutes = require('./otpRoutes');
 const capacityRoutes = require('./capacityRoutes');
 const serviceAreaRoutes = require('./serviceAreaRoutes');
+const scheduleRoutes = require('./scheduleRoutes');
 
 router.use('/auth', authRoutes);
 router.use('/providers', providerRoutes);
@@ -38,6 +39,7 @@ router.use('/subscriptions', subscriptionRoutes);
 router.use('/otp', otpRoutes);
 router.use('/capacity', capacityRoutes);
 router.use('/service-area', serviceAreaRoutes);
+router.use('/schedule', scheduleRoutes);
 
 module.exports = router;
 
