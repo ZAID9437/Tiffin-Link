@@ -228,14 +228,14 @@ const createOrder = async (req, res) => {
       await newOrder.save();
       return res.status(201).json({ 
         success: true, 
-        message: 'Order created successfully in MongoDB with Bill Receipt', 
+        message: 'Order created successfully with Bill Receipt', 
         data: newOrder, 
         source: 'database' 
       });
     } else {
       return res.status(201).json({ 
         success: true, 
-        message: 'Order created (in-memory)', 
+        message: 'Order created', 
         data: { _id: 'ord_' + Date.now(), ...orderData }, 
         source: 'in-memory' 
       });
@@ -246,7 +246,7 @@ const createOrder = async (req, res) => {
   }
 };
 
-// @desc    Update order status or details in MongoDB
+// @desc    Update order status or details
 // @route   PUT /api/orders/:id
 const updateOrder = async (req, res) => {
   try {
@@ -259,7 +259,7 @@ const updateOrder = async (req, res) => {
 
     if (await isDbConnected()) {
       const updated = await Order.findByIdAndUpdate(id, updateData, { new: true });
-      return res.json({ success: true, message: 'Order updated in MongoDB', data: updated });
+      return res.json({ success: true, message: 'Order updated successfully', data: updated });
     }
     return res.json({ success: true, message: 'Order updated (in-memory)', data: req.body });
   } catch (error) {
@@ -355,7 +355,7 @@ const deleteOrder = async (req, res) => {
     const { id } = req.params;
     if (await isDbConnected()) {
       await Order.findByIdAndDelete(id);
-      return res.json({ success: true, message: 'Order deleted from MongoDB' });
+      return res.json({ success: true, message: 'Order deleted successfully' });
     }
     return res.json({ success: true, message: 'Order deleted (in-memory)' });
   } catch (error) {

@@ -336,7 +336,7 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem' }) {
 
         <span className="text-[10px] text-emerald-800 bg-white px-2.5 py-1 rounded-lg border border-emerald-300 font-extrabold flex items-center gap-1.5 shadow-2xs">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-          <span>● GPS ACTIVE — Real MongoDB Coordinates</span>
+          <span>● GPS ACTIVE — Live Real-Time Coordinates</span>
         </span>
       </div>
     </div>

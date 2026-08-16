@@ -227,7 +227,7 @@ const registerProvider = async (req, res) => {
 
       return res.status(201).json({ 
         success: true, 
-        message: 'Kitchen registered successfully in MongoDB',
+        message: 'Kitchen registered successfully',
         data: newProvider, 
         user: updatedUser ? formatUserPayload(updatedUser) : null,
         accessToken,
@@ -368,7 +368,7 @@ const toggleProviderStatus = async (req, res) => {
       return res.json({
         success: true,
         acceptingOrders,
-        message: `Provider status updated to ${acceptingOrders ? 'ONLINE' : 'PAUSED'} in MongoDB`
+        message: `Provider status updated to ${acceptingOrders ? 'ONLINE' : 'PAUSED'}`
       });
     }
     return res.json({ success: true, acceptingOrders, message: 'Status updated (in-memory)' });

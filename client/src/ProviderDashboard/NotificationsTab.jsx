@@ -400,7 +400,7 @@ export default function NotificationsTab({ onNavigateTab }) {
         {loading && notifications.length === 0 && (
           <div className="bg-white rounded-2xl p-12 text-center border border-[#E5ECE8] space-y-3 shadow-xs">
             <div className="w-8 h-8 border-4 border-[#0A8B5F] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-[#6B7280] font-bold">Loading real-time notifications from MongoDB...</p>
+            <p className="text-xs text-[#6B7280] font-bold">Loading real-time notifications...</p>
           </div>
         )}
 

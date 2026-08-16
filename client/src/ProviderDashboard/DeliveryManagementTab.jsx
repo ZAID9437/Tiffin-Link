@@ -228,7 +228,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
   // Retry Delivery Assignment Handler
   const handleRetryDelivery = async (reqId) => {
     try {
-      showToast('🔄 Retrying driver search in MongoDB...');
+      showToast('🔄 Retrying driver search...');
       const res = await fetch('http://localhost:5000/api/delivery/retry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -659,7 +659,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
         {loading ? (
           <div className="p-12 text-center text-[#6B7280] space-y-3">
             <RefreshCw size={24} className="animate-spin mx-auto text-[#0A8B5F]" />
-            <p className="font-bold">Syncing delivery queue with MongoDB...</p>
+            <p className="font-bold">Syncing delivery queue...</p>
           </div>
         ) : filteredDeliveries.length === 0 ? (
           /* 45. EMPTY STATE */
@@ -860,7 +860,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
               <h3 className="text-base font-black text-[#111827]">Delivery Drivers Fleet</h3>
             </div>
             <p className="text-xs text-[#6B7280] font-medium mt-0.5">
-              ⚡ <span className="font-bold text-[#0A8B5F]">Swiggy & Zomato Auto-Assign Active:</span> System automatically matches nearest available driver (distance & rating) in MongoDB when an order is ready.
+              ⚡ <span className="font-bold text-[#0A8B5F]">Swiggy & Zomato Auto-Assign Active:</span> System automatically matches nearest available driver (distance & rating) when an order is ready.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -936,7 +936,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                             try {
                               const unassignedReq = deliveries.find(d => normalizeStatus(d.status) === 'Assignment Pending');
                               const reqId = unassignedReq ? unassignedReq.requestId : (deliveries[0]?.requestId || '#DEL-1029');
-                              showToast(`⚡ Assigning ${drv.name} to order in MongoDB...`);
+                              showToast(`⚡ Assigning ${drv.name} to order...`);
                               const res = await fetch('http://localhost:5000/api/delivery/assign', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },

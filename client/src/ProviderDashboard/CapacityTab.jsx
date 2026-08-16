@@ -91,7 +91,7 @@ export default function CapacityTab() {
       });
       const json = await res.json();
       if (json.success) {
-        showToast('✓ Saved Kitchen Capacity Settings to MongoDB!');
+        showToast('✓ Saved Kitchen Capacity Settings successfully!');
         fetchCapacityFromDb();
       } else {
         showToast('⚠️ ' + (json.message || 'Failed to save settings'));
@@ -185,7 +185,7 @@ export default function CapacityTab() {
       <div className="bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-6">
         <div className="border-b border-[#E5ECE8] pb-3 flex items-center justify-between">
           <h2 className="text-sm font-black text-[#111827] uppercase tracking-wider">TODAY'S CAPACITY</h2>
-          <span className="text-xs text-[#6B7280] font-bold">Real-time MongoDB Order Integration</span>
+          <span className="text-xs text-[#6B7280] font-bold">Real-time Live Order Integration</span>
         </div>
 
         {/* 3 Summary Cards */}

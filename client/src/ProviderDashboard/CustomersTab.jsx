@@ -97,7 +97,7 @@ export default function CustomersTab() {
             <span className="text-[#0A8B5F] font-extrabold">Customers</span>
           </div>
           <h1 className="text-2xl font-black text-[#111827] tracking-tight">Customer Directory</h1>
-          <p className="text-xs text-[#6B7280] font-medium mt-1">Real-time customer accounts fetched directly from MongoDB database <span className="text-[#0A8B5F] font-bold">tiffinlink.users</span>.</p>
+          <p className="text-xs text-[#6B7280] font-medium mt-1">Manage and track your active customer accounts.</p>
         </div>
 
         <button 
@@ -129,7 +129,7 @@ export default function CustomersTab() {
             <UserCheck size={17} className="text-emerald-600" />
           </div>
           <div className="text-3xl font-black text-[#111827]">{activeCustomersCount}</div>
-          <p className="text-[11px] text-emerald-700 font-semibold mt-1">● Active buyers in MongoDB</p>
+          <p className="text-[11px] text-emerald-700 font-semibold mt-1">● Active buyers registered</p>
         </div>
 
         {/* Card 3: New Today */}
@@ -201,7 +201,7 @@ export default function CustomersTab() {
         {loading ? (
           <div className="p-12 text-center">
             <div className="w-8 h-8 border-4 border-[#0A8B5F] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-[#6B7280] font-bold mt-3">Fetching real customer accounts from MongoDB...</p>
+            <p className="text-xs text-[#6B7280] font-bold mt-3">Fetching customer accounts...</p>
           </div>
         ) : filteredCustomers.length === 0 ? (
           <div className="p-12 text-center space-y-3">

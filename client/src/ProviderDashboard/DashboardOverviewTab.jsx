@@ -452,7 +452,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
             {stats.todaysOrdersCount}
           </div>
           <div className="text-[11px] text-[#0A8B5F] font-semibold mt-2 flex items-center gap-1">
-            <span>📈 Live MongoDB Sync</span>
+            <span>📈 Live Sync</span>
             <span className="opacity-75">• Today only</span>
           </div>
         </div>
@@ -786,7 +786,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
 
             {/* Modal Footer */}
             <div className="p-4 bg-[#F9FBF9] border-t border-[#E5ECE8] flex items-center justify-between text-xs text-[#6B7280]">
-              <span className="font-bold">Total {getFilteredReportOrders().length} orders loaded from MongoDB Database</span>
+              <span className="font-bold">Total {getFilteredReportOrders().length} orders loaded</span>
               <button
                 type="button"
                 onClick={() => setIsReportModalOpen(false)}

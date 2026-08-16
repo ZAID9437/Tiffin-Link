@@ -85,7 +85,8 @@ export default function ReviewsTab() {
       });
       const json = await res.json();
       if (json.success) {
-        showToast('✓ Provider reply saved to MongoDB database!');
+        showToast('✓ Provider reply saved successfully!');
+        setReplyingReviewId(null);
         setReplyText('');
         setSelectedReview(null);
         fetchReviewsFromDb();
@@ -152,7 +153,7 @@ export default function ReviewsTab() {
         </div>
 
         <button 
-          onClick={() => { fetchReviewsFromDb(); showToast('✓ Refreshed reviews from MongoDB!'); }}
+          onClick={() => { fetchReviewsFromDb(); showToast('✓ Refreshed customer reviews!'); }}
           className="px-4 py-2 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer self-start sm:self-auto"
         >
           <RotateCw size={14} className="text-[#0A8B5F]" />
@@ -173,7 +174,7 @@ export default function ReviewsTab() {
             <span>{stats.overallRating} ★</span>
             <span className="text-xs text-[#6B7280] font-bold">out of 5</span>
           </div>
-          <p className="text-[11px] text-[#0A8B5F] font-semibold mt-1">Based on MongoDB customer feedback</p>
+          <p className="text-[11px] text-[#0A8B5F] font-semibold mt-1">Based on real customer feedback</p>
         </div>
 
         {/* Card 2: Total Reviews */}
@@ -297,7 +298,7 @@ export default function ReviewsTab() {
         {loading ? (
           <div className="p-12 text-center">
             <div className="w-8 h-8 border-4 border-[#0A8B5F] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-[#6B7280] font-bold mt-3">Loading customer reviews from MongoDB...</p>
+            <p className="text-xs text-[#6B7280] font-bold mt-3">Loading customer reviews...</p>
           </div>
         ) : filteredReviews.length === 0 ? (
           <div className="p-12 text-center space-y-3">

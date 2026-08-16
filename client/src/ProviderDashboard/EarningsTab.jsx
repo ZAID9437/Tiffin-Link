@@ -264,7 +264,7 @@ export default function EarningsTab() {
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button 
-            onClick={() => { fetchOrdersFromDb(); showToast('✓ Refreshed earnings from MongoDB!'); }}
+            onClick={() => { fetchOrdersFromDb(); showToast('✓ Refreshed earnings data!'); }}
             className="px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
           >
             <RotateCw size={14} className="text-[#0A8B5F]" />
@@ -487,7 +487,7 @@ export default function EarningsTab() {
               <span>Net Earnings</span>
               <span className="text-lg text-[#0A8B5F]">₹{netEarnings.toLocaleString()}</span>
             </div>
-            <p className="text-[10px] text-[#6B7280] font-medium">Calculated directly from MongoDB orders collection.</p>
+            <p className="text-[10px] text-[#6B7280] font-medium">Calculated directly from live order transactions.</p>
           </div>
         </div>
 
@@ -513,7 +513,7 @@ export default function EarningsTab() {
         {loading ? (
           <div className="p-12 text-center">
             <div className="w-8 h-8 border-4 border-[#0A8B5F] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-[#6B7280] font-bold mt-3">Loading transaction logs from MongoDB...</p>
+            <p className="text-xs text-[#6B7280] font-bold mt-3">Loading transaction logs...</p>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="p-12 text-center space-y-3">

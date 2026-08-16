@@ -172,7 +172,7 @@ export default function OrderHistoryTab() {
         {/* Table */}
         <div className="overflow-x-auto">
           {loading ? (
-            <div className="p-8 text-center text-xs text-[#5B7067] font-bold">Loading orders from MongoDB database...</div>
+            <div className="p-8 text-center text-xs text-[#5B7067] font-bold">Loading order history...</div>
           ) : filteredOrders.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#5B7067] font-bold">No matching orders found.</div>
           ) : (
@@ -221,7 +221,7 @@ export default function OrderHistoryTab() {
 
         {/* Footer Summary */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[#E5ECE8] text-xs text-[#5B7067] font-bold">
-          <span>Showing {filteredOrders.length} orders from MongoDB database</span>
+          <span>Showing {filteredOrders.length} orders</span>
         </div>
 
       </div>

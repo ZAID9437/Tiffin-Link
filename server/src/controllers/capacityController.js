@@ -163,7 +163,7 @@ const updateCapacitySettings = async (req, res) => {
 
     return res.json({
       success: true,
-      message: '✓ Kitchen capacity settings saved successfully in MongoDB!'
+      message: '✓ Kitchen capacity settings saved successfully!'
     });
   } catch (error) {
     console.error('Error updating capacity settings:', error);

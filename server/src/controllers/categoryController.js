@@ -59,21 +59,21 @@ const createCategory = async (req, res) => {
       await newCategory.save();
       return res.status(201).json({ 
         success: true, 
-        message: 'Category stored successfully in MongoDB', 
+        message: 'Category stored successfully', 
         data: newCategory, 
         source: 'database' 
       });
     } else {
       return res.status(201).json({ 
         success: true, 
-        message: 'Category created (in-memory)', 
+        message: 'Category created', 
         data: { _id: 'cat_' + Date.now(), ...catData }, 
         source: 'in-memory' 
       });
     }
   } catch (error) {
     console.error('Error creating category:', error);
-    res.status(500).json({ success: false, message: 'Failed to save category to MongoDB: ' + error.message });
+    res.status(500).json({ success: false, message: 'Failed to save category: ' + error.message });
   }
 };
 
@@ -84,9 +84,9 @@ const updateCategory = async (req, res) => {
     const { id } = req.params;
     if (await isDbConnected()) {
       const updated = await Category.findByIdAndUpdate(id, req.body, { new: true });
-      return res.json({ success: true, message: 'Category updated in MongoDB', data: updated });
+      return res.json({ success: true, message: 'Category updated successfully', data: updated });
     }
-    return res.json({ success: true, message: 'Category updated (in-memory)', data: req.body });
+    return res.json({ success: true, message: 'Category updated', data: req.body });
   } catch (error) {
     console.error('Error updating category:', error);
     res.status(500).json({ success: false, message: 'Failed to update category' });
@@ -100,7 +100,7 @@ const deleteCategory = async (req, res) => {
     const { id } = req.params;
     if (await isDbConnected()) {
       await Category.findByIdAndDelete(id);
-      return res.json({ success: true, message: 'Category deleted from MongoDB' });
+      return res.json({ success: true, message: 'Category deleted successfully' });
     }
     return res.json({ success: true, message: 'Category deleted (in-memory)' });
   } catch (error) {
