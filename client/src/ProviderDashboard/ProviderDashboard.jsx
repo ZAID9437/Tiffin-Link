@@ -679,26 +679,32 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
           </div>
 
           {/* Sidebar Footer Online Switch & Logout */}
-          <div className="pt-4 border-t border-[#E5ECE8] space-y-2">
-            <div className="p-3 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-black">
-                <span className={`w-2.5 h-2.5 rounded-full ${isKitchenOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                <span className={isKitchenOnline ? 'text-emerald-700 font-black' : 'text-red-600 font-black'}>
-                  {isKitchenOnline ? 'ACCEPTING' : 'OFFLINE'}
-                </span>
+          <div className="pt-4 border-t border-[#E5ECE8] space-y-3">
+            <div className="p-3 bg-white rounded-2xl border border-[#E5ECE8] shadow-2xs space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs font-black shrink-0">
+                  <span className={`w-2.5 h-2.5 rounded-full ${isKitchenOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                  <span className={isKitchenOnline ? 'text-emerald-700 font-extrabold' : 'text-red-600 font-extrabold'}>
+                    {isKitchenOnline ? 'ONLINE' : 'OFFLINE'}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleToggleKitchenOnline}
+                  className={`px-3 py-1 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer border shrink-0 ${
+                    isKitchenOnline
+                      ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 shadow-2xs'
+                      : 'bg-[#0A8B5F] text-white border-[#0A8B5F] hover:bg-[#08734E] shadow-xs'
+                  }`}
+                >
+                  {isKitchenOnline ? 'Go Offline' : 'Go Online'}
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={handleToggleKitchenOnline}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer border shadow-2xs ${
-                  isKitchenOnline
-                    ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100'
-                    : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                }`}
-              >
-                {isKitchenOnline ? '[ Go Offline ]' : '[ Go Online ]'}
-              </button>
+              <div className="text-[10px] text-[#6B7280] font-medium leading-tight pt-1 border-t border-[#F0F5F2]">
+                {isKitchenOnline ? '✓ Accepting customer orders in real-time' : '✕ Kitchen is currently paused'}
+              </div>
             </div>
 
             <button
