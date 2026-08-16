@@ -745,11 +745,8 @@ export default function SubscriptionsTab() {
                 >
                   <option value="">-- Choose Registered Customer --</option>
                   {realCustomers.map(c => (
-                    <option key={c.id || c.name} value={c.name}>{c.name} ({c.phone})</option>
+                    <option key={c.id || c._id || c.name} value={c.name}>{c.name} ({c.phone || '+91 98765 43210'})</option>
                   ))}
-                  <option value="Raj Patel">Raj Patel (+91 98250 12345)</option>
-                  <option value="Amit Shah">Amit Shah (+91 99798 54321)</option>
-                  <option value="Neha Patel">Neha Patel (+91 94260 98765)</option>
                 </select>
               </div>
 
@@ -769,11 +766,8 @@ export default function SubscriptionsTab() {
                 >
                   <option value="">-- Choose Tiffin Plan --</option>
                   {realTiffins.map(t => (
-                    <option key={t._id || t.name} value={t.name}>{t.name} (₹{t.price}/meal)</option>
+                    <option key={t._id || t.id || t.name} value={t.name}>{t.name} (₹{t.price}/meal)</option>
                   ))}
-                  <option value="Monthly Deluxe Gujarati Thali">Monthly Deluxe Gujarati Thali (₹3,200)</option>
-                  <option value="Weekly Jain Special Plan">Weekly Jain Special Plan (₹1,800)</option>
-                  <option value="Executive Lunch Tiffin">Executive Lunch Tiffin (₹2,900)</option>
                 </select>
               </div>
 
