@@ -166,6 +166,46 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide customer name, tiffin name, and unit price' });
     }
 
+    // Capacity Auto-Stop Validation Check
+    if (await isDbConnected()) {
+      try {
+        const ProviderSetting = require('../models/ProviderSetting');
+        const KitchenCapacity = require('../models/KitchenCapacity');
+        
+        const settings = await ProviderSetting.findOne({ providerId: 'prov_1' });
+        const maxDaily = settings?.tiffin?.maxDailyLimit ?? 50;
+        const autoStop = settings?.tiffin?.autoPauseLimit ?? true;
+        const allowOver = settings?.tiffin?.allowOverbooking ?? false;
+
+        const dObj = new Date();
+        const todayKey = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
+        
+        const todayCapDoc = await KitchenCapacity.findOne({ providerId: 'prov_1', date: todayKey });
+        const finalMax = todayCapDoc ? todayCapDoc.maxCapacity : maxDaily;
+        const finalAutoStop = todayCapDoc ? todayCapDoc.autoStopOrders : autoStop;
+        const finalAllowOver = todayCapDoc ? todayCapDoc.allowOverbooking : allowOver;
+
+        const existingOrders = await Order.find({ status: { $ne: 'Cancelled' } });
+        const todayBooked = existingOrders
+          .filter(o => {
+            const od = new Date(o.createdAt);
+            const k = `${od.getFullYear()}-${String(od.getMonth() + 1).padStart(2, '0')}-${String(od.getDate()).padStart(2, '0')}`;
+            return k === todayKey;
+          })
+          .reduce((sum, o) => sum + (o.quantity || 1), 0);
+
+        const newTotal = todayBooked + (Number(quantity) || 1);
+        if (newTotal > finalMax && finalAutoStop && !finalAllowOver) {
+          return res.status(400).json({
+            success: false,
+            message: 'Kitchen is currently at full capacity.'
+          });
+        }
+      } catch (capErr) {
+        console.error('Error validating capacity during order creation:', capErr);
+      }
+    }
+
     const bill = calculateBillBreakdown(quantity, unitPrice, distanceKm || 3.2);
     const orderNum = Math.floor(1000 + Math.random() * 9000);
 
