@@ -62,6 +62,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isKitchenOnline, setIsKitchenOnline] = useState(true);
+  const [statusToast, setStatusToast] = useState('');
 
   // Dynamic Sidebar Badge Counts from MongoDB Database
   const [badgeCounts, setBadgeCounts] = useState({
@@ -88,6 +89,13 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
           newCount = ordJson.data.filter(o => o.status === 'New').length;
         }
 
+        // 3. Fetch provider online status from MongoDB
+        const dashRes = await fetch('http://localhost:5000/api/providers/dashboard');
+        const dashJson = await dashRes.json();
+        if (dashJson.success && dashJson.data && dashJson.data.acceptingOrders !== undefined) {
+          setIsKitchenOnline(Boolean(dashJson.data.acceptingOrders));
+        }
+
         setBadgeCounts({
           liveRequests: reqCount,
           newOrders: newCount
@@ -101,6 +109,28 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
     const interval = setInterval(fetchSidebarBadges, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleToggleKitchenOnline = async () => {
+    const nextStatus = !isKitchenOnline;
+    setIsKitchenOnline(nextStatus);
+    try {
+      const res = await fetch('http://localhost:5000/api/providers/status', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          acceptingOrders: nextStatus,
+          email: currentUser?.email || 'provider@tiffinlink.com'
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setStatusToast(`✓ Kitchen status updated to ${nextStatus ? 'ONLINE (Accepting Orders)' : 'OFFLINE (Paused)'}`);
+        setTimeout(() => setStatusToast(''), 3500);
+      }
+    } catch (err) {
+      console.error('Error updating status in database:', err);
+    }
+  };
 
   const toggleSubMenu = (menu) => {
     setExpandedMenus(prev => ({
@@ -218,6 +248,21 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
 
         {/* Right Actions & Profile */}
         <div className="flex items-center gap-2 md:gap-3">
+          {/* Quick Kitchen Online Status Header Badge */}
+          <button
+            type="button"
+            onClick={handleToggleKitchenOnline}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+              isKitchenOnline
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                : 'bg-red-50 text-red-800 border-red-300 hover:bg-red-100'
+            }`}
+            title="Click to toggle Kitchen Status"
+          >
+            <span className={`w-2 h-2 rounded-full ${isKitchenOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+            <span>{isKitchenOnline ? 'ONLINE' : 'OFFLINE'}</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('notifications')}
             className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F9FBF9] rounded-xl transition-colors relative cursor-pointer"
@@ -637,13 +682,20 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
           <div className="pt-4 border-t border-[#E5ECE8] space-y-2">
             <div className="p-3 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-black">
-                <span className={`w-2 h-2 rounded-full ${isKitchenOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
-                <span>{isKitchenOnline ? 'ACCEPTING' : 'OFFLINE'}</span>
+                <span className={`w-2.5 h-2.5 rounded-full ${isKitchenOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                <span className={isKitchenOnline ? 'text-emerald-700 font-black' : 'text-red-600 font-black'}>
+                  {isKitchenOnline ? 'ACCEPTING' : 'OFFLINE'}
+                </span>
               </div>
 
               <button
-                onClick={() => setIsKitchenOnline(!isKitchenOnline)}
-                className="text-[10px] text-[#0A8B5F] hover:underline font-bold cursor-pointer"
+                type="button"
+                onClick={handleToggleKitchenOnline}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer border shadow-2xs ${
+                  isKitchenOnline
+                    ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                }`}
               >
                 {isKitchenOnline ? '[ Go Offline ]' : '[ Go Online ]'}
               </button>
@@ -665,6 +717,13 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         </main>
 
       </div>
+
+      {/* Status Toast Banner */}
+      {statusToast && (
+        <div className="fixed bottom-6 right-6 z-[9999] bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce font-extrabold text-xs">
+          <span>{statusToast}</span>
+        </div>
+      )}
     </div>
   );
 }
