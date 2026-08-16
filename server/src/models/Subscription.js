@@ -1,10 +1,19 @@
 const mongoose = require('mongoose');
 
 const subscriptionSchema = new mongoose.Schema({
+  providerId: {
+    type: String,
+    required: true,
+    default: 'prov_1'
+  },
   subId: {
     type: String,
     required: true,
     unique: true
+  },
+  customerId: {
+    type: String,
+    default: ''
   },
   customerName: {
     type: String,
@@ -18,32 +27,75 @@ const subscriptionSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  tiffinId: {
+    type: String,
+    default: ''
+  },
   plan: {
     type: String,
     required: true
   },
+  frequency: {
+    type: String,
+    enum: ['Daily', 'Weekly', 'Monthly', 'Custom days'],
+    default: 'Daily'
+  },
+  deliveryDays: {
+    type: [String],
+    default: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  },
   mealType: {
     type: String,
-    required: true
+    default: 'Lunch'
   },
   pricePerMeal: {
     type: Number,
-    required: true
+    default: 120
   },
-  nextMeal: {
+  amount: {
+    type: Number,
+    default: 3200
+  },
+  startDate: {
     type: String,
-    default: 'Tomorrow • 12:30 PM'
+    default: '01 Aug 2026'
+  },
+  endDate: {
+    type: String,
+    default: '31 Aug 2026'
+  },
+  nextDeliveryDate: {
+    type: String,
+    default: '18 Aug 2026'
   },
   address: {
     type: String,
     required: true
   },
+  paymentStatus: {
+    type: String,
+    enum: ['PAID', 'PENDING', 'FAILED', 'REFUNDED'],
+    default: 'PAID'
+  },
   status: {
     type: String,
-    enum: ['Active', 'Paused', 'Cancelled'],
-    default: 'Active'
+    enum: ['ACTIVE', 'PAUSED', 'CANCELLED'],
+    default: 'ACTIVE'
+  },
+  pausedAt: {
+    type: Date
+  },
+  resumedAt: {
+    type: Date
+  },
+  cancelledAt: {
+    type: Date
   },
   createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
     type: Date,
     default: Date.now
   }

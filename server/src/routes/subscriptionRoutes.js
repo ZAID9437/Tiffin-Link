@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { 
-  getSubscriptions, 
-  createSubscription, 
-  updateSubscription, 
-  deleteSubscription 
+const {
+  getSubscriptions,
+  createSubscription,
+  updateSubscription,
+  deleteSubscription
 } = require('../controllers/subscriptionController');
 
 router.get('/', getSubscriptions);
