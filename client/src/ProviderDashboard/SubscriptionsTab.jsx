@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  RotateCw, 
-  Download, 
-  Plus, 
-  Calendar, 
-  CheckCircle2, 
-  PauseCircle, 
-  XCircle, 
-  Clock, 
-  DollarSign, 
-  Eye, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Search,
+  RotateCw,
+  Download,
+  Plus,
+  Calendar,
+  CheckCircle2,
+  PauseCircle,
+  XCircle,
+  Clock,
+  DollarSign,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
   X,
   Check,
   User,
@@ -228,7 +228,7 @@ export default function SubscriptionsTab() {
 
   return (
     <div className="space-y-6 animate-slide-up text-xs font-bold text-[#111827]">
-      
+
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 z-[9999] bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
@@ -263,9 +263,9 @@ export default function SubscriptionsTab() {
           {/* Search Input */}
           <div className="relative min-w-[180px] sm:w-56">
             <Search size={14} className="absolute left-3 top-2.5 text-[#6B7280]" />
-            <input 
-              type="text" 
-              placeholder="Search customer / sub..." 
+            <input
+              type="text"
+              placeholder="Search customer / sub..."
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
               className="w-full pl-9 pr-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-semibold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
@@ -273,7 +273,7 @@ export default function SubscriptionsTab() {
           </div>
 
           {/* Export Button */}
-          <button 
+          <button
             onClick={handleExportCSV}
             className="px-3.5 py-2 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
           >
@@ -282,19 +282,19 @@ export default function SubscriptionsTab() {
           </button>
 
           {/* Create Subscription Button */}
-          <button 
+          <button
             onClick={() => setIsCreateModalOpen(true)}
             className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Plus size={15} />
-            <span>+ Create Subscription</span>
+            <span> Create Subscription</span>
           </button>
         </div>
       </div>
 
       {/* OVERVIEW STATISTICS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
+
         {/* Card 1: ACTIVE SUBSCRIPTIONS */}
         <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
           <div className="text-xs font-extrabold text-[#6B7280] uppercase tracking-wider mb-2">ACTIVE SUBSCRIPTIONS</div>
@@ -332,7 +332,7 @@ export default function SubscriptionsTab() {
           {/* Status Dropdown */}
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-[#6B7280]">Status:</span>
-            <select 
+            <select
               value={statusFilter}
               onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
               className="px-3 py-1.5 bg-[#F9FBF9] border border-[#E5ECE8] text-xs font-bold text-[#111827] rounded-xl focus:outline-none cursor-pointer"
@@ -348,7 +348,7 @@ export default function SubscriptionsTab() {
           {/* Plan Dropdown */}
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-[#6B7280]">Plan:</span>
-            <select 
+            <select
               value={planFilter}
               onChange={e => { setPlanFilter(e.target.value); setCurrentPage(1); }}
               className="px-3 py-1.5 bg-[#F9FBF9] border border-[#E5ECE8] text-xs font-bold text-[#111827] rounded-xl focus:outline-none cursor-pointer"
@@ -399,8 +399,8 @@ export default function SubscriptionsTab() {
                 </thead>
                 <tbody className="divide-y divide-[#E5ECE8] font-bold">
                   {subscriptions.map(sub => (
-                    <tr 
-                      key={sub._id || sub.subId} 
+                    <tr
+                      key={sub._id || sub.subId}
                       onClick={() => setSelectedSub(sub)}
                       className="hover:bg-[#F9FBF9] transition-colors cursor-pointer"
                     >
@@ -439,18 +439,17 @@ export default function SubscriptionsTab() {
 
                       {/* Status */}
                       <td className="p-4">
-                        <span className={`px-2.5 py-1 text-[10px] font-black rounded-md uppercase border ${
-                          sub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                        <span className={`px-2.5 py-1 text-[10px] font-black rounded-md uppercase border ${sub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                           sub.status === 'PAUSED' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                          'bg-red-50 text-red-700 border-red-200'
-                        }`}>
+                            'bg-red-50 text-red-700 border-red-200'
+                          }`}>
                           ● {sub.status || 'ACTIVE'}
                         </span>
                       </td>
 
                       {/* Action View */}
                       <td className="p-4 text-right">
-                        <button 
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedSub(sub);
@@ -470,7 +469,7 @@ export default function SubscriptionsTab() {
             {/* Mobile Card List View */}
             <div className="block md:hidden divide-y divide-[#E5ECE8]">
               {subscriptions.map(sub => (
-                <div 
+                <div
                   key={sub._id || sub.subId}
                   onClick={() => setSelectedSub(sub)}
                   className="p-4 space-y-3 hover:bg-[#F9FBF9] transition-colors cursor-pointer"
@@ -486,11 +485,10 @@ export default function SubscriptionsTab() {
                       </div>
                     </div>
 
-                    <span className={`px-2 py-0.5 text-[10px] font-black rounded-md uppercase border ${
-                      sub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                    <span className={`px-2 py-0.5 text-[10px] font-black rounded-md uppercase border ${sub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                       sub.status === 'PAUSED' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                      'bg-red-50 text-red-700 border-red-200'
-                    }`}>
+                        'bg-red-50 text-red-700 border-red-200'
+                      }`}>
                       ● {sub.status}
                     </span>
                   </div>
@@ -504,7 +502,7 @@ export default function SubscriptionsTab() {
                       <span className="text-[#6B7280]">Amount: </span>
                       <strong className="text-[#111827]">₹{sub.amount}</strong>
                     </div>
-                    <button 
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedSub(sub);
@@ -527,7 +525,7 @@ export default function SubscriptionsTab() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button 
+            <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               className="p-1.5 rounded-lg border border-[#E5ECE8] hover:bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
@@ -536,18 +534,17 @@ export default function SubscriptionsTab() {
             </button>
 
             {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(page => (
-              <button 
+              <button
                 key={page}
                 onClick={() => setCurrentPage(page)}
-                className={`w-8 h-8 rounded-lg text-xs font-black cursor-pointer transition-colors ${
-                  currentPage === page ? 'bg-[#0A8B5F] text-white shadow-xs' : 'hover:bg-white text-[#6B7280]'
-                }`}
+                className={`w-8 h-8 rounded-lg text-xs font-black cursor-pointer transition-colors ${currentPage === page ? 'bg-[#0A8B5F] text-white shadow-xs' : 'hover:bg-white text-[#6B7280]'
+                  }`}
               >
                 {page}
               </button>
             ))}
 
-            <button 
+            <button
               disabled={currentPage === pagination.totalPages}
               onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
               className="p-1.5 rounded-lg border border-[#E5ECE8] hover:bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
@@ -563,12 +560,12 @@ export default function SubscriptionsTab() {
       {selectedSub && (
         <div className="fixed inset-0 z-[6000] bg-black/50 backdrop-blur-xs flex justify-end">
           <div className="bg-white w-full max-w-md h-full shadow-2xl p-6 border-l border-[#E5ECE8] animate-slide-left space-y-5 overflow-y-auto text-xs font-bold text-[#111827]">
-            
+
             {/* Drawer Header */}
             <div className="flex justify-between items-center border-b border-[#E5ECE8] pb-3">
               <h2 className="text-base font-black text-[#111827]">Subscription Details</h2>
-              <button 
-                onClick={() => setSelectedSub(null)} 
+              <button
+                onClick={() => setSelectedSub(null)}
                 className="p-1.5 rounded-xl border border-[#E5ECE8] hover:bg-gray-100 text-[#6B7280] cursor-pointer"
               >
                 <X size={18} />
@@ -587,11 +584,10 @@ export default function SubscriptionsTab() {
                 </div>
               </div>
 
-              <span className={`px-3 py-1 text-[10px] font-black rounded-full uppercase border ${
-                selectedSub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+              <span className={`px-3 py-1 text-[10px] font-black rounded-full uppercase border ${selectedSub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                 selectedSub.status === 'PAUSED' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                'bg-red-50 text-red-700 border-red-200'
-              }`}>
+                  'bg-red-50 text-red-700 border-red-200'
+                }`}>
                 ● {selectedSub.status || 'ACTIVE'}
               </span>
             </div>
@@ -653,11 +649,10 @@ export default function SubscriptionsTab() {
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => {
                   const isScheduled = (selectedSub.deliveryDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']).includes(day);
                   return (
-                    <div 
+                    <div
                       key={day}
-                      className={`p-2 rounded-xl border text-xs font-black flex items-center justify-center gap-1 ${
-                        isScheduled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200'
-                      }`}
+                      className={`p-2 rounded-xl border text-xs font-black flex items-center justify-center gap-1 ${isScheduled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200'
+                        }`}
                     >
                       <span>{isScheduled ? '✓' : '○'}</span>
                       <span>{day}</span>
@@ -670,7 +665,7 @@ export default function SubscriptionsTab() {
             {/* ACTION FOOTER */}
             <div className="pt-3 border-t border-[#E5ECE8] flex items-center gap-2">
               {selectedSub.status === 'ACTIVE' ? (
-                <button 
+                <button
                   onClick={() => handleUpdateStatus(selectedSub._id || selectedSub.id, 'PAUSED')}
                   className="flex-1 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-extrabold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >
@@ -678,7 +673,7 @@ export default function SubscriptionsTab() {
                   <span>Pause</span>
                 </button>
               ) : selectedSub.status === 'PAUSED' ? (
-                <button 
+                <button
                   onClick={() => handleUpdateStatus(selectedSub._id || selectedSub.id, 'ACTIVE')}
                   className="flex-1 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >
@@ -687,7 +682,7 @@ export default function SubscriptionsTab() {
                 </button>
               ) : null}
 
-              <button 
+              <button
                 onClick={() => {
                   alert(`Edit modal for ${selectedSub.customerName}'s plan`);
                 }}
@@ -698,7 +693,7 @@ export default function SubscriptionsTab() {
               </button>
 
               {selectedSub.status !== 'CANCELLED' && (
-                <button 
+                <button
                   onClick={() => handleUpdateStatus(selectedSub._id || selectedSub.id, 'CANCELLED')}
                   className="px-3 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-extrabold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >
@@ -717,8 +712,8 @@ export default function SubscriptionsTab() {
         <div className="fixed inset-0 z-[6000] bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-[#E5ECE8] animate-scale-in">
             <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
-              <h3 className="text-base font-black text-[#111827]">+ Create New Subscription</h3>
-              <button 
+              <h3 className="text-base font-black text-[#111827]">Create New Subscription</h3>
+              <button
                 onClick={() => setIsCreateModalOpen(false)}
                 className="p-1 text-[#6B7280] hover:text-[#111827] rounded-lg cursor-pointer"
               >
@@ -730,7 +725,7 @@ export default function SubscriptionsTab() {
               {/* Select Customer */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-[#6B7280]">Select Customer</label>
-                <select 
+                <select
                   onChange={e => {
                     const cust = realCustomers.find(c => c.name === e.target.value);
                     setNewCustName(e.target.value);
@@ -753,7 +748,7 @@ export default function SubscriptionsTab() {
               {/* Select Tiffin Plan */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-[#6B7280]">Tiffin Plan / Package</label>
-                <select 
+                <select
                   onChange={e => {
                     const tif = realTiffins.find(t => t.name === e.target.value);
                     setNewPlanName(e.target.value);
@@ -777,8 +772,8 @@ export default function SubscriptionsTab() {
                 <div className="flex items-center gap-4 pt-1">
                   {['Daily', 'Weekly', 'Monthly'].map(freq => (
                     <label key={freq} className="flex items-center gap-1.5 text-xs font-bold cursor-pointer">
-                      <input 
-                        type="radio" 
+                      <input
+                        type="radio"
                         name="freq"
                         value={freq}
                         checked={newFrequency === freq}
@@ -795,7 +790,7 @@ export default function SubscriptionsTab() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[#6B7280]">Meal Type</label>
-                  <select 
+                  <select
                     value={newMealType}
                     onChange={e => setNewMealType(e.target.value)}
                     className="w-full px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827]"
@@ -808,7 +803,7 @@ export default function SubscriptionsTab() {
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[#6B7280]">Total Amount (₹)</label>
-                  <input 
+                  <input
                     type="number"
                     value={newAmount}
                     onChange={e => setNewAmount(Number(e.target.value))}
@@ -821,7 +816,7 @@ export default function SubscriptionsTab() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[#6B7280]">Start Date</label>
-                  <input 
+                  <input
                     type="text"
                     placeholder="01 Aug 2026"
                     value={newStartDate}
@@ -832,7 +827,7 @@ export default function SubscriptionsTab() {
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-[#6B7280]">End Date</label>
-                  <input 
+                  <input
                     type="text"
                     placeholder="31 Aug 2026"
                     value={newEndDate}

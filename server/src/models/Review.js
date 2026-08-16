@@ -1,15 +1,28 @@
 const mongoose = require('mongoose');
 
 const reviewSchema = new mongoose.Schema({
+  providerId: {
+    type: String,
+    required: true,
+    default: 'prov_1'
+  },
   orderId: {
     type: String,
     required: true
+  },
+  customerId: {
+    type: String,
+    default: ''
   },
   customerName: {
     type: String,
     required: true
   },
   customerEmail: {
+    type: String,
+    default: ''
+  },
+  tiffinId: {
     type: String,
     default: ''
   },
