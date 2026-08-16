@@ -17,7 +17,12 @@ import {
   MapPin,
   CheckCircle2,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  FileText,
+  Download,
+  Printer,
+  Calendar,
+  Filter
 } from 'lucide-react';
 import AnimatedCounter from './AnimatedCounter';
 
@@ -28,9 +33,11 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     liveRequestsCount: 0,
     todaysOrdersCount: 0,
     revenueToday: 0,
-    rating: 4.8,
-    reviewCount: 0
+    rating: 4.4,
+    reviewCount: 5
   });
+
+  const [allRawOrders, setAllRawOrders] = useState([]);
 
   const [todaysOrders, setTodaysOrders] = useState([]);
   const [kitchenCapacity, setKitchenCapacity] = useState({
@@ -51,6 +58,57 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
 
   const [toastMessage, setToastMessage] = useState(null);
 
+  // Report & Export Modal State
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportFilter, setReportFilter] = useState('today'); // 'today' | 'yesterday' | '7days' | 'all'
+
+  // Date Check Helper Functions
+  const isTodayDate = (dateInput) => {
+    if (!dateInput) return false;
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  };
+
+  const isYesterdayDate = (dateInput) => {
+    if (!dateInput) return false;
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return false;
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    return (
+      d.getFullYear() === y.getFullYear() &&
+      d.getMonth() === y.getMonth() &&
+      d.getDate() === y.getDate()
+    );
+  };
+
+  const isWithinLastDays = (dateInput, days = 7) => {
+    if (!dateInput) return false;
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date();
+    const diffTime = Math.abs(now - d);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays <= days;
+  };
+
+  const formatDateFormatted = (dateInput) => {
+    if (!dateInput) return 'Today';
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return dateInput;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${day}/${month}/${year} • ${timeStr}`;
+  };
+
   // Poll MongoDB Database for Real Dashboard Data
   useEffect(() => {
     const fetchDashboardDataFromDb = async () => {
@@ -60,18 +118,20 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
         const ordJson = await ordRes.json();
         
         if (ordJson.success && Array.isArray(ordJson.data)) {
-          const allOrders = ordJson.data;
+          const fetchedOrders = ordJson.data;
+          setAllRawOrders(fetchedOrders);
 
-          // Todays Orders Count
-          const todaysCount = allOrders.length;
+          // Strictly Todays Orders Only (excluding past days and tomorrow)
+          const todaysOrdersOnly = fetchedOrders.filter(o => isTodayDate(o.createdAt || o.date));
+          const todaysCount = todaysOrdersOnly.length;
 
-          // Revenue Today
-          const revToday = allOrders
+          // Revenue Today (strictly for today's non-cancelled orders)
+          const revToday = todaysOrdersOnly
             .filter(o => o.status !== 'Cancelled')
             .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
 
           // Active Orders for Table (Top 5 active/recent)
-          const activeOrdersFormatted = allOrders.slice(0, 5).map(o => {
+          const activeOrdersFormatted = fetchedOrders.slice(0, 5).map(o => {
             let statusBg = 'bg-gray-100 text-gray-800 border-gray-200';
             if (o.status === 'Preparing') statusBg = 'bg-amber-100 text-amber-800 border-amber-200';
             if (o.status === 'Ready') statusBg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
@@ -82,7 +142,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
               id: o.orderId || '#1027',
               customer: o.customerName || 'Customer',
               items: `${o.tiffinName || 'Tiffin Meal'} × ${o.quantity || 1}`,
-              time: o.createdAt ? new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '5:00 PM',
+              time: o.createdAt ? formatDateFormatted(o.createdAt) : 'Today',
               amount: o.totalAmount || 120,
               status: o.deliveryPartnerName ? `Partner: ${o.deliveryPartnerName}` : o.status,
               statusBg
@@ -91,17 +151,17 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
 
           setTodaysOrders(activeOrdersFormatted);
 
-          // Kitchen Capacity Calculation
-          const totalCooked = allOrders
+          // Kitchen Capacity Calculation (cooked meals today)
+          const totalCooked = todaysOrdersOnly
             .filter(o => o.status !== 'Cancelled')
             .reduce((sum, o) => sum + (Number(o.quantity) || 1), 0);
 
           setKitchenCapacity(prev => ({ ...prev, cookedMeals: totalCooked }));
 
           // Delivery Status Widget Counts
-          const rdy = allOrders.filter(o => o.status === 'Ready').length;
-          const asg = allOrders.filter(o => o.deliveryPartnerName && o.deliveryPartnerName.trim() !== '').length;
-          const src = allOrders.filter(o => o.status === 'Ready' && (!o.deliveryPartnerName || o.deliveryPartnerName.trim() === '')).length;
+          const rdy = fetchedOrders.filter(o => o.status === 'Ready').length;
+          const asg = fetchedOrders.filter(o => o.deliveryPartnerName && o.deliveryPartnerName.trim() !== '').length;
+          const src = fetchedOrders.filter(o => o.status === 'Ready' && (!o.deliveryPartnerName || o.deliveryPartnerName.trim() === '')).length;
 
           setDeliveryCounts({ ready: rdy, assigned: asg, searching: src });
 
@@ -139,7 +199,13 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
         // 3. Fetch Reviews Rating from MongoDB
         const revRes = await fetch('http://localhost:5000/api/reviews');
         const revJson = await revRes.json();
-        if (revJson.success && Array.isArray(revJson.data) && revJson.data.length > 0) {
+        if (revJson.success && revJson.stats) {
+          setStats(prev => ({
+            ...prev,
+            rating: Number(revJson.stats.overallRating || 4.4),
+            reviewCount: Number(revJson.stats.totalReviews || 5)
+          }));
+        } else if (revJson.success && Array.isArray(revJson.data) && revJson.data.length > 0) {
           const avg = (revJson.data.reduce((sum, r) => sum + (r.rating || 5), 0) / revJson.data.length).toFixed(1);
           setStats(prev => ({ ...prev, rating: Number(avg), reviewCount: revJson.data.length }));
         }
@@ -150,9 +216,84 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     };
 
     fetchDashboardDataFromDb();
-    const interval = setInterval(fetchDashboardDataFromDb, 4000);
+    const interval = setInterval(fetchDashboardDataFromDb, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Filter Orders for Modal Report
+  const getFilteredReportOrders = () => {
+    if (reportFilter === 'today') {
+      return allRawOrders.filter(o => isTodayDate(o.createdAt || o.date));
+    }
+    if (reportFilter === 'yesterday') {
+      return allRawOrders.filter(o => isYesterdayDate(o.createdAt || o.date));
+    }
+    if (reportFilter === '7days') {
+      return allRawOrders.filter(o => isWithinLastDays(o.createdAt || o.date, 7));
+    }
+    return allRawOrders; // 'all'
+  };
+
+  // Export CSV Report Handler
+  const handleExportCSVReport = () => {
+    const reportList = getFilteredReportOrders();
+    if (reportList.length === 0) return;
+
+    const headers = ['Order ID', 'Date & Time', 'Customer Name', 'Phone', 'Address', 'Tiffin Item', 'Qty', 'Amount (INR)', 'Payment', 'Status'];
+    const rows = reportList.map(o => [
+      `"${o.orderId || ''}"`,
+      `"${formatDateFormatted(o.createdAt || o.date)}"`,
+      `"${o.customerName || ''}"`,
+      `"${o.customerPhone || ''}"`,
+      `"${o.customerAddress || ''}"`,
+      `"${o.tiffinName || ''}"`,
+      o.quantity || 1,
+      o.totalAmount || 0,
+      `"${o.paymentStatus || 'Paid'}"`,
+      `"${o.status || 'Completed'}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `TiffinLink_Orders_Report_${reportFilter}_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Helper to create demo today order for dynamic testing
+  const handleCreateTodayOrderDemo = async () => {
+    try {
+      const demoOrder = {
+        customerName: 'Karan Mehta',
+        customerPhone: '+91 98123 77889',
+        customerAddress: 'C-501 Shivalik Park, Bodakdev, Ahmedabad',
+        tiffinName: 'Gujarati Special Kathiawadi Thali',
+        tiffinCategory: 'Gujarati',
+        quantity: 2,
+        unitPrice: 130,
+        distanceKm: 2.4,
+        paymentStatus: 'Paid',
+        status: 'Preparing'
+      };
+
+      const res = await fetch('http://localhost:5000/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(demoOrder)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMessage(`✓ Order ${data.data.orderId} created for Today! Orders Today incremented.`);
+        setTimeout(() => setToastMessage(null), 3500);
+      }
+    } catch (err) {
+      console.error('Error creating demo today order:', err);
+    }
+  };
 
   const handleToggleAcceptingOrders = async () => {
     const nextState = !acceptingOrders;
@@ -240,28 +381,40 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
           <p className="text-xs font-medium text-[#6B7280] mt-1">Here's what needs your attention today.</p>
         </div>
         
-        {/* Accepting Orders Switch */}
-        <div className="flex items-center gap-3 self-start md:self-auto bg-[#F9FBF9] px-4 py-2.5 rounded-xl border border-[#E5ECE8]">
-          <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${acceptingOrders ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
-            <span className="text-xs font-bold text-[#111827]">
-              {acceptingOrders ? '🟢 ACCEPTING ORDERS' : '🔴 KITCHEN OFFLINE'}
-            </span>
-          </div>
-
-          <button 
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Report & Export Button */}
+          <button
             type="button"
-            onClick={handleToggleAcceptingOrders}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-              acceptingOrders ? 'bg-[#0A8B5F]' : 'bg-gray-300'
-            }`}
+            onClick={() => setIsReportModalOpen(true)}
+            className="px-4 py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] text-white text-xs font-black rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer"
           >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                acceptingOrders ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
+            <FileText size={16} />
+            <span>📊 Report & Export</span>
           </button>
+
+          {/* Accepting Orders Switch */}
+          <div className="flex items-center gap-3 bg-[#F9FBF9] px-4 py-2.5 rounded-xl border border-[#E5ECE8]">
+            <div className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${acceptingOrders ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+              <span className="text-xs font-bold text-[#111827]">
+                {acceptingOrders ? '🟢 ACCEPTING ORDERS' : '🔴 KITCHEN OFFLINE'}
+              </span>
+            </div>
+
+            <button 
+              type="button"
+              onClick={handleToggleAcceptingOrders}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                acceptingOrders ? 'bg-[#0A8B5F]' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                  acceptingOrders ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -289,7 +442,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
         {/* Orders Today */}
         <div 
           onClick={() => onNavigateTab('orders')}
-          className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs cursor-pointer hover:border-[#0A8B5F] transition-all"
+          className="bg-white p-5 rounded-2xl border-2 border-emerald-500/80 shadow-xs cursor-pointer hover:border-[#0A8B5F] transition-all relative overflow-hidden"
         >
           <div className="flex items-center gap-2 text-[11px] font-bold text-[#6B7280] uppercase tracking-wider mb-2">
             <ShoppingBag size={15} className="text-[#0A8B5F]" />
@@ -298,7 +451,10 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
           <div className="text-3xl font-black text-[#111827]">
             {stats.todaysOrdersCount}
           </div>
-          <div className="text-[11px] text-[#0A8B5F] font-semibold mt-2">📈 Live MongoDB sync</div>
+          <div className="text-[11px] text-[#0A8B5F] font-semibold mt-2 flex items-center gap-1">
+            <span>📈 Live MongoDB Sync</span>
+            <span className="opacity-75">• Today only</span>
+          </div>
         </div>
 
         {/* Earned Today */}
@@ -476,6 +632,173 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
         </div>
 
       </div>
+
+      {/* Daily & Previous Orders Report Modal */}
+      {isReportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#E5ECE8] overflow-hidden animate-scale-up">
+            
+            {/* Modal Header */}
+            <div className="p-6 bg-[#0A8B5F] text-white flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black flex items-center gap-2">
+                  <FileText size={22} />
+                  <span>Daily & Previous Orders Report</span>
+                </h2>
+                <p className="text-xs opacity-90 font-medium mt-1">
+                  Filter, review, and export real-time order history by formatted date
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsReportModalOpen(false)}
+                className="p-2 hover:bg-white/20 rounded-full transition-colors cursor-pointer text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Filter Controls Toolbar */}
+            <div className="p-4 bg-[#F9FBF9] border-b border-[#E5ECE8] flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {[
+                  { id: 'today', label: "Today's Orders" },
+                  { id: 'yesterday', label: 'Yesterday' },
+                  { id: '7days', label: 'Last 7 Days' },
+                  { id: 'all', label: 'All Previous Orders' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setReportFilter(tab.id)}
+                    className={`px-3.5 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
+                      reportFilter === tab.id
+                        ? 'bg-[#0A8B5F] text-white shadow-xs'
+                        : 'bg-white text-[#4B5563] border border-[#E5ECE8] hover:bg-gray-100'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportCSVReport}
+                  className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white text-xs font-black rounded-xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                >
+                  <Download size={15} />
+                  <span>Export CSV</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#111827] text-xs font-black rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-gray-300"
+                >
+                  <Printer size={15} />
+                  <span>Print Report</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Summary Statistics Pill Header */}
+            {(() => {
+              const currentList = getFilteredReportOrders();
+              const totalRev = currentList.filter(o => o.status !== 'Cancelled').reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+              const completedCount = currentList.filter(o => o.status === 'Completed' || o.status === 'Ready' || o.status === 'Preparing').length;
+              const cancelledCount = currentList.filter(o => o.status === 'Cancelled').length;
+
+              return (
+                <div className="p-6 border-b border-[#E5ECE8] grid grid-cols-2 sm:grid-cols-4 gap-4 bg-white">
+                  <div className="p-4 rounded-2xl bg-[#F9FBF9] border border-[#E5ECE8]">
+                    <div className="text-[11px] font-bold text-[#6B7280] uppercase">Selected Orders</div>
+                    <div className="text-2xl font-black text-[#111827] mt-1">{currentList.length}</div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
+                    <div className="text-[11px] font-bold text-emerald-700 uppercase">Total Revenue</div>
+                    <div className="text-2xl font-black text-emerald-900 mt-1">₹{totalRev.toLocaleString('en-IN')}</div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100">
+                    <div className="text-[11px] font-bold text-blue-700 uppercase">Completed / Active</div>
+                    <div className="text-2xl font-black text-blue-900 mt-1">{completedCount}</div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100">
+                    <div className="text-[11px] font-bold text-rose-700 uppercase">Cancelled</div>
+                    <div className="text-2xl font-black text-rose-900 mt-1">{cancelledCount}</div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Formatted Date Orders Table */}
+            <div className="p-6 flex-1 overflow-y-auto">
+              {getFilteredReportOrders().length === 0 ? (
+                <div className="p-12 text-center text-[#6B7280]">
+                  <ShoppingBag size={32} className="mx-auto text-gray-300 mb-2" />
+                  <div className="font-extrabold text-[#111827]">No orders found for selected date range</div>
+                  <p className="text-xs mt-1">Try switching tabs to view previous orders or today's orders.</p>
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#E5ECE8] text-[#6B7280] uppercase font-black tracking-wider">
+                      <th className="pb-3 px-2">Date & Time (DD/MM/YYYY)</th>
+                      <th className="pb-3 px-2">Order ID</th>
+                      <th className="pb-3 px-2">Customer</th>
+                      <th className="pb-3 px-2">Tiffin Item</th>
+                      <th className="pb-3 px-2">Amount</th>
+                      <th className="pb-3 px-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E5ECE8] font-medium text-[#111827]">
+                    {getFilteredReportOrders().map(o => (
+                      <tr key={o._id || o.orderId} className="hover:bg-[#F9FBF9]">
+                        <td className="py-3 px-2 font-bold text-[#4B5563]">
+                          {formatDateFormatted(o.createdAt || o.date)}
+                        </td>
+                        <td className="py-3 px-2 font-black text-[#0A8B5F]">{o.orderId}</td>
+                        <td className="py-3 px-2">
+                          <div className="font-bold">{o.customerName}</div>
+                          <div className="text-[10px] text-[#6B7280]">{o.customerPhone}</div>
+                        </td>
+                        <td className="py-3 px-2 text-[#4B5563]">
+                          {o.tiffinName} <span className="font-extrabold text-[#111827]">(x{o.quantity || 1})</span>
+                        </td>
+                        <td className="py-3 px-2 font-black text-[#111827]">₹{o.totalAmount}</td>
+                        <td className="py-3 px-2">
+                          <span className={`px-2.5 py-1 text-[10px] font-black rounded-lg ${
+                            o.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
+                            o.status === 'Preparing' ? 'bg-amber-100 text-amber-800' :
+                            o.status === 'Ready' ? 'bg-blue-100 text-blue-800' :
+                            o.status === 'Cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {o.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-[#F9FBF9] border-t border-[#E5ECE8] flex items-center justify-between text-xs text-[#6B7280]">
+              <span className="font-bold">Total {getFilteredReportOrders().length} orders loaded from MongoDB Database</span>
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(false)}
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-[#111827] font-black rounded-xl transition-all cursor-pointer"
+              >
+                Close Report
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

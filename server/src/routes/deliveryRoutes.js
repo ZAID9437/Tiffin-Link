@@ -4,6 +4,7 @@ const { registerDelivery } = require('../controllers/deliveryController');
 const {
   getDeliveryRequests,
   createDeliveryRequest,
+  broadcastDeliveryRequest,
   acceptDeliveryRequest,
   assignDriver,
   confirmPickup,
@@ -11,16 +12,21 @@ const {
   updateDeliveryStatus,
   updateDriverLocation,
   getNearbyDrivers,
+  getDeliveryMetrics,
+  verifyOtp,
   retryDelivery,
   cancelDelivery
 } = require('../controllers/deliveryDispatchController');
 
 router.post('/', registerDelivery);
 router.get('/requests', getDeliveryRequests);
+router.get('/metrics', getDeliveryMetrics);
 router.post('/dispatch', createDeliveryRequest);
+router.post('/broadcast', broadcastDeliveryRequest);
 router.post('/accept', acceptDeliveryRequest);
 router.post('/assign', assignDriver);
 router.post('/confirm-pickup', confirmPickup);
+router.post('/verify-otp', verifyOtp);
 router.post('/send-otp-sms', sendPickupOtpSms);
 router.post('/status', updateDeliveryStatus);
 router.post('/location', updateDriverLocation);

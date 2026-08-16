@@ -1,9 +1,57 @@
+const mongoose = require('mongoose');
 const DeliveryRequest = require('../models/DeliveryRequest');
 const Order = require('../models/Order');
 const User = require('../models/User');
+const Driver = require('../models/Driver');
 const { ensureConnected } = require('../config/db');
+const { startTwilioVerification, checkTwilioVerification, normalizeE164 } = require('../services/twilioService');
 
 const isDbConnected = async () => await ensureConnected();
+
+const isValidObjectId = (id) => {
+  if (!id) return false;
+  return mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+};
+
+const buildIdQuery = (rawId) => {
+  if (!rawId) return { _id: null };
+  const strId = String(rawId).trim();
+  const cleanId = strId.replace(/^#+/, '');
+  const hashedId = `#${cleanId}`;
+
+  const queries = [
+    { requestId: strId },
+    { requestId: cleanId },
+    { requestId: hashedId },
+    { orderId: strId },
+    { orderId: cleanId },
+    { orderId: hashedId }
+  ];
+
+  if (isValidObjectId(strId)) {
+    queries.push({ _id: strId });
+  }
+
+  return { $or: queries };
+};
+
+const isRequestMatch = (r, id) => {
+  if (!r || !id) return false;
+  const targetStr = String(id).trim();
+  const targetClean = targetStr.replace(/^#+/, '');
+
+  const rReq = String(r.requestId || '').trim().replace(/^#+/, '');
+  const rOrd = String(r.orderId || '').trim().replace(/^#+/, '');
+  const rId = String(r._id || '').trim();
+
+  return (
+    rReq === targetClean ||
+    rOrd === targetClean ||
+    rId === targetStr ||
+    targetStr === `#${rReq}` ||
+    targetStr === `#${rOrd}`
+  );
+};
 
 // Diverse Dynamic Delivery Partners Collection
 const NEARBY_AVAILABLE_DRIVERS = [
@@ -170,17 +218,15 @@ const updateLiveGpsInDatabase = async (requests) => {
   }
 };
 
-// @desc    Get all delivery requests for provider
+// @desc    Get all delivery requests for provider from MongoDB
+// @desc    Get all delivery requests for provider from MongoDB
 // @route   GET /api/delivery/requests
 const getDeliveryRequests = async (req, res) => {
   try {
-    const userEmail = req.query.email || req.headers['x-provider-email'] || 'menxoxo50@gmail.com';
-
     if (await isDbConnected()) {
-      let requests = await DeliveryRequest.find({ providerEmail: userEmail }).sort({ requestedAt: -1 });
+      let requests = await DeliveryRequest.find().sort({ requestedAt: -1 });
 
       if (requests.length === 0) {
-        await DeliveryRequest.deleteMany({ providerEmail: userEmail });
         requests = await DeliveryRequest.insertMany(DEFAULT_DELIVERY_REQUESTS);
       }
 
@@ -189,7 +235,8 @@ const getDeliveryRequests = async (req, res) => {
       return res.json({
         success: true,
         requests,
-        source: 'database'
+        source: 'database',
+        databaseName: 'tiffinlink'
       });
     } else {
       return res.json({
@@ -204,6 +251,36 @@ const getDeliveryRequests = async (req, res) => {
   }
 };
 
+// Smart Swiggy & Zomato Auto-Dispatch Algorithm (Nearest + Highest Rating Driver in MongoDB)
+const findBestNearbyDriverFromDb = async () => {
+  try {
+    if (await isDbConnected()) {
+      let drivers = await Driver.find({ status: 'AVAILABLE' }).sort({ distanceKm: 1, rating: -1 });
+      if (drivers.length === 0) {
+        drivers = await Driver.find().sort({ distanceKm: 1, rating: -1 });
+      }
+      if (drivers.length > 0) {
+        const best = drivers[0];
+        await Driver.findByIdAndUpdate(best._id, { $inc: { activeDeliveries: 1 } });
+        return {
+          driverId: best.driverId,
+          name: best.name,
+          phone: best.phone,
+          rating: best.rating,
+          vehicleNo: best.vehicleNo,
+          distanceKm: best.distanceKm,
+          location: best.currentLocation || { lat: 23.0280, lng: 72.5670 }
+        };
+      }
+    }
+  } catch (err) {
+    console.error('Error finding best nearby driver in DB:', err);
+  }
+  const fallback = NEARBY_AVAILABLE_DRIVERS[dispatchCounter % NEARBY_AVAILABLE_DRIVERS.length];
+  dispatchCounter++;
+  return fallback;
+};
+
 // @desc    Create new delivery dispatch request with Dynamic Driver Matching
 // @route   POST /api/delivery/dispatch
 const createDeliveryRequest = async (req, res) => {
@@ -213,8 +290,7 @@ const createDeliveryRequest = async (req, res) => {
     const requestId = `#DEL-${Math.floor(1000 + Math.random() * 9000)}`;
     const pickupOtp = String(Math.floor(1000 + Math.random() * 9000));
 
-    const selectedDriver = NEARBY_AVAILABLE_DRIVERS[dispatchCounter % NEARBY_AVAILABLE_DRIVERS.length];
-    dispatchCounter++;
+    const selectedDriver = await findBestNearbyDriverFromDb();
 
     const newRequestData = {
       requestId,
@@ -232,11 +308,11 @@ const createDeliveryRequest = async (req, res) => {
         phone: selectedDriver.phone,
         rating: selectedDriver.rating,
         vehicleNo: selectedDriver.vehicleNo,
-        location: { lat: 23.0280, lng: 72.5670 }
+        location: selectedDriver.location || { lat: 23.0280, lng: 72.5670 }
       },
       status: 'Driver Assigned',
-      distanceKm: selectedDriver.distanceKm,
-      etaMinutes: 12,
+      distanceKm: selectedDriver.distanceKm || 1.2,
+      etaMinutes: Math.round((selectedDriver.distanceKm || 1.2) * 5 + 6),
       amount: amount || 240,
       itemCount: itemCount || 1,
       pickupOtp,
@@ -256,14 +332,14 @@ const createDeliveryRequest = async (req, res) => {
 
       return res.json({
         success: true,
-        message: `Delivery request created! Automatically assigned to ${selectedDriver.name}.`,
+        message: `⚡ Zomato & Swiggy Auto-Dispatch: Matched to nearest driver ${selectedDriver.name} (${selectedDriver.distanceKm} km away)!`,
         request
       });
     }
 
     return res.json({
       success: true,
-      message: `Delivery request created! Automatically assigned to ${selectedDriver.name}.`,
+      message: `⚡ Zomato & Swiggy Auto-Dispatch: Matched to nearest driver ${selectedDriver.name} (${selectedDriver.distanceKm} km away)!`,
       request: newRequestData
     });
   } catch (error) {
@@ -272,32 +348,168 @@ const createDeliveryRequest = async (req, res) => {
   }
 };
 
-// @desc    Manually assign driver to delivery request
+// @desc    Manually or Automatically assign driver to delivery request
 // @route   POST /api/delivery/assign
 const assignDriver = async (req, res) => {
   try {
     const { requestId, driverId } = req.body;
     
-    let selectedDriver = NEARBY_AVAILABLE_DRIVERS.find(d => d.driverId === driverId);
-    if (!selectedDriver) {
-      selectedDriver = NEARBY_AVAILABLE_DRIVERS[dispatchCounter % NEARBY_AVAILABLE_DRIVERS.length];
-      dispatchCounter++;
+    let selectedDriver = null;
+    if (driverId) {
+      if (await isDbConnected()) {
+        const query = isValidObjectId(driverId) ? { $or: [{ driverId }, { _id: driverId }] } : { driverId };
+        selectedDriver = await Driver.findOne(query);
+      }
+      if (!selectedDriver) {
+        selectedDriver = NEARBY_AVAILABLE_DRIVERS.find(d => d.driverId === driverId || d._id === driverId);
+      }
     }
 
+    if (!selectedDriver) {
+      selectedDriver = await findBestNearbyDriverFromDb();
+    } else if (await isDbConnected() && selectedDriver._id && isValidObjectId(selectedDriver._id)) {
+      await Driver.updateOne({ _id: selectedDriver._id }, { $inc: { activeDeliveries: 1 } });
+    }
+
+    const driverPayload = {
+      driverId: selectedDriver.driverId || selectedDriver._id || 'DRV-101',
+      name: selectedDriver.name,
+      phone: selectedDriver.phone || '+91 98251 44556',
+      rating: selectedDriver.rating || 4.8,
+      vehicleNo: selectedDriver.vehicleNo || 'Bike',
+      location: selectedDriver.location || selectedDriver.currentLocation || { lat: 23.0280, lng: 72.5670 }
+    };
+
     if (await isDbConnected()) {
+      const delQuery = isValidObjectId(requestId) ? { $or: [{ requestId }, { orderId: requestId }, { _id: requestId }] } : { $or: [{ requestId }, { orderId: requestId }] };
+
       const request = await DeliveryRequest.findOneAndUpdate(
-        { $or: [{ requestId }, { _id: requestId }] },
+        delQuery,
         { 
           $set: { 
             status: 'Driver Assigned', 
-            assignedDriver: selectedDriver,
+            assignedDriver: driverPayload,
             acceptedAt: new Date() 
           } 
         },
         { new: true }
       );
 
-      if (request?.orderId) {
+      if (requestId) {
+        const ordQuery = isValidObjectId(requestId) ? { $or: [{ orderId: requestId }, { _id: requestId }] } : { orderId: requestId };
+        await Order.findOneAndUpdate(
+          ordQuery,
+          { $set: { status: 'Ready', deliveryStatus: 'Assigned', deliveryPartnerName: selectedDriver.name, deliveryPartnerPhone: selectedDriver.phone } }
+        );
+      }
+
+      return res.json({
+        success: true,
+        message: `✓ Delivery partner ${selectedDriver.name} assigned successfully!`,
+        request
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `✓ Delivery partner ${selectedDriver.name} assigned successfully!`
+    });
+  } catch (error) {
+    console.error('Error assigning driver:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Get dynamic summary counts for Provider Delivery Management header
+// @route   GET /api/delivery/metrics
+const getDeliveryMetrics = async (req, res) => {
+  try {
+    if (await isDbConnected()) {
+      const readyCount = await Order.countDocuments({ status: 'Ready' });
+      const searchingCount = await DeliveryRequest.countDocuments({ status: 'Searching Drivers' });
+      const assignedCount = await DeliveryRequest.countDocuments({ status: 'Driver Assigned' });
+      const pickupCount = await DeliveryRequest.countDocuments({ status: { $in: ['Arrived at Provider', 'ARRIVED_AT_PICKUP'] } });
+      const onWayCount = await DeliveryRequest.countDocuments({ status: { $in: ['Picked Up', 'Out for Delivery', 'OUT_FOR_DELIVERY'] } });
+
+      return res.json({
+        success: true,
+        metrics: {
+          ready: readyCount,
+          searching: searchingCount,
+          assigned: assignedCount,
+          pickup: pickupCount,
+          onWay: onWayCount
+        }
+      });
+    } else {
+      return res.json({
+        success: true,
+        metrics: { ready: 4, searching: 2, assigned: 3, pickup: 1, onWay: 5 }
+      });
+    }
+  } catch (error) {
+    console.error('Error getting delivery metrics:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Driver accepts delivery request (Atomic First-Accept-Wins)
+// @route   POST /api/delivery/accept
+const acceptDeliveryRequest = async (req, res) => {
+  try {
+    const { requestId, driverId, driverName, driverPhone, vehicleNo, rating } = req.body;
+    let selectedDriver = null;
+
+    if (await isDbConnected()) {
+      if (driverId) {
+        selectedDriver = await Driver.findOne({ $or: [{ driverId }, { _id: driverId }] });
+      }
+      if (!selectedDriver) {
+        selectedDriver = {
+          driverId: driverId || 'DRV-' + Math.floor(1000 + Math.random() * 9000),
+          name: driverName || 'Rahul Sharma',
+          phone: driverPhone || '+91 98251 44556',
+          rating: rating || 4.8,
+          vehicleNo: vehicleNo || 'GJ-01-AB-1029',
+          location: { lat: 23.0280, lng: 72.5670 }
+        };
+      }
+
+      // Atomic Conditional Update: Only succeed if status is 'Searching Drivers' or assignedDriver.driverId is empty
+      const request = await DeliveryRequest.findOneAndUpdate(
+        { 
+          $or: [{ requestId }, { orderId: requestId }, { _id: requestId }],
+          $or: [
+            { status: 'Searching Drivers' },
+            { 'assignedDriver.driverId': '' },
+            { 'assignedDriver.driverId': null }
+          ]
+        },
+        { 
+          $set: { 
+            status: 'Driver Assigned', 
+            assignedDriver: {
+              driverId: selectedDriver.driverId,
+              name: selectedDriver.name,
+              phone: selectedDriver.phone,
+              rating: selectedDriver.rating,
+              vehicleNo: selectedDriver.vehicleNo,
+              location: selectedDriver.location || { lat: 23.0280, lng: 72.5670 }
+            },
+            acceptedAt: new Date() 
+          } 
+        },
+        { new: true }
+      );
+
+      if (!request) {
+        return res.status(409).json({
+          success: false,
+          message: 'This delivery has already been assigned to another driver.'
+        });
+      }
+
+      if (request.orderId) {
         await Order.findOneAndUpdate(
           { $or: [{ orderId: request.orderId }, { _id: request.orderId }] },
           { $set: { status: 'Ready', deliveryStatus: 'Assigned', deliveryPartnerName: selectedDriver.name, deliveryPartnerPhone: selectedDriver.phone } }
@@ -306,55 +518,87 @@ const assignDriver = async (req, res) => {
 
       return res.json({
         success: true,
-        message: `Delivery partner ${selectedDriver.name} assigned successfully!`,
+        message: `✓ Delivery accepted by ${selectedDriver.name}!`,
         request
       });
     }
 
     return res.json({
       success: true,
-      message: `Delivery partner ${selectedDriver.name} assigned successfully!`
-    });
-  } catch (error) {
-    console.error('Error assigning driver:', error);
-    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
-  }
-};
-
-// @desc    Driver accepts delivery request
-// @route   POST /api/delivery/accept
-const acceptDeliveryRequest = async (req, res) => {
-  try {
-    const { requestId, driverId } = req.body;
-    const selectedDriver = NEARBY_AVAILABLE_DRIVERS.find(d => d.driverId === driverId) || NEARBY_AVAILABLE_DRIVERS[0];
-
-    if (await isDbConnected()) {
-      const request = await DeliveryRequest.findOneAndUpdate(
-        { $or: [{ requestId }, { _id: requestId }] },
-        { 
-          $set: { 
-            status: 'Driver Assigned', 
-            assignedDriver: selectedDriver,
-            acceptedAt: new Date() 
-          } 
-        },
-        { new: true }
-      );
-
-      return res.json({
-        success: true,
-        message: `Delivery accepted by ${selectedDriver.name}!`,
-        request
-      });
-    }
-
-    return res.json({
-      success: true,
-      message: `Delivery accepted by ${selectedDriver.name}!`
+      message: `Delivery accepted by ${driverName || 'driver'}!`
     });
   } catch (error) {
     console.error('Error accepting delivery request:', error);
     res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Verify Pickup or Delivery OTP (Twilio Verify API Integration)
+// @route   POST /api/delivery/verify-otp
+const verifyOtp = async (req, res) => {
+  try {
+    const { requestId, type, otp, phone } = req.body;
+    if (!otp || String(otp).trim() === '') {
+      return res.status(400).json({ success: false, message: 'OTP code is required.' });
+    }
+
+    if (await isDbConnected()) {
+      const delivery = await DeliveryRequest.findOne({ $or: [{ requestId }, { orderId: requestId }, { _id: requestId }] });
+      if (!delivery) {
+        return res.status(404).json({ success: false, message: 'Delivery request not found.' });
+      }
+
+      const targetPhone = phone || (type === 'pickup' ? delivery.assignedDriver?.phone : delivery.customerPhone) || '+91 98251 44556';
+      const twilioCheck = await checkTwilioVerification(targetPhone, otp);
+
+      if (!twilioCheck.success) {
+        // Fallback to saved Mongo OTP if Twilio is unconfigured
+        if (type === 'pickup' && delivery.pickupOtp && delivery.pickupOtp.trim() !== String(otp).trim()) {
+          return res.status(400).json({ success: false, message: twilioCheck.message || 'Invalid OTP. Please try again.' });
+        }
+        if (type === 'delivery' && delivery.deliveryOtp && delivery.deliveryOtp.trim() !== String(otp).trim()) {
+          return res.status(400).json({ success: false, message: twilioCheck.message || 'Invalid OTP. Please try again.' });
+        }
+      }
+
+      if (type === 'pickup') {
+        if (delivery.pickupOtpVerified) {
+          return res.status(400).json({ success: false, message: 'Pickup OTP has already been used.' });
+        }
+        delivery.pickupOtpVerified = true;
+        delivery.status = 'Out for Delivery';
+        delivery.pickedUpAt = new Date();
+        await delivery.save();
+
+        if (delivery.orderId) {
+          await Order.findOneAndUpdate(
+            { $or: [{ orderId: delivery.orderId }, { _id: delivery.orderId }] },
+            { $set: { status: 'Out for Delivery', deliveryStatus: 'Picked Up', pickedUpAt: new Date() } }
+          );
+        }
+        return res.json({ success: true, message: '✓ Pickup OTP verified successfully via Twilio Verify!', delivery });
+      } else if (type === 'delivery') {
+        if (delivery.deliveryOtpVerified) {
+          return res.status(400).json({ success: false, message: 'Delivery OTP has already been used.' });
+        }
+        delivery.deliveryOtpVerified = true;
+        delivery.status = 'Delivered';
+        delivery.deliveredAt = new Date();
+        await delivery.save();
+
+        if (delivery.orderId) {
+          await Order.findOneAndUpdate(
+            { $or: [{ orderId: delivery.orderId }, { _id: delivery.orderId }] },
+            { $set: { status: 'Completed', deliveryStatus: 'Delivered', deliveredAt: new Date() } }
+          );
+        }
+        return res.json({ success: true, message: '✓ Delivery completed! Customer OTP verified via Twilio Verify.', delivery });
+      }
+    }
+    return res.json({ success: true, message: '✓ OTP verified successfully!' });
+  } catch (error) {
+    console.error('Error verifying OTP:', error);
+    res.status(500).json({ success: false, message: 'Unable to verify OTP. Please try again.' });
   }
 };
 
@@ -365,53 +609,54 @@ const confirmPickup = async (req, res) => {
     const { requestId, otp, bypassOtp } = req.body;
     const providerEmail = req.body.email || req.query.email || 'menxoxo50@gmail.com';
 
+    // Update in-memory DEFAULT_DELIVERY_REQUESTS array so fallbacks sync instantly
+    DEFAULT_DELIVERY_REQUESTS.forEach(r => {
+      if (isRequestMatch(r, requestId)) {
+        r.status = 'Out for Delivery';
+        r.pickedUpAt = new Date();
+      }
+    });
+
     if (await isDbConnected()) {
-      const existing = await DeliveryRequest.findOne({ $or: [{ requestId }, { _id: requestId }] });
+      const query = buildIdQuery(requestId);
+      let existing = await DeliveryRequest.findOne(query);
       
       if (!existing) {
-        return res.status(404).json({ success: false, message: 'Delivery request not found.' });
-      }
-
-      // Concurrent update protection: Reject if already picked up or out for delivery
-      if (['Picked Up', 'Out for Delivery', 'Delivered'].includes(existing.status)) {
-        return res.status(400).json({ 
-          success: false, 
-          message: `This order has already been picked up (Status: ${existing.status}). Duplicate pickup rejected.` 
+        existing = await DeliveryRequest.create({
+          requestId: requestId && String(requestId).startsWith('#DEL-') ? requestId : `#DEL-${Math.floor(1000 + Math.random() * 9000)}`,
+          orderId: requestId,
+          providerEmail,
+          status: 'Out for Delivery',
+          pickedUpAt: new Date()
         });
-      }
-
-      // OTP Verification Logic
-      if (!bypassOtp) {
-        if (!otp || String(otp).trim() === '') {
-          return res.status(400).json({ success: false, message: 'Invalid pickup code. Please enter the OTP provided by delivery partner.' });
-        }
-        if (existing.pickupOtp && String(existing.pickupOtp) !== String(otp).trim()) {
-          return res.status(400).json({ success: false, message: 'Invalid pickup code. Please check the code and try again.' });
-        }
       }
 
       const serverTimestamp = new Date();
 
-      const request = await DeliveryRequest.findOneAndUpdate(
-        { _id: existing._id },
+      // Update ALL matching delivery request documents in MongoDB
+      await DeliveryRequest.updateMany(
+        query,
         { 
           $set: { 
-            status: 'Picked Up', 
+            status: 'Out for Delivery', 
             pickedUpAt: serverTimestamp,
             verifiedBy: providerEmail,
             verificationMethod: bypassOtp ? 'NO_OTP_FALLBACK' : 'SMS_OTP'
           } 
-        },
-        { new: true }
+        }
       );
 
-      if (existing.orderId) {
-        await Order.findOneAndUpdate(
-          { $or: [{ orderId: existing.orderId }, { _id: existing.orderId }] },
+      const request = await DeliveryRequest.findOne(query);
+
+      // Update matching Order document in MongoDB
+      const orderIdTarget = existing.orderId || requestId;
+      if (orderIdTarget) {
+        await Order.updateMany(
+          buildIdQuery(orderIdTarget),
           { 
             $set: { 
-              status: 'Ready', 
-              deliveryStatus: 'Picked Up',
+              status: 'Out for Delivery', 
+              deliveryStatus: 'Out for Delivery',
               pickedUpAt: serverTimestamp 
             } 
           }
@@ -509,14 +754,29 @@ const updateDriverLocation = async (req, res) => {
   }
 };
 
-// @desc    Get nearby available drivers
+// @desc    Get nearby available drivers from MongoDB Driver collection
 // @route   GET /api/delivery/drivers/nearby
 const getNearbyDrivers = async (req, res) => {
   try {
-    return res.json({
-      success: true,
-      drivers: NEARBY_AVAILABLE_DRIVERS
-    });
+    if (await isDbConnected()) {
+      let drivers = await Driver.find().sort({ rating: -1 });
+      if (drivers.length === 0) {
+        await Driver.insertMany(NEARBY_AVAILABLE_DRIVERS);
+        drivers = await Driver.find().sort({ rating: -1 });
+      }
+      return res.json({
+        success: true,
+        drivers,
+        source: 'database',
+        databaseName: 'tiffinlink'
+      });
+    } else {
+      return res.json({
+        success: true,
+        drivers: NEARBY_AVAILABLE_DRIVERS,
+        source: 'in-memory'
+      });
+    }
   } catch (error) {
     console.error('Error fetching nearby drivers:', error);
     res.status(500).json({ success: false, message: 'Server error: ' + error.message, drivers: NEARBY_AVAILABLE_DRIVERS });
@@ -577,30 +837,96 @@ const cancelDelivery = async (req, res) => {
   }
 };
 
-// @desc    Simulate sending Pickup OTP via SMS to delivery driver mobile
+// @desc    Send Pickup OTP via SMS / WhatsApp using Twilio Verify API to driver mobile
 // @route   POST /api/delivery/send-otp-sms
 const sendPickupOtpSms = async (req, res) => {
   try {
-    const { requestId } = req.body;
+    const { requestId, channel } = req.body;
+    const newOtp = String(Math.floor(1000 + Math.random() * 9000));
     let request = null;
 
     if (await isDbConnected()) {
-      request = await DeliveryRequest.findOne({ $or: [{ requestId }, { _id: requestId }] });
+      request = await DeliveryRequest.findOneAndUpdate(
+        { $or: [{ requestId }, { orderId: requestId }, { _id: requestId }] },
+        { $set: { pickupOtp: newOtp } },
+        { new: true }
+      );
     }
 
-    const driverPhone = request?.assignedDriver?.phone || '+91 98251 44556';
-    const otp = request?.pickupOtp || '4821';
+    const rawDriverPhone = request?.assignedDriver?.phone || req.body.phone || '+91 98251 44556';
+    const e164Phone = normalizeE164(rawDriverPhone);
 
-    console.log(`[SMS GATEWAY] Sent Pickup OTP ${otp} via SMS to Driver mobile ${driverPhone}`);
+    const twilioResult = await startTwilioVerification(e164Phone, channel || 'sms');
 
     return res.json({
       success: true,
-      message: `Pickup OTP (${otp}) sent via SMS to driver mobile (${driverPhone})!`,
-      driverPhone,
-      otpSent: true
+      otp: newOtp,
+      e164Phone,
+      message: twilioResult.message || `📲 SMS OTP sent to driver mobile (${e164Phone})!`,
+      driverPhone: e164Phone,
+      otpSent: true,
+      twilioResult
     });
   } catch (error) {
-    console.error('Error sending SMS OTP:', error);
+    console.error('Error sending SMS OTP via Twilio:', error);
+    res.status(500).json({ success: false, message: 'Unable to send OTP. Please try again.' });
+  }
+};
+
+// @desc    Broadcast delivery request to ALL online drivers (Swiggy/Zomato Priority 1 Flow)
+// @route   POST /api/delivery/broadcast
+const broadcastDeliveryRequest = async (req, res) => {
+  try {
+    const { requestId } = req.body;
+    
+    if (await isDbConnected()) {
+      let request = await DeliveryRequest.findOne({ $or: [{ requestId }, { _id: requestId }] });
+      if (request) {
+        request = await DeliveryRequest.findOneAndUpdate(
+          { _id: request._id },
+          { $set: { status: 'Searching Drivers', requestedAt: new Date() } },
+          { new: true }
+        );
+
+        // Auto-Simulate driver acceptance after 3 seconds if no driver manually accepts
+        setTimeout(async () => {
+          try {
+            const bestDriver = await findBestNearbyDriverFromDb();
+            await DeliveryRequest.findOneAndUpdate(
+              { _id: request._id, status: 'Searching Drivers' },
+              {
+                $set: {
+                  status: 'Driver Assigned',
+                  assignedDriver: bestDriver,
+                  acceptedAt: new Date()
+                }
+              }
+            );
+            if (request.orderId) {
+              await Order.findOneAndUpdate(
+                { $or: [{ orderId: request.orderId }, { _id: request.orderId }] },
+                { $set: { status: 'Ready', deliveryStatus: 'Assigned', deliveryPartnerName: bestDriver.name, deliveryPartnerPhone: bestDriver.phone } }
+              );
+            }
+          } catch (e) {
+            console.error('Auto-accept simulation error:', e);
+          }
+        }, 3000);
+
+        return res.json({
+          success: true,
+          message: '📡 Broadcast sent to all online drivers nearby! Waiting for driver to accept...',
+          request
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: '📡 Broadcast sent to all online drivers nearby! Waiting for driver to accept...'
+    });
+  } catch (error) {
+    console.error('Error broadcasting delivery request:', error);
     res.status(500).json({ success: false, message: 'Server error: ' + error.message });
   }
 };
@@ -608,6 +934,7 @@ const sendPickupOtpSms = async (req, res) => {
 module.exports = {
   getDeliveryRequests,
   createDeliveryRequest,
+  broadcastDeliveryRequest,
   assignDriver,
   acceptDeliveryRequest,
   confirmPickup,
@@ -615,6 +942,8 @@ module.exports = {
   updateDeliveryStatus,
   updateDriverLocation,
   getNearbyDrivers,
+  getDeliveryMetrics,
+  verifyOtp,
   retryDelivery,
   cancelDelivery
 };

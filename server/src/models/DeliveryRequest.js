@@ -80,19 +80,40 @@ const deliveryRequestSchema = new mongoose.Schema({
       status: { type: String, enum: ['Offered', 'Accepted', 'Rejected', 'Passed'], default: 'Offered' }
     }
   ],
+  tiffinName: {
+    type: String,
+    default: 'Gujarati Veg Thali × 2'
+  },
+  tiffinCategory: {
+    type: String,
+    default: 'Gujarati'
+  },
+  pickupOtp: {
+    type: String,
+    default: ''
+  },
+  deliveryOtp: {
+    type: String,
+    default: ''
+  },
+  pickupOtpVerified: {
+    type: Boolean,
+    default: false
+  },
+  deliveryOtpVerified: {
+    type: Boolean,
+    default: false
+  },
   requestedAt: {
     type: Date,
     default: Date.now
   },
-  acceptedAt: {
-    type: Date
-  },
-  pickedUpAt: {
-    type: Date
-  },
-  deliveredAt: {
-    type: Date
-  }
+  acceptedAt: Date,
+  arrivedAt: Date,
+  pickedUpAt: Date,
+  outForDeliveryAt: Date,
+  nearCustomerAt: Date,
+  deliveredAt: Date
 });
 
 module.exports = mongoose.model('DeliveryRequest', deliveryRequestSchema);
