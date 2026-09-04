@@ -4,7 +4,7 @@ const kitchenCapacitySchema = new mongoose.Schema({
   providerId: {
     type: String,
     required: true,
-    default: 'prov_1'
+    index: true
   },
   date: {
     type: String, // Format: YYYY-MM-DD

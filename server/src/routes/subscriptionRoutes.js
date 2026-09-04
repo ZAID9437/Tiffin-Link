@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect, requireProvider } = require('../middleware/authMiddleware');
 const {
   getSubscriptions,
   createSubscription,
@@ -7,9 +8,9 @@ const {
   deleteSubscription
 } = require('../controllers/subscriptionController');
 
-router.get('/', getSubscriptions);
-router.post('/', createSubscription);
-router.put('/:id', updateSubscription);
-router.delete('/:id', deleteSubscription);
+router.get('/', protect, requireProvider, getSubscriptions);
+router.post('/', protect, requireProvider, createSubscription);
+router.put('/:id', protect, requireProvider, updateSubscription);
+router.delete('/:id', protect, requireProvider, deleteSubscription);
 
 module.exports = router;

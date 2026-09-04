@@ -140,15 +140,12 @@ const defaultInitialOrders = [
 // @route   GET /api/orders
 const getOrders = async (req, res) => {
   try {
+    const providerId = req.providerId;
     if (await isDbConnected()) {
-      let orders = await Order.find().sort({ createdAt: -1 });
-      if (orders.length === 0) {
-        await Order.insertMany(defaultInitialOrders);
-        orders = await Order.find().sort({ createdAt: -1 });
-      }
+      const orders = await Order.find({ providerId }).sort({ createdAt: -1 });
       return res.json({ success: true, data: orders, source: 'database', databaseName: 'tiffinlink' });
     } else {
-      return res.json({ success: true, data: defaultInitialOrders, source: 'in-memory' });
+      return res.json({ success: true, data: [], source: 'in-memory' });
     }
   } catch (error) {
     console.error('Error fetching orders:', error);
@@ -160,6 +157,10 @@ const getOrders = async (req, res) => {
 // @route   POST /api/orders
 const createOrder = async (req, res) => {
   try {
+    const providerId = req.providerId || req.body.providerId;
+    if (!providerId) {
+      return res.status(400).json({ success: false, message: 'Provider ID is required' });
+    }
     const { customerName, customerPhone, customerAddress, tiffinName, tiffinCategory, tiffinImage, quantity, unitPrice, distanceKm, paymentStatus, status } = req.body;
     
     if (!customerName || !tiffinName || !unitPrice) {
@@ -174,7 +175,7 @@ const createOrder = async (req, res) => {
         const KitchenCapacity = require('../models/KitchenCapacity');
 
         // 1. Kitchen Schedule Check
-        const schedDoc = await KitchenSchedule.findOne({ providerId: 'prov_1' });
+        const schedDoc = await KitchenSchedule.findOne({ providerId });
         if (schedDoc) {
           const now = new Date();
           const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -198,7 +199,7 @@ const createOrder = async (req, res) => {
         }
 
         // 2. Capacity Auto-Stop Validation Check
-        const settings = await ProviderSetting.findOne({ providerId: 'prov_1' });
+        const settings = await ProviderSetting.findOne({ providerId });
         const maxDaily = settings?.tiffin?.maxDailyLimit ?? 50;
         const autoStop = settings?.tiffin?.autoPauseLimit ?? true;
         const allowOver = settings?.tiffin?.allowOverbooking ?? false;
@@ -206,12 +207,12 @@ const createOrder = async (req, res) => {
         const dObj = new Date();
         const todayKey = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
         
-        const todayCapDoc = await KitchenCapacity.findOne({ providerId: 'prov_1', date: todayKey });
+        const todayCapDoc = await KitchenCapacity.findOne({ providerId, date: todayKey });
         const finalMax = todayCapDoc ? todayCapDoc.maxCapacity : maxDaily;
         const finalAutoStop = todayCapDoc ? todayCapDoc.autoStopOrders : autoStop;
         const finalAllowOver = todayCapDoc ? todayCapDoc.allowOverbooking : allowOver;
 
-        const existingOrders = await Order.find({ status: { $ne: 'Cancelled' } });
+        const existingOrders = await Order.find({ providerId, status: { $ne: 'Cancelled' } });
         const todayBooked = existingOrders
           .filter(o => {
             const od = new Date(o.createdAt);
@@ -236,6 +237,7 @@ const createOrder = async (req, res) => {
     const orderNum = Math.floor(1000 + Math.random() * 9000);
 
     const orderData = {
+      providerId,
       orderId: `#${orderNum}`,
       customerName: customerName.trim(),
       customerPhone: customerPhone || '+91 98765 43210',
@@ -277,6 +279,7 @@ const createOrder = async (req, res) => {
 const updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     const updateData = { ...req.body };
 
     if (updateData.status === 'Ready' && (!updateData.deliveryStatus || updateData.deliveryStatus === 'Unassigned')) {
@@ -284,7 +287,10 @@ const updateOrder = async (req, res) => {
     }
 
     if (await isDbConnected()) {
-      const updated = await Order.findByIdAndUpdate(id, updateData, { new: true });
+      const updated = await Order.findOneAndUpdate({ _id: id, providerId }, updateData, { new: true });
+      if (!updated) {
+        return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+      }
       return res.json({ success: true, message: 'Order updated successfully', data: updated });
     }
     return res.json({ success: true, message: 'Order updated (in-memory)', data: req.body });
@@ -299,6 +305,7 @@ const updateOrder = async (req, res) => {
 const acceptDelivery = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     const { partnerName, partnerPhone } = req.body;
 
     const deliveryPartnerName = partnerName || 'Rahul M.';
@@ -308,6 +315,7 @@ const acceptDelivery = async (req, res) => {
       const updatedOrder = await Order.findOneAndUpdate(
         { 
           _id: id, 
+          providerId,
           status: 'Ready',
           deliveryStatus: { $in: ['Unassigned', 'Searching'] }
         },
@@ -325,7 +333,7 @@ const acceptDelivery = async (req, res) => {
       if (!updatedOrder) {
         return res.status(409).json({ 
           success: false, 
-          message: 'Delivery offer is no longer available or already accepted by another partner.' 
+          message: 'Delivery offer is no longer available or unauthorized.' 
         });
       }
 
@@ -352,6 +360,7 @@ const acceptDelivery = async (req, res) => {
 const updateDeliveryStatus = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     const { deliveryStatus } = req.body;
 
     const updateFields = { deliveryStatus };
@@ -363,7 +372,10 @@ const updateDeliveryStatus = async (req, res) => {
     }
 
     if (await isDbConnected()) {
-      const updated = await Order.findByIdAndUpdate(id, updateFields, { new: true });
+      const updated = await Order.findOneAndUpdate({ _id: id, providerId }, updateFields, { new: true });
+      if (!updated) {
+        return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+      }
       return res.json({ success: true, message: `Delivery status updated to ${deliveryStatus}`, data: updated });
     }
 
@@ -379,8 +391,12 @@ const updateDeliveryStatus = async (req, res) => {
 const deleteOrder = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     if (await isDbConnected()) {
-      await Order.findByIdAndDelete(id);
+      const deleted = await Order.findOneAndDelete({ _id: id, providerId });
+      if (!deleted) {
+        return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+      }
       return res.json({ success: true, message: 'Order deleted successfully' });
     }
     return res.json({ success: true, message: 'Order deleted (in-memory)' });

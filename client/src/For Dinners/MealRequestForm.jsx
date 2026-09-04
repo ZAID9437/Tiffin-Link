@@ -2,19 +2,36 @@ import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 
 export default function MealRequestForm({ onSubmitRequestSuccess }) {
+  const todayStr = new Date().toISOString().split('T')[0];
   const [formData, setFormData] = useState({
+    customerName: '',
+    customerPhone: '',
     mealType: 'Veg Tiffin',
-    date: '2026-05-17',
-    time: '17:00',
+    date: todayStr,
+    time: '13:00',
     deliveryType: 'Delivery',
-    location: 'Iscon Circle, Ahmedabad',
-    budget: '100'
+    location: 'Satellite, Ahmedabad',
+    budget: '140'
   });
   const [loading, setLoading] = useState(false);
   const [isMealTypeOpen, setIsMealTypeOpen] = useState(false);
   const [isDeliveryTypeOpen, setIsDeliveryTypeOpen] = useState(false);
   const mealTypeRef = useRef(null);
   const deliveryTypeRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const savedUser = localStorage.getItem('tiffinlink_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        setFormData(prev => ({
+          ...prev,
+          customerName: u.name || prev.customerName,
+          customerPhone: u.phone || prev.customerPhone
+        }));
+      }
+    } catch (e) {}
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -48,12 +65,15 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          customerName: formData.customerName || 'Customer Diner',
+          customerPhone: formData.customerPhone || '+91 98250 99881',
           mealType: formData.mealType,
           date: formData.date,
           time: formData.time,
           deliveryType: formData.deliveryType,
           location: formData.location,
-          budget: Number(formData.budget)
+          budget: Number(formData.budget),
+          category: formData.mealType.includes('Jain') ? 'Jain' : (formData.mealType.includes('Non-Veg') ? 'Non-Veg' : 'Gujarati')
         }),
       });
 

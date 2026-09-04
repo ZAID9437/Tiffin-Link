@@ -21,8 +21,8 @@ import {
   X, 
   Paperclip, 
   MessageSquare,
-  LifeBuoy
 } from 'lucide-react';
+import { apiRequest } from '../services/api';
 
 export default function HelpSupportTab({ currentUser, onNavigateTab }) {
   const [tickets, setTickets] = useState([]);
@@ -59,15 +59,11 @@ export default function HelpSupportTab({ currentUser, onNavigateTab }) {
   const fetchSupportData = async () => {
     try {
       setLoading(true);
-      const email = currentUser?.email || 'menxoxo50@gmail.com';
       
-      const [ticketRes, faqRes] = await Promise.all([
-        fetch(`http://localhost:5000/api/support/tickets?email=${encodeURIComponent(email)}`),
-        fetch('http://localhost:5000/api/support/faqs')
+      const [ticketJson, faqJson] = await Promise.all([
+        apiRequest('/support/tickets'),
+        apiRequest('/support/faqs')
       ]);
-
-      const ticketJson = await ticketRes.json();
-      const faqJson = await faqRes.json();
 
       if (ticketJson.success && ticketJson.tickets) {
         setTickets(ticketJson.tickets);
@@ -84,8 +80,7 @@ export default function HelpSupportTab({ currentUser, onNavigateTab }) {
 
   const fetchProviderOrders = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/orders/provider');
-      const json = await res.json();
+      const json = await apiRequest('/orders/provider');
       if (json.success && json.orders) {
         setOrders(json.orders);
       }
@@ -103,14 +98,11 @@ export default function HelpSupportTab({ currentUser, onNavigateTab }) {
 
     try {
       setSubmitting(true);
-      const email = currentUser?.email || 'menxoxo50@gmail.com';
-      const res = await fetch('http://localhost:5000/api/support/tickets', {
+      const json = await apiRequest('/support/tickets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...ticketForm, email })
+        body: JSON.stringify(ticketForm)
       });
 
-      const json = await res.json();
       if (json.success && json.ticket) {
         setTickets(prev => [json.ticket, ...prev]);
         setCreateModalOpen(false);

@@ -6,9 +6,14 @@ const supportTicketSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  providerId: {
+    type: String,
+    required: true,
+    index: true
+  },
   providerEmail: {
     type: String,
-    default: 'menxoxo50@gmail.com'
+    default: ''
   },
   subject: {
     type: String,

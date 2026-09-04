@@ -79,14 +79,13 @@ const DEFAULT_FAQS = [
 // @route   GET /api/support/tickets
 const getTickets = async (req, res) => {
   try {
-    const userEmail = req.query.email || req.headers['x-provider-email'] || 'menxoxo50@gmail.com';
+    const providerId = req.providerId;
+    const userEmail = req.user?.email || req.provider?.email;
 
     if (await isDbConnected()) {
-      let tickets = await SupportTicket.find({ providerEmail: userEmail }).sort({ createdAt: -1 });
-
-      if (tickets.length === 0) {
-        tickets = await SupportTicket.insertMany(DEFAULT_TICKETS);
-      }
+      let tickets = await SupportTicket.find({
+        $or: [{ providerId }, { providerEmail: userEmail }]
+      }).sort({ createdAt: -1 });
 
       return res.json({
         success: true,
@@ -96,13 +95,13 @@ const getTickets = async (req, res) => {
     } else {
       return res.json({
         success: true,
-        tickets: DEFAULT_TICKETS,
+        tickets: [],
         source: 'in-memory'
       });
     }
   } catch (error) {
     console.error('Error fetching support tickets:', error);
-    res.status(500).json({ success: false, message: 'Server error: ' + error.message, tickets: DEFAULT_TICKETS });
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message, tickets: [] });
   }
 };
 
@@ -110,17 +109,19 @@ const getTickets = async (req, res) => {
 // @route   POST /api/support/tickets
 const createTicket = async (req, res) => {
   try {
-    const { subject, category, relatedOrderId, description, attachmentUrl, email } = req.body;
+    const { subject, category, relatedOrderId, description, attachmentUrl } = req.body;
 
     if (!subject || !description) {
       return res.status(400).json({ success: false, message: 'Subject and description are required' });
     }
 
-    const providerEmail = email || req.query.email || 'menxoxo50@gmail.com';
+    const providerId = req.providerId;
+    const providerEmail = req.user?.email || req.provider?.email || '';
     const ticketId = `#TK-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newTicketData = {
       ticketId,
+      providerId,
       providerEmail,
       subject,
       category: category || 'Orders',

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { setAuthTokens } from '../services/api';
 
 export default function LoginModal({ 
   isOpen, 
@@ -206,6 +207,9 @@ export default function LoginModal({
 
       if (data.success) {
         setSubmitStatus('granted');
+        if (data.accessToken) {
+          setAuthTokens(data.accessToken, data.refreshToken);
+        }
         const authenticatedUser = data.user || { email: email.trim(), name: name.trim() || email.split('@')[0], role: activeRole };
         if (onLoginSuccess) {
           onLoginSuccess(authenticatedUser);

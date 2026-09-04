@@ -4,8 +4,7 @@ const providerSettingSchema = new mongoose.Schema({
   providerId: {
     type: String,
     required: true,
-    unique: true,
-    default: 'prov_1'
+    unique: true
   },
   account: {
     name: { type: String, default: 'Zaid Mansuri' },

@@ -45,7 +45,7 @@ const timeToMinutes = (timeStr) => {
 // @route   GET /api/schedule
 const getSchedule = async (req, res) => {
   try {
-    const providerId = req.query.providerId || 'prov_1';
+    const providerId = req.providerId;
 
     let scheduleDoc = null;
     if (await isDbConnected()) {
@@ -142,7 +142,8 @@ const getSchedule = async (req, res) => {
 // @route   POST /api/schedule/settings
 const updateScheduleSettings = async (req, res) => {
   try {
-    const { providerId = 'prov_1', weeklySchedule, orderWindows, specialDates } = req.body;
+    const providerId = req.providerId;
+    const { weeklySchedule, orderWindows, specialDates } = req.body;
 
     if (await isDbConnected()) {
       let scheduleDoc = await KitchenSchedule.findOne({ providerId });
@@ -172,7 +173,8 @@ const updateScheduleSettings = async (req, res) => {
 // @route   POST /api/schedule/special-date
 const addSpecialDate = async (req, res) => {
   try {
-    const { providerId = 'prov_1', date, reason = 'Holiday', status = 'CLOSED' } = req.body;
+    const providerId = req.providerId;
+    const { date, reason = 'Holiday', status = 'CLOSED' } = req.body;
     if (!date) {
       return res.status(400).json({ success: false, message: 'Date is required' });
     }
@@ -207,7 +209,7 @@ const addSpecialDate = async (req, res) => {
 const deleteSpecialDate = async (req, res) => {
   try {
     const { id } = req.params;
-    const providerId = req.query.providerId || 'prov_1';
+    const providerId = req.providerId;
 
     if (await isDbConnected()) {
       let scheduleDoc = await KitchenSchedule.findOne({ providerId });
@@ -232,14 +234,14 @@ const deleteSpecialDate = async (req, res) => {
 // @route   GET /api/schedule/validate-order
 const validateOrderEligibility = async (req, res) => {
   try {
-    const providerId = req.query.providerId || 'prov_1';
+    const providerId = req.providerId || req.query.providerId;
     const mealWindowName = req.query.mealWindow || 'Lunch';
 
     let scheduleOk = true;
     let capacityOk = true;
     let reason = '';
 
-    if (await isDbConnected()) {
+    if (await isDbConnected() && providerId) {
       // 1. SCHEDULE CHECK
       const scheduleDoc = await KitchenSchedule.findOne({ providerId });
       const orderWindows = scheduleDoc?.orderWindows || defaultOrderWindows;

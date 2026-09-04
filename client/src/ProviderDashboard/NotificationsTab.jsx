@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiRequest } from '../services/api';
 import { 
   Bell, 
   ShoppingBag, 
@@ -114,8 +115,7 @@ export default function NotificationsTab({ onNavigateTab }) {
     try {
       if (!isBackground) setLoading(true);
       setHasError(false);
-      const res = await fetch('http://localhost:5000/api/notifications');
-      const json = await res.json();
+      const json = await apiRequest('/notifications');
       if (json.success && Array.isArray(json.notifications) && json.notifications.length > 0) {
         setNotifications(json.notifications);
         if (json.summary) setSummary(json.summary);
@@ -132,7 +132,7 @@ export default function NotificationsTab({ onNavigateTab }) {
   const handleMarkAsRead = async (notifId, e) => {
     if (e) e.stopPropagation();
     try {
-      await fetch(`http://localhost:5000/api/notifications/${notifId}/read`, { method: 'PUT' });
+      await apiRequest(`/notifications/${notifId}/read`, { method: 'PUT' });
     } catch (err) {
       console.error('Error marking read:', err);
     }
@@ -146,7 +146,7 @@ export default function NotificationsTab({ onNavigateTab }) {
   const handleMarkAsUnread = async (notifId, e) => {
     if (e) e.stopPropagation();
     try {
-      await fetch(`http://localhost:5000/api/notifications/${notifId}/unread`, { method: 'PUT' });
+      await apiRequest(`/notifications/${notifId}/unread`, { method: 'PUT' });
     } catch (err) {
       console.error('Error marking unread:', err);
     }
@@ -159,7 +159,7 @@ export default function NotificationsTab({ onNavigateTab }) {
   // Handler: Mark All as Read
   const handleMarkAllAsRead = async () => {
     try {
-      await fetch('http://localhost:5000/api/notifications/read-all', { method: 'PUT' });
+      await apiRequest('/notifications/read-all', { method: 'PUT' });
     } catch (err) {
       console.error('Error marking all read:', err);
     }
@@ -172,7 +172,7 @@ export default function NotificationsTab({ onNavigateTab }) {
   const handleDeleteNotification = async (notifId, e) => {
     if (e) e.stopPropagation();
     try {
-      await fetch(`http://localhost:5000/api/notifications/${notifId}`, { method: 'DELETE' });
+      await apiRequest(`/notifications/${notifId}`, { method: 'DELETE' });
     } catch (err) {
       console.error('Error deleting notification:', err);
     }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiRequest } from '../services/api';
 import { 
   Plus, 
   Edit3, 
@@ -108,8 +109,7 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
   const fetchTiffins = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/tiffins');
-      const json = await res.json();
+      const json = await apiRequest('/tiffins');
       if (json.success && Array.isArray(json.data)) {
         setTiffins(json.data.map(t => ({
           ...t,
@@ -125,8 +125,7 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/categories');
-      const json = await res.json();
+      const json = await apiRequest('/categories');
       if (json.success && Array.isArray(json.data)) {
         setCategories(json.data.map(c => ({
           ...c,
@@ -194,12 +193,10 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
     if (editingCategory) {
       const targetId = editingCategory.id || editingCategory._id;
       try {
-        const res = await fetch(`http://localhost:5000/api/categories/${targetId}`, {
+        const json = await apiRequest(`/categories/${targetId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        const json = await res.json();
         if (json.success) {
           showToast(`✓ Category "${trimmed}" updated successfully!`);
           fetchCategories();
@@ -213,12 +210,10 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
         return;
       }
       try {
-        const res = await fetch('http://localhost:5000/api/categories', {
+        const json = await apiRequest('/categories', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        const json = await res.json();
         if (json.success) {
           showToast(`✓ Category "${trimmed}" created successfully!`);
           fetchCategories();
@@ -239,9 +234,8 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
     showToast(`Category "${cat.name}" is now ${nextStatus.toLowerCase()}`);
 
     try {
-      await fetch(`http://localhost:5000/api/categories/${targetId}`, {
+      await apiRequest(`/categories/${targetId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus })
       });
     } catch (err) {
@@ -267,7 +261,7 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
       showToast(`✓ Category "${deletingCategory.name}" removed successfully.`);
 
       try {
-        await fetch(`http://localhost:5000/api/categories/${targetId}`, {
+        await apiRequest(`/categories/${targetId}`, {
           method: 'DELETE'
         });
       } catch (err) {
@@ -300,9 +294,8 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
     showToast(`Tiffin "${target.name}" status updated to ${nextStatus}`);
 
     try {
-      await fetch(`http://localhost:5000/api/tiffins/${id}`, {
+      await apiRequest(`/tiffins/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus })
       });
     } catch (err) {
@@ -319,7 +312,7 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
       showToast(`Tiffin "${deletingTiffin.name}" deleted successfully.`);
       
       try {
-        await fetch(`http://localhost:5000/api/tiffins/${targetId}`, {
+        await apiRequest(`/tiffins/${targetId}`, {
           method: 'DELETE'
         });
       } catch (err) {
@@ -361,12 +354,10 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
     if (editingTiffin) {
       const targetId = editingTiffin.id || editingTiffin._id;
       try {
-        const res = await fetch(`http://localhost:5000/api/tiffins/${targetId}`, {
+        const json = await apiRequest(`/tiffins/${targetId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        const json = await res.json();
         if (json.success) {
           showToast(`✓ Tiffin "${payload.name}" updated successfully!`);
           fetchTiffins();
@@ -377,12 +368,10 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
       setEditingTiffin(null);
     } else {
       try {
-        const res = await fetch('http://localhost:5000/api/tiffins', {
+        const json = await apiRequest('/tiffins', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        const json = await res.json();
         if (json.success && json.data) {
           showToast(`✓ Tiffin "${payload.name}" created successfully!`);
           fetchTiffins();

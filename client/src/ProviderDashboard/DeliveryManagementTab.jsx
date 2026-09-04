@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiRequest } from '../services/api';
 import {
   Truck,
   Zap,
@@ -72,9 +73,8 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
 
       // 1. BACKEND TWILIO VERIFY DISPATCH
       try {
-        await fetch('http://localhost:5000/api/delivery/send-otp-sms', {
+        await apiRequest('/delivery/send-otp-sms', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             requestId: pickupTarget?.requestId || pickupTarget?.orderId || pickupTarget?._id,
             phone: cleanPhone,
@@ -188,20 +188,17 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
       showToast(`✓ Pickup confirmed! Status updated to Out for Delivery. Handed over to ${driver.name}.`);
 
       // 2. BACKEND DATABASE UPDATE
-      await fetch('http://localhost:5000/api/delivery/confirm-pickup', {
+      await apiRequest('/delivery/confirm-pickup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requestId: targetId,
-          email,
           otp: enteredCode || targetOtp,
           bypassOtp
         })
       });
 
-      await fetch('http://localhost:5000/api/delivery/verify-otp', {
+      await apiRequest('/delivery/verify-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requestId: targetId,
           type: 'pickup',
@@ -229,12 +226,10 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
   const handleRetryDelivery = async (reqId) => {
     try {
       showToast('🔄 Retrying driver search...');
-      const res = await fetch('http://localhost:5000/api/delivery/retry', {
+      const json = await apiRequest('/delivery/retry', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: reqId })
       });
-      const json = await res.json();
       if (json.success) {
         showToast(json.message || 'Re-initiated driver search!');
         fetchDeliveryData();
@@ -261,11 +256,8 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
 
   const fetchDeliveryData = async () => {
     try {
-      const email = currentUser?.email || 'menxoxo50@gmail.com';
-
       // 1. Fetch Delivery Requests from MongoDB
-      const delRes = await fetch(`http://localhost:5000/api/delivery/requests?email=${encodeURIComponent(email)}`);
-      const delJson = await delRes.json();
+      const delJson = await apiRequest('/delivery/requests');
 
       if (delJson.success && Array.isArray(delJson.requests)) {
         setDeliveries(prev => {
@@ -281,15 +273,15 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
       }
 
       // 2. Fetch Ready Orders from MongoDB
-      const ordRes = await fetch('http://localhost:5000/api/orders');
-      const ordJson = await ordRes.json();
-      if (ordJson.success && Array.isArray(ordJson.data)) {
+      const ordJson = await apiRequest('/orders/provider');
+      if (ordJson.success && Array.isArray(ordJson.orders)) {
+        setReadyOrders(ordJson.orders.filter(o => o.status === 'Ready'));
+      } else if (ordJson.success && Array.isArray(ordJson.data)) {
         setReadyOrders(ordJson.data.filter(o => o.status === 'Ready'));
       }
 
       // 3. Fetch Nearby Drivers from MongoDB
-      const drvRes = await fetch('http://localhost:5000/api/delivery/drivers/nearby');
-      const drvJson = await drvRes.json();
+      const drvJson = await apiRequest('/delivery/drivers/nearby');
       if (drvJson.success && Array.isArray(drvJson.drivers)) {
         setNearbyDrivers(drvJson.drivers);
       }
@@ -335,12 +327,10 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
 
     try {
       showToast('📡 Broadcasting request to all online drivers nearby...');
-      const res = await fetch('http://localhost:5000/api/delivery/broadcast', {
+      const json = await apiRequest('/delivery/broadcast', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: item.requestId || item.orderId || item._id })
       });
-      const json = await res.json();
 
       setTimeout(() => {
         setIsAutoSearching(false);
@@ -937,12 +927,10 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                               const unassignedReq = deliveries.find(d => normalizeStatus(d.status) === 'Assignment Pending');
                               const reqId = unassignedReq ? unassignedReq.requestId : (deliveries[0]?.requestId || '#DEL-1029');
                               showToast(`⚡ Assigning ${drv.name} to order...`);
-                              const res = await fetch('http://localhost:5000/api/delivery/assign', {
+                              const json = await apiRequest('/delivery/assign', {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ requestId: reqId, driverId: drv.driverId || drv._id })
                               });
-                              const json = await res.json();
                               showToast(json.message || `✓ Driver ${drv.name} assigned successfully!`);
                               fetchDeliveryData();
                             } catch (err) {

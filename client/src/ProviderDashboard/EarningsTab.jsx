@@ -17,16 +17,20 @@ import {
   PieChart
 } from 'lucide-react';
 
+import { apiRequest } from '../services/api';
+
 export default function EarningsTab() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   
   // Period & Date Filter States
-  const [periodFilter, setPeriodFilter] = useState('This Month');
+  const [periodFilter, setPeriodFilter] = useState('All Time');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('All');
+  const [tiffinFilter, setTiffinFilter] = useState('All');
+  const [chartRange, setChartRange] = useState('ALL'); // '7D' | '30D' | 'ALL'
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState('');
-  const [chartRange, setChartRange] = useState('30D');
 
   // Hover Tooltip State for Chart
   const [hoveredDay, setHoveredDay] = useState(null);
@@ -47,8 +51,7 @@ export default function EarningsTab() {
   const fetchOrdersFromDb = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/orders');
-      const json = await res.json();
+      const json = await apiRequest('/orders');
       if (json.success && Array.isArray(json.data)) {
         setOrders(json.data.map(o => ({
           ...o,

@@ -219,16 +219,12 @@ const updateLiveGpsInDatabase = async (requests) => {
 };
 
 // @desc    Get all delivery requests for provider from MongoDB
-// @desc    Get all delivery requests for provider from MongoDB
 // @route   GET /api/delivery/requests
 const getDeliveryRequests = async (req, res) => {
   try {
+    const providerId = req.providerId;
     if (await isDbConnected()) {
-      let requests = await DeliveryRequest.find().sort({ requestedAt: -1 });
-
-      if (requests.length === 0) {
-        requests = await DeliveryRequest.insertMany(DEFAULT_DELIVERY_REQUESTS);
-      }
+      let requests = await DeliveryRequest.find({ providerId }).sort({ requestedAt: -1 });
 
       await updateLiveGpsInDatabase(requests);
 
@@ -241,13 +237,13 @@ const getDeliveryRequests = async (req, res) => {
     } else {
       return res.json({
         success: true,
-        requests: DEFAULT_DELIVERY_REQUESTS,
+        requests: [],
         source: 'in-memory'
       });
     }
   } catch (error) {
     console.error('Error fetching delivery requests:', error);
-    res.status(500).json({ success: false, message: 'Server error: ' + error.message, requests: DEFAULT_DELIVERY_REQUESTS });
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message, requests: [] });
   }
 };
 
@@ -285,8 +281,10 @@ const findBestNearbyDriverFromDb = async () => {
 // @route   POST /api/delivery/dispatch
 const createDeliveryRequest = async (req, res) => {
   try {
+    const providerId = req.providerId;
     const { orderId, customerName, customerPhone, deliveryAddress, amount, itemCount, tiffinName } = req.body;
-    const providerEmail = req.body.email || req.query.email || 'menxoxo50@gmail.com';
+    const providerEmail = req.provider?.email || req.body.email || '';
+    const providerName = req.provider?.name || req.provider?.businessName || '';
     const requestId = `#DEL-${Math.floor(1000 + Math.random() * 9000)}`;
     const pickupOtp = String(Math.floor(1000 + Math.random() * 9000));
 
@@ -294,9 +292,10 @@ const createDeliveryRequest = async (req, res) => {
 
     const newRequestData = {
       requestId,
+      providerId,
       orderId: orderId || `ORD-${Math.floor(1000 + Math.random() * 9000)}`,
       providerEmail,
-      providerName: 'Xoxo Men Kitchen',
+      providerName,
       customerName: customerName || 'Raj Patel',
       customerPhone: customerPhone || '+91 98765 12345',
       tiffinName: tiffinName || 'Gujarati Special Thali × 1',
@@ -325,26 +324,58 @@ const createDeliveryRequest = async (req, res) => {
       
       if (orderId) {
         await Order.findOneAndUpdate(
-          { $or: [{ orderId }, { _id: orderId }] },
+          { $or: [{ orderId }, { _id: orderId }], providerId },
           { $set: { status: 'Ready', deliveryStatus: 'Assigned', deliveryPartnerName: selectedDriver.name, deliveryPartnerPhone: selectedDriver.phone } }
         );
       }
 
-      return res.json({
+      return res.status(201).json({
         success: true,
-        message: `⚡ Zomato & Swiggy Auto-Dispatch: Matched to nearest driver ${selectedDriver.name} (${selectedDriver.distanceKm} km away)!`,
+        message: `Delivery dispatched! Driver ${selectedDriver.name} (${selectedDriver.vehicleNo}) assigned.`,
         request
       });
     }
 
-    return res.json({
+    return res.status(201).json({
       success: true,
-      message: `⚡ Zomato & Swiggy Auto-Dispatch: Matched to nearest driver ${selectedDriver.name} (${selectedDriver.distanceKm} km away)!`,
+      message: `Delivery dispatched (in-memory)`,
       request: newRequestData
     });
   } catch (error) {
-    console.error('Error creating delivery dispatch request:', error);
-    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+    console.error('Error creating delivery request:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getDeliveryMetrics = async (req, res) => {
+  try {
+    const providerId = req.providerId;
+    if (await isDbConnected()) {
+      const readyCount = await Order.countDocuments({ providerId, status: 'Ready' });
+      const searchingCount = await DeliveryRequest.countDocuments({ providerId, status: 'Searching Drivers' });
+      const assignedCount = await DeliveryRequest.countDocuments({ providerId, status: 'Driver Assigned' });
+      const pickupCount = await DeliveryRequest.countDocuments({ providerId, status: { $in: ['Arrived at Provider', 'ARRIVED_AT_PICKUP'] } });
+      const onWayCount = await DeliveryRequest.countDocuments({ providerId, status: { $in: ['Picked Up', 'Out for Delivery', 'OUT_FOR_DELIVERY'] } });
+
+      return res.json({
+        success: true,
+        metrics: {
+          ready: readyCount,
+          searching: searchingCount,
+          assigned: assignedCount,
+          pickup: pickupCount,
+          onWay: onWayCount
+        }
+      });
+    } else {
+      return res.json({
+        success: true,
+        metrics: { ready: 0, searching: 0, assigned: 0, pickup: 0, onWay: 0 }
+      });
+    }
+  } catch (error) {
+    console.error('Error getting delivery metrics:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -417,39 +448,6 @@ const assignDriver = async (req, res) => {
   } catch (error) {
     console.error('Error assigning driver:', error);
     res.status(500).json({ success: false, message: 'Server error: ' + error.message });
-  }
-};
-
-// @desc    Get dynamic summary counts for Provider Delivery Management header
-// @route   GET /api/delivery/metrics
-const getDeliveryMetrics = async (req, res) => {
-  try {
-    if (await isDbConnected()) {
-      const readyCount = await Order.countDocuments({ status: 'Ready' });
-      const searchingCount = await DeliveryRequest.countDocuments({ status: 'Searching Drivers' });
-      const assignedCount = await DeliveryRequest.countDocuments({ status: 'Driver Assigned' });
-      const pickupCount = await DeliveryRequest.countDocuments({ status: { $in: ['Arrived at Provider', 'ARRIVED_AT_PICKUP'] } });
-      const onWayCount = await DeliveryRequest.countDocuments({ status: { $in: ['Picked Up', 'Out for Delivery', 'OUT_FOR_DELIVERY'] } });
-
-      return res.json({
-        success: true,
-        metrics: {
-          ready: readyCount,
-          searching: searchingCount,
-          assigned: assignedCount,
-          pickup: pickupCount,
-          onWay: onWayCount
-        }
-      });
-    } else {
-      return res.json({
-        success: true,
-        metrics: { ready: 4, searching: 2, assigned: 3, pickup: 1, onWay: 5 }
-      });
-    }
-  } catch (error) {
-    console.error('Error getting delivery metrics:', error);
-    res.status(500).json({ success: false, message: error.message });
   }
 };
 

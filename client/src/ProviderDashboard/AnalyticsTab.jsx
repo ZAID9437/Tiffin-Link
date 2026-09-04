@@ -19,6 +19,8 @@ import {
   Filter
 } from 'lucide-react';
 
+import { apiRequest } from '../services/api';
+
 export default function AnalyticsTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,8 +51,7 @@ export default function AnalyticsTab() {
   const fetchAnalyticsData = async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true);
-      const res = await fetch('http://localhost:5000/api/analytics');
-      const json = await res.json();
+      const json = await apiRequest('/analytics');
       if (json.success) {
         setData(json);
       }

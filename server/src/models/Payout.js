@@ -6,9 +6,14 @@ const payoutSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  providerId: {
+    type: String,
+    required: true,
+    index: true
+  },
   providerName: {
     type: String,
-    default: 'Shreeji Tiffin Services'
+    default: ''
   },
   amount: {
     type: Number,

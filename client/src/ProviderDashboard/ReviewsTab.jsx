@@ -23,21 +23,12 @@ import {
 export default function ReviewsTab() {
   const [reviews, setReviews] = useState([]);
   const [stats, setStats] = useState({
-    overallRating: '4.6',
+    overallRating: '4.7',
     totalReviews: 128,
-    responseRate: 92,
-    ratingDistribution: {
-      5: { count: 105, percent: 82 },
-      4: { count: 13, percent: 10 },
-      3: { count: 6, percent: 5 },
-      2: { count: 3, percent: 2 },
-      1: { count: 1, percent: 1 }
-    },
-    tiffinPerformance: [
-      { tiffinName: 'Gujarati Veg Thali', reviewsCount: 42, rating: '4.8', trend: '↑' },
-      { tiffinName: 'Jain Special Thali', reviewsCount: 31, rating: '4.5', trend: '→' },
-      { tiffinName: 'Family Meal', reviewsCount: 27, rating: '4.2', trend: '↓' }
-    ]
+    foodQualityRating: '4.8',
+    deliveryRating: '4.6',
+    packagingRating: '4.7',
+    breakdown: { 5: 3, 4: 1, 3: 1, 2: 0, 1: 0 }
   });
 
   const [pagination, setPagination] = useState({
@@ -48,47 +39,41 @@ export default function ReviewsTab() {
   });
 
   const [loading, setLoading] = useState(true);
-  const [toastMsg, setToastMsg] = useState('');
-
-  // Filters State
-  const [searchQuery, setSearchQuery] = useState('');
   const [ratingFilter, setRatingFilter] = useState('All');
+  const [repliedFilter, setRepliedFilter] = useState('All');
   const [tiffinFilter, setTiffinFilter] = useState('All');
   const [dateRangeFilter, setDateRangeFilter] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Selected Review for Side Drawer
+  // Modals & Drawers State
   const [selectedReview, setSelectedReview] = useState(null);
-
-  // Reply Modal State
   const [replyModalReview, setReplyModalReview] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   useEffect(() => {
     fetchReviewsFromDb();
-  }, [searchQuery, ratingFilter, tiffinFilter, dateRangeFilter, currentPage]);
+  }, [ratingFilter, repliedFilter, tiffinFilter, dateRangeFilter, currentPage]);
 
   const showToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(''), 3500);
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3000);
   };
 
   const fetchReviewsFromDb = async () => {
     try {
       setLoading(true);
       const queryParams = new URLSearchParams({
-        providerId: 'prov_1',
-        search: searchQuery,
         rating: ratingFilter,
+        replied: repliedFilter,
         tiffin: tiffinFilter,
         dateRange: dateRangeFilter,
         page: currentPage,
         limit: 5
       });
 
-      const res = await fetch(`http://localhost:5000/api/reviews?${queryParams.toString()}`);
-      const json = await res.json();
+      const json = await apiRequest(`/reviews?${queryParams.toString()}`);
 
       if (json.success && json.data) {
         if (Array.isArray(json.data.reviews)) {
@@ -115,12 +100,10 @@ export default function ReviewsTab() {
 
     try {
       setSubmittingReply(true);
-      const res = await fetch(`http://localhost:5000/api/reviews/${replyModalReview._id}/reply`, {
+      const json = await apiRequest(`/reviews/${replyModalReview._id}/reply`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ providerReply: replyText.trim() })
       });
-      const json = await res.json();
 
       if (json.success) {
         showToast('✓ Provider reply saved successfully!');

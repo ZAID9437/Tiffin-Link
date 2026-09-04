@@ -34,6 +34,7 @@ router.use('/settings', settingRoutes);
 router.use('/support', supportRoutes);
 router.use('/delivery', deliveryRoutes);
 router.use('/requests', requestRoutes);
+router.use('/live-requests', requestRoutes);
 router.use('/contact', contactRoutes);
 router.use('/subscriptions', subscriptionRoutes);
 router.use('/otp', otpRoutes);

@@ -15,7 +15,7 @@ export const clearAuthTokens = () => {
 };
 
 export const apiRequest = async (endpoint, options = {}) => {
-  const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+  const url = endpoint.startsWith('http') ? endpoint : `${BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
   
   const headers = {
     'Content-Type': 'application/json',

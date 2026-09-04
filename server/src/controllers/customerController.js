@@ -36,8 +36,8 @@ const filterByDateRange = (dateStr, range) => {
 // @route   GET /api/customers
 const getCustomers = async (req, res) => {
   try {
+    const providerId = req.providerId;
     const {
-      providerId = 'prov_1',
       search = '',
       status = 'All',
       orderFilter = 'All',
@@ -52,54 +52,45 @@ const getCustomers = async (req, res) => {
     let customerList = [];
 
     if (await isDbConnected()) {
-      // 1. Ensure seed users exist in DB if empty
-      let registeredUsers = await User.find({ role: 'customer' });
-      if (registeredUsers.length === 0) {
-        for (const u of defaultInitialUsers) {
-          await User.updateOne({ email: u.email }, { $set: u }, { upsert: true });
+      // Fetch orders strictly belonging to this provider
+      const providerOrders = await Order.find({ providerId }).sort({ createdAt: -1 });
+
+      // Map of customers who have relationship with this provider
+      const customerMap = new Map();
+
+      providerOrders.forEach(o => {
+        const key = (o.customerPhone || o.customerName || 'customer').toLowerCase();
+        if (!customerMap.has(key)) {
+          customerMap.set(key, {
+            id: o._id,
+            name: o.customerName,
+            phone: o.customerPhone || '+91 98250 12345',
+            email: o.customerEmail || '',
+            address: typeof o.customerAddress === 'string' ? o.customerAddress : (o.customerAddress?.street || 'Ahmedabad'),
+            latitude: o.deliveryAddress?.lat || 23.0300,
+            longitude: o.deliveryAddress?.lng || 72.5650,
+            status: 'Active',
+            totalOrdersCount: 0,
+            totalSpent: 0,
+            completedCount: 0,
+            cancelledCount: 0,
+            activeCount: 0,
+            lastOrderDate: o.createdAt,
+            orders: []
+          });
         }
-        registeredUsers = await User.find({ role: 'customer' });
-      }
 
-      // 2. Fetch orders for this provider
-      const allOrders = await Order.find().sort({ createdAt: -1 });
-
-      // 3. Group and aggregate metrics per customer
-      customerList = registeredUsers.map(user => {
-        const userOrders = allOrders.filter(o =>
-          (o.customerPhone && o.customerPhone === user.phone) ||
-          (o.customerName && o.customerName.toLowerCase() === user.name.toLowerCase()) ||
-          (o.customerEmail && o.customerEmail.toLowerCase() === user.email.toLowerCase())
-        );
-
-        const totalSpent = userOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-        const completedCount = userOrders.filter(o => o.status === 'Completed').length;
-        const cancelledCount = userOrders.filter(o => o.status === 'Cancelled').length;
-        const activeCount = userOrders.filter(o => ['New', 'Preparing', 'Ready', 'Out for Delivery'].includes(o.status)).length;
-        const lastOrderDate = userOrders.length > 0 ? userOrders[0].createdAt : user.createdAt;
-        const primaryAddress = userOrders.length > 0 ? (typeof userOrders[0].customerAddress === 'string' ? userOrders[0].customerAddress : userOrders[0].customerAddress?.street || 'Ahmedabad') : (user.address || 'Ahmedabad');
-
-        return {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone || '+91 98250 12345',
-          address: primaryAddress,
-          latitude: userOrders[0]?.deliveryAddress?.lat || 23.0300,
-          longitude: userOrders[0]?.deliveryAddress?.lng || 72.5650,
-          status: user.isActive ? 'Active' : 'Inactive',
-          totalOrdersCount: userOrders.length,
-          totalSpent,
-          completedCount,
-          cancelledCount,
-          activeCount,
-          lastOrderDate,
-          orders: userOrders.map(o => ({
-            ...o.toObject(),
-            id: o._id
-          }))
-        };
+        const entry = customerMap.get(key);
+        entry.totalOrdersCount += 1;
+        entry.totalSpent += o.totalAmount || 0;
+        if (o.status === 'Completed') entry.completedCount += 1;
+        if (o.status === 'Cancelled') entry.cancelledCount += 1;
+        if (['New', 'Preparing', 'Ready', 'Out for Delivery'].includes(o.status)) entry.activeCount += 1;
+        if (new Date(o.createdAt) > new Date(entry.lastOrderDate)) entry.lastOrderDate = o.createdAt;
+        entry.orders.push({ ...o.toObject(), id: o._id });
       });
+
+      customerList = Array.from(customerMap.values());
     } else {
       customerList = defaultInitialUsers.map((u, idx) => ({
         id: `usr_${idx}`,

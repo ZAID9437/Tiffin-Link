@@ -1,6 +1,15 @@
 const mongoose = require('mongoose');
 
 const providerSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    index: true
+  },
+  isAcceptingOrders: {
+    type: Boolean,
+    default: true
+  },
   name: {
     type: String,
     required: true
@@ -10,7 +19,7 @@ const providerSchema = new mongoose.Schema({
     required: true
   },
   fullName: { type: String, default: '' },
-  email: { type: String, default: '' },
+  email: { type: String, default: '', index: true },
   mobile: { type: String, default: '' },
   dob: { type: String, default: '' },
   gender: { type: String, default: '' },

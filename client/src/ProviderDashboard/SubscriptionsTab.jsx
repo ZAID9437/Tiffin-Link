@@ -22,6 +22,8 @@ import {
   Play
 } from 'lucide-react';
 
+import { apiRequest } from '../services/api';
+
 export default function SubscriptionsTab() {
   const [subscriptions, setSubscriptions] = useState([]);
   const [metrics, setMetrics] = useState({
@@ -93,8 +95,7 @@ export default function SubscriptionsTab() {
         limit: 5
       });
 
-      const res = await fetch(`http://localhost:5000/api/subscriptions?${queryParams.toString()}`);
-      const json = await res.json();
+      const json = await apiRequest(`/subscriptions?${queryParams.toString()}`);
 
       if (json.success && json.data) {
         if (Array.isArray(json.data.subscriptions)) {
@@ -116,13 +117,13 @@ export default function SubscriptionsTab() {
 
   const fetchRealCustomersAndTiffins = async () => {
     try {
-      const cRes = await fetch('http://localhost:5000/api/customers');
+      const cRes = await apiRequest('/customers');
       const cJson = await cRes.json();
       if (cJson.success && cJson.data && Array.isArray(cJson.data.customers)) {
         setRealCustomers(cJson.data.customers);
       }
 
-      const tRes = await fetch('http://localhost:5000/api/tiffins');
+      const tRes = await apiRequest('/tiffins');
       const tJson = await tRes.json();
       if (tJson.success && Array.isArray(tJson.data)) {
         setRealTiffins(tJson.data);
@@ -135,15 +136,13 @@ export default function SubscriptionsTab() {
   // Status Change Handler (Pause, Resume, Cancel)
   const handleUpdateStatus = async (subId, newStatus) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/subscriptions/${subId}`, {
+      const json = await apiRequest(`/subscriptions/${subId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: newStatus,
           deliveryDays: selectedSub?.deliveryDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
         })
       });
-      const json = await res.json();
       if (json.success) {
         showToast(`✓ Subscription status updated to ${newStatus}`);
         if (selectedSub) {
@@ -166,11 +165,9 @@ export default function SubscriptionsTab() {
 
     try {
       setSaving(true);
-      const res = await fetch('http://localhost:5000/api/subscriptions', {
+      const json = await apiRequest('/subscriptions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          providerId: 'prov_1',
           customerName: newCustName,
           customerPhone: newCustPhone,
           customerEmail: newCustEmail,
@@ -185,7 +182,6 @@ export default function SubscriptionsTab() {
           paymentStatus: 'PAID'
         })
       });
-      const json = await res.json();
       if (json.success) {
         showToast(`✓ Created subscription for ${newCustName}!`);
         setIsCreateModalOpen(false);

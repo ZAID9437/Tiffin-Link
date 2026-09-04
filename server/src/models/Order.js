@@ -1,6 +1,15 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
+  providerId: {
+    type: String,
+    required: true,
+    index: true
+  },
+  tiffinId: {
+    type: String,
+    default: ''
+  },
   orderId: {
     type: String,
     required: true,
@@ -121,5 +130,7 @@ const orderSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+orderSchema.index({ providerId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Order', orderSchema);

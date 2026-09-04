@@ -53,6 +53,8 @@ import SettingsTab from './SettingsTab';
 import DeliveryManagementTab from './DeliveryManagementTab';
 import HelpSupportTab from './HelpSupportTab';
 
+import { apiRequest } from '../services/api';
+
 export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [expandedMenus, setExpandedMenus] = useState({
@@ -74,7 +76,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
     const fetchSidebarBadges = async () => {
       try {
         // 1. Fetch live pending requests count from MongoDB
-        const reqRes = await fetch('http://localhost:5000/api/requests');
+        const reqRes = await apiRequest('/requests');
         const reqJson = await reqRes.json();
         let reqCount = 0;
         if (reqJson.success && Array.isArray(reqJson.data)) {
@@ -82,7 +84,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         }
 
         // 2. Fetch new orders count from MongoDB
-        const ordRes = await fetch('http://localhost:5000/api/orders');
+        const ordRes = await apiRequest('/orders');
         const ordJson = await ordRes.json();
         let newCount = 0;
         if (ordJson.success && Array.isArray(ordJson.data)) {
@@ -90,7 +92,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         }
 
         // 3. Fetch provider online status from MongoDB
-        const dashRes = await fetch('http://localhost:5000/api/providers/dashboard');
+        const dashRes = await apiRequest('/providers/dashboard');
         const dashJson = await dashRes.json();
         if (dashJson.success && dashJson.data && dashJson.data.acceptingOrders !== undefined) {
           setIsKitchenOnline(Boolean(dashJson.data.acceptingOrders));
@@ -114,15 +116,12 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
     const nextStatus = !isKitchenOnline;
     setIsKitchenOnline(nextStatus);
     try {
-      const res = await fetch('http://localhost:5000/api/providers/status', {
+      const json = await apiRequest('/providers/status', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          acceptingOrders: nextStatus,
-          email: currentUser?.email || 'provider@tiffinlink.com'
+          acceptingOrders: nextStatus
         })
       });
-      const json = await res.json();
       if (json.success) {
         setStatusToast(`✓ Kitchen status updated to ${nextStatus ? 'ONLINE (Accepting Orders)' : 'OFFLINE (Paused)'}`);
         setTimeout(() => setStatusToast(''), 3500);

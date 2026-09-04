@@ -77,6 +77,8 @@ const INITIAL_SETTINGS = {
   }
 };
 
+import { apiRequest } from '../services/api';
+
 export default function SettingsTab({ currentUser, onUpdateUser }) {
   const [activeSection, setActiveSection] = useState('account');
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
@@ -98,9 +100,7 @@ export default function SettingsTab({ currentUser, onUpdateUser }) {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const email = currentUser?.email || 'menxoxo50@gmail.com';
-      const res = await fetch(`http://localhost:5000/api/settings/provider?email=${encodeURIComponent(email)}`);
-      const json = await res.json();
+      const json = await apiRequest('/settings/provider');
       if (json.success && json.settings) {
         setSettings(json.settings);
       }
@@ -115,23 +115,16 @@ export default function SettingsTab({ currentUser, onUpdateUser }) {
     if (e) e.preventDefault();
     try {
       setSaving(true);
-      const emailToUse = currentUser?.email || settings.account?.email || 'menxoxo50@gmail.com';
       
       const payload = {
-        ...settings,
-        account: {
-          ...settings.account,
-          email: settings.account?.email || emailToUse
-        }
+        ...settings
       };
 
-      const res = await fetch(`http://localhost:5000/api/settings/provider?email=${encodeURIComponent(emailToUse)}`, {
+      const json = await apiRequest('/settings/provider', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      const json = await res.json();
       if (json.success) {
         const updatedUserObj = {
           ...currentUser,

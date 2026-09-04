@@ -24,7 +24,7 @@ const getDateLabel = (idx, dateObj) => {
 // @route   GET /api/capacity
 const getCapacity = async (req, res) => {
   try {
-    const providerId = req.query.providerId || 'prov_1';
+    const providerId = req.providerId;
     let globalMaxCapacity = 50;
     let autoStopOrders = true;
     let allowOverbooking = false;
@@ -42,8 +42,8 @@ const getCapacity = async (req, res) => {
     const now = new Date();
     const daysList = [];
 
-    // Fetch orders for the next 7 days
-    const allOrders = (await isDbConnected()) ? await Order.find({ status: { $ne: 'Cancelled' } }) : [];
+    // Fetch orders for the next 7 days belonging to this provider
+    const allOrders = (await isDbConnected()) ? await Order.find({ providerId, status: { $ne: 'Cancelled' } }) : [];
 
     for (let i = 0; i < 7; i++) {
       const dateObj = new Date(now);
@@ -131,7 +131,8 @@ const getCapacity = async (req, res) => {
 // @route   POST /api/capacity/settings
 const updateCapacitySettings = async (req, res) => {
   try {
-    const { providerId = 'prov_1', maxDailyOrders, autoStopOrders, allowOverbooking } = req.body;
+    const providerId = req.providerId;
+    const { maxDailyOrders, autoStopOrders, allowOverbooking } = req.body;
 
     if (await isDbConnected()) {
       let settings = await ProviderSetting.findOne({ providerId });
@@ -175,7 +176,8 @@ const updateCapacitySettings = async (req, res) => {
 // @route   PUT /api/capacity/date
 const updateDateCapacity = async (req, res) => {
   try {
-    const { providerId = 'prov_1', date, maxCapacity } = req.body;
+    const providerId = req.providerId;
+    const { date, maxCapacity } = req.body;
 
     if (!date || maxCapacity === undefined) {
       return res.status(400).json({ success: false, message: 'Date and maxCapacity are required' });
@@ -206,7 +208,7 @@ const updateDateCapacity = async (req, res) => {
 // @route   GET /api/capacity/check-today
 const checkCapacityAvailable = async (req, res) => {
   try {
-    const providerId = req.query.providerId || 'prov_1';
+    const providerId = req.providerId || req.query.providerId;
     const now = new Date();
     const todayKey = formatDateKey(now);
 
@@ -214,7 +216,7 @@ const checkCapacityAvailable = async (req, res) => {
     let autoStop = true;
     let allowOver = false;
 
-    if (await isDbConnected()) {
+    if (await isDbConnected() && providerId) {
       const settings = await ProviderSetting.findOne({ providerId });
       if (settings) {
         globalMax = settings.tiffin?.maxDailyLimit ?? 50;
@@ -229,7 +231,7 @@ const checkCapacityAvailable = async (req, res) => {
         allowOver = todayCap.allowOverbooking;
       }
 
-      const todayOrders = await Order.find({ status: { $ne: 'Cancelled' } });
+      const todayOrders = await Order.find({ providerId, status: { $ne: 'Cancelled' } });
       const bookedCount = todayOrders.filter(o => formatDateKey(new Date(o.createdAt)) === todayKey)
                                      .reduce((sum, o) => sum + (o.quantity || 1), 0);
 

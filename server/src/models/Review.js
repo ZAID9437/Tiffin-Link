@@ -4,7 +4,7 @@ const reviewSchema = new mongoose.Schema({
   providerId: {
     type: String,
     required: true,
-    default: 'prov_1'
+    index: true
   },
   orderId: {
     type: String,
@@ -56,5 +56,7 @@ const reviewSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+reviewSchema.index({ providerId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Review', reviewSchema);

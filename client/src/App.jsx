@@ -35,6 +35,7 @@ import LoginModal from './components/LoginModal';
 import DemoModal from './components/DemoModal';
 import CookieConsentModal from './components/CookieConsentModal';
 
+import { clearAuthTokens } from './services/api';
 import { CheckCircle2 } from 'lucide-react';
 
 export default function App() {
@@ -70,6 +71,7 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('tiffinlink_user');
+    clearAuthTokens();
     showToastNotification('You have been signed out.');
   };
 
@@ -358,7 +360,6 @@ export default function App() {
     return () => {
       if (!isMobile) {
         document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseover', handleMouseOver);
         document.removeEventListener('mousemove', handleMagneticMove);
         cancelAnimationFrame(rafId);
       }

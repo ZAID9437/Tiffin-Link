@@ -4,7 +4,7 @@ const serviceAreaSchema = new mongoose.Schema({
   providerId: {
     type: String,
     required: true,
-    default: 'prov_1'
+    index: true
   },
   areaName: {
     type: String,

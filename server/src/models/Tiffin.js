@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const tiffinSchema = new mongoose.Schema({
+  providerId: {
+    type: String,
+    required: true,
+    index: true
+  },
   name: {
     type: String,
     required: true,
@@ -64,5 +69,7 @@ const tiffinSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+tiffinSchema.index({ providerId: 1, status: 1 });
 
 module.exports = mongoose.model('Tiffin', tiffinSchema);

@@ -31,6 +31,7 @@ import {
   FileText
 } from 'lucide-react';
 import DeliveryManagementTab from './DeliveryManagementTab';
+import { apiRequest } from '../services/api';
 
 export default function OrdersTab({ initialStatus = 'All' }) {
   const [orders, setOrders] = useState([]);
@@ -66,8 +67,7 @@ export default function OrdersTab({ initialStatus = 'All' }) {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/orders');
-      const json = await res.json();
+      const json = await apiRequest('/orders');
       if (json.success && Array.isArray(json.data)) {
         setOrders(json.data.map(o => ({
           ...o,
@@ -113,9 +113,8 @@ export default function OrdersTab({ initialStatus = 'All' }) {
     }
 
     try {
-      await fetch(`http://localhost:5000/api/orders/${dbId}`, {
+      await apiRequest(`/orders/${dbId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus, cancellationReason: reason })
       });
     } catch (err) {

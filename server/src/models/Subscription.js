@@ -4,7 +4,7 @@ const subscriptionSchema = new mongoose.Schema({
   providerId: {
     type: String,
     required: true,
-    default: 'prov_1'
+    index: true
   },
   subId: {
     type: String,
@@ -100,5 +100,7 @@ const subscriptionSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+subscriptionSchema.index({ providerId: 1, status: 1 });
 
 module.exports = mongoose.model('Subscription', subscriptionSchema);

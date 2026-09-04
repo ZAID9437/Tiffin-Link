@@ -104,8 +104,8 @@ const initialSeedSubscriptions = [
 // @route   GET /api/subscriptions
 const getSubscriptions = async (req, res) => {
   try {
+    const providerId = req.providerId;
     const {
-      providerId = 'prov_1',
       search = '',
       status = 'All',
       plan = 'All',
@@ -120,19 +120,8 @@ const getSubscriptions = async (req, res) => {
 
     if (await isDbConnected()) {
       subList = await Subscription.find({ providerId }).sort({ createdAt: -1 });
-
-      if (subList.length === 0) {
-        for (const s of initialSeedSubscriptions) {
-          await Subscription.updateOne(
-            { subId: s.subId },
-            { $set: { ...s, providerId } },
-            { upsert: true }
-          );
-        }
-        subList = await Subscription.find({ providerId }).sort({ createdAt: -1 });
-      }
     } else {
-      subList = initialSeedSubscriptions.map((s, idx) => ({ _id: `sub_${idx}`, ...s, providerId }));
+      subList = [];
     }
 
     // Apply Filters
@@ -215,8 +204,8 @@ const getSubscriptions = async (req, res) => {
 // @route   POST /api/subscriptions
 const createSubscription = async (req, res) => {
   try {
+    const providerId = req.providerId;
     const {
-      providerId = 'prov_1',
       customerName,
       customerPhone,
       customerEmail,
@@ -276,6 +265,7 @@ const createSubscription = async (req, res) => {
 const updateSubscription = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     const updateData = { ...req.body, updatedAt: new Date() };
 
     // Handle status transitions
@@ -283,14 +273,16 @@ const updateSubscription = async (req, res) => {
       updateData.pausedAt = new Date();
     } else if (updateData.status === 'ACTIVE') {
       updateData.resumedAt = new Date();
-      // Recalculate dynamic next delivery date upon resume
       updateData.nextDeliveryDate = calculateNextDeliveryDate(updateData.deliveryDays);
     } else if (updateData.status === 'CANCELLED') {
       updateData.cancelledAt = new Date();
     }
 
     if (await isDbConnected()) {
-      const updated = await Subscription.findByIdAndUpdate(id, updateData, { new: true });
+      const updated = await Subscription.findOneAndUpdate({ _id: id, providerId }, updateData, { new: true });
+      if (!updated) {
+        return res.status(404).json({ success: false, message: 'Subscription not found or unauthorized' });
+      }
       return res.json({ success: true, message: `✓ Subscription status updated to ${updateData.status || 'updated'}`, data: updated });
     }
 
@@ -306,8 +298,12 @@ const updateSubscription = async (req, res) => {
 const deleteSubscription = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     if (await isDbConnected()) {
-      await Subscription.findByIdAndDelete(id);
+      const deleted = await Subscription.findOneAndDelete({ _id: id, providerId });
+      if (!deleted) {
+        return res.status(404).json({ success: false, message: 'Subscription not found or unauthorized' });
+      }
       return res.json({ success: true, message: '✓ Subscription deleted successfully' });
     }
     return res.json({ success: true, message: '✓ Subscription deleted' });

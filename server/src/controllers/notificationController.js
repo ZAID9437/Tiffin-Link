@@ -3,12 +3,23 @@ const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
 
+// Helper to get array of valid recipient IDs for the authenticated user/provider
+const getRecipientIds = (req) => {
+  const ids = [];
+  if (req.providerId) ids.push(req.providerId.toString());
+  if (req.user?._id) ids.push(req.user._id.toString());
+  if (req.user?.id) ids.push(req.user.id.toString());
+  return Array.from(new Set(ids));
+};
+
 // @desc    Get all notifications and summary metrics
 // @route   GET /api/notifications
 const getNotifications = async (req, res) => {
   try {
-    if (await isDbConnected()) {
-      const notifications = await Notification.find().sort({ createdAt: -1 });
+    const recipientIds = getRecipientIds(req);
+
+    if (await isDbConnected() && recipientIds.length > 0) {
+      const notifications = await Notification.find({ recipientId: { $in: recipientIds } }).sort({ createdAt: -1 });
 
       const summary = {
         all: notifications.length,
@@ -43,12 +54,16 @@ const getNotifications = async (req, res) => {
 const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
-    if (await isDbConnected()) {
+    const recipientIds = getRecipientIds(req);
+    if (await isDbConnected() && recipientIds.length > 0) {
       const updated = await Notification.findOneAndUpdate(
-        { notificationId: id },
+        { notificationId: id, recipientId: { $in: recipientIds } },
         { $set: { read: true } },
         { new: true }
       );
+      if (!updated) {
+        return res.status(404).json({ success: false, message: 'Notification not found or unauthorized' });
+      }
       return res.json({ success: true, notification: updated });
     }
     return res.json({ success: true });
@@ -62,8 +77,9 @@ const markAsRead = async (req, res) => {
 // @route   PUT /api/notifications/read-all
 const markAllAsRead = async (req, res) => {
   try {
-    if (await isDbConnected()) {
-      await Notification.updateMany({}, { $set: { read: true } });
+    const recipientIds = getRecipientIds(req);
+    if (await isDbConnected() && recipientIds.length > 0) {
+      await Notification.updateMany({ recipientId: { $in: recipientIds } }, { $set: { read: true } });
       return res.json({ success: true, message: 'All notifications marked as read' });
     }
     return res.json({ success: true });
@@ -78,12 +94,16 @@ const markAllAsRead = async (req, res) => {
 const markAsUnread = async (req, res) => {
   try {
     const { id } = req.params;
-    if (await isDbConnected()) {
+    const recipientIds = getRecipientIds(req);
+    if (await isDbConnected() && recipientIds.length > 0) {
       const updated = await Notification.findOneAndUpdate(
-        { notificationId: id },
+        { notificationId: id, recipientId: { $in: recipientIds } },
         { $set: { read: false } },
         { new: true }
       );
+      if (!updated) {
+        return res.status(404).json({ success: false, message: 'Notification not found or unauthorized' });
+      }
       return res.json({ success: true, notification: updated });
     }
     return res.json({ success: true });
@@ -98,8 +118,12 @@ const markAsUnread = async (req, res) => {
 const deleteNotification = async (req, res) => {
   try {
     const { id } = req.params;
-    if (await isDbConnected()) {
-      await Notification.deleteOne({ notificationId: id });
+    const recipientIds = getRecipientIds(req);
+    if (await isDbConnected() && recipientIds.length > 0) {
+      const result = await Notification.deleteOne({ notificationId: id, recipientId: { $in: recipientIds } });
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ success: false, message: 'Notification not found or unauthorized' });
+      }
       return res.json({ success: true, message: 'Notification deleted successfully' });
     }
     return res.json({ success: true });

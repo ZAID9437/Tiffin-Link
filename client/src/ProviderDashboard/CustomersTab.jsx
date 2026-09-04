@@ -21,6 +21,8 @@ import {
   Filter
 } from 'lucide-react';
 
+import { apiRequest } from '../services/api';
+
 export default function CustomersTab() {
   const [customers, setCustomers] = useState([]);
   const [metrics, setMetrics] = useState({
@@ -55,7 +57,6 @@ export default function CustomersTab() {
     try {
       setLoading(true);
       const queryParams = new URLSearchParams({
-        providerId: 'prov_1',
         search: searchQuery,
         status: statusFilter,
         orderFilter: orderFilter,
@@ -64,8 +65,7 @@ export default function CustomersTab() {
         limit: 5
       });
 
-      const res = await fetch(`http://localhost:5000/api/customers?${queryParams.toString()}`);
-      const json = await res.json();
+      const json = await apiRequest(`/customers?${queryParams.toString()}`);
 
       if (json.success && json.data) {
         if (Array.isArray(json.data.customers)) {

@@ -25,6 +25,7 @@ import {
   Filter
 } from 'lucide-react';
 import AnimatedCounter from './AnimatedCounter';
+import { apiRequest } from '../services/api';
 
 export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
   const providerName = currentUser?.name || 'Xoxo Men';
@@ -114,8 +115,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     const fetchDashboardDataFromDb = async () => {
       try {
         // 1. Fetch Orders from MongoDB
-        const ordRes = await fetch('http://localhost:5000/api/orders');
-        const ordJson = await ordRes.json();
+        const ordJson = await apiRequest('/orders');
         
         if (ordJson.success && Array.isArray(ordJson.data)) {
           const fetchedOrders = ordJson.data;
@@ -132,7 +132,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
 
           // Active Orders for Table (Top 5 active/recent)
           const activeOrdersFormatted = fetchedOrders.slice(0, 5).map(o => {
-            let statusBg = 'bg-gray-100 text-gray-800 border-gray-200';
+            let statusBg = 'bg-gray-100 text-[#111827] border-gray-200';
             if (o.status === 'Preparing') statusBg = 'bg-amber-100 text-amber-800 border-amber-200';
             if (o.status === 'Ready') statusBg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
             if (o.status === 'New') statusBg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
@@ -173,8 +173,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
         }
 
         // 2. Fetch Live Requests from MongoDB
-        const reqRes = await fetch('http://localhost:5000/api/requests');
-        const reqJson = await reqRes.json();
+        const reqJson = await apiRequest('/requests');
         if (reqJson.success && Array.isArray(reqJson.data)) {
           const pendingList = reqJson.data.filter(r => r.status === 'pending');
           setStats(prev => ({ ...prev, liveRequestsCount: pendingList.length }));
@@ -197,8 +196,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
         }
 
         // 3. Fetch Reviews Rating from MongoDB
-        const revRes = await fetch('http://localhost:5000/api/reviews');
-        const revJson = await revRes.json();
+        const revJson = await apiRequest('/reviews');
         if (revJson.success && revJson.stats) {
           setStats(prev => ({
             ...prev,
@@ -280,12 +278,10 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
         status: 'Preparing'
       };
 
-      const res = await fetch('http://localhost:5000/api/orders', {
+      const data = await apiRequest('/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(demoOrder)
       });
-      const data = await res.json();
       if (data.success) {
         setToastMessage(`✓ Order ${data.data.orderId} created for Today! Orders Today incremented.`);
         setTimeout(() => setToastMessage(null), 3500);
@@ -307,10 +303,9 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     );
 
     try {
-      await fetch('http://localhost:5000/api/providers/status', {
+      await apiRequest('/providers/status', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ acceptingOrders: nextState, email: currentUser?.email })
+        body: JSON.stringify({ acceptingOrders: nextState })
       });
     } catch (err) {
       console.error('Error syncing status to MongoDB:', err);
@@ -328,9 +323,8 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     setToastMessage('✓ Live Request Accepted! Creating order in database & navigating to Preparing...');
 
     try {
-      await fetch('http://localhost:5000/api/orders', {
+      await apiRequest('/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerName: activeReq.customerName || 'Rahul Shah',
           customerPhone: activeReq.customerPhone || '+91 98765 12345',
@@ -347,9 +341,8 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
       });
 
       if (activeReq.id && activeReq.id.length > 10) {
-        await fetch(`http://localhost:5000/api/requests/${activeReq.id}`, {
+        await apiRequest(`/requests/${activeReq.id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'accepted' })
         });
       }

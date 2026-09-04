@@ -3,16 +3,33 @@ import { X, Search, MapPin, Navigation, IndianRupee, ShieldCheck } from 'lucide-
 import confetti from 'canvas-confetti';
 
 export default function MealRequestModal({ isOpen, onClose, onSubmitSuccess }) {
+  const todayStr = new Date().toISOString().split('T')[0];
   const [formData, setFormData] = useState({
+    customerName: '',
+    customerPhone: '',
     mealType: 'Veg Tiffin',
-    date: '2026-05-17',
-    time: '12:30',
+    date: todayStr,
+    time: '13:00',
     deliveryType: 'Delivery',
-    location: 'Iscon Circle, Ahmedabad',
-    budget: '100'
+    location: 'Satellite, Ahmedabad',
+    budget: '140'
   });
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem('tiffinlink_user');
+      if (saved) {
+        const u = JSON.parse(saved);
+        setFormData(prev => ({
+          ...prev,
+          customerName: u.name || prev.customerName,
+          customerPhone: u.phone || prev.customerPhone
+        }));
+      }
+    } catch (e) {}
+  }, []);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -43,12 +60,15 @@ export default function MealRequestModal({ isOpen, onClose, onSubmitSuccess }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          customerName: formData.customerName || 'Customer Diner',
+          customerPhone: formData.customerPhone || '+91 98250 99881',
           mealType: formData.mealType,
           date: formData.date,
           time: formData.time,
           deliveryType: formData.deliveryType,
           location: formData.location,
-          budget: Number(formData.budget)
+          budget: Number(formData.budget),
+          category: formData.mealType.includes('Jain') ? 'Jain' : (formData.mealType.includes('Non-Veg') ? 'Non-Veg' : 'Gujarati')
         }),
       });
 

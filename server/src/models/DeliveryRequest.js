@@ -6,17 +6,22 @@ const deliveryRequestSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
+  providerId: {
+    type: String,
+    required: true,
+    index: true
+  },
   orderId: {
     type: String,
     required: true
   },
   providerEmail: {
     type: String,
-    default: 'menxoxo50@gmail.com'
+    default: ''
   },
   providerName: {
     type: String,
-    default: 'Mansuri Kitchen'
+    default: ''
   },
   customerName: {
     type: String,
@@ -115,5 +120,7 @@ const deliveryRequestSchema = new mongoose.Schema({
   nearCustomerAt: Date,
   deliveredAt: Date
 });
+
+deliveryRequestSchema.index({ providerId: 1, requestedAt: -1 });
 
 module.exports = mongoose.model('DeliveryRequest', deliveryRequestSchema);

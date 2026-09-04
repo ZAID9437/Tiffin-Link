@@ -88,8 +88,8 @@ const filterByDateRange = (dateObj, range) => {
 // @route   GET /api/reviews
 const getReviews = async (req, res) => {
   try {
+    const providerId = req.providerId;
     const {
-      providerId = 'prov_1',
       search = '',
       rating = 'All',
       tiffin = 'All',
@@ -105,19 +105,8 @@ const getReviews = async (req, res) => {
 
     if (await isDbConnected()) {
       reviewList = await Review.find({ providerId }).sort({ createdAt: -1 });
-
-      if (reviewList.length === 0) {
-        for (const r of defaultInitialReviews) {
-          await Review.updateOne(
-            { orderId: r.orderId, customerName: r.customerName },
-            { $set: { ...r, providerId } },
-            { upsert: true }
-          );
-        }
-        reviewList = await Review.find({ providerId }).sort({ createdAt: -1 });
-      }
     } else {
-      reviewList = defaultInitialReviews.map((r, idx) => ({ _id: `rev_${idx}`, ...r, providerId }));
+      reviewList = [];
     }
 
     // Dynamic Overall Stats Calculation across FULL dataset
@@ -221,6 +210,7 @@ const getReviews = async (req, res) => {
 const replyToReview = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     const { providerReply } = req.body;
 
     if (!providerReply || providerReply.trim() === '') {
@@ -228,14 +218,18 @@ const replyToReview = async (req, res) => {
     }
 
     if (await isDbConnected()) {
-      const updatedReview = await Review.findByIdAndUpdate(
-        id,
+      const updatedReview = await Review.findOneAndUpdate(
+        { _id: id, providerId },
         {
           providerReply: providerReply.trim(),
           repliedAt: new Date()
         },
         { new: true }
       );
+
+      if (!updatedReview) {
+        return res.status(404).json({ success: false, message: 'Review not found or unauthorized' });
+      }
 
       return res.json({
         success: true,

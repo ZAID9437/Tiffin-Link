@@ -16,7 +16,7 @@ const defaultInitialAreas = [
 // @route   GET /api/service-area
 const getServiceArea = async (req, res) => {
   try {
-    const providerId = req.query.providerId || 'prov_1';
+    const providerId = req.providerId;
 
     let deliveryMode = 'Radius Based';
     let deliveryRadius = 5;
@@ -34,8 +34,8 @@ const getServiceArea = async (req, res) => {
     };
 
     let areas = [];
-    let eligibleCustomersCount = 128;
-    let todaysDeliveriesCount = 24;
+    let eligibleCustomersCount = 0;
+    let todaysDeliveriesCount = 0;
 
     if (await isDbConnected()) {
       let settings = await ProviderSetting.findOne({ providerId });
@@ -48,22 +48,22 @@ const getServiceArea = async (req, res) => {
         kitchenLocation.city = settings.business.city || kitchenLocation.city;
       }
 
-      // Check or initialize ServiceArea collection
+      // Check or initialize ServiceArea collection for this provider
       areas = await ServiceArea.find({ providerId }).sort({ createdAt: 1 });
       if (areas.length === 0) {
         const seedDocs = defaultInitialAreas.map(a => ({ ...a, providerId }));
         areas = await ServiceArea.insertMany(seedDocs);
       }
 
-      // Calculate real today's deliveries
+      // Calculate real today's deliveries for this provider
       const today = new Date();
-      const ordersToday = await Order.find({ status: { $ne: 'Cancelled' } });
+      const ordersToday = await Order.find({ providerId, status: { $ne: 'Cancelled' } });
       const filteredToday = ordersToday.filter(o => new Date(o.createdAt).toDateString() === today.toDateString());
-      todaysDeliveriesCount = filteredToday.length || 24;
+      todaysDeliveriesCount = filteredToday.length;
 
-      // Calculate real customer count
-      const usersCount = await User.countDocuments({ role: 'customer' });
-      eligibleCustomersCount = Math.max(usersCount, areas.reduce((sum, a) => sum + (a.customersCount || 0), 0)) || 128;
+      // Calculate unique customers for this provider
+      const uniqueCustomers = await Order.distinct('customerId', { providerId });
+      eligibleCustomersCount = uniqueCustomers.length || areas.reduce((sum, a) => sum + (a.customersCount || 0), 0);
 
       if (settings.tiffin) {
         deliveryRadius = settings.tiffin.maxDeliveryRadius || 5;
@@ -112,8 +112,8 @@ const getServiceArea = async (req, res) => {
 // @route   POST /api/service-area/settings
 const updateServiceAreaSettings = async (req, res) => {
   try {
+    const providerId = req.providerId;
     const {
-      providerId = 'prov_1',
       deliveryMode,
       deliveryRadius,
       minOrderAmount,
@@ -160,7 +160,8 @@ const updateServiceAreaSettings = async (req, res) => {
 // @route   POST /api/service-area/areas
 const addServiceArea = async (req, res) => {
   try {
-    const { providerId = 'prov_1', areaName, radiusKm, customersCount } = req.body;
+    const providerId = req.providerId;
+    const { areaName, radiusKm, customersCount } = req.body;
 
     if (!areaName) {
       return res.status(400).json({ success: false, message: 'Area name is required' });
@@ -170,7 +171,7 @@ const addServiceArea = async (req, res) => {
       providerId,
       areaName: areaName.trim(),
       radiusKm: Number(radiusKm) || 4,
-      customersCount: Number(customersCount) || Math.floor(Math.random() * 25) + 10,
+      customersCount: Number(customersCount) || 10,
       status: 'ACTIVE',
       latitude: 23.0300 + (Math.random() - 0.5) * 0.05,
       longitude: 72.5650 + (Math.random() - 0.5) * 0.05
@@ -194,8 +195,16 @@ const addServiceArea = async (req, res) => {
 const updateServiceArea = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     if (await isDbConnected()) {
-      const updated = await ServiceArea.findByIdAndUpdate(id, { ...req.body, updatedAt: new Date() }, { new: true });
+      const updated = await ServiceArea.findOneAndUpdate(
+        { _id: id, providerId },
+        { ...req.body, updatedAt: new Date() },
+        { new: true }
+      );
+      if (!updated) {
+        return res.status(404).json({ success: false, message: 'Service Area zone not found or unauthorized' });
+      }
       return res.json({ success: true, message: '✓ Service Area updated successfully', data: updated });
     }
     return res.json({ success: true, message: '✓ Service Area updated', data: req.body });
@@ -210,8 +219,12 @@ const updateServiceArea = async (req, res) => {
 const deleteServiceArea = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     if (await isDbConnected()) {
-      await ServiceArea.findByIdAndDelete(id);
+      const deleted = await ServiceArea.findOneAndDelete({ _id: id, providerId });
+      if (!deleted) {
+        return res.status(404).json({ success: false, message: 'Service Area zone not found or unauthorized' });
+      }
       return res.json({ success: true, message: '✓ Service Area deleted successfully' });
     }
     return res.json({ success: true, message: '✓ Service Area deleted' });

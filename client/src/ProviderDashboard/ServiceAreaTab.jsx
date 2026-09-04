@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import ServiceAreaMap from '../components/ServiceAreaMap';
+import { apiRequest } from '../services/api';
 
 export default function ServiceAreaTab() {
   const [loading, setLoading] = useState(false);
@@ -72,8 +73,7 @@ export default function ServiceAreaTab() {
   const fetchServiceAreaFromDb = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/service-area?providerId=prov_1');
-      const json = await res.json();
+      const json = await apiRequest('/service-area');
 
       if (json.success && json.data) {
         if (json.data.summary) {
@@ -106,20 +106,16 @@ export default function ServiceAreaTab() {
     if (e) e.preventDefault();
     try {
       setSaving(true);
-      const res = await fetch('http://localhost:5000/api/service-area/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const json = await apiRequest('/service-area/settings', {
+        method: 'PUT',
         body: JSON.stringify({
-          providerId: 'prov_1',
-          deliveryMode,
-          deliveryRadius: Number(deliveryRadius),
+          maxDeliveryRadiusKm: Number(deliveryRadius),
           minOrderAmount: Number(minOrderAmount),
           deliveryFee: Number(deliveryFee),
           freeDeliveryAbove: Number(freeDeliveryAbove),
           acceptOrdersOnlyInsideArea: Boolean(acceptOrdersOnlyInsideArea)
         })
       });
-      const json = await res.json();
       if (json.success) {
         showToast('✓ Saved Service Area Settings!');
         fetchServiceAreaFromDb();
@@ -143,16 +139,13 @@ export default function ServiceAreaTab() {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/service-area/areas', {
+      const json = await apiRequest('/service-area/areas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          providerId: 'prov_1',
           areaName: newAreaName.trim(),
           radiusKm: Number(newAreaRadius) || 4
         })
       });
-      const json = await res.json();
       if (json.success) {
         showToast(`✓ Added ${newAreaName} to active service areas!`);
         setIsAddModalOpen(false);
@@ -168,14 +161,12 @@ export default function ServiceAreaTab() {
   // Edit Area Radius
   const handleSaveAreaEdit = async (areaId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/service-area/areas/${areaId}`, {
+      const json = await apiRequest(`/service-area/areas/${areaId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           radiusKm: Number(editAreaRadiusVal)
         })
       });
-      const json = await res.json();
       if (json.success) {
         showToast('✓ Updated service area radius!');
         setEditingAreaId(null);
@@ -190,10 +181,9 @@ export default function ServiceAreaTab() {
   const handleDeleteArea = async (areaId, name) => {
     if (!window.confirm(`Are you sure you want to delete ${name} from service areas?`)) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/service-area/areas/${areaId}`, {
+      const json = await apiRequest(`/service-area/areas/${areaId}`, {
         method: 'DELETE'
       });
-      const json = await res.json();
       if (json.success) {
         showToast(`✓ Deleted ${name} from service areas`);
         fetchServiceAreaFromDb();

@@ -67,8 +67,7 @@ const kitchenScheduleSchema = new mongoose.Schema({
   providerId: {
     type: String,
     required: true,
-    unique: true,
-    default: 'prov_1'
+    unique: true
   },
   weeklySchedule: [weeklyDaySchema],
   orderWindows: [orderWindowSchema],

@@ -13,6 +13,8 @@ import {
   FileText
 } from 'lucide-react';
 
+import { apiRequest } from '../services/api';
+
 export default function OrderHistoryTab() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,9 +30,10 @@ export default function OrderHistoryTab() {
   const fetchHistoryOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/orders');
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
+      const json = await apiRequest('/orders/provider');
+      if (json.success && Array.isArray(json.orders)) {
+        setOrders(json.orders);
+      } else if (json.success && Array.isArray(json.data)) {
         setOrders(json.data);
       }
     } catch (err) {

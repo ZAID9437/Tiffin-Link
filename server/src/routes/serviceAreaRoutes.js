@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect, requireProvider } = require('../middleware/authMiddleware');
 const {
   getServiceArea,
   updateServiceAreaSettings,
@@ -8,10 +9,11 @@ const {
   deleteServiceArea
 } = require('../controllers/serviceAreaController');
 
-router.get('/', getServiceArea);
-router.post('/settings', updateServiceAreaSettings);
-router.post('/areas', addServiceArea);
-router.put('/areas/:id', updateServiceArea);
-router.delete('/areas/:id', deleteServiceArea);
+router.get('/', protect, requireProvider, getServiceArea);
+router.post('/settings', protect, requireProvider, updateServiceAreaSettings);
+router.post('/areas', protect, requireProvider, addServiceArea);
+router.put('/areas/:id', protect, requireProvider, updateServiceArea);
+router.delete('/areas/:id', protect, requireProvider, deleteServiceArea);
 
 module.exports = router;
+

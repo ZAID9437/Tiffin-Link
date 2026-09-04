@@ -10,11 +10,12 @@ const isDbConnected = async () => await ensureConnected();
 // @route   GET /api/analytics
 const getAnalytics = async (req, res) => {
   try {
+    const providerId = req.providerId;
+
     if (await isDbConnected()) {
-      const allOrders = await Order.find().sort({ createdAt: -1 });
-      const allReviews = await Review.find().sort({ createdAt: -1 });
-      const allUsers = await User.find({ role: 'customer' });
-      const allTiffins = await Tiffin.find();
+      const allOrders = await Order.find({ providerId }).sort({ createdAt: -1 });
+      const allReviews = await Review.find({ providerId }).sort({ createdAt: -1 });
+      const allTiffins = await Tiffin.find({ providerId });
 
       // 1. Summary Metrics Calculation
       const completedOrders = allOrders.filter(o => o.status === 'Completed' || o.status === 'Ready' || o.status === 'Preparing');
@@ -22,11 +23,11 @@ const getAnalytics = async (req, res) => {
       const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
       const uniqueCustomerNames = Array.from(new Set(allOrders.map(o => o.customerName))).filter(Boolean);
-      const totalCustomersCount = Math.max(uniqueCustomerNames.length, allUsers.length);
+      const totalCustomersCount = uniqueCustomerNames.length;
 
       // Average Rating from Reviews
       const totalReviewSum = allReviews.reduce((sum, r) => sum + (r.rating || 5), 0);
-      const avgRating = allReviews.length > 0 ? (totalReviewSum / allReviews.length).toFixed(1) : '4.7';
+      const avgRating = allReviews.length > 0 ? (totalReviewSum / allReviews.length).toFixed(1) : (allReviews.length === 0 ? '5.0' : '4.7');
 
       // 2. Top Tiffins Aggregation from Real Orders
       const tiffinSalesMap = {};
@@ -70,10 +71,10 @@ const getAnalytics = async (req, res) => {
         allOrders.filter(o => o.customerName === name).length > 1
       ).length;
 
-      const newCustomersCount = Math.max(1, uniqueCustomerNames.length - returningCustomersCount);
+      const newCustomersCount = Math.max(0, uniqueCustomerNames.length - returningCustomersCount);
       const repeatRate = uniqueCustomerNames.length > 0 
         ? Math.round((returningCustomersCount / uniqueCustomerNames.length) * 100) 
-        : 64;
+        : 0;
 
       // 5. Rating Analytics
       const ratingDistribution = {
@@ -91,20 +92,24 @@ const getAnalytics = async (req, res) => {
         const dayRev = dayOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
         return {
           day,
-          revenue: dayRev || (idx + 1) * 520,
-          ordersCount: dayOrders.length || idx + 2
+          revenue: dayRev,
+          ordersCount: dayOrders.length
         };
       });
 
       // 7. Data-Driven Business Insights
-      const bestSellingItem = topTiffins.length > 0 ? topTiffins[0].tiffinName : 'Gujarati Home Thali';
-      const bestSellingOrders = topTiffins.length > 0 ? topTiffins[0].ordersCount : 2;
+      const bestSellingItem = topTiffins.length > 0 ? topTiffins[0].tiffinName : 'N/A';
+      const bestSellingOrders = topTiffins.length > 0 ? topTiffins[0].ordersCount : 0;
 
       const businessInsights = [
-        `Your ${bestSellingItem} is your #1 best-selling tiffin with ${bestSellingOrders} orders fulfilled.`,
+        bestSellingItem !== 'N/A' 
+          ? `Your ${bestSellingItem} is your #1 best-selling tiffin with ${bestSellingOrders} orders fulfilled.` 
+          : 'No sales data available yet for best-selling tiffins.',
         `Returning customers generated ${repeatRate}% of your total kitchen orders.`,
-        `Your kitchen achieved an average customer satisfaction score of ${avgRating} ★ across all reviews.`,
-        `Completion rate is ${statusPercentages.Completed || 80}% with low cancellation impact.`
+        allReviews.length > 0
+          ? `Your kitchen achieved an average customer satisfaction score of ${avgRating} ★ across all reviews.`
+          : 'No customer reviews submitted yet.',
+        `Completion rate is ${statusPercentages.Completed || 0}% with low cancellation impact.`
       ];
 
       return res.json({
@@ -114,10 +119,10 @@ const getAnalytics = async (req, res) => {
           revenue: totalRevenue,
           customersCount: totalCustomersCount,
           avgRating,
-          ordersChangePct: 12,
-          revenueChangePct: 18,
-          customersChangePct: 4,
-          ratingChangePct: 0.2
+          ordersChangePct: 0,
+          revenueChangePct: 0,
+          customersChangePct: 0,
+          ratingChangePct: 0
         },
         topTiffins,
         orderPerformance: {
@@ -142,13 +147,13 @@ const getAnalytics = async (req, res) => {
     } else {
       return res.json({
         success: true,
-        summary: { ordersCount: 24, revenue: 4850, customersCount: 19, avgRating: '4.7', ordersChangePct: 12, revenueChangePct: 18, customersChangePct: 4, ratingChangePct: 0.2 },
-        topTiffins: [{ rank: 1, tiffinName: 'Gujarati Home Thali', category: 'Gujarati', ordersCount: 42, revenue: 10080, rating: 4.8 }],
-        orderPerformance: { counts: { Completed: 20, Preparing: 2, Ready: 1, Cancelled: 1, Pending: 0 }, percentages: { Completed: 82, Preparing: 8, Ready: 4, Cancelled: 6, Pending: 0 } },
-        customerInsights: { newCustomers: 19, returningCustomers: 34, repeatRate: 64 },
-        ratingAnalytics: { overallRating: '4.7', totalReviews: 5, distribution: { 5: 3, 4: 1, 3: 1, 2: 0, 1: 0 } },
+        summary: { ordersCount: 0, revenue: 0, customersCount: 0, avgRating: '0.0', ordersChangePct: 0, revenueChangePct: 0, customersChangePct: 0, ratingChangePct: 0 },
+        topTiffins: [],
+        orderPerformance: { counts: { Completed: 0, Preparing: 0, Ready: 0, Cancelled: 0, Pending: 0 }, percentages: { Completed: 0, Preparing: 0, Ready: 0, Cancelled: 0, Pending: 0 } },
+        customerInsights: { newCustomers: 0, returningCustomers: 0, repeatRate: 0 },
+        ratingAnalytics: { overallRating: '0.0', totalReviews: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } },
         chartData: [],
-        businessInsights: ['Gujarati Thali is your best-selling tiffin.', 'Returning customers generated 64% of orders.'],
+        businessInsights: ['No database connection.'],
         source: 'in-memory'
       });
     }

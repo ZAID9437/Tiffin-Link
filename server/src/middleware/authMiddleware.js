@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Provider = require('../models/Provider');
 
 const protect = async (req, res, next) => {
   let token;
@@ -27,6 +28,32 @@ const protect = async (req, res, next) => {
       }
 
       req.user = user;
+
+      // If user is a Provider, bind their authenticated Provider record & providerId
+      if (user.role === 'provider') {
+        let provider = await Provider.findOne({
+          $or: [{ userId: user._id }, { email: user.email }]
+        });
+
+        if (!provider) {
+          provider = await Provider.create({
+            userId: user._id,
+            name: user.name || 'Artisanal Home Kitchen',
+            businessName: user.name || 'Artisanal Home Kitchen',
+            description: 'Authentic home-cooked meals prepared with fresh ingredients.',
+            email: user.email,
+            mobile: user.phone || '',
+            status: 'active'
+          });
+        } else if (!provider.userId) {
+          provider.userId = user._id;
+          await provider.save();
+        }
+
+        req.provider = provider;
+        req.providerId = provider._id.toString();
+      }
+
       return next();
     } catch (error) {
       console.error('JWT Authentication Error:', error.message);
@@ -39,4 +66,14 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+const requireProvider = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
+  if (req.user.role !== 'provider' || !req.providerId) {
+    return res.status(403).json({ success: false, message: 'Forbidden: Provider access required' });
+  }
+  next();
+};
+
+module.exports = { protect, requireProvider };

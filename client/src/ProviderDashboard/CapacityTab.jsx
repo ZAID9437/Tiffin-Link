@@ -14,6 +14,8 @@ import {
   X
 } from 'lucide-react';
 
+import { apiRequest } from '../services/api';
+
 export default function CapacityTab() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -53,8 +55,7 @@ export default function CapacityTab() {
 
   const fetchCapacityFromDb = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/capacity?providerId=prov_1');
-      const json = await res.json();
+      const json = await apiRequest('/capacity');
 
       if (json.success && json.data) {
         if (json.data.today) {
@@ -79,17 +80,14 @@ export default function CapacityTab() {
     if (e) e.preventDefault();
     try {
       setSaving(true);
-      const res = await fetch('http://localhost:5000/api/capacity/settings', {
+      const json = await apiRequest('/capacity/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          providerId: 'prov_1',
           maxDailyOrders: Number(maxDailyOrders),
           autoStopOrders: Boolean(autoStopOrders),
           allowOverbooking: Boolean(allowOverbooking)
         })
       });
-      const json = await res.json();
       if (json.success) {
         showToast('✓ Saved Kitchen Capacity Settings successfully!');
         fetchCapacityFromDb();
@@ -107,16 +105,13 @@ export default function CapacityTab() {
   // Save specific date capacity limit
   const handleSaveDateCapacity = async (dateKey, newCap) => {
     try {
-      const res = await fetch('http://localhost:5000/api/capacity/date', {
+      const json = await apiRequest('/capacity/date', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          providerId: 'prov_1',
           date: dateKey,
           maxCapacity: Number(newCap)
         })
       });
-      const json = await res.json();
       if (json.success) {
         showToast(`✓ Updated capacity to ${newCap} for ${dateKey}`);
         setEditingDateKey(null);

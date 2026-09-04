@@ -54,19 +54,23 @@ const defaultInitialTiffins = [
   }
 ];
 
-// @desc    Get all tiffins from MongoDB
+// @desc    Get tiffins from MongoDB (provider-scoped or public)
 // @route   GET /api/tiffins
 const getTiffins = async (req, res) => {
   try {
+    const providerId = req.providerId || req.query.providerId;
+    let query = {};
+    if (providerId) {
+      query.providerId = providerId;
+    } else {
+      query.status = 'Active';
+    }
+
     if (await isDbConnected()) {
-      let tiffins = await Tiffin.find().sort({ createdAt: -1 });
-      if (tiffins.length === 0) {
-        await Tiffin.insertMany(defaultInitialTiffins);
-        tiffins = await Tiffin.find().sort({ createdAt: -1 });
-      }
+      const tiffins = await Tiffin.find(query).sort({ createdAt: -1 });
       return res.json({ success: true, data: tiffins, source: 'database', databaseName: 'tiffinlink' });
     } else {
-      return res.json({ success: true, data: defaultInitialTiffins, source: 'in-memory' });
+      return res.json({ success: true, data: [], source: 'in-memory' });
     }
   } catch (error) {
     console.error('Error fetching tiffins:', error);
@@ -78,6 +82,11 @@ const getTiffins = async (req, res) => {
 // @route   POST /api/tiffins
 const createTiffin = async (req, res) => {
   try {
+    const providerId = req.providerId;
+    if (!providerId) {
+      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+    }
+
     const { name, description, price, category, foodType, capacity, days, area, ingredients, image, status } = req.body;
     
     if (!name || !price) {
@@ -85,6 +94,7 @@ const createTiffin = async (req, res) => {
     }
 
     const tiffinData = {
+      providerId,
       name: name.trim(),
       description: description || 'Authentic home-cooked thali prepared daily.',
       price: Number(price),
@@ -129,8 +139,12 @@ const createTiffin = async (req, res) => {
 const updateTiffin = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     if (await isDbConnected()) {
-      const updated = await Tiffin.findByIdAndUpdate(id, req.body, { new: true });
+      const updated = await Tiffin.findOneAndUpdate({ _id: id, providerId }, req.body, { new: true });
+      if (!updated) {
+        return res.status(404).json({ success: false, message: 'Tiffin not found or unauthorized' });
+      }
       return res.json({ success: true, message: 'Tiffin updated in MongoDB', data: updated });
     }
     return res.json({ success: true, message: 'Tiffin updated (in-memory)', data: req.body });
@@ -145,8 +159,12 @@ const updateTiffin = async (req, res) => {
 const deleteTiffin = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId;
     if (await isDbConnected()) {
-      await Tiffin.findByIdAndDelete(id);
+      const deleted = await Tiffin.findOneAndDelete({ _id: id, providerId });
+      if (!deleted) {
+        return res.status(404).json({ success: false, message: 'Tiffin not found or unauthorized' });
+      }
       return res.json({ success: true, message: 'Tiffin deleted from MongoDB' });
     }
     return res.json({ success: true, message: 'Tiffin deleted (in-memory)' });

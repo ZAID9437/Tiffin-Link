@@ -8,7 +8,8 @@ const notificationSchema = new mongoose.Schema({
   },
   recipientId: {
     type: String,
-    default: 'provider_1'
+    required: true,
+    index: true
   },
   title: {
     type: String,
@@ -39,5 +40,7 @@ const notificationSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+notificationSchema.index({ recipientId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

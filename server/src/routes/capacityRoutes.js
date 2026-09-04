@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect, requireProvider } = require('../middleware/authMiddleware');
 const {
   getCapacity,
   updateCapacitySettings,
@@ -7,9 +8,10 @@ const {
   checkCapacityAvailable
 } = require('../controllers/capacityController');
 
-router.get('/', getCapacity);
-router.post('/settings', updateCapacitySettings);
-router.put('/date', updateDateCapacity);
-router.get('/check-today', checkCapacityAvailable);
+router.get('/', protect, requireProvider, getCapacity);
+router.post('/settings', protect, requireProvider, updateCapacitySettings);
+router.put('/date', protect, requireProvider, updateDateCapacity);
+router.get('/check-today', protect, checkCapacityAvailable);
 
 module.exports = router;
+

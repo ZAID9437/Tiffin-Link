@@ -50,24 +50,19 @@ export default function ScheduleTab() {
     { name: 'Dinner', icon: '🌙', cutoffTime: '07:30 PM', deliveryStartTime: '08:00 PM', deliveryEndTime: '10:00 PM', isActive: true }
   ]);
 
-  // Special Dates / Holidays State
-  const [specialDates, setSpecialDates] = useState([
-    { _id: 'sd_1', date: '18 Aug', reason: 'Holiday', status: 'CLOSED' },
-    { _id: 'sd_2', date: '25 Aug', reason: 'Festival', status: 'CLOSED' }
-  ]);
+  // Special Holiday Overrides
+  const [specialDates, setSpecialDates] = useState([]);
 
-  // Editing State for Weekly Schedule Row
+  // Modal & Edit States
   const [editingDay, setEditingDay] = useState(null);
   const [editOpenTime, setEditOpenTime] = useState('09:00 AM');
   const [editCloseTime, setEditCloseTime] = useState('09:00 PM');
 
-  // Editing State for Order Window
   const [editingWindowName, setEditingWindowName] = useState(null);
   const [editCutoff, setEditCutoff] = useState('11:30 AM');
   const [editDeliveryStart, setEditDeliveryStart] = useState('12:00 PM');
   const [editDeliveryEnd, setEditDeliveryEnd] = useState('03:00 PM');
 
-  // Special Date Modal State
   const [isAddDateModalOpen, setIsAddDateModalOpen] = useState(false);
   const [newDateVal, setNewDateVal] = useState('');
   const [newReasonVal, setNewReasonVal] = useState('Holiday');
@@ -84,8 +79,7 @@ export default function ScheduleTab() {
   const fetchScheduleFromDb = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/schedule?providerId=prov_1');
-      const json = await res.json();
+      const json = await apiRequest('/schedule');
 
       if (json.success && json.data) {
         if (json.data.todayStatus) {
@@ -113,17 +107,14 @@ export default function ScheduleTab() {
     if (e) e.preventDefault();
     try {
       setSaving(true);
-      const res = await fetch('http://localhost:5000/api/schedule/settings', {
+      const json = await apiRequest('/schedule/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          providerId: 'prov_1',
           weeklySchedule,
           orderWindows,
           specialDates
         })
       });
-      const json = await res.json();
       if (json.success) {
         showToast('✓ Saved Kitchen Schedule & Order Windows!');
         fetchScheduleFromDb();
@@ -190,17 +181,14 @@ export default function ScheduleTab() {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/schedule/special-date', {
+      const json = await apiRequest('/schedule/special-date', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          providerId: 'prov_1',
           date: newDateVal.trim(),
           reason: newReasonVal.trim() || 'Holiday',
           status: 'CLOSED'
         })
       });
-      const json = await res.json();
       if (json.success) {
         showToast(`✓ Added ${newDateVal} to holiday overrides!`);
         setIsAddDateModalOpen(false);
@@ -217,10 +205,9 @@ export default function ScheduleTab() {
   const handleDeleteSpecialDate = async (id, dateStr) => {
     if (!window.confirm(`Are you sure you want to remove ${dateStr} from special dates?`)) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/schedule/special-date/${id}?providerId=prov_1`, {
+      const json = await apiRequest(`/schedule/special-date/${id}`, {
         method: 'DELETE'
       });
-      const json = await res.json();
       if (json.success) {
         showToast(`✓ Removed ${dateStr} from special dates`);
         fetchScheduleFromDb();

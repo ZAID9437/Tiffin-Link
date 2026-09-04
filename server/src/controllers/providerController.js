@@ -262,69 +262,30 @@ let currentAcceptingOrders = true;
 // @route   GET /api/providers/dashboard
 const getProviderDashboardStats = async (req, res) => {
   try {
-    const MealRequest = require('../models/MealRequest');
-    let acceptingOrders = currentAcceptingOrders;
+    const Order = require('../models/Order');
+    const Tiffin = require('../models/Tiffin');
+    const providerId = req.providerId;
 
     if (await isDbConnected()) {
-      let dbRequests = await MealRequest.find().sort({ createdAt: -1 });
+      const p = await Provider.findById(providerId);
+      const acceptingOrders = p ? Boolean(p.isAcceptingOrders) : true;
 
-      const p = await Provider.findOne();
-      if (p && p.isAcceptingOrders !== undefined) {
-        acceptingOrders = Boolean(p.isAcceptingOrders);
-        currentAcceptingOrders = acceptingOrders;
-      }
+      const dbOrders = await Order.find({ providerId }).sort({ createdAt: -1 });
+      const activeTiffinsCount = await Tiffin.countDocuments({ providerId });
 
-      // If database collection is empty, seed 3 initial real meal requests into MongoDB tiffinlink.mealrequests
-      if (dbRequests.length === 0) {
-        await MealRequest.insertMany([
-          {
-            mealType: 'Gujarati Veg Thali',
-            date: new Date().toISOString().split('T')[0],
-            time: '12:45 PM',
-            deliveryType: 'Home Delivery',
-            location: 'Raj Patel (Satellite)',
-            budget: 240,
-            createdAt: new Date(Date.now() - 1000 * 60 * 30)
-          },
-          {
-            mealType: 'Jain Special Thali',
-            date: new Date().toISOString().split('T')[0],
-            time: '12:30 PM',
-            deliveryType: 'Home Delivery',
-            location: 'Amit Shah (Paldi)',
-            budget: 360,
-            createdAt: new Date(Date.now() - 1000 * 60 * 60)
-          },
-          {
-            mealType: 'Kathiyawadi Combo',
-            date: new Date().toISOString().split('T')[0],
-            time: '12:15 PM',
-            deliveryType: 'Takeaway',
-            location: 'Neha Patel (Navrangpura)',
-            budget: 120,
-            createdAt: new Date(Date.now() - 1000 * 60 * 90)
-          }
-        ]);
-        dbRequests = await MealRequest.find().sort({ createdAt: -1 });
-      }
+      const todaysOrdersCount = dbOrders.length;
+      const revenueToday = dbOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+      const uniqueCustomers = new Set(dbOrders.map(o => o.customerPhone || o.customerName).filter(Boolean));
+      const todaysCustomersCount = uniqueCustomers.size;
 
-      const activeTiffinsCount = await Provider.countDocuments();
-      const totalUsers = await User.countDocuments();
-
-      // Calculate total revenue & counts dynamically from MongoDB documents
-      const todaysOrdersCount = dbRequests.length;
-      const revenueToday = dbRequests.reduce((sum, r) => sum + (Number(r.budget) || 120), 0);
-      const todaysCustomersCount = Math.max(totalUsers, dbRequests.length);
-
-      const formattedOrders = dbRequests.map((r, i) => {
-        const cleanName = r.location ? r.location.split('(')[0].trim() : 'Customer';
+      const formattedOrders = dbOrders.slice(0, 10).map((o, i) => {
         return {
-          id: `#${1024 + i}`,
-          customer: cleanName,
-          amount: r.budget || 240,
-          qtyText: `${r.mealType || 'Veg'} Tiffin`,
-          status: i === 0 ? 'Preparing' : i === 1 ? 'Ready' : 'Delivered',
-          statusBg: i === 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : i === 1 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-[#E8F0EC] text-[#0A8B5F] border-[#C5DDD2]'
+          id: o.orderId || `#${1024 + i}`,
+          customer: o.customerName || 'Customer',
+          amount: o.totalAmount || 240,
+          qtyText: `${o.quantity || 1} x ${o.tiffinName || 'Tiffin'}`,
+          status: o.status || 'Preparing',
+          statusBg: o.status === 'Preparing' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : o.status === 'Ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-[#E8F0EC] text-[#0A8B5F] border-[#C5DDD2]'
         };
       });
 
@@ -334,7 +295,7 @@ const getProviderDashboardStats = async (req, res) => {
         databaseName: 'tiffinlink',
         data: {
           todaysOrdersCount,
-          activeTiffinsCount: activeTiffinsCount || 8,
+          activeTiffinsCount,
           todaysCustomersCount,
           revenueToday,
           todaysOrders: formattedOrders,
@@ -346,16 +307,12 @@ const getProviderDashboardStats = async (req, res) => {
         success: true,
         source: 'in-memory',
         data: {
-          todaysOrdersCount: 24,
-          activeTiffinsCount: 8,
-          todaysCustomersCount: 19,
-          revenueToday: 4850,
-          todaysOrders: [
-            { id: '#1024', customer: 'Raj Patel', amount: 240, qtyText: '2 Tiffin', status: 'Preparing', statusBg: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-            { id: '#1025', customer: 'Amit Shah', amount: 360, qtyText: '3 Tiffin', status: 'Ready', statusBg: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-            { id: '#1026', customer: 'Neha Patel', amount: 120, qtyText: '1 Tiffin', status: 'Delivered', statusBg: 'bg-[#E8F0EC] text-[#0A8B5F] border-[#C5DDD2]' }
-          ],
-          acceptingOrders: currentAcceptingOrders
+          todaysOrdersCount: 0,
+          activeTiffinsCount: 0,
+          todaysCustomersCount: 0,
+          revenueToday: 0,
+          todaysOrders: [],
+          acceptingOrders: true
         }
       });
     }
@@ -369,18 +326,19 @@ const getProviderDashboardStats = async (req, res) => {
 // @route   PUT /api/providers/status
 const toggleProviderStatus = async (req, res) => {
   try {
-    const { acceptingOrders, email } = req.body;
-    currentAcceptingOrders = Boolean(acceptingOrders);
+    const { acceptingOrders } = req.body;
+    const providerId = req.providerId;
+    const isAccepting = Boolean(acceptingOrders);
 
     if (await isDbConnected()) {
-      await Provider.updateMany({}, { $set: { isAcceptingOrders: currentAcceptingOrders } });
+      await Provider.findByIdAndUpdate(providerId, { $set: { isAcceptingOrders: isAccepting } });
       return res.json({
         success: true,
-        acceptingOrders: currentAcceptingOrders,
-        message: `Provider status updated to ${currentAcceptingOrders ? 'ONLINE' : 'PAUSED'}`
+        acceptingOrders: isAccepting,
+        message: `Provider status updated to ${isAccepting ? 'ONLINE' : 'PAUSED'}`
       });
     }
-    return res.json({ success: true, acceptingOrders: currentAcceptingOrders, message: 'Status updated (in-memory)' });
+    return res.json({ success: true, acceptingOrders: isAccepting, message: 'Status updated' });
   } catch (error) {
     console.error('Error toggling status:', error);
     res.status(500).json({ success: false, message: 'Failed to update status' });

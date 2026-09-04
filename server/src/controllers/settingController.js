@@ -10,32 +10,26 @@ const isDbConnected = async () => await ensureConnected();
 // @route   GET /api/settings/provider
 const getProviderSettings = async (req, res) => {
   try {
-    const userEmail = req.query.email || req.headers['x-provider-email'] || 'menxoxo50@gmail.com';
+    const pId = req.providerId.toString();
+    const realProvider = req.provider;
+    const realUser = req.user;
 
     if (await isDbConnected()) {
-      // Find user and provider records in MongoDB by email
-      const realUser = await User.findOne({ email: userEmail.trim().toLowerCase() });
-      let realProvider = await Provider.findOne({ email: userEmail });
-      if (!realProvider) {
-        realProvider = await Provider.findOne({ email: { $exists: true, $ne: '' } }).sort({ createdAt: -1 }) || await Provider.findOne();
-      }
-
-      const pId = realProvider ? realProvider._id.toString() : 'prov_1';
       let settings = await ProviderSetting.findOne({ providerId: pId });
 
       const defaultDynamicSettings = {
         providerId: pId,
         account: {
-          name: realProvider?.fullName || realProvider?.name || realUser?.name || 'Zaid Mansuri',
-          email: realProvider?.email || realUser?.email || userEmail,
-          phone: realProvider?.mobile || realUser?.phone || '+91 1234567890',
+          name: realProvider?.fullName || realProvider?.name || realUser?.name || 'Provider Account',
+          email: realProvider?.email || realUser?.email || '',
+          phone: realProvider?.mobile || realUser?.phone || '',
           avatarUrl: realProvider?.image || '/assets/provider_1.png',
           accountStatus: 'Verified Active'
         },
         business: {
-          providerName: realProvider?.businessName || realProvider?.name || 'Mansuri Kitchen',
-          description: realProvider?.description || 'Authentic home-cooked Gujarati thali, Jain food, and North Indian meals prepared with fresh ingredients and pure ghee.',
-          address: [realProvider?.address?.houseNo, realProvider?.address?.street].filter(Boolean).join(', ') || realProvider?.address?.city || '4, Ruhan Duplex In Aman Park, Opp Labbaik Park B/H Canal',
+          providerName: realProvider?.businessName || realProvider?.name || 'Kitchen Business',
+          description: realProvider?.description || 'Authentic home-cooked thali and meals prepared with fresh ingredients.',
+          address: [realProvider?.address?.houseNo, realProvider?.address?.street].filter(Boolean).join(', ') || realProvider?.address?.city || '',
           city: realProvider?.address?.city || realProvider?.address?.locality || 'Ahmedabad',
           serviceArea: realProvider?.address?.locality ? `${realProvider.address.locality} (5km radius)` : 'Ahmedabad (5km radius)',
           openingTime: realProvider?.opens || '10:00',
@@ -66,16 +60,16 @@ const getProviderSettings = async (req, res) => {
         },
         payments: {
           payoutMethod: 'Bank Transfer (IMPS)',
-          bankName: realProvider?.bankName || 'abc bank',
-          ifscCode: realProvider?.ifscCode || 'HDFC0001234',
-          accountNumber: realProvider?.accountNumber || '1234567890',
-          upiId: realProvider?.upiId || 'shreejitiffin@okicici',
+          bankName: realProvider?.bankName || '',
+          ifscCode: realProvider?.ifscCode || '',
+          accountNumber: realProvider?.accountNumber || '',
+          upiId: realProvider?.upiId || '',
           autoPayout: true
         },
         security: {
           twoFactorEnabled: false,
-          activeSessions: 2,
-          lastPasswordChange: '14 Aug 2026'
+          activeSessions: 1,
+          lastPasswordChange: 'Recently'
         },
         preferences: {
           language: 'English (India)',
@@ -120,7 +114,7 @@ const getProviderSettings = async (req, res) => {
     } else {
       return res.json({
         success: true,
-        settings: defaultDynamicSettings,
+        settings: { providerId: pId },
         source: 'in-memory'
       });
     }
@@ -135,16 +129,9 @@ const getProviderSettings = async (req, res) => {
 const updateProviderSettings = async (req, res) => {
   try {
     const updatedData = req.body;
-    const userEmail = updatedData.account?.email || req.query.email || 'menxoxo50@gmail.com';
+    const pId = req.providerId.toString();
 
     if (await isDbConnected()) {
-      let realProvider = await Provider.findOne({ email: userEmail });
-      if (!realProvider) {
-        realProvider = await Provider.findOne({ email: { $exists: true, $ne: '' } }).sort({ createdAt: -1 }) || await Provider.findOne();
-      }
-
-      const pId = realProvider ? realProvider._id.toString() : 'prov_1';
-
       const settings = await ProviderSetting.findOneAndUpdate(
         { providerId: pId },
         { $set: { ...updatedData, providerId: pId, updatedAt: Date.now() } },
@@ -154,7 +141,7 @@ const updateProviderSettings = async (req, res) => {
       // Extract form values safely
       const newBizName = updatedData.business?.providerName;
       const newFullName = updatedData.account?.name;
-      const newEmail = updatedData.account?.email || userEmail;
+      const newEmail = updatedData.account?.email;
       const newPhone = updatedData.account?.phone;
       const newDesc = updatedData.business?.description;
       const newOpens = updatedData.business?.openingTime;
@@ -169,15 +156,16 @@ const updateProviderSettings = async (req, res) => {
       const newUpi = updatedData.payments?.upiId;
 
       // Update User collection document for this specific user ONLY
-      if (newEmail) {
+      if (req.user?._id) {
         const userUpdate = {};
         if (newFullName) userUpdate.name = newFullName;
         if (newPhone) userUpdate.phone = newPhone;
-        await User.findOneAndUpdate({ email: newEmail.trim().toLowerCase() }, { $set: userUpdate });
+        if (newEmail) userUpdate.email = newEmail.trim().toLowerCase();
+        await User.findByIdAndUpdate(req.user._id, { $set: userUpdate });
       }
 
-      // Dynamically update ONLY this provider's document in MongoDB
-      if (realProvider) {
+      // Update ONLY this provider's document in MongoDB
+      if (req.provider?._id) {
         const providerUpdate = {};
         if (newBizName) {
           providerUpdate.name = newBizName;
@@ -200,17 +188,16 @@ const updateProviderSettings = async (req, res) => {
 
         if (newAddress || newCity) {
           providerUpdate.address = {
-            street: newAddress || realProvider.address?.street || '',
-            city: newCity || realProvider.address?.city || '',
+            street: newAddress || req.provider.address?.street || '',
+            city: newCity || req.provider.address?.city || '',
             houseNo: '',
-            locality: updatedData.business?.serviceArea || realProvider.address?.locality || '',
+            locality: updatedData.business?.serviceArea || req.provider.address?.locality || '',
             pincode: '',
             isLocationPinned: true
           };
         }
 
-        // UPDATE ONLY THIS SINGLE SPECIFIC PROVIDER DOCUMENT
-        await Provider.findByIdAndUpdate(realProvider._id, { $set: providerUpdate });
+        await Provider.findByIdAndUpdate(req.provider._id, { $set: providerUpdate });
       }
 
       return res.json({
