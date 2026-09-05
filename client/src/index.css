@@ -1,6 +1,8 @@
 /* TiffinLink Premium Design Tokens & Global CSS */
 
 /* Global text selection reset */
+@import "maplibre-gl/dist/maplibre-gl.css"
+
 body,
 html,
 #root {

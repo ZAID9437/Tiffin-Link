@@ -368,7 +368,11 @@ export default function OrdersTab({ initialStatus = 'All' }) {
 
                     <div className="text-right">
                       <div className="text-lg font-black text-[#0A8B5F]">₹{ord.totalAmount}</div>
-                      <div className="text-[10px] text-[#6B7280] font-bold">{ord.paymentStatus}</div>
+                      <span className={`inline-block mt-0.5 px-2 py-0.5 text-[10px] font-extrabold rounded-md border ${
+                        ord.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
+                      }`}>
+                        {ord.paymentStatus === 'Paid' ? '✓ Paid Online (Advance)' : ord.paymentStatus}
+                      </span>
                     </div>
                   </div>
 

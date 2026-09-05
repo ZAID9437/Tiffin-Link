@@ -22,6 +22,18 @@ const reviewSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  customerPhone: {
+    type: String,
+    default: '+91 98765 43210'
+  },
+  customerTotalOrders: {
+    type: Number,
+    default: 12
+  },
+  customerTotalReviews: {
+    type: Number,
+    default: 3
+  },
   tiffinId: {
     type: String,
     default: ''
@@ -40,6 +52,38 @@ const reviewSchema = new mongoose.Schema({
     min: 1,
     max: 5
   },
+  foodQualityRating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 5
+  },
+  packagingRating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 5
+  },
+  tasteRating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 5
+  },
+  deliveryRating: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 4
+  },
+  orderAmount: {
+    type: Number,
+    default: 240
+  },
+  orderQuantity: {
+    type: Number,
+    default: 2
+  },
   comment: {
     type: String,
     required: true
@@ -51,6 +95,10 @@ const reviewSchema = new mongoose.Schema({
   repliedAt: {
     type: Date
   },
+  repliedBy: {
+    type: String,
+    default: 'Provider Kitchen'
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -58,5 +106,7 @@ const reviewSchema = new mongoose.Schema({
 });
 
 reviewSchema.index({ providerId: 1, createdAt: -1 });
+reviewSchema.index({ providerId: 1, rating: -1 });
+reviewSchema.index({ providerId: 1, tiffinName: 1 });
 
 module.exports = mongoose.model('Review', reviewSchema);

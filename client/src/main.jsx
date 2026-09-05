@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext'
+import "maplibre-gl/dist/maplibre-gl.css"
 
 class RootErrorBoundary extends React.Component {
   constructor(props) {
