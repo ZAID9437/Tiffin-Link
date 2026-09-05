@@ -15,6 +15,64 @@ import {
   Lock
 } from 'lucide-react';
 
+const FOOD_CATEGORIES = [
+  { 
+    id: 'pure veg', 
+    label: 'Pure Veg', 
+    subtext: '100% Vegetarian (No Meat/Egg)',
+    borderClass: 'border-emerald-600', 
+    bgClass: 'bg-emerald-500/10', 
+    dotClass: 'bg-emerald-600' 
+  },
+  { 
+    id: 'jain food', 
+    label: 'Jain Food', 
+    subtext: 'Pure Veg (No Onion/Garlic/Roots)',
+    borderClass: 'border-sky-600', 
+    bgClass: 'bg-sky-500/10', 
+    dotClass: 'bg-sky-600' 
+  },
+  { 
+    id: 'veg & non-veg', 
+    label: 'Veg & Non-Veg', 
+    subtext: 'Both Veg & Non-Veg Prepared',
+    borderClass: 'border-rose-700', 
+    bgClass: 'bg-rose-500/10', 
+    dotClass: 'bg-rose-700' 
+  },
+  { 
+    id: 'pure non-veg', 
+    label: 'Pure Non-Veg', 
+    subtext: 'Non-Vegetarian Meals Only',
+    borderClass: 'border-rose-700', 
+    bgClass: 'bg-rose-500/10', 
+    dotClass: 'bg-rose-700' 
+  }
+];
+
+const renderFoodSymbol = (category = 'Pure Veg') => {
+  const catLower = (category || '').toLowerCase();
+  if (catLower === 'jain food' || catLower.includes('jain')) {
+    return (
+      <div className="w-4.5 h-4.5 border-2 border-sky-600 flex items-center justify-center p-[2px] bg-sky-50 rounded-[3px] shrink-0">
+        <div className="w-2 h-2 rounded-full bg-sky-600" />
+      </div>
+    );
+  }
+  if (catLower.includes('non-veg') || catLower.includes('non veg')) {
+    return (
+      <div className="w-4.5 h-4.5 border-2 border-rose-700 flex items-center justify-center p-[2px] bg-rose-50 rounded-[3px] shrink-0">
+        <div className="w-2 h-2 rounded-full bg-rose-700" />
+      </div>
+    );
+  }
+  return (
+    <div className="w-4.5 h-4.5 border-2 border-emerald-600 flex items-center justify-center p-[2px] bg-emerald-50 rounded-[3px] shrink-0">
+      <div className="w-2 h-2 rounded-full bg-emerald-600" />
+    </div>
+  );
+};
+
 const INITIAL_SETTINGS = {
   account: {
     name: 'Zaid Mansuri',
@@ -26,6 +84,7 @@ const INITIAL_SETTINGS = {
   business: {
     providerName: 'Shreeji Authentic Tiffins',
     description: 'Authentic home-cooked Gujarati thali, Jain food, and North Indian meals prepared with fresh ingredients and pure ghee.',
+    foodClassification: 'Pure Veg',
     address: '102, Shivalik Plaza, CG Road',
     city: 'Ahmedabad',
     serviceArea: 'CG Road, Paldi, Navrangpura, Satellite (5km radius)',
@@ -387,6 +446,84 @@ export default function SettingsTab({ currentUser, onUpdateUser }) {
                       onChange={e => setSettings({ ...settings, business: { ...settings.business, description: e.target.value } })}
                       className="w-full px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
                     />
+                  </div>
+
+                  {/* Food Category & Classification Mark (ISI Standard) */}
+                  <div className="space-y-3 bg-[#F9FBF9] p-4 rounded-xl border border-[#E5ECE8]">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <label className="text-xs font-extrabold text-[#111827] flex items-center gap-1.5">
+                          <span>🥗 Kitchen Food Category & Dietary Classification</span>
+                          <span className="text-[10px] font-bold text-[#0A8B5F] bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+                            ISI Mark Standard
+                          </span>
+                        </label>
+                        <p className="text-[11px] text-[#6B7280] font-medium mt-0.5">
+                          Select category option to display official mark on your Diner page kitchen cards.
+                        </p>
+                      </div>
+
+                      {/* Live Symbol Preview */}
+                      <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-[#E5ECE8] shadow-2xs self-start sm:self-auto shrink-0">
+                        <span className="text-[10px] text-[#6B7280] font-bold uppercase tracking-wider">Card Mark:</span>
+                        {renderFoodSymbol(settings.business.foodClassification || 'Pure Veg')}
+                        <span className="text-[11px] font-black uppercase tracking-wider text-[#111827]">
+                          {settings.business.foodClassification || 'Pure Veg'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Select Option Dropdown */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#6B7280]">Select Dietary Classification</label>
+                      <select
+                        value={settings.business.foodClassification || 'Pure Veg'}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setSettings({
+                            ...settings,
+                            business: { ...settings.business, foodClassification: val },
+                            tiffin: { ...settings.tiffin, vegPreference: val }
+                          });
+                        }}
+                        className="w-full px-3.5 py-2.5 bg-white border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-[#0A8B5F] shadow-2xs cursor-pointer"
+                      >
+                        <option value="Pure Veg">🟢 Pure Veg (100% Vegetarian - Green Mark)</option>
+                        <option value="Jain Food">🔵 Jain Food (No Onion / Garlic - Blue Mark)</option>
+                        <option value="Veg & Non-Veg">🔴 Veg & Non-Veg (Mixed Kitchen - Red Mark)</option>
+                        <option value="Pure Non-Veg">🔴 Pure Non-Veg (Non-Vegetarian Only - Red Mark)</option>
+                      </select>
+                    </div>
+
+                    {/* Interactive Category Option Cards with ISI Symbol */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                      {FOOD_CATEGORIES.map(cat => {
+                        const isSelected = (settings.business.foodClassification || 'Pure Veg').toLowerCase() === cat.label.toLowerCase();
+                        return (
+                          <button
+                            type="button"
+                            key={cat.id}
+                            onClick={() => setSettings({
+                              ...settings,
+                              business: { ...settings.business, foodClassification: cat.label },
+                              tiffin: { ...settings.tiffin, vegPreference: cat.label }
+                            })}
+                            className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all cursor-pointer text-center ${
+                              isSelected 
+                                ? 'bg-white border-[#0A8B5F] shadow-sm ring-2 ring-[#0A8B5F]/20 font-black' 
+                                : 'bg-white/70 hover:bg-white border-[#E5ECE8] opacity-80 hover:opacity-100 font-bold'
+                            }`}
+                          >
+                            {/* Official ISI Dot Symbol */}
+                            <div className={`w-5 h-5 border-2 flex items-center justify-center p-[2.5px] rounded-[3px] shadow-2xs ${cat.borderClass} ${cat.bgClass}`}>
+                              <div className={`w-2.5 h-2.5 rounded-full ${cat.dotClass}`} />
+                            </div>
+                            <div className="font-extrabold text-xs text-[#111827]">{cat.label}</div>
+                            <div className="text-[9.5px] text-[#6B7280] font-medium leading-tight">{cat.subtext}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

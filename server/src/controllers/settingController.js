@@ -29,6 +29,7 @@ const getProviderSettings = async (req, res) => {
         business: {
           providerName: realProvider?.businessName || realProvider?.name || 'Kitchen Business',
           description: realProvider?.description || 'Authentic home-cooked thali and meals prepared with fresh ingredients.',
+          foodClassification: realProvider?.tags?.[0] || 'Pure Veg',
           address: [realProvider?.address?.houseNo, realProvider?.address?.street].filter(Boolean).join(', ') || realProvider?.address?.city || '',
           city: realProvider?.address?.city || realProvider?.address?.locality || 'Ahmedabad',
           serviceArea: realProvider?.address?.locality ? `${realProvider.address.locality} (5km radius)` : 'Ahmedabad (5km radius)',
@@ -144,6 +145,7 @@ const updateProviderSettings = async (req, res) => {
       const newEmail = updatedData.account?.email;
       const newPhone = updatedData.account?.phone;
       const newDesc = updatedData.business?.description;
+      const newFoodClassification = updatedData.business?.foodClassification || updatedData.tiffin?.vegPreference;
       const newOpens = updatedData.business?.openingTime;
       const newCloses = updatedData.business?.closingTime;
       const newAddress = updatedData.business?.address;
@@ -175,6 +177,10 @@ const updateProviderSettings = async (req, res) => {
         if (newEmail) providerUpdate.email = newEmail;
         if (newPhone) providerUpdate.mobile = newPhone;
         if (newDesc) providerUpdate.description = newDesc;
+        if (newFoodClassification) {
+          providerUpdate.tags = [newFoodClassification];
+          providerUpdate.businessType = newFoodClassification;
+        }
         if (newOpens) providerUpdate.opens = newOpens;
         if (newCloses) providerUpdate.closes = newCloses;
         if (newBankName) providerUpdate.bankName = newBankName;
