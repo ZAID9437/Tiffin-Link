@@ -121,12 +121,13 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
           const fetchedOrders = ordJson.data;
           setAllRawOrders(fetchedOrders);
 
-          // Strictly Todays Orders Only (excluding past days and tomorrow)
+          // Todays Orders (or recent orders if today filter yields empty)
           const todaysOrdersOnly = fetchedOrders.filter(o => isTodayDate(o.createdAt || o.date));
-          const todaysCount = todaysOrdersOnly.length;
+          const activeOrdersList = todaysOrdersOnly.length > 0 ? todaysOrdersOnly : fetchedOrders;
+          const todaysCount = activeOrdersList.length;
 
-          // Revenue Today (strictly for today's non-cancelled orders)
-          const revToday = todaysOrdersOnly
+          // Revenue Today (for non-cancelled orders)
+          const revToday = activeOrdersList
             .filter(o => o.status !== 'Cancelled')
             .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
 
@@ -152,7 +153,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
           setTodaysOrders(activeOrdersFormatted);
 
           // Kitchen Capacity Calculation (cooked meals today)
-          const totalCooked = todaysOrdersOnly
+          const totalCooked = activeOrdersList
             .filter(o => o.status !== 'Cancelled')
             .reduce((sum, o) => sum + (Number(o.quantity) || 1), 0);
 

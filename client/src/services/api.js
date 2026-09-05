@@ -60,5 +60,18 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
   }
 
+  // Safely parse JSON payload and attach fields to response so callers get both Response methods and parsed JSON object fields
+  try {
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const jsonBody = await response.clone().json();
+      if (jsonBody && typeof jsonBody === 'object') {
+        Object.assign(response, jsonBody);
+      }
+    }
+  } catch (err) {
+    // Ignore JSON parsing errors for non-JSON responses
+  }
+
   return response;
 };

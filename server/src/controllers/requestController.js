@@ -99,7 +99,7 @@ const SIMULATED_SAMPLES = [
   }
 ];
 
-// Helper to format/enrich request object with live dynamic remaining seconds
+// Helper to format/enrich request object with live dynamic remaining seconds (max 2 minutes = 120s)
 const enrichRequestWithLiveTimer = (reqObj) => {
   const now = Date.now();
   let expiresAtMs;
@@ -107,15 +107,19 @@ const enrichRequestWithLiveTimer = (reqObj) => {
   if (reqObj.expiresAt) {
     expiresAtMs = new Date(reqObj.expiresAt).getTime();
   } else if (reqObj.createdAt) {
-    expiresAtMs = new Date(reqObj.createdAt).getTime() + 180 * 1000;
+    expiresAtMs = new Date(reqObj.createdAt).getTime() + 120 * 1000; // Strictly 2 minutes
   } else {
     expiresAtMs = now + 120 * 1000;
   }
 
-  let secondsLeft = Math.max(0, Math.floor((expiresAtMs - now) / 1000));
-  // If request is still 'pending' but time has run out, give a grace countdown for demo visibility
-  if (secondsLeft === 0 && reqObj.status === 'pending') {
-    secondsLeft = 90;
+  let secondsLeft = Math.max(0, Math.min(120, Math.floor((expiresAtMs - now) / 1000)));
+
+  // Automatically decline pending request when 2-minute timer reaches 0
+  if (secondsLeft <= 0 && reqObj.status === 'pending') {
+    reqObj.status = 'declined';
+    if (typeof reqObj.save === 'function') {
+      reqObj.save().catch(e => console.error('Error auto-declining expired request:', e));
+    }
   }
 
   const plain = typeof reqObj.toObject === 'function' ? reqObj.toObject() : { ...reqObj };
@@ -177,7 +181,7 @@ const createRequest = async (req, res) => {
     const qty = Number(quantity) || 1;
     const itemBudget = Number(budget) || (items && items[0] ? items[0].price : 120);
     const calculatedTotal = totalAmount ? Number(totalAmount) : (qty * itemBudget);
-    const durationMin = Number(validMinutes) || 3;
+    const durationMin = Number(validMinutes) || 2;
     const expiresAt = new Date(Date.now() + durationMin * 60 * 1000);
 
     const formattedItems = Array.isArray(items) && items.length > 0
@@ -337,7 +341,7 @@ const declineRequest = async (req, res) => {
 const simulateLiveRequest = async (req, res) => {
   try {
     const randomSample = SIMULATED_SAMPLES[Math.floor(Math.random() * SIMULATED_SAMPLES.length)];
-    const expiresAt = new Date(Date.now() + 180 * 1000); // 3 minutes validity
+    const expiresAt = new Date(Date.now() + 120 * 1000); // 2 minutes validity
     
     // Slight jitter to phone number to make each simulated order unique
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);

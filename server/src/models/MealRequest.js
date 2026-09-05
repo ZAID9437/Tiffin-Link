@@ -73,7 +73,7 @@ const mealRequestSchema = new mongoose.Schema({
   },
   expiresAt: {
     type: Date,
-    default: () => new Date(Date.now() + 3 * 60 * 1000) // 3 minutes validity by default
+    default: () => new Date(Date.now() + 2 * 60 * 1000) // 2 minutes validity by default
   },
   createdAt: {
     type: Date,

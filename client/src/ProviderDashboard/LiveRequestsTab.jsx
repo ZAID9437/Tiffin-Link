@@ -47,11 +47,11 @@ export default function LiveRequestsTab({ onNavigateTab, onAcceptRequest }) {
             // Find existing request in state to maintain continuous second countdown
             const existing = prev.find(p => (p.dbId === r._id || p.id === r.id));
 
-            let secondsLeft = r.secondsLeft !== undefined ? r.secondsLeft : 120;
+            let secondsLeft = r.secondsLeft !== undefined ? Math.min(120, r.secondsLeft) : 120;
             if (r.expiresAt) {
-              secondsLeft = Math.max(0, Math.floor((new Date(r.expiresAt).getTime() - now) / 1000));
+              secondsLeft = Math.max(0, Math.min(120, Math.floor((new Date(r.expiresAt).getTime() - now) / 1000)));
             } else if (existing && existing.secondsLeft !== undefined) {
-              secondsLeft = existing.secondsLeft;
+              secondsLeft = Math.min(120, existing.secondsLeft);
             }
 
             const formattedItems = Array.isArray(r.items) && r.items.length > 0
@@ -86,13 +86,25 @@ export default function LiveRequestsTab({ onNavigateTab, onAcceptRequest }) {
     }
   };
 
-  // 1-second countdown ticker
+  // 1-second countdown ticker with automatic decline when 2-minute timer reaches 0
   useEffect(() => {
     const timer = setInterval(() => {
-      setRequests(prev => prev.map(req => ({
-        ...req,
-        secondsLeft: req.secondsLeft > 0 ? req.secondsLeft - 1 : 0
-      })));
+      setRequests(prev => {
+        const updated = prev.map(req => {
+          if (req.secondsLeft <= 0 || req.status !== 'pending') return req;
+
+          const nextSec = req.secondsLeft - 1;
+          if (nextSec === 0) {
+            apiRequest(`/requests/${req.dbId || req.id}/decline`, { method: 'POST' }).catch(() => {});
+            setToastMsg(`⚠️ Live Request #${req.id} auto-declined (2-min timer expired)`);
+            setTimeout(() => setToastMsg(''), 4000);
+            return { ...req, secondsLeft: 0, status: 'declined' };
+          }
+          return { ...req, secondsLeft: nextSec };
+        });
+
+        return updated.filter(r => r.secondsLeft > 0 && r.status === 'pending');
+      });
     }, 1000);
     return () => clearInterval(timer);
   }, []);
