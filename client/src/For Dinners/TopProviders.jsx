@@ -25,8 +25,8 @@ function ProviderCard({ provider }) {
             className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
           />
           {/* Glass Rating Badge */}
-          <span className="absolute top-3 right-3 bg-onyx-black/85 backdrop-blur-md text-bone-white text-[9px] font-label-caps tracking-widest px-2.5 py-1 rounded-full flex items-center gap-0.5 shadow-sm border border-white/10 z-20">
-            ★ {provider.rating}
+          <span className="absolute top-3 right-3 bg-black/85 backdrop-blur-md text-white text-[11px] font-extrabold tracking-wider px-2.5 py-1 rounded-full flex items-center gap-1 shadow-lg border border-white/20 z-20">
+            ★ {provider.rating ? Number(provider.rating).toFixed(1) : '4.8'}
           </span>
         </div>
 
@@ -107,7 +107,7 @@ export default function TopProviders() {
     try {
       const response = await fetch('http://localhost:5000/api/providers');
       const data = await response.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.data)) {
         setProviders(data.data);
       }
     } catch (error) {
@@ -172,6 +172,10 @@ export default function TopProviders() {
 
   useEffect(() => {
     fetchProviders();
+    const interval = setInterval(() => {
+      fetchProviders();
+    }, 4000); // 4-second live poll for real-time rating updates on Diner cards
+    return () => clearInterval(interval);
   }, []);
 
   const scroll = (direction) => {

@@ -54,7 +54,9 @@ const defaultInitialTiffins = [
   }
 ];
 
-// @desc    Get tiffins from MongoDB (provider-scoped or public)
+const Review = require('../models/Review');
+
+// @desc    Get tiffins from MongoDB (provider-scoped or public) with live ratings
 // @route   GET /api/tiffins
 const getTiffins = async (req, res) => {
   try {
@@ -68,7 +70,30 @@ const getTiffins = async (req, res) => {
 
     if (await isDbConnected()) {
       const tiffins = await Tiffin.find(query).sort({ createdAt: -1 });
-      return res.json({ success: true, data: tiffins, source: 'database', databaseName: 'tiffinlink' });
+
+      // Dynamically calculate rating for each tiffin from MongoDB Review collection
+      const enrichedTiffins = await Promise.all(tiffins.map(async (t) => {
+        const tObj = t.toObject ? t.toObject() : { ...t };
+        const reviews = await Review.find({
+          $or: [
+            { tiffinId: t._id.toString() },
+            { tiffinName: t.name }
+          ]
+        });
+
+        if (reviews.length > 0) {
+          const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 5), 0);
+          const avg = (sum / reviews.length).toFixed(1);
+          tObj.rating = Number(avg);
+          tObj.reviewCount = reviews.length;
+        } else {
+          tObj.rating = tObj.rating || 4.8;
+          tObj.reviewCount = tObj.reviewCount || 5;
+        }
+        return tObj;
+      }));
+
+      return res.json({ success: true, data: enrichedTiffins, source: 'database', databaseName: 'tiffinlink' });
     } else {
       return res.json({ success: true, data: [], source: 'in-memory' });
     }
