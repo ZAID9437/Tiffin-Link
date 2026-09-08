@@ -4,6 +4,12 @@ import DeliveryRequestsView from './DeliveryRequestsView';
 import GoogleDeliveryMap from '../components/GoogleDeliveryMap';
 import { sendDriverLocationUpdate } from '../services/socket';
 
+const formatOrderRef = (ref) => {
+  if (!ref) return '';
+  const clean = String(ref).trim().replace(/^#+/, '');
+  return `#${clean}`;
+};
+
 export default function DeliveryDashboard({ currentUser, onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -326,7 +332,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
                       {activeDelivery ? '1 Active' : 'No Active Delivery'}
                     </div>
                     <p className="font-body-md text-xs text-sand-neutral truncate">
-                      {activeDelivery ? `#${activeDelivery.orderId || activeDelivery.requestId}` : 'Waiting for a new delivery request'}
+                      {activeDelivery ? formatOrderRef(activeDelivery.orderId || activeDelivery.requestId) : 'Waiting for a new delivery request'}
                     </p>
                   </div>
                 </div>
@@ -362,7 +368,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-label-caps text-xs text-secondary uppercase tracking-widest">ACTIVE TRIP</span>
-                          <span className="font-button-text font-bold text-onyx-black text-lg">#{activeDelivery.orderId || activeDelivery.requestId}</span>
+                          <span className="font-button-text font-bold text-onyx-black text-lg">{formatOrderRef(activeDelivery.orderId || activeDelivery.requestId)}</span>
                         </div>
                         <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 bg-emerald-100 text-emerald-900 font-label-caps text-[11px] font-bold uppercase tracking-wider">
                           <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
@@ -529,7 +535,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
                       <div key={item._id || item.requestId || idx} className="py-3.5 flex items-center justify-between gap-4 text-sm font-body-md hover:bg-surface-container-low transition-colors px-2">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-onyx-black">#{item.orderId || item.requestId}</span>
+                            <span className="font-bold text-onyx-black">{formatOrderRef(item.orderId || item.requestId)}</span>
                             <span className={`px-2 py-0.5 font-label-caps text-[10px] uppercase font-bold ${item.status === 'Delivered' ? 'bg-emerald-100 text-emerald-900' : 'bg-sand-neutral text-onyx-black'}`}>
                               {item.status}
                             </span>

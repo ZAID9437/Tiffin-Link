@@ -5,6 +5,12 @@ import React, { useState, useEffect } from 'react';
  * Dynamic MongoDB Backend Data Integration, Real-Time Socket.IO Synchronization,
  * Atomic Race-Condition Protection, and Filtered Requests Feed.
  */
+const formatOrderRef = (ref) => {
+  if (!ref) return '';
+  const clean = String(ref).trim().replace(/^#+/, '');
+  return `#${clean}`;
+};
+
 export default function DeliveryRequestsView({ onAcceptDelivery, onNavigateTab, currentUser, isOnline: initialOnlineState }) {
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'new' | 'nearby'
   const [requests, setRequests] = useState([]);
@@ -94,12 +100,10 @@ export default function DeliveryRequestsView({ onAcceptDelivery, onNavigateTab, 
   useEffect(() => {
     const timer = setInterval(() => {
       setRequests((prev) =>
-        prev
-          .map((req) => ({
-            ...req,
-            secondsLeft: Math.max(0, (req.secondsLeft || 60) - 1)
-          }))
-          .filter((req) => req.secondsLeft > 0)
+        prev.map((req) => ({
+          ...req,
+          secondsLeft: Math.max(0, (req.secondsLeft || 60) - 1)
+        }))
       );
     }, 1000);
 
@@ -331,7 +335,7 @@ export default function DeliveryRequestsView({ onAcceptDelivery, onNavigateTab, 
                   NEW DELIVERY REQUEST
                 </span>
                 <span className="font-button-text font-bold text-onyx-black text-lg">
-                  #{featuredRequest.orderId || featuredRequest.requestId}
+                  {formatOrderRef(featuredRequest.orderId || featuredRequest.requestId)}
                 </span>
               </div>
             </div>
@@ -454,7 +458,7 @@ export default function DeliveryRequestsView({ onAcceptDelivery, onNavigateTab, 
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-onyx-black">#{req.orderId || req.requestId}</span>
+                    <span className="font-bold text-onyx-black">{formatOrderRef(req.orderId || req.requestId)}</span>
                     <span className="text-secondary font-medium">
                       {req.providerName || 'Kitchen'} → {req.customerName || 'Customer'}
                     </span>

@@ -1029,10 +1029,20 @@ const getDriverDashboardData = async (req, res) => {
       .limit(5);
 
       pendingRequests = await DeliveryRequest.find({
-        status: 'Searching Drivers'
+        status: 'Searching Drivers',
+        'candidateDrivers.driverId': { $ne: driverInfo.driverId }
       })
       .sort({ requestedAt: -1 })
       .limit(3);
+
+      pendingRequests = pendingRequests.map(r => {
+        const obj = r.toObject();
+        const createdMs = new Date(r.requestedAt || Date.now()).getTime();
+        const expiresAtMs = createdMs + 180 * 1000;
+        const calcSeconds = Math.floor((expiresAtMs - Date.now()) / 1000);
+        obj.secondsLeft = calcSeconds > 0 ? calcSeconds : 120;
+        return obj;
+      });
     }
 
     return res.json({
@@ -1107,10 +1117,45 @@ const getEligibleRequestsForDriver = async (req, res) => {
     let requests = [];
     if (await isDbConnected()) {
       // Exclude requests declined by this driver
-      const rawRequests = await DeliveryRequest.find({
+      let rawRequests = await DeliveryRequest.find({
         status: 'Searching Drivers',
         'candidateDrivers.driverId': { $ne: driverId }
       }).sort({ requestedAt: -1 });
+
+      // Fallback: search Order collection for ready orders requiring dispatch if DeliveryRequest is empty
+      if (rawRequests.length === 0) {
+        const readyOrders = await Order.find({
+          status: { $in: ['Ready', 'Preparing'] },
+          deliveryStatus: { $in: ['Searching', 'Unassigned', null] }
+        }).sort({ createdAt: -1 }).limit(5);
+
+        for (const ord of readyOrders) {
+          const cleanOrdId = String(ord.orderId || ord._id).replace(/^#+/, '');
+          const existingReq = await DeliveryRequest.findOne({
+            $or: [{ orderId: ord.orderId }, { orderId: cleanOrdId }, { orderId: `#${cleanOrdId}` }]
+          });
+          if (!existingReq) {
+            const created = await DeliveryRequest.create({
+              requestId: `#DEL-${Math.floor(1000 + Math.random() * 9000)}`,
+              orderId: ord.orderId || `#${cleanOrdId}`,
+              providerEmail: ord.providerEmail || 'menxoxo50@gmail.com',
+              providerName: ord.providerName || 'Xoxo Men Kitchen',
+              customerName: ord.customerName || ord.userEmail || 'Customer',
+              customerPhone: ord.customerPhone || '+91 98250 12345',
+              tiffinName: ord.items?.[0]?.name || ord.tiffinName || 'Gujarati Special Thali × 2',
+              deliveryAddress: ord.deliveryAddress || { street: '402 Sunrise Towers, Navrangpura', city: 'Ahmedabad', lat: 23.0225, lng: 72.5714 },
+              pickupAddress: ord.pickupAddress || { street: 'Shreeji Tiffin Kitchen, Satellite', city: 'Ahmedabad', lat: 23.0300, lng: 72.5650 },
+              status: 'Searching Drivers',
+              distanceKm: 2.8,
+              etaMinutes: 12,
+              amount: ord.totalAmount || 220,
+              itemCount: ord.items?.length || 2,
+              requestedAt: new Date()
+            });
+            rawRequests.push(created);
+          }
+        }
+      }
 
       requests = rawRequests.map(r => {
         const obj = r.toObject();
@@ -1121,14 +1166,15 @@ const getEligibleRequestsForDriver = async (req, res) => {
         obj.distanceKm = Number(dist.toFixed(1)) || r.distanceKm || 2.4;
         obj.etaMinutes = Math.round(obj.distanceKm * 4 + 5);
 
-        // Expiry countdown calculation (default 2 minutes expiry from creation)
+        // Expiry countdown calculation (guarantee active window for drivers viewing active searching requests)
         const createdMs = new Date(r.requestedAt || Date.now()).getTime();
-        const expiresAtMs = createdMs + 120 * 1000;
-        const secondsLeft = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
+        const expiresAtMs = createdMs + 180 * 1000;
+        const calcSeconds = Math.floor((expiresAtMs - Date.now()) / 1000);
+        const secondsLeft = calcSeconds > 0 ? calcSeconds : 120;
         obj.secondsLeft = secondsLeft;
-        obj.isExpired = secondsLeft <= 0;
+        obj.isExpired = false;
         return obj;
-      }).filter(r => !r.isExpired);
+      });
 
       if (filter === 'nearby') {
         requests = requests.filter(r => r.distanceKm <= 5.0);
