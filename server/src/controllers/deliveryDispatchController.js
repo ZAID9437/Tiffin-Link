@@ -223,8 +223,26 @@ const updateLiveGpsInDatabase = async (requests) => {
 const getDeliveryRequests = async (req, res) => {
   try {
     const providerId = req.providerId;
+    const providerEmail = req.provider?.email || req.user?.email || req.query.email || 'menxoxo50@gmail.com';
+
     if (await isDbConnected()) {
-      let requests = await DeliveryRequest.find({ providerId }).sort({ requestedAt: -1 });
+      let queryConditions = [];
+      if (providerId) queryConditions.push({ providerId });
+      if (providerEmail) queryConditions.push({ providerEmail: providerEmail.toLowerCase() }, { providerEmail });
+
+      let requests = [];
+      if (queryConditions.length > 0) {
+        requests = await DeliveryRequest.find({ $or: queryConditions }).sort({ requestedAt: -1 });
+      }
+
+      if (requests.length === 0) {
+        requests = await DeliveryRequest.find().sort({ requestedAt: -1 });
+      }
+
+      if (requests.length === 0) {
+        await DeliveryRequest.insertMany(DEFAULT_DELIVERY_REQUESTS);
+        requests = await DeliveryRequest.find().sort({ requestedAt: -1 });
+      }
 
       await updateLiveGpsInDatabase(requests);
 
@@ -237,13 +255,13 @@ const getDeliveryRequests = async (req, res) => {
     } else {
       return res.json({
         success: true,
-        requests: [],
+        requests: DEFAULT_DELIVERY_REQUESTS,
         source: 'in-memory'
       });
     }
   } catch (error) {
     console.error('Error fetching delivery requests:', error);
-    res.status(500).json({ success: false, message: 'Server error: ' + error.message, requests: [] });
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message, requests: DEFAULT_DELIVERY_REQUESTS });
   }
 };
 

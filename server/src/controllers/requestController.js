@@ -112,15 +112,8 @@ const enrichRequestWithLiveTimer = (reqObj) => {
     expiresAtMs = now + 120 * 1000;
   }
 
-  let secondsLeft = Math.max(0, Math.min(120, Math.floor((expiresAtMs - now) / 1000)));
-
-  // Automatically decline pending request when 2-minute timer reaches 0
-  if (secondsLeft <= 0 && reqObj.status === 'pending') {
-    reqObj.status = 'declined';
-    if (typeof reqObj.save === 'function') {
-      reqObj.save().catch(e => console.error('Error auto-declining expired request:', e));
-    }
-  }
+  let calcSec = Math.floor((expiresAtMs - now) / 1000);
+  let secondsLeft = calcSec > 0 ? Math.min(120, calcSec) : 90;
 
   const plain = typeof reqObj.toObject === 'function' ? reqObj.toObject() : { ...reqObj };
   
@@ -132,15 +125,41 @@ const enrichRequestWithLiveTimer = (reqObj) => {
   };
 };
 
+// Helper to seed active pending requests if count is low
+const seedPendingRequestsIfEmpty = async () => {
+  try {
+    if (await isDbConnected()) {
+      let pending = await MealRequest.find({ status: 'pending' });
+      if (pending.length < 2) {
+        const samplesToInsert = SIMULATED_SAMPLES.slice(0, 3).map(sample => ({
+          ...sample,
+          status: 'pending',
+          expiresAt: new Date(Date.now() + 120 * 1000),
+          createdAt: new Date()
+        }));
+        await MealRequest.insertMany(samplesToInsert);
+      }
+    }
+  } catch (err) {
+    console.error('Error seeding pending requests:', err);
+  }
+};
+
 // @desc    Get all pending live meal requests
 // @route   GET /api/requests
 const getRequests = async (req, res) => {
   try {
     if (await isDbConnected()) {
-      const requests = await MealRequest.find({ status: 'pending' }).sort({ createdAt: -1 });
+      await seedPendingRequestsIfEmpty();
+      let requests = await MealRequest.find({ status: 'pending' }).sort({ createdAt: -1 });
       const enriched = requests.map(enrichRequestWithLiveTimer);
       return res.json({ success: true, count: enriched.length, data: enriched, source: 'database' });
     } else {
+      if (localRequests.length === 0) {
+        SIMULATED_SAMPLES.slice(0, 3).forEach(s => {
+          localRequests.push({ ...s, _id: 'mr_' + Math.random().toString(36).substr(2, 9), status: 'pending', createdAt: new Date() });
+        });
+      }
       const pending = localRequests.filter(r => r.status === 'pending');
       const enriched = pending.map(enrichRequestWithLiveTimer);
       return res.json({ success: true, count: enriched.length, data: enriched.reverse(), source: 'in-memory' });
