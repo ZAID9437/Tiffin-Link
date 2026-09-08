@@ -218,6 +218,77 @@ const updateLiveGpsInDatabase = async (requests) => {
   }
 };
 
+// Idempotent reconciliation helper: connects ready/preparing/new orders to deliveryrequests
+const reconcileMissingDeliveryRequests = async () => {
+  try {
+    if (!(await isDbConnected())) return;
+
+    const unassignedOrders = await Order.find({
+      status: { $in: ['New', 'Preparing', 'Ready', 'Accepted'] },
+      deliveryStatus: { $in: ['Searching', 'Unassigned', 'Pending', null, ''] }
+    });
+
+    for (const ord of unassignedOrders) {
+      const ordIdStr = String(ord.orderId || ord._id).trim();
+      const cleanOrdId = ordIdStr.replace(/^#+/, '');
+      const hashedOrdId = `#${cleanOrdId}`;
+
+      const existingReq = await DeliveryRequest.findOne({
+        $or: [
+          { orderId: ordIdStr },
+          { orderId: cleanOrdId },
+          { orderId: hashedOrdId }
+        ]
+      });
+
+      if (!existingReq) {
+        let providerName = 'Xoxo Men Kitchen';
+        let providerEmail = 'menxoxo50@gmail.com';
+        if (ord.providerId && isValidObjectId(ord.providerId)) {
+          const prov = await Provider.findById(ord.providerId);
+          if (prov) {
+            providerName = prov.businessName || prov.name || providerName;
+            providerEmail = prov.email || providerEmail;
+          }
+        }
+
+        await DeliveryRequest.create({
+          requestId: `#DEL-${Math.floor(1000 + Math.random() * 9000)}`,
+          orderId: ord.orderId || hashedOrdId,
+          providerId: String(ord.providerId || '6a7f3051d4b48741d8722416'),
+          providerEmail,
+          providerName,
+          customerName: ord.customerName || 'Customer',
+          customerPhone: ord.customerPhone || '+91 98250 12345',
+          tiffinName: `${ord.tiffinName || 'Gujarati Special Thali'} × ${ord.quantity || 1}`,
+          tiffinCategory: ord.tiffinCategory || 'Gujarati',
+          deliveryAddress: {
+            street: ord.customerAddress || 'Satellite, Ahmedabad',
+            city: 'Ahmedabad',
+            lat: 23.0225,
+            lng: 72.5714
+          },
+          pickupAddress: {
+            street: 'Ruhan Duplex, Satellite',
+            city: 'Ahmedabad',
+            lat: 23.0300,
+            lng: 72.5650
+          },
+          status: 'Searching Drivers',
+          distanceKm: ord.deliveryKm || 2.4,
+          etaMinutes: Math.round((ord.deliveryKm || 2.4) * 4 + 5),
+          amount: ord.totalAmount || 220,
+          itemCount: ord.quantity || 1,
+          candidateDrivers: [],
+          requestedAt: ord.createdAt ? new Date(ord.createdAt) : new Date()
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error in reconcileMissingDeliveryRequests:', err);
+  }
+};
+
 // @desc    Get all delivery requests for provider from MongoDB
 // @route   GET /api/delivery/requests
 const getDeliveryRequests = async (req, res) => {
@@ -226,6 +297,8 @@ const getDeliveryRequests = async (req, res) => {
     const providerEmail = req.provider?.email || req.user?.email || req.query.email || 'menxoxo50@gmail.com';
 
     if (await isDbConnected()) {
+      await reconcileMissingDeliveryRequests();
+
       let queryConditions = [];
       if (providerId) queryConditions.push({ providerId });
       if (providerEmail) queryConditions.push({ providerEmail: providerEmail.toLowerCase() }, { providerEmail });
@@ -236,11 +309,6 @@ const getDeliveryRequests = async (req, res) => {
       }
 
       if (requests.length === 0) {
-        requests = await DeliveryRequest.find().sort({ requestedAt: -1 });
-      }
-
-      if (requests.length === 0) {
-        await DeliveryRequest.insertMany(DEFAULT_DELIVERY_REQUESTS);
         requests = await DeliveryRequest.find().sort({ requestedAt: -1 });
       }
 
@@ -255,13 +323,13 @@ const getDeliveryRequests = async (req, res) => {
     } else {
       return res.json({
         success: true,
-        requests: DEFAULT_DELIVERY_REQUESTS,
+        requests: [],
         source: 'in-memory'
       });
     }
   } catch (error) {
     console.error('Error fetching delivery requests:', error);
-    res.status(500).json({ success: false, message: 'Server error: ' + error.message, requests: DEFAULT_DELIVERY_REQUESTS });
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message, requests: [] });
   }
 };
 
@@ -1012,6 +1080,7 @@ const getDriverDashboardData = async (req, res) => {
     let pendingRequests = [];
 
     if (await isDbConnected()) {
+      await reconcileMissingDeliveryRequests();
       const activeReq = await DeliveryRequest.findOne({
         $or: [
           ...(driverInfo.driverId ? [{ 'assignedDriver.driverId': driverInfo.driverId }] : []),
@@ -1127,64 +1196,30 @@ const toggleDriverStatus = async (req, res) => {
 // @route   GET /api/delivery/driver-requests
 const getEligibleRequestsForDriver = async (req, res) => {
   try {
-    const driverId = req.user?.id || req.query.driverId || 'TL-8041';
+    const driverId = req.user?.id || req.user?._id || req.query.driverId || 'TL-8041';
     const driverLat = parseFloat(req.query.lat) || 23.0280;
     const driverLng = parseFloat(req.query.lng) || 72.5670;
     const filter = req.query.filter || 'all';
 
     let requests = [];
     if (await isDbConnected()) {
-      // Exclude requests declined by this driver
+      // 1. Run idempotent reconciliation for any active ready orders lacking delivery requests
+      await reconcileMissingDeliveryRequests();
+
+      // 2. Fetch active delivery requests searching for drivers, excluding declined ones
       let rawRequests = await DeliveryRequest.find({
         status: 'Searching Drivers',
         'candidateDrivers.driverId': { $ne: driverId }
       }).sort({ requestedAt: -1 });
 
-      // Fallback: search Order collection for ready orders requiring dispatch if DeliveryRequest is empty
-      if (rawRequests.length === 0) {
-        const readyOrders = await Order.find({
-          status: { $in: ['Ready', 'Preparing'] },
-          deliveryStatus: { $in: ['Searching', 'Unassigned', null] }
-        }).sort({ createdAt: -1 }).limit(5);
-
-        for (const ord of readyOrders) {
-          const cleanOrdId = String(ord.orderId || ord._id).replace(/^#+/, '');
-          const existingReq = await DeliveryRequest.findOne({
-            $or: [{ orderId: ord.orderId }, { orderId: cleanOrdId }, { orderId: `#${cleanOrdId}` }]
-          });
-          if (!existingReq) {
-            const created = await DeliveryRequest.create({
-              requestId: `#DEL-${Math.floor(1000 + Math.random() * 9000)}`,
-              orderId: ord.orderId || `#${cleanOrdId}`,
-              providerEmail: ord.providerEmail || 'menxoxo50@gmail.com',
-              providerName: ord.providerName || 'Xoxo Men Kitchen',
-              customerName: ord.customerName || ord.userEmail || 'Customer',
-              customerPhone: ord.customerPhone || '+91 98250 12345',
-              tiffinName: ord.items?.[0]?.name || ord.tiffinName || 'Gujarati Special Thali × 2',
-              deliveryAddress: ord.deliveryAddress || { street: '402 Sunrise Towers, Navrangpura', city: 'Ahmedabad', lat: 23.0225, lng: 72.5714 },
-              pickupAddress: ord.pickupAddress || { street: 'Shreeji Tiffin Kitchen, Satellite', city: 'Ahmedabad', lat: 23.0300, lng: 72.5650 },
-              status: 'Searching Drivers',
-              distanceKm: 2.8,
-              etaMinutes: 12,
-              amount: ord.totalAmount || 220,
-              itemCount: ord.items?.length || 2,
-              requestedAt: new Date()
-            });
-            rawRequests.push(created);
-          }
-        }
-      }
-
       requests = rawRequests.map(r => {
         const obj = r.toObject();
-        // Calculate distance from driver GPS
         const pLat = r.pickupAddress?.lat || 23.0300;
         const pLng = r.pickupAddress?.lng || 72.5650;
         const dist = Math.sqrt(Math.pow(pLat - driverLat, 2) + Math.pow(pLng - driverLng, 2)) * 111;
         obj.distanceKm = Number(dist.toFixed(1)) || r.distanceKm || 2.4;
         obj.etaMinutes = Math.round(obj.distanceKm * 4 + 5);
 
-        // Expiry countdown calculation (guarantee active window for drivers viewing active searching requests)
         const createdMs = new Date(r.requestedAt || Date.now()).getTime();
         const expiresAtMs = createdMs + 180 * 1000;
         const calcSeconds = Math.floor((expiresAtMs - Date.now()) / 1000);
