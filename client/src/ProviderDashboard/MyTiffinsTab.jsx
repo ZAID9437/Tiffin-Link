@@ -457,36 +457,36 @@ export default function MyTiffinsTab({ initialSubView = 'all', initialOpenModal 
       )}
 
       {/* Top Module Sub-Navigation Bar */}
-      <div className="bg-white rounded-sm p-4 shadow-xs border border-[#e7e3db] flex flex-wrap items-center justify-between gap-4 font-sans">
+      <div className="bg-white rounded-2xl p-4 shadow-xs border border-[#E5ECE8] flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <button 
             onClick={() => setSubView('all')}
-            className={`px-4 py-2 rounded-sm text-xs font-semibold transition-all cursor-pointer ${
-              subView === 'all' ? 'bg-[#171717] text-white shadow-xs' : 'text-[#726f68] hover:bg-[#f7f4ee] hover:text-black'
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              subView === 'all' ? 'bg-[#0A8B5F] text-white shadow-xs' : 'text-[#6B7280] hover:bg-[#F9FBF9]'
             }`}
           >
             All Tiffins
           </button>
           <button 
             onClick={() => { setEditingTiffin(null); setSubView('add'); }}
-            className={`px-4 py-2 rounded-sm text-xs font-semibold transition-all cursor-pointer ${
-              subView === 'add' ? 'bg-[#171717] text-white shadow-xs' : 'text-[#726f68] hover:bg-[#f7f4ee] hover:text-black'
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              subView === 'add' ? 'bg-[#0A8B5F] text-white shadow-xs' : 'text-[#6B7280] hover:bg-[#F9FBF9]'
             }`}
           >
             + Add Tiffin
           </button>
           <button 
             onClick={() => setSubView('availability')}
-            className={`px-4 py-2 rounded-sm text-xs font-semibold transition-all cursor-pointer ${
-              subView === 'availability' ? 'bg-[#171717] text-white shadow-xs' : 'text-[#726f68] hover:bg-[#f7f4ee] hover:text-black'
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+              subView === 'availability' ? 'bg-[#0A8B5F] text-white shadow-xs' : 'text-[#6B7280] hover:bg-[#F9FBF9]'
             }`}
           >
             Availability
           </button>
           <button 
             onClick={() => setSubView('categories')}
-            className={`px-4 py-2 rounded-sm text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-              subView === 'categories' ? 'bg-[#171717] text-white shadow-xs' : 'text-[#726f68] hover:bg-[#f7f4ee] hover:text-black'
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 ${
+              subView === 'categories' ? 'bg-[#0A8B5F] text-white shadow-xs' : 'text-[#6B7280] hover:bg-[#F9FBF9]'
             }`}
           >
             <Tag size={13} />
