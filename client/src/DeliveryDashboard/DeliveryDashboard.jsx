@@ -743,8 +743,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
               </div>
 
             </div>
-
-          </div>
+          )}
         </main>
       </div>
 
