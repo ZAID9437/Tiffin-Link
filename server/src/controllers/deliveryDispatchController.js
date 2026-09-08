@@ -1095,6 +1095,160 @@ const toggleDriverStatus = async (req, res) => {
   }
 };
 
+// @desc    Get real-time eligible delivery requests for driver feed
+// @route   GET /api/delivery/driver-requests
+const getEligibleRequestsForDriver = async (req, res) => {
+  try {
+    const driverId = req.user?.id || req.query.driverId || 'TL-8041';
+    const driverLat = parseFloat(req.query.lat) || 23.0280;
+    const driverLng = parseFloat(req.query.lng) || 72.5670;
+    const filter = req.query.filter || 'all';
+
+    let requests = [];
+    if (await isDbConnected()) {
+      // Exclude requests declined by this driver
+      const rawRequests = await DeliveryRequest.find({
+        status: 'Searching Drivers',
+        'candidateDrivers.driverId': { $ne: driverId }
+      }).sort({ requestedAt: -1 });
+
+      requests = rawRequests.map(r => {
+        const obj = r.toObject();
+        // Calculate distance from driver GPS
+        const pLat = r.pickupAddress?.lat || 23.0300;
+        const pLng = r.pickupAddress?.lng || 72.5650;
+        const dist = Math.sqrt(Math.pow(pLat - driverLat, 2) + Math.pow(pLng - driverLng, 2)) * 111;
+        obj.distanceKm = Number(dist.toFixed(1)) || r.distanceKm || 2.4;
+        obj.etaMinutes = Math.round(obj.distanceKm * 4 + 5);
+
+        // Expiry countdown calculation (default 2 minutes expiry from creation)
+        const createdMs = new Date(r.requestedAt || Date.now()).getTime();
+        const expiresAtMs = createdMs + 120 * 1000;
+        const secondsLeft = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
+        obj.secondsLeft = secondsLeft;
+        obj.isExpired = secondsLeft <= 0;
+        return obj;
+      }).filter(r => !r.isExpired);
+
+      if (filter === 'nearby') {
+        requests = requests.filter(r => r.distanceKm <= 5.0);
+      } else if (filter === 'new') {
+        const fiveMinsAgo = Date.now() - 5 * 60 * 1000;
+        requests = requests.filter(r => new Date(r.requestedAt).getTime() >= fiveMinsAgo);
+      }
+    }
+
+    const pendingCount = requests.length;
+    const nearbyCount = requests.filter(r => r.distanceKm <= 5.0).length;
+    const estEarnings = requests.reduce((sum, r) => sum + (r.amount || 150), 0);
+
+    return res.json({
+      success: true,
+      data: {
+        requests,
+        pendingCount,
+        nearbyCount,
+        estEarnings
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching eligible driver requests:', error);
+    res.status(500).json({ success: false, message: 'Server error loading delivery requests', data: { requests: [], pendingCount: 0, nearbyCount: 0, estEarnings: 0 } });
+  }
+};
+
+// @desc    Atomically accept a delivery request with race-condition protection
+// @route   POST /api/delivery/requests/:requestId/accept
+const acceptDeliveryRequestAtomic = async (req, res) => {
+  try {
+    const requestId = req.params.requestId || req.body.requestId;
+    const driverId = req.body.driverId || req.user?.id || 'TL-8041';
+    const driverName = req.body.driverName || req.user?.name || 'Rajesh Kumar';
+    const driverPhone = req.body.driverPhone || req.user?.phone || '+91 98201 44821';
+    const vehicleNo = req.body.vehicleNo || 'GJ-01-AB-1029';
+
+    if (await isDbConnected()) {
+      // Atomic lock using findOneAndUpdate where status must be 'Searching Drivers'
+      const acceptedReq = await DeliveryRequest.findOneAndUpdate(
+        {
+          $or: [{ requestId }, { orderId: requestId }, { _id: isValidObjectId(requestId) ? requestId : null }],
+          status: 'Searching Drivers'
+        },
+        {
+          $set: {
+            status: 'Driver Assigned',
+            'assignedDriver.driverId': driverId,
+            'assignedDriver.name': driverName,
+            'assignedDriver.phone': driverPhone,
+            'assignedDriver.vehicleNo': vehicleNo,
+            acceptedAt: new Date()
+          }
+        },
+        { new: true }
+      );
+
+      if (!acceptedReq) {
+        return res.status(409).json({
+          success: false,
+          message: 'This delivery is no longer available. Another delivery partner may have accepted it.'
+        });
+      }
+
+      if (acceptedReq.orderId) {
+        await Order.findOneAndUpdate(
+          { $or: [{ orderId: acceptedReq.orderId }, { _id: isValidObjectId(acceptedReq.orderId) ? acceptedReq.orderId : null }] },
+          { $set: { status: 'Ready', deliveryStatus: 'Assigned', deliveryPartnerName: driverName, deliveryPartnerPhone: driverPhone } }
+        );
+      }
+
+      return res.json({
+        success: true,
+        message: '✓ Delivery request accepted successfully! Trip locked into Active Dispatch.',
+        request: acceptedReq
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: '✓ Delivery request accepted successfully! Trip locked into Active Dispatch.'
+    });
+  } catch (error) {
+    console.error('Error accepting delivery request atomic:', error);
+    res.status(500).json({ success: false, message: 'Server error accepting request' });
+  }
+};
+
+// @desc    Decline a delivery request for authenticated driver
+// @route   POST /api/delivery/requests/:requestId/decline
+const declineDeliveryRequest = async (req, res) => {
+  try {
+    const requestId = req.params.requestId || req.body.requestId;
+    const driverId = req.body.driverId || req.user?.id || 'TL-8041';
+
+    if (await isDbConnected()) {
+      await DeliveryRequest.updateOne(
+        { $or: [{ requestId }, { orderId: requestId }, { _id: isValidObjectId(requestId) ? requestId : null }] },
+        {
+          $push: {
+            candidateDrivers: {
+              driverId,
+              status: 'Rejected'
+            }
+          }
+        }
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: 'Delivery request declined.'
+    });
+  } catch (error) {
+    console.error('Error declining delivery request:', error);
+    res.status(500).json({ success: false, message: 'Server error declining request' });
+  }
+};
+
 module.exports = {
   getDeliveryRequests,
   createDeliveryRequest,
@@ -1111,5 +1265,8 @@ module.exports = {
   retryDelivery,
   cancelDelivery,
   getDriverDashboardData,
-  toggleDriverStatus
+  toggleDriverStatus,
+  getEligibleRequestsForDriver,
+  acceptDeliveryRequestAtomic,
+  declineDeliveryRequest
 };

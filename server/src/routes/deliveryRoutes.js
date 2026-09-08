@@ -16,6 +16,9 @@ const {
   getDeliveryMetrics,
   getDriverDashboardData,
   toggleDriverStatus,
+  getEligibleRequestsForDriver,
+  acceptDeliveryRequestAtomic,
+  declineDeliveryRequest,
   verifyOtp,
   retryDelivery,
   cancelDelivery
@@ -26,6 +29,9 @@ router.get('/applications', getDeliveryApplications);
 router.post('/verify-status', updateVerificationStatus);
 router.get('/dashboard', getDriverDashboardData);
 router.get('/driver-dashboard', getDriverDashboardData);
+router.get('/driver-requests', getEligibleRequestsForDriver);
+router.post('/requests/:requestId/accept', acceptDeliveryRequestAtomic);
+router.post('/requests/:requestId/decline', declineDeliveryRequest);
 router.post('/status/toggle', toggleDriverStatus);
 router.get('/requests', protect, requireProvider, getDeliveryRequests);
 router.get('/metrics', protect, requireProvider, getDeliveryMetrics);
