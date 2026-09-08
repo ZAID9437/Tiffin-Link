@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { setAuthTokens } from '../services/api';
+import { setAuthTokens, saveUserSession } from '../services/api';
 
 export default function LoginModal({ 
   isOpen, 
@@ -210,7 +210,11 @@ export default function LoginModal({
         if (data.accessToken) {
           setAuthTokens(data.accessToken, data.refreshToken);
         }
-        const authenticatedUser = data.user || { email: email.trim(), name: name.trim() || email.split('@')[0], role: activeRole };
+        const authenticatedUser = {
+          ...(data.user || { email: email.trim(), name: name.trim() || email.split('@')[0] }),
+          role: activeRole || data.user?.role || 'customer'
+        };
+        saveUserSession(authenticatedUser, data.accessToken, data.refreshToken);
         if (onLoginSuccess) {
           onLoginSuccess(authenticatedUser);
         }

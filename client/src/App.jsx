@@ -36,14 +36,21 @@ import DemoModal from './components/DemoModal';
 import CookieConsentModal from './components/CookieConsentModal';
 import CustomerDeliveryTrackingModal from './components/CustomerDeliveryTrackingModal';
 
-import { clearAuthTokens } from './services/api';
+import { clearAuthTokens, getCookie, setCookie, saveUserSession } from './services/api';
 import { CheckCircle2 } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('tiffinlink_user');
-      return saved ? JSON.parse(saved) : null;
+      const cookieUser = getCookie('tiffinlink_user');
+      const activeRole = localStorage.getItem('tiffinlink_user_role') || getCookie('tiffinlink_role');
+
+      let user = saved ? JSON.parse(saved) : (cookieUser ? (typeof cookieUser === 'object' ? cookieUser : JSON.parse(cookieUser)) : null);
+      if (user && activeRole) {
+        user = { ...user, role: activeRole };
+      }
+      return user;
     } catch {
       return null;
     }
@@ -55,8 +62,10 @@ export default function App() {
         .then(r => r.json())
         .then(data => {
           if (data.success && data.user) {
-            setCurrentUser(data.user);
-            localStorage.setItem('tiffinlink_user', JSON.stringify(data.user));
+            const activeRole = localStorage.getItem('tiffinlink_user_role') || getCookie('tiffinlink_role') || currentUser.role;
+            const updatedUser = { ...data.user, role: activeRole || data.user.role };
+            setCurrentUser(updatedUser);
+            saveUserSession(updatedUser);
           }
         })
         .catch(err => console.error('Failed to sync profile from MongoDB:', err));
@@ -65,14 +74,19 @@ export default function App() {
 
   const handleLoginSuccess = (userObj) => {
     setCurrentUser(userObj);
-    localStorage.setItem('tiffinlink_user', JSON.stringify(userObj));
+    saveUserSession(userObj);
+    if (userObj.role === 'delivery') {
+      window.location.hash = '#delivery';
+    } else if (userObj.role === 'provider') {
+      window.location.hash = '#provider';
+    }
     showToastNotification(`Welcome back, ${userObj.name || userObj.email}! Signed in successfully.`);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('tiffinlink_user');
     clearAuthTokens();
+    window.location.hash = '';
     showToastNotification('You have been signed out.');
   };
 
@@ -87,18 +101,22 @@ export default function App() {
   const [activeCustomerOrderId, setActiveCustomerOrderId] = useState('');
   const [preloaderFinished, setPreloaderFinished] = useState(false);
 
-  // Simple state-based router using window.location.hash
+  // State-based router with session & cookies persistence
   const [view, setView] = useState(() => {
     const hash = window.location.hash;
-    if (hash === '#provider') return 'provider';
-    if (hash === '#delivery') return 'delivery';
+    const activeRole = localStorage.getItem('tiffinlink_user_role') || getCookie('tiffinlink_role');
+    if (hash === '#delivery' || activeRole === 'delivery' || currentUser?.role === 'delivery') return 'delivery';
+    if (hash === '#provider' || activeRole === 'provider' || currentUser?.role === 'provider') return 'provider';
     return 'home';
   });
 
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
-      const currentView = hash === '#provider' ? 'provider' : hash === '#delivery' ? 'delivery' : 'home';
+      const activeRole = localStorage.getItem('tiffinlink_user_role') || getCookie('tiffinlink_role');
+      let currentView = 'home';
+      if (hash === '#delivery' || activeRole === 'delivery') currentView = 'delivery';
+      else if (hash === '#provider' || activeRole === 'provider') currentView = 'provider';
       setView(currentView);
       window.scrollTo({ top: 0, behavior: 'instant' });
     };

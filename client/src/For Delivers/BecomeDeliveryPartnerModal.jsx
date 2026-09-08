@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { saveUserSession } from '../services/api';
 
 export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSuccess }) {
   // Initial state structure matching all form fields
@@ -302,6 +303,17 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
 
       // Clear draft on successful submission
       localStorage.removeItem('tiffinlink_delivery_partner_draft');
+
+      // Save delivery user session in cookies & localStorage
+      const deliveryUser = {
+        name: formData.fullName,
+        email: formData.email,
+        phone: formData.mobile,
+        role: 'delivery',
+        id: generatedId
+      };
+      saveUserSession(deliveryUser);
+      window.location.hash = '#delivery';
 
       if (onSubmitSuccess) {
         onSubmitSuccess();
