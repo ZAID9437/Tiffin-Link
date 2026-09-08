@@ -14,6 +14,8 @@ const {
   updateDriverLocation,
   getNearbyDrivers,
   getDeliveryMetrics,
+  getDriverDashboardData,
+  toggleDriverStatus,
   verifyOtp,
   retryDelivery,
   cancelDelivery
@@ -22,6 +24,9 @@ const {
 router.post('/', registerDelivery);
 router.get('/applications', getDeliveryApplications);
 router.post('/verify-status', updateVerificationStatus);
+router.get('/dashboard', getDriverDashboardData);
+router.get('/driver-dashboard', getDriverDashboardData);
+router.post('/status/toggle', toggleDriverStatus);
 router.get('/requests', protect, requireProvider, getDeliveryRequests);
 router.get('/metrics', protect, requireProvider, getDeliveryMetrics);
 router.post('/dispatch', protect, requireProvider, createDeliveryRequest);

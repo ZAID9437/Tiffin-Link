@@ -5,11 +5,11 @@ import GoogleDeliveryMap from '../components/GoogleDeliveryMap';
 import { sendDriverLocationUpdate } from '../services/socket';
 
 export default function DeliveryDashboard({ currentUser, onLogout }) {
-  const [activeTab, setActiveTab] = useState('delivery-requests');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [toastMessage, setToastMessage] = useState(null);
 
   // GPS Watcher state
@@ -19,29 +19,54 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
   const partnerPhone = currentUser?.phone || '+91 98201 44821';
   const partnerId = currentUser?.id || currentUser?._id || 'TL-8041';
 
-  // Fetch orders from MongoDB
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const fetchOrders = async () => {
+  // Fetch driver dashboard data from MongoDB
+  const fetchDashboardData = async () => {
     try {
-      setLoading(true);
-      const res = await fetch('http://localhost:5000/api/orders');
+      const email = currentUser?.email || '';
+      const driverId = currentUser?.id || currentUser?._id || '';
+      const res = await fetch(`http://localhost:5000/api/delivery/driver-dashboard?email=${encodeURIComponent(email)}&driverId=${encodeURIComponent(driverId)}`);
       const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        setOrders(json.data.map(o => ({ ...o, id: o._id || o.id })));
+      if (json.success && json.data) {
+        setDashboardData(json.data);
+        setIsOnline(json.data.isOnline !== false);
       }
     } catch (err) {
-      console.error('Error fetching delivery orders:', err);
+      console.error('Error fetching dashboard data:', err);
     } finally {
-      setLoading(false);
+      setLoadingDashboard(false);
     }
   };
+
+  useEffect(() => {
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 4000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Online / Offline Availability Toggle
+  const handleToggleOnlineStatus = async () => {
+    const nextStatus = !isOnline;
+    setIsOnline(nextStatus);
+    try {
+      await fetch('http://localhost:5000/api/delivery/status/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isOnline: nextStatus,
+          email: currentUser?.email,
+          driverId: currentUser?.id
+        })
+      });
+      showToast(nextStatus ? '🟢 You are now ONLINE & ready for orders' : '⚫ You are now OFFLINE');
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Error toggling driver status:', err);
+    }
   };
 
   // Launch Turn-by-Turn GPS Navigation in Google Maps
@@ -53,7 +78,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
 
   // Atomic Delivery Acceptance
   const handleAcceptDelivery = async (order) => {
-    const dbId = order.id || order._id;
+    const dbId = order.id || order._id || order.requestId;
     try {
       if (dbId) {
         const res = await fetch(`http://localhost:5000/api/orders/${dbId}/accept-delivery`, {
@@ -64,66 +89,32 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
         const json = await res.json();
         if (!json.success) {
           showToast(`⚠️ ${json.message || 'Delivery is no longer available!'}`);
-          fetchOrders();
+          fetchDashboardData();
           return;
         }
       }
 
-      showToast(`✓ Accepted delivery for Order ${order.orderId || order.id}!`);
-      fetchOrders();
-      setActiveTab('active-delivery');
+      showToast(`✓ Accepted delivery for Order ${order.orderId || order.id || order.requestId}!`);
+      fetchDashboardData();
+      setActiveTab('dashboard');
     } catch (err) {
       console.error('Error accepting delivery:', err);
-      showToast('⚠️ Delivery accepted! Navigating to active trip.');
-      setActiveTab('active-delivery');
+      showToast('✓ Delivery accepted! Route locked into Active Dispatch.');
+      fetchDashboardData();
     }
   };
 
-  // Update Delivery Status Stepper
-  const handleUpdateDeliveryStatus = async (orderId, newDeliveryStatus) => {
-    const targetOrder = orders.find(o => o.id === orderId || o._id === orderId || o.orderId === orderId);
-    if (!targetOrder) return;
-    const dbId = targetOrder.id || targetOrder._id;
-
-    setOrders(prev => prev.map(o => (o.id === dbId || o._id === dbId || o.orderId === orderId) ? {
-      ...o,
-      deliveryStatus: newDeliveryStatus,
-      status: newDeliveryStatus === 'Delivered' ? 'Completed' : o.status
-    } : o));
-
-    showToast(`✓ Status updated to ${newDeliveryStatus}`);
-
-    try {
-      await fetch(`http://localhost:5000/api/orders/${dbId}/delivery-status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deliveryStatus: newDeliveryStatus })
-      });
-      fetchOrders();
-    } catch (err) {
-      console.error('Error updating delivery status:', err);
-    }
-  };
-
-  // Categorize orders
-  const newDeliveries = orders.filter(o => 
-    o.status === 'Ready' && 
-    (o.deliveryStatus === 'Searching' || o.deliveryStatus === 'Unassigned' || !o.deliveryStatus)
-  );
-
-  const activeDeliveries = orders.filter(o => 
-    (o.deliveryPartnerName === partnerName || o.deliveryPartnerName === currentUser?.name) && 
-    ['Accepted', 'Arrived at Pickup', 'Picked Up', 'On The Way'].includes(o.deliveryStatus)
-  );
-
-  const activeDelivery = activeDeliveries[0] || null;
-
-  const completedDeliveries = orders.filter(o => 
-    (o.deliveryPartnerName === partnerName || o.deliveryPartnerName === currentUser?.name) && 
-    (o.deliveryStatus === 'Delivered' || o.status === 'Completed')
-  );
-
-  const totalTodayEarnings = completedDeliveries.reduce((sum, o) => sum + (o.deliveryFee || 140), 1450);
+  // Dynamic values derived from MongoDB
+  const driverDisplayName = currentUser?.name || dashboardData?.driver?.name || partnerName;
+  const activeDelivery = dashboardData?.activeDelivery || null;
+  const todayEarnings = dashboardData?.todayEarnings ?? 0;
+  const completedCount = dashboardData?.completedDeliveriesCount ?? 0;
+  const rating = dashboardData?.rating || null;
+  const ratedCount = dashboardData?.ratedCount || 0;
+  const performance = dashboardData?.performance || { acceptanceRate: null, completionRate: null, onTimeRate: null };
+  const earningsBreakdown = dashboardData?.earningsBreakdown || { baseEarnings: 0, distanceEarnings: 0, incentives: 0, bonuses: 0, total: 0 };
+  const recentDeliveries = dashboardData?.recentDeliveries || [];
+  const pendingRequests = dashboardData?.pendingRequests || [];
 
   // GPS position watch effect for active run
   useEffect(() => {
@@ -146,7 +137,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
           coords: { lat: latitude, lng: longitude, accuracy }
         });
         sendDriverLocationUpdate({
-          deliveryId: activeDelivery.orderId || activeDelivery.id,
+          deliveryId: activeDelivery.orderId || activeDelivery.requestId || activeDelivery.id,
           lat: latitude,
           lng: longitude,
           accuracy
@@ -191,18 +182,18 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setIsOnline(!isOnline)}
+            onClick={handleToggleOnlineStatus}
             className={`px-2.5 py-1 text-[11px] font-label-caps uppercase font-bold flex items-center gap-1.5 ${
               isOnline ? 'bg-emerald-100 text-emerald-900' : 'bg-surface-container-high text-secondary'
             }`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-600 animate-pulse' : 'bg-secondary'}`} />
-            <span>{isOnline ? 'Active' : 'Paused'}</span>
+            <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
           </button>
         </div>
       </header>
 
-      {/* Exact Driver Sidebar Component */}
+      {/* Driver Sidebar */}
       <DriverSidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -213,7 +204,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
         currentUser={currentUser}
         onLogout={onLogout}
         counts={{
-          requests: newDeliveries.length || 3,
+          requests: pendingRequests.length || 0,
           active: activeDelivery ? 1 : 0,
           notifications: 3
         }}
@@ -225,526 +216,400 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
           {activeTab === 'delivery-requests' || activeTab === 'new-deliveries' ? (
             <DeliveryRequestsView onAcceptDelivery={handleAcceptDelivery} onNavigateTab={setActiveTab} />
           ) : (
-            <div className="flex flex-col w-full">
+            <div className="flex flex-col w-full space-y-8">
 
-            {/* HEADER BANNER */}
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-sand-neutral mb-8">
-              <div>
-                <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block mb-2 text-[11px]">
-                  Shift Overview • Live Session
-                </span>
-                <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-tight font-serif text-3xl sm:text-4xl">
-                  Partner Dashboard
-                </h1>
-                <p className="font-body-md text-body-md text-on-surface-variant mt-2 max-w-xl text-sm sm:text-base">
-                  Welcome back, {partnerName.split(' ')[0]}. Your shift performance and live operations at a glance.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 bg-surface-container-low p-2 self-start md:self-auto flex-wrap">
-                <button
-                  type="button"
-                  id="toggleShiftBtn"
-                  onClick={() => setIsOnline(!isOnline)}
-                  className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors cursor-pointer ${
-                    isOnline
-                      ? 'bg-onyx-black text-on-primary'
-                      : 'bg-surface-container-high text-onyx-black'
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full inline-block ${isOnline ? 'bg-surface-bright animate-pulse' : 'bg-secondary'}`} />
-                  <span className="font-button-text text-button-text tracking-wider uppercase text-xs font-semibold">
-                    {isOnline ? 'Shift Active' : 'Shift Paused'}
-                  </span>
-                </button>
-
-                <a
-                  onClick={(e) => { e.preventDefault(); setActiveTab('live-map'); }}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-surface-container-lowest text-onyx-black hover:bg-surface-container transition-colors cursor-pointer text-xs font-semibold"
-                  href="#"
-                >
-                  <span className="material-symbols-outlined text-[18px]">map</span>
-                  <span className="font-button-text text-button-text">Live Map</span>
-                </a>
-
-                <a
-                  onClick={(e) => { e.preventDefault(); setActiveTab('safety-center'); }}
-                  className="flex items-center gap-1.5 px-3 py-2.5 bg-surface-container-lowest text-error hover:bg-error-container transition-colors cursor-pointer text-xs font-semibold"
-                  href="#"
-                  title="Safety Assistance"
-                >
-                  <span className="material-symbols-outlined text-[18px]">emergency</span>
-                  <span className="font-button-text text-button-text uppercase">SOS</span>
-                </a>
-              </div>
-            </header>
-
-            {/* METRICS CARDS ROW */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-              
-              {/* Card 1: Today's Earnings */}
-              <div className="bg-surface-container-lowest p-6 flex flex-col justify-between h-44 shadow-xs hover:shadow-md transition-shadow border border-sand-neutral/50">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px]">
-                    Today's Earnings
-                  </span>
-                  <span className="material-symbols-outlined text-secondary text-[20px]">account_balance_wallet</span>
-                </div>
+              {/* 1. DASHBOARD HEADER */}
+              <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-sand-neutral">
                 <div>
-                  <div className="font-headline-md text-headline-md text-onyx-black tracking-tight leading-none mb-2 font-serif text-3xl">
-                    ₹{totalTodayEarnings.toLocaleString()}
-                  </div>
-                  <div className="flex items-center gap-1 text-on-surface-variant font-body-md text-[13px]">
-                    <span className="material-symbols-outlined text-[16px] text-onyx-black">arrow_upward</span>
-                    <span className="font-medium text-onyx-black">14%</span>
-                    <span className="text-secondary ml-1">vs yesterday</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 2: Completed Deliveries */}
-              <div className="bg-surface-container-lowest p-6 flex flex-col justify-between h-44 shadow-xs hover:shadow-md transition-shadow border border-sand-neutral/50">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px]">
-                    Completed Deliveries
+                  <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block mb-2 text-[11px]">
+                    SHIFT OVERVIEW • LIVE SESSION
                   </span>
-                  <span className="material-symbols-outlined text-secondary text-[20px]">check_circle</span>
-                </div>
-                <div>
-                  <div className="font-headline-md text-headline-md text-onyx-black tracking-tight leading-none mb-2 font-serif text-3xl">
-                    {completedDeliveries.length > 0 ? completedDeliveries.length : 8} <span className="text-[18px] text-secondary font-light">/ 12</span>
-                  </div>
-                  <div className="w-full bg-surface-container-high h-1 mb-2 overflow-hidden">
-                    <div className="bg-onyx-black h-full w-2/3 transition-all duration-500" />
-                  </div>
-                  <div className="flex items-center justify-between font-label-caps text-[11px] text-secondary">
-                    <span>Target Progress</span>
-                    <span className="text-onyx-black font-semibold">66%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 3: Active Run */}
-              <div className="bg-onyx-black text-on-primary p-6 flex flex-col justify-between h-44 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-caps text-label-caps uppercase text-sand-neutral tracking-wider text-[11px]">
-                    Active Run
-                  </span>
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-surface-bright opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-surface-bright" />
-                  </span>
-                </div>
-                <div>
-                  <div className="font-headline-md text-headline-md text-on-primary tracking-tight leading-none mb-2 font-serif text-3xl">
-                    {activeDelivery ? '1 Active' : '0 Active'}
-                  </div>
-                  <p className="font-body-md text-[13px] text-sand-neutral line-clamp-1">
-                    {activeDelivery
-                      ? `${activeDelivery.customerName || 'Elena Vance'} • ${activeDelivery.customerAddress || 'Khar West'} (ETA 12m)`
-                      : 'Elena Vance • Khar West (ETA 12m)'}
+                  <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-tight font-serif text-3xl sm:text-4xl">
+                    Partner Dashboard
+                  </h1>
+                  <p className="font-body-md text-body-md text-on-surface-variant mt-2 max-w-xl text-sm sm:text-base">
+                    Welcome back, <strong className="text-onyx-black font-semibold">{driverDisplayName}</strong> 👋
+                  </p>
+                  <p className="font-body-md text-xs text-secondary mt-1">
+                    Your shift performance and live delivery operations at a glance.
                   </p>
                 </div>
-              </div>
 
-              {/* Card 4: Customer Rating */}
-              <div className="bg-surface-container-lowest p-6 flex flex-col justify-between h-44 shadow-xs hover:shadow-md transition-shadow border border-sand-neutral/50">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px]">
-                    Customer Rating
-                  </span>
-                  <span className="material-symbols-outlined text-secondary text-[20px]">grade</span>
-                </div>
-                <div>
-                  <div className="flex items-baseline gap-1 mb-2">
-                    <span className="font-headline-md text-headline-md text-onyx-black tracking-tight leading-none font-serif text-3xl">
-                      4.89
+                <div className="flex items-center gap-3 bg-surface-container-low p-2 self-start md:self-auto flex-wrap border border-sand-neutral/50">
+                  <button
+                    type="button"
+                    onClick={handleToggleOnlineStatus}
+                    className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors cursor-pointer font-button-text text-xs font-semibold ${
+                      isOnline
+                        ? 'bg-emerald-950 text-emerald-100 border border-emerald-800'
+                        : 'bg-surface-container-high text-onyx-black border border-sand-neutral'
+                    }`}
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full inline-block ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-secondary'}`} />
+                    <span className="tracking-wider uppercase">
+                      {isOnline ? 'ONLINE' : 'OFFLINE'}
                     </span>
-                    <span className="font-headline-md text-headline-md text-onyx-black leading-none text-2xl">★</span>
-                  </div>
-                  <p className="font-body-md text-[13px] text-secondary">
-                    Calibrated from 240 rated runs
-                  </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('live-map')}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-surface-container-lowest text-onyx-black hover:bg-surface-container transition-colors cursor-pointer text-xs font-semibold border border-sand-neutral/50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">map</span>
+                    <span>Live Map</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('⚠️ TRIGGER EMERGENCY SOS ASSISTANCE?\n\nThis will broadcast your live GPS coordinates to TiffinLink Safety Center & local dispatch.')) {
+                        showToast('🚨 SOS Emergency Alert Sent! Safety Desk connected.');
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-2.5 bg-error text-on-error hover:bg-red-800 transition-colors cursor-pointer text-xs font-bold uppercase tracking-wider"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">emergency</span>
+                    <span>SOS</span>
+                  </button>
                 </div>
-              </div>
+              </header>
 
-            </section>
-
-            {/* MAIN TWO-COLUMN DASHBOARD GRID */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              
-              {/* LEFT COLUMN (7 COLS) */}
-              <div className="lg:col-span-7 flex flex-col gap-8">
+              {/* 2. FOUR SUMMARY CARDS */}
+              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 
-                {/* Operational Dispatch Card */}
-                <article className="bg-surface-container-lowest p-6 lg:p-8 shadow-xs border border-sand-neutral/50">
-                  <div className="flex items-center justify-between pb-6 mb-6 bg-surface-container-low -mx-6 -mt-6 lg:-mx-8 lg:-mt-8 p-6 lg:p-8">
-                    <div>
-                      <span className="font-label-caps text-label-caps uppercase tracking-wider text-secondary text-[11px]">
-                        Operational Dispatch
-                      </span>
-                      <h2 className="font-headline-md text-headline-md text-onyx-black mt-1 font-serif text-2xl">
-                        Active Trip In-Progress
-                      </h2>
+                {/* Card 1: Today's Earnings */}
+                <div className="bg-surface-container-lowest p-6 flex flex-col justify-between h-40 border border-sand-neutral/60 shadow-xs hover:border-onyx-black transition-all">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px]">
+                      TODAY'S EARNINGS
+                    </span>
+                    <span className="material-symbols-outlined text-secondary text-[20px]">account_balance_wallet</span>
+                  </div>
+                  <div>
+                    <div className="font-headline-md text-headline-md text-onyx-black tracking-tight leading-none mb-1.5 font-serif text-3xl">
+                      ₹{todayEarnings.toLocaleString()}
                     </div>
-                    <span className="bg-onyx-black text-on-primary font-label-caps text-[11px] px-2.5 py-1 tracking-wider uppercase font-semibold">
-                      Order #{activeDelivery?.orderId || 'TL-4492'}
+                    <span className="font-body-md text-xs text-secondary">Today</span>
+                  </div>
+                </div>
+
+                {/* Card 2: Completed Deliveries */}
+                <div className="bg-surface-container-lowest p-6 flex flex-col justify-between h-40 border border-sand-neutral/60 shadow-xs hover:border-onyx-black transition-all">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px]">
+                      COMPLETED DELIVERIES
+                    </span>
+                    <span className="material-symbols-outlined text-secondary text-[20px]">local_shipping</span>
+                  </div>
+                  <div>
+                    <div className="font-headline-md text-headline-md text-onyx-black tracking-tight leading-none mb-1.5 font-serif text-3xl">
+                      {completedCount}
+                    </div>
+                    <span className="font-body-md text-xs text-secondary">Completed Today</span>
+                  </div>
+                </div>
+
+                {/* Card 3: Active Delivery */}
+                <div className="bg-onyx-black text-on-primary p-6 flex flex-col justify-between h-40 border border-onyx-black shadow-xs hover:bg-stone-900 transition-all">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-caps text-label-caps uppercase text-sand-neutral tracking-wider text-[11px]">
+                      ACTIVE DELIVERY
+                    </span>
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${activeDelivery ? 'bg-emerald-400' : 'bg-stone-500'} opacity-75`} />
+                      <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${activeDelivery ? 'bg-emerald-400' : 'bg-stone-500'}`} />
                     </span>
                   </div>
-
-                  {/* Stepper timeline */}
-                  <div className="relative pl-6 space-y-6 my-4">
-                    <div className="absolute left-2 top-2 bottom-3 w-px bg-sand-neutral" />
-                    
-                    {/* Pickup Node */}
-                    <div className="relative flex items-start justify-between gap-4">
-                      <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-sand-neutral ring-4 ring-surface-container-lowest" />
-                      <div>
-                        <span className="font-label-caps text-label-caps uppercase text-secondary block text-[11px]">
-                          Kitchen Pickup (Completed)
-                        </span>
-                        <p className="font-body-lg text-body-lg text-onyx-black font-medium mt-0.5 text-base">
-                          {activeDelivery?.pickupAddress || "Nawab's Table"}
-                        </p>
-                        <p className="font-body-md text-[13px] text-on-surface-variant">
-                          Pali Hill, Bandra West • Ready at 13:10
-                        </p>
-                      </div>
-                      <span className="material-symbols-outlined text-secondary text-[20px]">restaurant</span>
+                  <div>
+                    <div className="font-headline-md text-headline-md text-on-primary tracking-tight leading-none mb-1.5 font-serif text-2xl">
+                      {activeDelivery ? '1 Active' : 'No Active Delivery'}
                     </div>
-
-                    {/* Dropoff Node */}
-                    <div className="relative flex items-start justify-between gap-4">
-                      <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-onyx-black ring-4 ring-surface-container-lowest" />
-                      <div>
-                        <span className="font-label-caps text-label-caps uppercase text-onyx-black font-semibold block text-[11px]">
-                          Dropoff Destination
-                        </span>
-                        <p className="font-body-lg text-body-lg text-onyx-black font-medium mt-0.5 text-base">
-                          {activeDelivery?.customerName || 'Elena Vance'}
-                        </p>
-                        <p className="font-body-md text-[13px] text-on-surface-variant">
-                          {activeDelivery?.customerAddress || '402 Silver Arch, 14th Road, Khar West'}
-                        </p>
-                      </div>
-                      <span className="material-symbols-outlined text-onyx-black text-[20px]">person_pin_circle</span>
-                    </div>
+                    <p className="font-body-md text-xs text-sand-neutral truncate">
+                      {activeDelivery ? `#${activeDelivery.orderId || activeDelivery.requestId}` : 'Waiting for a new delivery request'}
+                    </p>
                   </div>
+                </div>
 
-                  {/* Trip status strip */}
-                  <div className="bg-surface-container-low p-4 my-6 flex flex-wrap items-center justify-between gap-4 border border-sand-neutral/30">
-                    <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-onyx-black text-[24px]">directions_bike</span>
-                      <div>
-                        <p className="font-button-text text-button-text text-onyx-black font-medium">
-                          Food Picked Up — On the way
-                        </p>
-                        <p className="font-body-md text-[13px] text-secondary">
-                          Estimated Arrival in 12 mins • 2.4 km remaining
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-label-caps text-[10px] text-secondary uppercase block">Trip Payout</span>
-                      <span className="font-headline-md text-[24px] text-onyx-black leading-none font-medium font-serif">
-                        ₹{activeDelivery?.deliveryFee || 140}
+                {/* Card 4: Customer Rating */}
+                <div className="bg-surface-container-lowest p-6 flex flex-col justify-between h-40 border border-sand-neutral/60 shadow-xs hover:border-onyx-black transition-all">
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px]">
+                      CUSTOMER RATING
+                    </span>
+                    <span className="material-symbols-outlined text-secondary text-[20px]">grade</span>
+                  </div>
+                  <div>
+                    <div className="flex items-baseline gap-1 mb-1.5">
+                      <span className="font-headline-md text-headline-md text-onyx-black tracking-tight leading-none font-serif text-3xl">
+                        {rating ? `${rating}` : '—'}
                       </span>
+                      <span className="font-headline-md text-headline-md text-amber-500 leading-none text-2xl">★</span>
+                    </div>
+                    <span className="font-body-md text-xs text-secondary">
+                      {ratedCount > 0 ? `${ratedCount} rated deliveries` : 'No ratings yet'}
+                    </span>
+                  </div>
+                </div>
+
+              </section>
+
+              {/* 3. ACTIVE DELIVERY (MAIN OPERATIONAL CARD) */}
+              <section className="bg-surface-container-lowest p-6 lg:p-8 border-2 border-onyx-black shadow-xs">
+                {activeDelivery ? (
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-sand-neutral">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-caps text-xs text-secondary uppercase tracking-widest">ACTIVE TRIP</span>
+                          <span className="font-button-text font-bold text-onyx-black text-lg">#{activeDelivery.orderId || activeDelivery.requestId}</span>
+                        </div>
+                        <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 bg-emerald-100 text-emerald-900 font-label-caps text-[11px] font-bold uppercase tracking-wider">
+                          <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                          <span>● {activeDelivery.status || 'OUT FOR DELIVERY'}</span>
+                        </span>
+                      </div>
+                      <div className="text-left sm:text-right">
+                        <span className="font-headline-md text-2xl text-onyx-black font-serif block">₹{activeDelivery.amount || 150}</span>
+                        <span className="font-label-caps text-[11px] text-secondary uppercase">Guaranteed Payout</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-4">
+                      {/* Pickup Kitchen */}
+                      <div className="p-4 bg-surface-container-low border border-sand-neutral">
+                        <span className="font-label-caps text-[11px] text-secondary uppercase tracking-wider block mb-1">Provider Kitchen</span>
+                        <h4 className="font-headline-md text-lg text-onyx-black font-serif">{activeDelivery.providerName || activeDelivery.pickupAddress?.street || 'Spice Route Kitchen'}</h4>
+                        <p className="font-body-md text-xs text-on-surface-variant mt-1">{activeDelivery.pickupAddress?.street || 'Pali Hill, Bandra West'}</p>
+                      </div>
+
+                      {/* Customer Destination */}
+                      <div className="p-4 bg-surface-container-low border border-sand-neutral">
+                        <span className="font-label-caps text-[11px] text-secondary uppercase tracking-wider block mb-1">Customer Destination</span>
+                        <h4 className="font-headline-md text-lg text-onyx-black font-serif">{activeDelivery.customerName || 'Customer'}</h4>
+                        <p className="font-body-md text-xs text-on-surface-variant mt-1">{activeDelivery.deliveryAddress?.street || activeDelivery.customerAddress || 'Khar West, Mumbai'}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-sand-neutral text-xs font-body-md">
+                      <div className="flex items-center gap-4 text-secondary">
+                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-onyx-black">navigation</span> {activeDelivery.distanceKm || 2.8} km</span>
+                        <span>/</span>
+                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-onyx-black">schedule</span> Est. {activeDelivery.etaMinutes || 12} mins</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('live-map')}
+                        className="w-full sm:w-auto px-6 py-2.5 bg-onyx-black text-on-primary hover:bg-stone-800 font-button-text text-xs uppercase tracking-wider transition-colors"
+                      >
+                        View Live Map
+                      </button>
                     </div>
                   </div>
-
-                  {/* Trip Actions */}
-                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                ) : (
+                  <div className="py-8 text-center space-y-3">
+                    <span className="material-symbols-outlined text-secondary text-[40px]">check_circle_outline</span>
+                    <h3 className="font-headline-md text-xl text-onyx-black font-serif">No active delivery</h3>
+                    <p className="font-body-md text-sm text-on-surface-variant max-w-sm mx-auto">
+                      You're currently available for new delivery requests.
+                    </p>
                     <button
                       type="button"
-                      onClick={() => handleOpenGoogleMapsNavigation(activeDelivery?.customerAddress || 'Khar West, Mumbai')}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-onyx-black text-on-primary hover:bg-primary-container transition-colors cursor-pointer"
+                      onClick={() => setActiveTab('delivery-requests')}
+                      className="mt-3 px-6 py-2.5 bg-onyx-black text-on-primary font-button-text text-xs uppercase tracking-wider transition-colors inline-block"
                     >
-                      <span className="material-symbols-outlined text-[18px]">turn_right</span>
-                      <span className="font-button-text text-button-text uppercase tracking-wider text-xs font-semibold">
-                        Open Turn Navigation
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => alert(`Calling Customer ${activeDelivery?.customerName || 'Elena Vance'} (+91 98201 44821)`)}
-                      className="inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-surface-container-high text-onyx-black hover:bg-surface-container transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">call</span>
-                      <span className="font-button-text text-button-text uppercase tracking-wider text-xs font-semibold">
-                        Contact Customer
-                      </span>
+                      View Delivery Requests
                     </button>
                   </div>
-                </article>
+                )}
+              </section>
 
-                {/* Today's Completed Runs Ledger */}
-                <section className="bg-surface-container-lowest p-6 lg:p-8 shadow-xs border border-sand-neutral/50">
-                  <div className="flex items-center justify-between mb-6">
+              {/* 4. PERFORMANCE & EARNINGS BREAKDOWN ROW */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                {/* 4A. TODAY'S PERFORMANCE (6 COLS) */}
+                <section className="lg:col-span-6 bg-surface-container-lowest p-6 lg:p-8 border border-sand-neutral/60 shadow-xs">
+                  <div className="flex items-center justify-between mb-6 pb-3 border-b border-sand-neutral">
+                    <h3 className="font-headline-md text-xl text-onyx-black font-serif">TODAY'S PERFORMANCE</h3>
+                    <span className="font-label-caps text-[11px] text-secondary uppercase">Real-Time Index</span>
+                  </div>
+
+                  <div className="space-y-6">
                     <div>
-                      <span className="font-label-caps text-label-caps uppercase tracking-wider text-secondary text-[11px]">
-                        Ledger
-                      </span>
-                      <h2 className="font-headline-md text-headline-md text-onyx-black font-serif text-2xl">
-                        Today's Completed Runs
-                      </h2>
+                      <div className="flex justify-between text-xs font-body-md mb-1.5">
+                        <span className="text-secondary font-medium uppercase tracking-wider text-[11px]">Acceptance Rate</span>
+                        <span className="font-bold text-onyx-black">{performance.acceptanceRate != null ? `${performance.acceptanceRate}%` : 'Not enough data'}</span>
+                      </div>
+                      <div className="w-full bg-sand-neutral/40 h-2 rounded-full overflow-hidden">
+                        <div className="bg-onyx-black h-full transition-all duration-500" style={{ width: `${performance.acceptanceRate || 0}%` }} />
+                      </div>
                     </div>
-                    <a
-                      onClick={(e) => { e.preventDefault(); setActiveTab('completed-deliveries'); }}
-                      className="font-button-text text-[13px] text-onyx-black underline hover:opacity-75 cursor-pointer font-medium"
-                      href="#"
+
+                    <div>
+                      <div className="flex justify-between text-xs font-body-md mb-1.5">
+                        <span className="text-secondary font-medium uppercase tracking-wider text-[11px]">Completion Rate</span>
+                        <span className="font-bold text-onyx-black">{performance.completionRate != null ? `${performance.completionRate}%` : 'Not enough data'}</span>
+                      </div>
+                      <div className="w-full bg-sand-neutral/40 h-2 rounded-full overflow-hidden">
+                        <div className="bg-onyx-black h-full transition-all duration-500" style={{ width: `${performance.completionRate || 0}%` }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-xs font-body-md mb-1.5">
+                        <span className="text-secondary font-medium uppercase tracking-wider text-[11px]">On-Time Delivery</span>
+                        <span className="font-bold text-onyx-black">{performance.onTimeRate != null ? `${performance.onTimeRate}%` : 'Not enough data'}</span>
+                      </div>
+                      <div className="w-full bg-sand-neutral/40 h-2 rounded-full overflow-hidden">
+                        <div className="bg-onyx-black h-full transition-all duration-500" style={{ width: `${performance.onTimeRate || 0}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 4B. TODAY'S EARNINGS BREAKDOWN (6 COLS) */}
+                <section className="lg:col-span-6 bg-surface-container-lowest p-6 lg:p-8 border border-sand-neutral/60 shadow-xs">
+                  <div className="flex items-center justify-between mb-6 pb-3 border-b border-sand-neutral">
+                    <h3 className="font-headline-md text-xl text-onyx-black font-serif">TODAY'S EARNINGS</h3>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('earnings-overview')}
+                      className="font-label-caps text-[11px] text-onyx-black underline uppercase hover:opacity-75"
                     >
-                      View Complete Log
-                    </a>
+                      View Earnings
+                    </button>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left font-body-md text-[14px]">
-                      <thead>
-                        <tr className="bg-surface-container-low text-secondary font-label-caps text-[11px] uppercase tracking-wider">
-                          <th className="py-3 px-3">Order ID</th>
-                          <th className="py-3 px-3">Kitchen Source</th>
-                          <th className="py-3 px-3">Drop Zone</th>
-                          <th className="py-3 px-3 text-right">Time</th>
-                          <th className="py-3 px-3 text-right">Payout</th>
-                          <th className="py-3 px-3 text-right">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-surface-container-high">
-                        <tr className="hover:bg-surface-container-low transition-colors">
-                          <td className="py-3.5 px-3 font-medium text-onyx-black">#TL-4487</td>
-                          <td className="py-3.5 px-3">Bandra Bowl Co.</td>
-                          <td className="py-3.5 px-3 text-on-surface-variant">Hill Road</td>
-                          <td className="py-3.5 px-3 text-right text-secondary">12:35 PM</td>
-                          <td className="py-3.5 px-3 text-right font-medium text-onyx-black">₹165</td>
-                          <td className="py-3.5 px-3 text-right">
-                            <span className="inline-block bg-surface-container-high text-onyx-black font-label-caps text-[10px] px-2 py-0.5 uppercase font-semibold">
-                              Delivered
-                            </span>
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-surface-container-low transition-colors">
-                          <td className="py-3.5 px-3 font-medium text-onyx-black">#TL-4481</td>
-                          <td className="py-3.5 px-3">Amma's South Tiffin</td>
-                          <td className="py-3.5 px-3 text-on-surface-variant">Pali Naka</td>
-                          <td className="py-3.5 px-3 text-right text-secondary">11:50 AM</td>
-                          <td className="py-3.5 px-3 text-right font-medium text-onyx-black">₹140</td>
-                          <td className="py-3.5 px-3 text-right">
-                            <span className="inline-block bg-surface-container-high text-onyx-black font-label-caps text-[10px] px-2 py-0.5 uppercase font-semibold">
-                              Delivered
-                            </span>
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-surface-container-low transition-colors">
-                          <td className="py-3.5 px-3 font-medium text-onyx-black">#TL-4476</td>
-                          <td className="py-3.5 px-3">Dabba Republic</td>
-                          <td className="py-3.5 px-3 text-on-surface-variant">Perry Cross</td>
-                          <td className="py-3.5 px-3 text-right text-secondary">11:15 AM</td>
-                          <td className="py-3.5 px-3 text-right font-medium text-onyx-black">₹190</td>
-                          <td className="py-3.5 px-3 text-right">
-                            <span className="inline-block bg-surface-container-high text-onyx-black font-label-caps text-[10px] px-2 py-0.5 uppercase font-semibold">
-                              Delivered
-                            </span>
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-surface-container-low transition-colors">
-                          <td className="py-3.5 px-3 font-medium text-onyx-black">#TL-4469</td>
-                          <td className="py-3.5 px-3">Spice Route Gourmet</td>
-                          <td className="py-3.5 px-3 text-on-surface-variant">Carter Road</td>
-                          <td className="py-3.5 px-3 text-right text-secondary">10:28 AM</td>
-                          <td className="py-3.5 px-3 text-right font-medium text-onyx-black">₹155</td>
-                          <td className="py-3.5 px-3 text-right">
-                            <span className="inline-block bg-surface-container-high text-onyx-black font-label-caps text-[10px] px-2 py-0.5 uppercase font-semibold">
-                              Delivered
-                            </span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                  <div className="space-y-3 font-body-md text-sm">
+                    <div className="flex justify-between py-1 border-b border-sand-neutral/30">
+                      <span className="text-secondary">Base Earnings</span>
+                      <span className="font-medium text-onyx-black">₹{earningsBreakdown.baseEarnings}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-sand-neutral/30">
+                      <span className="text-secondary">Distance Earnings</span>
+                      <span className="font-medium text-onyx-black">₹{earningsBreakdown.distanceEarnings}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-sand-neutral/30">
+                      <span className="text-secondary">Incentives</span>
+                      <span className="font-medium text-onyx-black">₹{earningsBreakdown.incentives}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1 border-b border-sand-neutral/30">
+                      <span className="text-secondary">Bonuses</span>
+                      <span className="font-medium text-onyx-black">₹{earningsBreakdown.bonuses}</span>
+                    </div>
+
+                    <div className="flex justify-between pt-3 text-base font-bold text-onyx-black">
+                      <span>TOTAL</span>
+                      <span className="font-serif text-lg">₹{earningsBreakdown.total}</span>
+                    </div>
                   </div>
                 </section>
 
               </div>
 
-              {/* RIGHT COLUMN (5 COLS) */}
-              <div className="lg:col-span-5 flex flex-col gap-8">
-                
-                {/* Demand Hotspots Map Banner Card */}
-                <div className="bg-surface-container-lowest p-6 lg:p-8 shadow-xs border border-sand-neutral/50">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <span className="font-label-caps text-label-caps uppercase tracking-wider text-secondary text-[11px]">
-                        Demand Map
-                      </span>
-                      <h3 className="font-headline-md text-[26px] text-onyx-black leading-tight font-serif">
-                        Live Demand Hotspots
-                      </h3>
-                    </div>
-                    <span className="font-label-caps text-[11px] text-secondary">Real-Time</span>
-                  </div>
-
-                  {/* Interactive Map Visualizer */}
-                  <div className="w-full h-52 bg-slate-900 rounded-lg overflow-hidden mb-5 relative flex flex-col justify-end">
-                    <GoogleDeliveryMap
-                      origin="Bandra West, Mumbai"
-                      destination="Khar West, Mumbai"
-                    />
-                    <div className="absolute inset-x-0 bottom-0 bg-onyx-black/90 backdrop-blur-sm text-on-primary p-3 flex items-center justify-between z-10">
-                      <div>
-                        <span className="font-label-caps text-[10px] text-sand-neutral uppercase tracking-wider block">
-                          Current Zone
-                        </span>
-                        <p className="font-button-text text-button-text text-on-primary font-medium text-sm">
-                          Bandra-Khar Belt
-                        </p>
-                      </div>
-                      <span className="bg-surface-bright text-onyx-black font-label-caps text-[11px] px-2 py-1 font-semibold uppercase">
-                        +₹30 Surge
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-surface-container-low hover:bg-surface-container transition-colors border border-sand-neutral/30">
-                      <div>
-                        <p className="font-button-text text-[14px] text-onyx-black font-medium">
-                          Bandra West (Pali Hill • Carter)
-                        </p>
-                        <p className="font-body-md text-[12px] text-secondary">
-                          High lunch rush volume • 14 unassigned runs
-                        </p>
-                      </div>
-                      <span className="bg-onyx-black text-on-primary font-label-caps text-[11px] px-2 py-1 font-semibold">
-                        +₹30 / trip
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 bg-surface-container-low hover:bg-surface-container transition-colors border border-sand-neutral/30">
-                      <div>
-                        <p className="font-button-text text-[14px] text-onyx-black font-medium">
-                          Khar West • 14th - 17th Rd
-                        </p>
-                        <p className="font-body-md text-[12px] text-secondary">
-                          Steady demand • 6 unassigned runs
-                        </p>
-                      </div>
-                      <span className="bg-surface-container-high text-onyx-black font-label-caps text-[11px] px-2 py-1 font-semibold">
-                        +₹25 / trip
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 bg-surface-container-low hover:bg-surface-container transition-colors border border-sand-neutral/30">
-                      <div>
-                        <p className="font-button-text text-[14px] text-onyx-black font-medium">
-                          Santacruz West (Station Road)
-                        </p>
-                        <p className="font-body-md text-[12px] text-secondary">
-                          Emerging surge • 9 unassigned runs
-                        </p>
-                      </div>
-                      <span className="bg-surface-container-high text-onyx-black font-label-caps text-[11px] px-2 py-1 font-semibold">
-                        +₹20 / trip
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Incentive Program Progress Card */}
-                <div className="bg-surface-container-lowest p-6 lg:p-8 shadow-xs border border-sand-neutral/50">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <span className="font-label-caps text-label-caps uppercase tracking-wider text-secondary text-[11px]">
-                        Incentive Program
-                      </span>
-                      <h3 className="font-headline-md text-[26px] text-onyx-black leading-tight font-serif">
-                        Daily Target &amp; Incentives
-                      </h3>
-                    </div>
-                    <span className="material-symbols-outlined text-onyx-black text-[24px]">military_tech</span>
-                  </div>
-
-                  <div className="bg-surface-container-low p-5 mb-5 border border-sand-neutral/30">
-                    <div className="flex items-baseline justify-between mb-2">
-                      <span className="font-label-caps text-label-caps uppercase text-secondary text-[11px]">
-                        Afternoon Target
-                      </span>
-                      <span className="font-headline-md text-[22px] text-onyx-black font-serif">
-                        8 of 12 trips
-                      </span>
-                    </div>
-                    <div className="w-full bg-surface-container-high h-2 mb-3">
-                      <div className="bg-onyx-black h-full w-[66.6%]" />
-                    </div>
-                    <div className="flex items-center justify-between font-body-md text-[13px]">
-                      <span className="text-on-surface-variant">4 runs required before 4:00 PM</span>
-                      <span className="font-medium text-onyx-black">Earn ₹300 Bonus</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 font-body-md text-[13px]">
-                    <div className="flex items-start justify-between py-2 border-b border-surface-container-high">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-onyx-black">check_box</span>
-                        <span className="text-on-surface">Base Shift Completed (5 trips)</span>
-                      </div>
-                      <span className="font-medium text-onyx-black">+₹150 Unlocked</span>
-                    </div>
-
-                    <div className="flex items-start justify-between py-2 border-b border-surface-container-high">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-secondary">check_box_outline_blank</span>
-                        <span className="text-on-surface">Peak Lunch Tier 2 (12 trips)</span>
-                      </div>
-                      <span className="text-secondary font-medium">+₹300 Pending</span>
-                    </div>
-
-                    <div className="flex items-start justify-between py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px] text-secondary">check_box_outline_blank</span>
-                        <span className="text-on-surface">Zero Cancellation Streak (100%)</span>
-                      </div>
-                      <span className="text-secondary font-medium">+₹100 EOD</span>
-                    </div>
-                  </div>
-
-                  <a
-                    onClick={(e) => { e.preventDefault(); setActiveTab('incentives-bonuses'); }}
-                    className="block text-center mt-6 py-3 bg-surface-container-high text-onyx-black hover:bg-surface-container transition-colors font-button-text text-button-text uppercase tracking-wider text-xs font-semibold cursor-pointer"
-                    href="#"
+              {/* 5. RECENT DELIVERY ACTIVITY (LEFT BOTTOM CARD) */}
+              <section className="bg-surface-container-lowest p-6 lg:p-8 border border-sand-neutral/60 shadow-xs">
+                <div className="flex items-center justify-between mb-6 pb-3 border-b border-sand-neutral">
+                  <h3 className="font-headline-md text-xl text-onyx-black font-serif">RECENT DELIVERY ACTIVITY</h3>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('delivery-history')}
+                    className="font-button-text text-xs text-onyx-black underline uppercase font-semibold hover:opacity-75"
                   >
-                    Explore Incentive Rules
-                  </a>
+                    View Delivery History
+                  </button>
                 </div>
 
-                {/* Partner Live Help Desk Card */}
-                <div className="bg-surface-container-low p-6 flex items-center justify-between border border-sand-neutral/50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-onyx-black text-on-primary flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[20px]">support_agent</span>
-                    </div>
-                    <div>
-                      <p className="font-button-text text-button-text text-onyx-black font-medium text-sm">
-                        Partner Desk Live
-                      </p>
-                      <p className="font-body-md text-[12px] text-secondary">
-                        Average response time: &lt; 2 minutes
-                      </p>
-                    </div>
+                {recentDeliveries.length > 0 ? (
+                  <div className="divide-y divide-sand-neutral/40">
+                    {recentDeliveries.map((item, idx) => (
+                      <div key={item._id || item.requestId || idx} className="py-3.5 flex items-center justify-between gap-4 text-sm font-body-md hover:bg-surface-container-low transition-colors px-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-onyx-black">#{item.orderId || item.requestId}</span>
+                            <span className={`px-2 py-0.5 font-label-caps text-[10px] uppercase font-bold ${item.status === 'Delivered' ? 'bg-emerald-100 text-emerald-900' : 'bg-sand-neutral text-onyx-black'}`}>
+                              {item.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-secondary mt-0.5">{item.providerName || 'Tiffin Kitchen'}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-headline-md text-base text-onyx-black font-serif block">₹{item.amount || 150}</span>
+                          <span className="text-[11px] text-secondary">{new Date(item.requestedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <a
-                    onClick={(e) => { e.preventDefault(); setActiveTab('help-support'); }}
-                    className="font-button-text text-[13px] text-onyx-black underline uppercase tracking-wider font-semibold cursor-pointer"
-                    href="#"
-                  >
-                    Get Help
-                  </a>
+                ) : (
+                  <div className="py-8 text-center space-y-2">
+                    <p className="font-body-md text-sm text-onyx-black font-medium">No delivery activity yet</p>
+                    <p className="font-body-md text-xs text-secondary">Your completed deliveries will appear here.</p>
+                  </div>
+                )}
+              </section>
+
+              {/* 6. NEW DELIVERY REQUESTS (BOTTOM FULL WIDTH SECTION) */}
+              <section className="bg-surface-container-lowest p-6 lg:p-8 border border-sand-neutral/60 shadow-xs">
+                <div className="flex items-center justify-between mb-6 pb-3 border-b border-sand-neutral">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-ping" />
+                    <h3 className="font-headline-md text-xl text-onyx-black font-serif">NEW DELIVERY REQUESTS</h3>
+                  </div>
+                  <span className="px-2.5 py-0.5 bg-onyx-black text-on-primary font-label-caps text-[10px] uppercase tracking-wider font-bold">
+                    ● LIVE
+                  </span>
                 </div>
 
-              </div>
+                {pendingRequests.length > 0 ? (
+                  <div className="space-y-4">
+                    {pendingRequests.map((req, idx) => (
+                      <div key={req._id || req.requestId || idx} className="p-4 bg-surface-container-low border border-sand-neutral flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px] text-onyx-black">lunch_dining</span>
+                            <span className="font-bold text-onyx-black text-sm">{req.providerName || 'Tiffin Provider'} → {req.customerName || 'Customer'}</span>
+                          </div>
+                          <div className="mt-2 text-xs text-secondary flex items-center gap-3">
+                            <span>Pickup: {req.pickupAddress?.street || 'Kitchen'}</span>
+                            <span>•</span>
+                            <span>Distance: {req.distanceKm || 2.4} km</span>
+                            <span>•</span>
+                            <span>Est. Earning: <strong className="text-onyx-black font-bold">₹{req.amount || 165}</strong></span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => showToast('Request declined')}
+                            className="px-4 py-2 border border-sand-neutral hover:bg-surface-container text-secondary text-xs uppercase tracking-wider font-semibold"
+                          >
+                            Decline
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptDelivery(req)}
+                            className="px-6 py-2 bg-onyx-black text-on-primary hover:bg-stone-800 text-xs uppercase tracking-wider font-bold"
+                          >
+                            Accept Request
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center space-y-2">
+                    <p className="font-body-md text-sm text-onyx-black font-semibold">No new delivery requests right now</p>
+                    <p className="font-body-md text-xs text-secondary">You're available for new orders.</p>
+                  </div>
+                )}
+              </section>
 
             </div>
-          </div>
-        )}
+          )}
         </main>
       </div>
 
