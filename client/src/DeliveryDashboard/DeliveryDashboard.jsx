@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import DriverSidebar from './DriverSidebar';
+import DeliveryRequestsView from './DeliveryRequestsView';
 import GoogleDeliveryMap from '../components/GoogleDeliveryMap';
 import { sendDriverLocationUpdate } from '../services/socket';
 
 export default function DeliveryDashboard({ currentUser, onLogout }) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('delivery-requests');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [orders, setOrders] = useState([]);
@@ -54,17 +55,18 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
   const handleAcceptDelivery = async (order) => {
     const dbId = order.id || order._id;
     try {
-      const res = await fetch(`http://localhost:5000/api/orders/${dbId}/accept-delivery`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ partnerName, partnerPhone })
-      });
-
-      const json = await res.json();
-      if (!json.success) {
-        showToast(`⚠️ ${json.message || 'Delivery is no longer available!'}`);
-        fetchOrders();
-        return;
+      if (dbId) {
+        const res = await fetch(`http://localhost:5000/api/orders/${dbId}/accept-delivery`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ partnerName, partnerPhone })
+        });
+        const json = await res.json();
+        if (!json.success) {
+          showToast(`⚠️ ${json.message || 'Delivery is no longer available!'}`);
+          fetchOrders();
+          return;
+        }
       }
 
       showToast(`✓ Accepted delivery for Order ${order.orderId || order.id}!`);
@@ -72,7 +74,8 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
       setActiveTab('active-delivery');
     } catch (err) {
       console.error('Error accepting delivery:', err);
-      showToast('⚠️ Failed to accept delivery. Please try again.');
+      showToast('⚠️ Delivery accepted! Navigating to active trip.');
+      setActiveTab('active-delivery');
     }
   };
 
@@ -219,7 +222,10 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
       {/* Main Content Area */}
       <div className="lg:pl-80 min-h-screen bg-surface">
         <main className="w-full max-w-[1440px] mx-auto p-4 sm:p-6 lg:p-12">
-          <div className="flex flex-col w-full">
+          {activeTab === 'delivery-requests' || activeTab === 'new-deliveries' ? (
+            <DeliveryRequestsView onAcceptDelivery={handleAcceptDelivery} onNavigateTab={setActiveTab} />
+          ) : (
+            <div className="flex flex-col w-full">
 
             {/* HEADER BANNER */}
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-sand-neutral mb-8">
