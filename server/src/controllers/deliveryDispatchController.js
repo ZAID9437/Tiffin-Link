@@ -725,26 +725,43 @@ const updateDeliveryStatus = async (req, res) => {
 // @route   POST /api/delivery/location
 const updateDriverLocation = async (req, res) => {
   try {
-    const { requestId, lat, lng } = req.body;
+    const { requestId, lat, lng, accuracy } = req.body;
 
     if (await isDbConnected()) {
       const request = await DeliveryRequest.findOneAndUpdate(
-        { $or: [{ requestId }, { _id: requestId }] },
-        { $set: { 'assignedDriver.location': { lat, lng } } },
+        { $or: [{ requestId }, { orderId: requestId }, { _id: requestId }] },
+        { $set: { 
+            'assignedDriver.location': { lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy || 0), updatedAt: new Date() },
+            driverLocation: { lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy || 0), updatedAt: new Date() }
+          }
+        },
         { new: true }
       );
+
+      try {
+        const { getIO } = require('../services/socketService');
+        const io = getIO();
+        const targetId = request?.requestId || request?.orderId || requestId;
+        io.to(`delivery:${targetId}`).emit('delivery:location:changed', {
+          deliveryId: targetId,
+          location: { lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy || 0), updatedAt: new Date() },
+          status: request?.status
+        });
+      } catch (socketErr) {
+        // Socket broadcast optional fallback
+      }
 
       return res.json({
         success: true,
         message: 'Driver location updated in real-time!',
-        location: { lat, lng }
+        location: { lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy || 0) }
       });
     }
 
     return res.json({
       success: true,
       message: 'Driver location updated in real-time!',
-      location: { lat, lng }
+      location: { lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy || 0) }
     });
   } catch (error) {
     console.error('Error updating driver location:', error);

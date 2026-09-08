@@ -56,7 +56,9 @@ const protect = async (req, res, next) => {
 
       return next();
     } catch (error) {
-      console.error('JWT Authentication Error:', error.message);
+      if (error.name !== 'TokenExpiredError') {
+        console.error('JWT Authentication Error:', error.message);
+      }
     }
   }
 

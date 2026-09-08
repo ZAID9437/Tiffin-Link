@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect, requireProvider } = require('../middleware/authMiddleware');
-const { registerDelivery } = require('../controllers/deliveryController');
+const { registerDelivery, getDeliveryApplications, updateVerificationStatus } = require('../controllers/deliveryController');
 const {
   getDeliveryRequests,
   createDeliveryRequest,
@@ -20,6 +20,8 @@ const {
 } = require('../controllers/deliveryDispatchController');
 
 router.post('/', registerDelivery);
+router.get('/applications', getDeliveryApplications);
+router.post('/verify-status', updateVerificationStatus);
 router.get('/requests', protect, requireProvider, getDeliveryRequests);
 router.get('/metrics', protect, requireProvider, getDeliveryMetrics);
 router.post('/dispatch', protect, requireProvider, createDeliveryRequest);

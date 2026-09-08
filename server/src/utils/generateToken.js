@@ -4,7 +4,7 @@ const generateAccessToken = (userId, role) => {
   return jwt.sign(
     { userId, role },
     process.env.JWT_SECRET || 'tiffinlink_super_secret_jwt_access_key_2026',
-    { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
 };
 

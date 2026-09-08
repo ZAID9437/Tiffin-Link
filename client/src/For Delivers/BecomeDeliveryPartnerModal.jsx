@@ -235,7 +235,15 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
     if (!formData.zip || !formData.zip.trim()) missing.push("Pincode / ZIP");
 
     if (formData.vehicleType !== 'bicycle') {
-      if (!formData.licenseNumber || !formData.licenseNumber.trim()) missing.push("Driving License Number");
+      if (!formData.licenseNumber || !formData.licenseNumber.trim()) {
+        missing.push("Driving License Number");
+      } else {
+        // Indian Driving License format (e.g., GJ0120230001234)
+        const licenseRegex = /^[A-Z]{2}[0-9]{2}[ -]?[0-9]{11}$/i;
+        if (!licenseRegex.test(formData.licenseNumber.trim())) {
+          missing.push("Valid Indian Driving License (e.g. GJ0120230001234)");
+        }
+      }
       if (!formData.licenseCopy) missing.push("Upload Driving License Copy");
     }
 
@@ -260,18 +268,22 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
     setLoading(true);
 
     try {
-      // POST delivery partner data to backend
+      // POST all delivery partner form fields to MongoDB backend
+      let generatedId = `TL-${Math.floor(10000 + Math.random() * 90000)}-B`;
       try {
-        await fetch('http://localhost:5000/api/delivery', {
+        const res = await fetch('http://localhost:5000/api/delivery', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
+        const json = await res.json();
+        if (json.success && json.data?.applicationId) {
+          generatedId = json.data.applicationId;
+        }
       } catch (apiErr) {
         console.error("Delivery API save error:", apiErr);
       }
 
-      const generatedId = `TL-${Math.floor(10000 + Math.random() * 90000)}-B`;
       const date = new Date();
       date.setDate(date.getDate() + 2);
       const options = { month: 'short', day: 'numeric', year: 'numeric' };
@@ -307,9 +319,9 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
   const showLicense = formData.vehicleType !== 'bicycle';
 
   return (
-    <div className="fixed inset-0 z-[5000] bg-bone-white overflow-y-auto w-screen h-screen flex flex-col animate-fade-in text-onyx-black font-body-md selection:bg-sand-neutral selection:text-onyx-black">
+    <div className="fixed inset-0 z-[5000] bg-[#F5F3EF] overflow-y-auto w-screen h-screen flex flex-col animate-fade-in text-[#1A1A1A] font-body-md selection:bg-[#DED9D1] selection:text-[#1A1A1A]">
       
-      {/* Dynamic styles to match user HTML */}
+      {/* Dynamic styles */}
       <style>{`
         .font-headline-md { font-family: 'EB Garamond', serif; }
         .font-headline-lg { font-family: 'EB Garamond', serif; }
@@ -319,9 +331,9 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
         .font-button-text { font-family: 'Hanken Grotesk', sans-serif; }
 
         /* Minimalist Scrollbar */
-        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #F5F3EF; }
-        ::-webkit-scrollbar-thumb { background: #DED9D1; }
+        ::-webkit-scrollbar-thumb { background: #DED9D1; border-radius: 3px; }
 
         .reveal-section {
           opacity: 0;
@@ -345,11 +357,6 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
           box-shadow: none;
         }
 
-        .toggle-checkbox:checked {
-          right: 0px !important;
-          background-color: #1A1A1A !important;
-        }
-
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
@@ -359,7 +366,7 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
         }
 
         .reveal-up {
-          animation: revealUp 1s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+          animation: revealUp 0.8s cubic-bezier(0.19, 1, 0.22, 1) forwards;
           opacity: 0;
         }
         @keyframes revealUp {
@@ -370,92 +377,105 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
         .line-draw {
           stroke-dasharray: 1000;
           stroke-dashoffset: 1000;
-          animation: draw 2s ease-out forwards;
+          animation: draw 1.8s cubic-bezier(0.19, 1, 0.22, 1) forwards;
         }
         @keyframes draw {
           to { stroke-dashoffset: 0; }
         }
       `}</style>
 
-      {/* Website Navigation Header - Suppressed on Confirmation Screen */}
-      {!submitted && <Navbar forceSolid={true} isFormOpen={true} onCloseForm={onClose} />}
+      {/* Website Navigation Header */}
+      <Navbar forceSolid={true} isFormOpen={true} onCloseForm={onClose} />
 
       {submitted ? (
-        <main className="flex-grow flex items-center justify-center px-margin-mobile md:px-margin-desktop py-12 md:py-24 relative overflow-hidden w-full">
-          {/* Abstract Background Graphic (Architectural minimalist aesthetic) */}
-          <div className="absolute top-0 right-0 w-1/3 h-full bg-sand-neutral/20 z-0 hidden md:block"></div>
+        <main className="flex-grow flex items-center justify-center px-6 md:px-16 pt-28 md:pt-36 pb-16 relative w-full max-w-[1440px] mx-auto">
+          {/* Subtle Background Accent */}
+          <div className="absolute top-0 right-0 w-1/3 h-full bg-[#EBE7DF]/30 z-0 hidden md:block"></div>
           
-          <div className="w-full max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-gutter items-center relative z-10 pt-8 md:pt-16">
+          <div className="w-full grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-center relative z-10">
             
-            {/* Visual Section (Bento-inspired asymmetrical layout) */}
-            <div className="col-span-1 md:col-span-6 flex justify-center items-center mb-12 md:mb-0 reveal-up" style={{ animationDelay: '0.1s' }}>
-              <div className="relative w-full aspect-square max-w-[500px]">
-                {/* Minimalist Architectural Success Icon/Graphic */}
-                <div className="absolute inset-0 bg-surface-container-high overflow-hidden">
-                  <img 
-                    className="w-full h-full object-cover mix-blend-multiply opacity-30 select-none pointer-events-none" 
-                    alt="Minimalist architectural success graphic" 
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDzqM50qt6lhwb5lUS2ttdNUI1lcgPDWtoC_XQPZD9f6ZjNAC_D38LncKMbz23CaVIJqtl6BIJC0O00vR3WeS6opCEeC8MelEcaI3gSt0kxXm2T7zZ9l6o3unEbaPCjLYDy3KL6dsjFcW9c8KUQmd4Qe4ZbU18kCnzA9MEtSKa0TmUm6gj49WK3-OnP3c5SnInqAjXEraQhjht8MBIfCJTf2j86EW9PsqnikR-nN53VK7yOUiSS6DQh"
-                  />
-                </div>
-                {/* SVG Success Checkmark */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <svg className="w-1/2 h-1/2" fill="none" height="200" viewBox="0 0 200 200" width="200" xmlns="http://www.w3.org/2000/svg">
-                    <circle className="text-onyx-black/10" cx="100" cy="100" r="98" stroke="currentColor" strokeWidth="1"></circle>
-                    <path className="text-onyx-black line-draw" d="M60 105L85 130L145 70" stroke="currentColor" strokeLinecap="square" strokeWidth="2"></path>
+            {/* Visual Section */}
+            <div className="col-span-1 md:col-span-6 flex justify-center items-center mb-8 md:mb-0 reveal-up" style={{ animationDelay: '0.1s' }}>
+              <div className="relative w-full aspect-square max-w-[440px] rounded-2xl bg-gradient-to-br from-[#EBE7DF] to-[#DFD9CD] p-8 flex flex-col items-center justify-center shadow-lg border border-[#DED9D1]">
+                
+                {/* Clean Animated Checkmark Container */}
+                <div className="w-40 h-40 rounded-full bg-[#F5F3EF] flex items-center justify-center shadow-inner relative mb-6">
+                  <div className="absolute inset-0 rounded-full bg-emerald-500/10 animate-ping"></div>
+                  <svg className="w-24 h-24 text-[#1A1A1A]" fill="none" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <circle className="text-[#1A1A1A]/10" cx="100" cy="100" r="90" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="text-emerald-600 line-draw" d="M55 105L85 135L148 68" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="8"></path>
                   </svg>
                 </div>
-                {/* Floating Tonal Card (Overlapping depth) */}
-                <div className="absolute -bottom-8 -right-8 w-48 h-48 bg-onyx-black hidden md:block reveal-up" style={{ animationDelay: '0.4s' }}>
-                  <div className="p-6 flex flex-col justify-end h-full">
-                    <p className="font-label-caps text-label-caps text-bone-white text-[10px] tracking-widest">STATUS</p>
-                    <p className="font-body-md text-body-md text-bone-white/60">VERIFIED PENDING</p>
+
+                <div className="text-center">
+                  <span className="font-label-caps text-xs tracking-widest text-[#8C7A6B] block mb-1">TIFFINLINK LOGISTICS</span>
+                  <h3 className="font-headline-md text-xl text-[#1A1A1A]">Partner Verification System</h3>
+                </div>
+
+                {/* Floating Tonal Card */}
+                <div className="absolute -bottom-6 -right-4 w-60 bg-[#1A1A1A] p-5 rounded-xl text-white shadow-2xl reveal-up hidden sm:block" style={{ animationDelay: '0.4s' }}>
+                  <p className="font-label-caps text-[10px] tracking-widest text-white/50 mb-2">VERIFICATION LOG</p>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]">check_circle</span>
+                    <p className="text-[12px] text-white font-medium">DOCUMENTS RECEIVED</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-400 text-[16px]">verified</span>
+                    <p className="text-[12px] text-emerald-400 font-bold">VERIFICATION SUCCESS</p>
                   </div>
                 </div>
+
               </div>
             </div>
             
             {/* Content Section */}
-            <div className="col-span-1 md:col-span-5 md:col-start-8">
+            <div className="col-span-1 md:col-span-6 md:pl-6">
               <header className="reveal-up" style={{ animationDelay: '0.2s' }}>
-                <span className="font-label-caps text-label-caps text-clay-earth mb-4 block text-xs tracking-widest">SUCCESS</span>
-                <h1 className="font-headline-lg text-[36px] md:text-[48px] text-onyx-black mb-6 uppercase leading-tight font-headline-lg">
-                  Application Submitted Successfully
+                <span className="font-label-caps text-emerald-600 mb-3 tracking-widest font-bold flex items-center gap-2 text-xs">
+                  <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                  APPLICATION &amp; DOCUMENTS VERIFIED
+                </span>
+                <h1 className="font-headline-lg text-3xl sm:text-4xl md:text-5xl text-[#1A1A1A] mb-5 uppercase leading-tight font-bold">
+                  Registration Complete
                 </h1>
               </header>
+              
               <div className="reveal-up" style={{ animationDelay: '0.3s' }}>
-                <p className="font-body-lg text-body-lg text-secondary mb-12 max-w-md">
-                  Your application has been received. Our team will verify your documents and contact you within 24–48 hours. You can track your application status from your dashboard.
+                <p className="font-body-md text-[#555555] mb-8 leading-relaxed text-base max-w-lg">
+                  Your application and documents have been received and successfully verified in our system. You are officially registered as a TiffinLink Delivery Partner and can now start taking delivery orders!
                 </p>
-                <div className="flex flex-col sm:flex-row gap-gutter">
+
+                <div className="flex flex-wrap gap-4 mb-10">
                   <button 
                     onClick={onClose}
-                    className="bg-onyx-black text-white px-8 py-4 font-button-text text-button-text transition-transform active:scale-95 hover:opacity-90 duration-200"
+                    className="bg-[#1A1A1A] text-white px-8 py-4 rounded-lg font-button-text text-sm font-semibold tracking-wide transition-all active:scale-95 hover:bg-black shadow-md flex items-center gap-2"
                   >
-                    Go to Dashboard
+                    <span>Go to Dashboard</span>
+                    <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                   </button>
                   <button 
                     onClick={() => setSubmitted(false)}
-                    className="text-onyx-black font-button-text text-button-text py-4 border-b border-onyx-black/20 hover:border-onyx-black transition-all duration-300"
+                    className="text-[#1A1A1A] font-button-text text-sm font-semibold px-6 py-4 border-b-2 border-[#1A1A1A]/20 hover:border-[#1A1A1A] transition-all"
                   >
-                    Review Submission
+                    Review Submitted Form
                   </button>
                 </div>
               </div>
               
-              {/* Info List */}
-              <div className="mt-20 reveal-up border-t border-sand-neutral pt-8" style={{ animationDelay: '0.5s' }}>
-                <div className="grid grid-cols-2 gap-gutter">
+              {/* Reference Info Card */}
+              <div className="reveal-up border-t border-[#DED9D1] pt-6" style={{ animationDelay: '0.5s' }}>
+                <div className="grid grid-cols-2 gap-6 bg-[#EBE7DF]/40 p-4 rounded-lg border border-[#DED9D1]/60">
                   <div>
-                    <p className="font-label-caps text-label-caps text-clay-earth mb-2 text-[10px] tracking-widest">REFERENCE ID</p>
-                    <p className="font-body-md text-body-md font-semibold">{refId}</p>
+                    <p className="font-label-caps text-[#8C7A6B] text-[10px] tracking-widest mb-1">REFERENCE ID</p>
+                    <p className="font-mono text-sm font-bold text-[#1A1A1A]">{refId}</p>
                   </div>
                   <div>
-                    <p className="font-label-caps text-label-caps text-clay-earth mb-2 text-[10px] tracking-widest">EXPECTED BY</p>
-                    <p className="font-body-md text-body-md font-semibold">{expectedDate}</p>
+                    <p className="font-label-caps text-[#8C7A6B] text-[10px] tracking-widest mb-1">EXPECTED DISPATCH</p>
+                    <p className="font-mono text-sm font-bold text-emerald-700">IMMEDIATE / READY</p>
                   </div>
                 </div>
               </div>
+
             </div>
             
           </div>
@@ -643,8 +663,42 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
                       required
                     >
                       <option value="">Select State</option>
-                      <option value="ca">California</option>
-                      <option value="ny">New York</option>
+                      <option value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</option>
+                      <option value="Andhra Pradesh">Andhra Pradesh</option>
+                      <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+                      <option value="Assam">Assam</option>
+                      <option value="Bihar">Bihar</option>
+                      <option value="Chandigarh">Chandigarh</option>
+                      <option value="Chhattisgarh">Chhattisgarh</option>
+                      <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+                      <option value="Delhi (NCT)">Delhi (NCT)</option>
+                      <option value="Goa">Goa</option>
+                      <option value="Gujarat">Gujarat</option>
+                      <option value="Haryana">Haryana</option>
+                      <option value="Himachal Pradesh">Himachal Pradesh</option>
+                      <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+                      <option value="Jharkhand">Jharkhand</option>
+                      <option value="Karnataka">Karnataka</option>
+                      <option value="Kerala">Kerala</option>
+                      <option value="Ladakh">Ladakh</option>
+                      <option value="Lakshadweep">Lakshadweep</option>
+                      <option value="Madhya Pradesh">Madhya Pradesh</option>
+                      <option value="Maharashtra">Maharashtra</option>
+                      <option value="Manipur">Manipur</option>
+                      <option value="Meghalaya">Meghalaya</option>
+                      <option value="Mizoram">Mizoram</option>
+                      <option value="Nagaland">Nagaland</option>
+                      <option value="Odisha">Odisha</option>
+                      <option value="Puducherry">Puducherry</option>
+                      <option value="Punjab">Punjab</option>
+                      <option value="Rajasthan">Rajasthan</option>
+                      <option value="Sikkim">Sikkim</option>
+                      <option value="Tamil Nadu">Tamil Nadu</option>
+                      <option value="Telangana">Telangana</option>
+                      <option value="Tripura">Tripura</option>
+                      <option value="Uttar Pradesh">Uttar Pradesh</option>
+                      <option value="Uttarakhand">Uttarakhand</option>
+                      <option value="West Bengal">West Bengal</option>
                     </select>
                     <span className="material-symbols-outlined absolute right-2 bottom-2 text-secondary pointer-events-none select-none text-[18px]">keyboard_arrow_down</span>
                   </div>

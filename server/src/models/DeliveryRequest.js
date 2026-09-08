@@ -51,8 +51,16 @@ const deliveryRequestSchema = new mongoose.Schema({
     vehicleNo: { type: String, default: '' },
     location: {
       lat: { type: Number, default: 23.0280 },
-      lng: { type: Number, default: 72.5670 }
+      lng: { type: Number, default: 72.5670 },
+      accuracy: { type: Number, default: 0 },
+      updatedAt: { type: Date, default: Date.now }
     }
+  },
+  driverLocation: {
+    lat: { type: Number },
+    lng: { type: Number },
+    accuracy: { type: Number, default: 0 },
+    updatedAt: { type: Date }
   },
   status: {
     type: String,

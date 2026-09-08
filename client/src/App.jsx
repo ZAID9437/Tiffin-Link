@@ -34,6 +34,7 @@ import ScrollRopeIndicator from './components/ScrollRopeIndicator';
 import LoginModal from './components/LoginModal';
 import DemoModal from './components/DemoModal';
 import CookieConsentModal from './components/CookieConsentModal';
+import CustomerDeliveryTrackingModal from './components/CustomerDeliveryTrackingModal';
 
 import { clearAuthTokens } from './services/api';
 import { CheckCircle2 } from 'lucide-react';
@@ -81,6 +82,9 @@ export default function App() {
   const [isBecomeDeliveryPartnerModalOpen, setIsBecomeDeliveryPartnerModalOpen] = useState(false);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const [isCookieConsentModalOpen, setIsCookieConsentModalOpen] = useState(false);
+  const [isCustomerTrackingModalOpen, setIsCustomerTrackingModalOpen] = useState(false);
+  const [hasActiveOrder, setHasActiveOrder] = useState(false);
+  const [activeCustomerOrderId, setActiveCustomerOrderId] = useState('');
   const [preloaderFinished, setPreloaderFinished] = useState(false);
 
   // Simple state-based router using window.location.hash
@@ -102,9 +106,58 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Anti-debugging blocking removed to allow standard browser inspect and right-click
+  // Sync active order for logged-in Diner/Customer from MongoDB
   useEffect(() => {
-  }, []);
+    if (!currentUser || currentUser.role === 'provider' || currentUser.role === 'delivery') {
+      setHasActiveOrder(false);
+      setActiveCustomerOrderId('');
+      return;
+    }
+
+    const checkActiveOrder = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/delivery/requests');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.requests)) {
+          const userPhone = currentUser.phone ? currentUser.phone.replace(/[^\d]/g, '') : '';
+          const userEmail = (currentUser.email || '').toLowerCase();
+          const userName = (currentUser.name || '').toLowerCase();
+
+          const activeRequest = json.requests.find(r => {
+            const reqPhone = r.customerPhone ? r.customerPhone.replace(/[^\d]/g, '') : '';
+            const reqEmail = (r.customerEmail || r.providerEmail || '').toLowerCase();
+            const reqName = (r.customerName || '').toLowerCase();
+
+            const isMatch = (userPhone && reqPhone && reqPhone.endsWith(userPhone.slice(-8))) ||
+                            (userEmail && reqEmail === userEmail) ||
+                            (userName && reqName.includes(userName));
+
+            const isActiveStatus = !['Delivered', 'Cancelled', 'Failed'].includes(r.status);
+            return isMatch && isActiveStatus;
+          });
+
+          if (activeRequest) {
+            setHasActiveOrder(true);
+            setActiveCustomerOrderId(activeRequest.requestId || activeRequest.orderId || activeRequest._id);
+          } else {
+            const sessionPlaced = localStorage.getItem('tiffinlink_recent_order');
+            if (sessionPlaced) {
+              setHasActiveOrder(true);
+              setActiveCustomerOrderId(sessionPlaced);
+            } else {
+              setHasActiveOrder(false);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error checking active customer orders:', err);
+      }
+    };
+
+    checkActiveOrder();
+    const interval = setInterval(checkActiveOrder, 4000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   // Toast Notification state
   const [toast, setToast] = useState({
@@ -120,14 +173,18 @@ export default function App() {
       type
     });
 
-    // Auto hide after 4 seconds
     setTimeout(() => {
       setToast(prev => ({ ...prev, show: false }));
     }, 4000);
   };
 
-  const handleRequestSubmitSuccess = () => {
-    showToastNotification('Meal Request submitted successfully! Checking local home-chefs...');
+  const handleRequestSubmitSuccess = (newReqId) => {
+    setHasActiveOrder(true);
+    if (newReqId) {
+      setActiveCustomerOrderId(newReqId);
+      localStorage.setItem('tiffinlink_recent_order', newReqId);
+    }
+    showToastNotification('Meal Request submitted successfully! Active tracking is now available.');
   };
 
   const handleBecomeProviderSuccess = () => {
@@ -410,6 +467,8 @@ export default function App() {
         onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)} 
         onOpenBecomeDeliveryPartnerModal={() => setIsBecomeDeliveryPartnerModalOpen(true)}
         onOpenLogin={() => setIsLoginModalOpen(true)}
+        onOpenTrackingModal={() => setIsCustomerTrackingModalOpen(true)}
+        hasActiveOrder={hasActiveOrder}
         currentView={view}
         currentUser={currentUser}
         onLogout={handleLogout}
@@ -506,6 +565,12 @@ export default function App() {
       <CookieConsentModal 
         isOpenOverride={isCookieConsentModalOpen}
         onCloseOverride={() => setIsCookieConsentModalOpen(false)}
+      />
+
+      <CustomerDeliveryTrackingModal 
+        isOpen={isCustomerTrackingModalOpen}
+        onClose={() => setIsCustomerTrackingModalOpen(false)}
+        initialOrderId={activeCustomerOrderId}
       />
 
       {/* Toast Alerts */}

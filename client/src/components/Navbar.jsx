@@ -4,6 +4,8 @@ export default function Navbar({
   onOpenBecomeProviderModal, 
   onOpenBecomeDeliveryPartnerModal, 
   onOpenLogin, 
+  onOpenTrackingModal,
+  hasActiveOrder = false,
   currentView,
   forceSolid = false,
   isFormOpen = false,
@@ -150,7 +152,21 @@ export default function Navbar({
           );
         })}
       </div>
-      <div className="flex items-center gap-6 md:gap-8">
+      <div className="flex items-center gap-4 md:gap-6">
+        {/* Show Track Order button ONLY for authenticated Diner/Customer who has an active delivery order */}
+        {currentUser && (currentUser.role !== 'provider' && currentUser.role !== 'delivery') && hasActiveOrder && onOpenTrackingModal && (
+          <button 
+            onClick={onOpenTrackingModal}
+            className={`hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black transition-all cursor-pointer shadow-xs active:scale-95 ${
+              isScrolled || forceSolid 
+                ? 'bg-[#0A8B5F] text-white hover:bg-[#08734e]' 
+                : 'bg-[#0A8B5F] hover:bg-[#08734e] text-white border border-emerald-400/40'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
+            <span>📍 Track Order</span>
+          </button>
+        )}
         {currentUser ? (
           <div className="relative" ref={menuRef}>
             <button 
