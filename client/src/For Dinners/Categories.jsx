@@ -126,17 +126,11 @@ export default function Categories() {
 
       <div className="max-w-[1440px] mx-auto">
         
-        {/* Header Section */}
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <p className="font-label-caps text-label-caps text-secondary tracking-[0.2em] mb-3">
-            EXPLORE REGIONAL LEGACIES
-          </p>
-          <h2 className="font-headline-lg text-4xl md:text-5xl text-onyx-black mb-4">
-            Curated Ancestral Kitchens
-          </h2>
-          <p className="font-body-md text-secondary text-sm md:text-base italic leading-relaxed">
-            Skip the fast food. Experience slow-cooked heirloom recipes crafted in micro-batches by local home chefs.
-          </p>
+        {/* Section Header */}
+        <div className="text-center max-w-3xl mx-auto mb-12 md:mb-16 reveal-on-scroll">
+          <p className="font-label-caps text-xs md:text-label-caps text-secondary mb-4 tracking-[0.25em]">REGIONAL CULINARY HERITAGE</p>
+          <h2 className="font-headline-lg text-3xl sm:text-5xl md:text-headline-lg text-onyx-black mb-6">Artisanal Regional Tiffins</h2>
+          <div className="w-12 h-[2px] bg-clay-earth/40 mx-auto" />
         </div>
 
         {/* Regional Navigation Tabs */}
@@ -166,7 +160,7 @@ export default function Categories() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
           
           {/* Left Column: Premium Framing of Visual Image hanging from a rope */}
-          <div className="lg:col-span-5 flex flex-col items-center justify-start min-h-[460px] pt-4 overflow-hidden relative">
+          <div className="lg:col-span-5 flex flex-col items-center justify-start min-h-[380px] sm:min-h-[460px] pt-4 overflow-hidden relative">
             {/* Static Horizontal Support Bar / Brass Rod */}
             <div className="w-32 h-[3px] bg-gradient-to-r from-clay-earth via-sand-neutral to-clay-earth rounded z-20 shadow-sm mb-[-9px]" />
             
@@ -194,7 +188,7 @@ export default function Categories() {
               {/* Photo Frame Card */}
               <div 
                 ref={tiltRef}
-                className="relative w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96 rounded-2xl border border-clay-earth/25 p-4 bg-surface-bright shadow-[0_15px_45px_rgba(74,66,56,0.12)] group/img cursor-pointer transition-all duration-500 hover:shadow-[0_20px_50px_rgba(74,66,56,0.18)] animate-scale-in -mt-[1px]"
+                className="relative w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 rounded-2xl border border-clay-earth/25 p-4 bg-surface-bright shadow-[0_15px_45px_rgba(74,66,56,0.12)] group/img cursor-pointer transition-all duration-500 hover:shadow-[0_20px_50px_rgba(74,66,56,0.18)] animate-scale-in -mt-[1px]"
               >
                 {/* Luxury gold inset border */}
                 <div className="absolute inset-2 border border-clay-earth/10 pointer-events-none rounded-xl" />

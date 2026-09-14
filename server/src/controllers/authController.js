@@ -193,15 +193,8 @@ const login = async (req, res) => {
         accessToken,
         refreshToken
       });
-    } else {
-      return res.json({
-        success: true,
-        message: 'Logged in successfully (in-memory).',
-        user: { email, name: email.split('@')[0], role: 'customer' },
-        accessToken: 'mock_access_token',
-        refreshToken: 'mock_refresh_token'
-      });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error in login:', error);
     res.status(500).json({ success: false, message: 'Login failed. ' + error.message });
@@ -251,13 +244,8 @@ const refresh = async (req, res) => {
         refreshToken: newRefreshToken,
         user: formatUserPayload(user)
       });
-    } else {
-      return res.json({
-        success: true,
-        accessToken: 'new_mock_access_token',
-        refreshToken: 'new_mock_refresh_token'
-      });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error refreshing token:', error);
     res.status(500).json({ success: false, message: 'Token refresh failed' });
@@ -300,38 +288,15 @@ const logout = async (req, res) => {
 // @route   GET /api/auth/me
 const getMe = async (req, res) => {
   try {
-    if (req.user) {
-      return res.json({
-        success: true,
-        user: formatUserPayload(req.user),
-        source: 'database'
-      });
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    let { email } = req.query;
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Email parameter is required' });
-    }
-
-    email = email.trim().toLowerCase();
-
-    if (isDbConnected()) {
-      const user = await User.findOne({ email });
-      if (!user) {
-        return res.status(404).json({ success: false, message: 'User profile not found' });
-      }
-      return res.json({
-        success: true,
-        user: formatUserPayload(user),
-        source: 'database'
-      });
-    } else {
-      return res.json({
-        success: true,
-        user: { email, name: email.split('@')[0], role: 'customer' },
-        source: 'in-memory'
-      });
-    }
+    return res.json({
+      success: true,
+      user: formatUserPayload(req.user),
+      source: 'database'
+    });
   } catch (error) {
     console.error('Error fetching user profile:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch user profile' });
@@ -488,22 +453,8 @@ const verifyOtp = async (req, res) => {
         refreshToken,
         source: 'database'
       });
-    } else {
-      const record = otpStore.get(email);
-      if (!record || record.otp !== otp) {
-        return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
-      }
-      otpStore.delete(email);
-
-      return res.json({
-        success: true,
-        message: 'Access granted successfully.',
-        user: { email, name: email.split('@')[0], role: 'customer' },
-        accessToken: 'mock_access_token',
-        refreshToken: 'mock_refresh_token',
-        source: 'in-memory'
-      });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error verifying OTP:', error);
     res.status(500).json({ success: false, message: 'Server error during verification' });

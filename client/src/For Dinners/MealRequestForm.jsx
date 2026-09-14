@@ -100,15 +100,15 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
   };
 
   return (
-    <section className="pt-section-gap pb-12 px-margin-desktop bg-bone-white">
-      <div className="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-gutter">
+    <section className="pt-12 md:pt-section-gap pb-12 px-4 sm:px-6 md:px-margin-desktop bg-bone-white">
+      <div className="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-gutter">
         {/* Left column: Title and form */}
         <div className="md:col-span-5 reveal-on-scroll">
-          <p className="font-label-caps text-label-caps text-secondary mb-8">KITCHEN CONCIERGE</p>
-          <h2 className="font-headline-lg text-headline-lg mb-12">Design your dining experience.</h2>
+          <p className="font-label-caps text-xs md:text-label-caps text-secondary mb-4 md:mb-8">KITCHEN CONCIERGE</p>
+          <h2 className="font-headline-lg text-3xl sm:text-5xl md:text-headline-lg mb-8 md:mb-12">Design your dining experience.</h2>
           
-          <form onSubmit={handleSubmit} className="space-y-10">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-8">
+          <form onSubmit={handleSubmit} className="space-y-8 md:space-y-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-x-8 sm:gap-y-8">
               {/* MEAL TYPE */}
               <div ref={mealTypeRef} className="border-b border-sand-neutral pb-4 group relative">
                 <label className="font-label-caps text-label-caps text-secondary transition-colors">MEAL TYPE</label>

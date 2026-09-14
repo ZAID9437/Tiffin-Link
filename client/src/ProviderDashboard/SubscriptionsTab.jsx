@@ -27,10 +27,10 @@ import { apiRequest } from '../services/api';
 export default function SubscriptionsTab() {
   const [subscriptions, setSubscriptions] = useState([]);
   const [metrics, setMetrics] = useState({
-    activeCount: 42,
-    expiringSoonCount: 6,
-    pausedCount: 3,
-    monthlyRevenue: 24850
+    activeCount: 0,
+    expiringSoonCount: 0,
+    pausedCount: 0,
+    monthlyRevenue: 0
   });
   const [pagination, setPagination] = useState({
     total: 0,

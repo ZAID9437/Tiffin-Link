@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import DriverSidebar from './DriverSidebar';
 import DeliveryRequestsView from './DeliveryRequestsView';
+import ActiveDeliveryView from './ActiveDeliveryView';
+import UpcomingDeliveriesView from './UpcomingDeliveriesView';
+import CompletedDeliveriesView from './CompletedDeliveriesView';
+import DeliveryHistoryView from './DeliveryHistoryView';
+import LiveMapView from './LiveMapView';
+import RouteNavigationView from './RouteNavigationView';
 import GoogleDeliveryMap from '../components/GoogleDeliveryMap';
-import { sendDriverLocationUpdate } from '../services/socket';
+import { 
+  sendDriverLocationUpdate, 
+  joinDriverRoom, 
+  subscribeToDeliveryLifecycle, 
+  subscribeToEarnings 
+} from '../services/socket';
 
 const formatOrderRef = (ref) => {
   if (!ref) return '';
@@ -21,16 +32,31 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
   // GPS Watcher state
   const [gpsStatus, setGpsStatus] = useState({ status: 'INIT', message: '', coords: null });
 
-  const partnerName = currentUser?.name || 'Rajesh Kumar';
-  const partnerPhone = currentUser?.phone || '+91 98201 44821';
-  const partnerId = currentUser?.id || currentUser?._id || 'TL-8041';
+  // Retrieve saved session user if prop is loading during browser refresh
+  const savedUserStr = typeof window !== 'undefined' ? (localStorage.getItem('user') || localStorage.getItem('tiffinlink_user')) : null;
+  const savedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || '') : '';
+
+  const partnerName = currentUser?.fullName || currentUser?.name || savedUser?.fullName || savedUser?.name || 'Delivery Partner';
+  const partnerPhone = currentUser?.phone || savedUser?.phone || '';
+  const partnerId = currentUser?.id || currentUser?._id || savedUser?.id || savedUser?._id || '';
+
+  const driverDisplayName = dashboardData?.driverInfo?.name || partnerName;
 
   // Fetch driver dashboard data from MongoDB
   const fetchDashboardData = async () => {
     try {
-      const email = currentUser?.email || '';
-      const driverId = currentUser?.id || currentUser?._id || '';
-      const res = await fetch(`http://localhost:5000/api/delivery/driver-dashboard?email=${encodeURIComponent(email)}&driverId=${encodeURIComponent(driverId)}`);
+      const email = currentUser?.email || savedUser?.email || '';
+      const driverId = currentUser?.id || currentUser?._id || savedUser?.id || savedUser?._id || '';
+      const phone = currentUser?.phone || savedUser?.phone || '';
+
+      const activeToken = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || token;
+      const headers = { 'Content-Type': 'application/json' };
+      if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
+
+      const res = await fetch(`http://localhost:5000/api/delivery/driver-dashboard?email=${encodeURIComponent(email)}&driverId=${encodeURIComponent(driverId)}&phone=${encodeURIComponent(phone)}`, {
+        headers
+      });
       const json = await res.json();
       if (json.success && json.data) {
         setDashboardData(json.data);
@@ -45,8 +71,27 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
 
   useEffect(() => {
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 4000);
-    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  // Subscribe to real-time delivery lifecycle & earnings events
+  useEffect(() => {
+    if (currentUser?.id || currentUser?._id) {
+      joinDriverRoom(currentUser.id || currentUser._id);
+    }
+
+    const unsubscribeLifecycle = subscribeToDeliveryLifecycle({
+      onAssigned: () => fetchDashboardData(),
+      onStatusUpdate: () => fetchDashboardData(),
+      onPickup: () => fetchDashboardData(),
+      onCompleted: () => fetchDashboardData()
+    });
+
+    const unsubscribeEarnings = subscribeToEarnings(() => fetchDashboardData());
+
+    return () => {
+      unsubscribeLifecycle();
+      unsubscribeEarnings();
+    };
   }, [currentUser]);
 
   const showToast = (msg) => {
@@ -87,13 +132,14 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
     const dbId = order.id || order._id || order.requestId;
     try {
       if (dbId) {
-        const res = await fetch(`http://localhost:5000/api/orders/${dbId}/accept-delivery`, {
+        const encodedId = encodeURIComponent(dbId);
+        const res = await fetch(`http://localhost:5000/api/orders/${encodedId}/accept-delivery`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ partnerName, partnerPhone })
         });
         const json = await res.json();
-        if (!json.success) {
+        if (!res.ok || !json.success) {
           showToast(`⚠️ ${json.message || 'Delivery is no longer available!'}`);
           fetchDashboardData();
           return;
@@ -105,13 +151,12 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
       setActiveTab('dashboard');
     } catch (err) {
       console.error('Error accepting delivery:', err);
-      showToast('✓ Delivery accepted! Route locked into Active Dispatch.');
+      showToast(`⚠️ ${err.message || 'Unable to accept delivery. Please try again.'}`);
       fetchDashboardData();
     }
   };
 
   // Dynamic values derived from MongoDB
-  const driverDisplayName = currentUser?.name || dashboardData?.driver?.name || partnerName;
   const activeDelivery = dashboardData?.activeDelivery || null;
   const todayEarnings = dashboardData?.todayEarnings ?? 0;
   const completedCount = dashboardData?.completedDeliveriesCount ?? 0;
@@ -219,8 +264,48 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
       {/* Main Content Area */}
       <div className="lg:pl-80 min-h-screen bg-surface">
         <main className="w-full max-w-[1440px] mx-auto p-4 sm:p-6 lg:p-12">
-          {activeTab === 'delivery-requests' || activeTab === 'new-deliveries' ? (
-            <DeliveryRequestsView onAcceptDelivery={handleAcceptDelivery} onNavigateTab={setActiveTab} />
+          {activeTab === 'active-delivery' ? (
+            <ActiveDeliveryView
+              activeDelivery={activeDelivery}
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onStatusUpdate={fetchDashboardData}
+            />
+          ) : activeTab === 'delivery-requests' || activeTab === 'new-deliveries' ? (
+            <DeliveryRequestsView
+              activeDelivery={activeDelivery}
+              onAcceptDelivery={handleAcceptDelivery}
+              onNavigateTab={setActiveTab}
+              currentUser={currentUser}
+              isOnline={isOnline}
+            />
+          ) : activeTab === 'upcoming-deliveries' || activeTab === 'upcoming' ? (
+            <UpcomingDeliveriesView
+              activeDelivery={activeDelivery}
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onStatusUpdate={fetchDashboardData}
+            />
+          ) : activeTab === 'completed-deliveries' || activeTab === 'completed' ? (
+            <CompletedDeliveriesView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'delivery-history' || activeTab === 'history' ? (
+            <DeliveryHistoryView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'live-map' || activeTab === 'map' ? (
+            <LiveMapView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'route-navigation' || activeTab === 'route' || activeTab === 'navigation' ? (
+            <RouteNavigationView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
           ) : (
             <div className="flex flex-col w-full space-y-8">
 
@@ -368,16 +453,36 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-label-caps text-xs text-secondary uppercase tracking-widest">ACTIVE TRIP</span>
-                          <span className="font-button-text font-bold text-onyx-black text-lg">{formatOrderRef(activeDelivery.orderId || activeDelivery.requestId)}</span>
+                          <span className="font-button-text font-bold text-onyx-black text-lg">{formatOrderRef(activeDelivery.orderId || activeDelivery.requestId || activeDelivery._id)}</span>
                         </div>
                         <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 bg-emerald-100 text-emerald-900 font-label-caps text-[11px] font-bold uppercase tracking-wider">
                           <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                          <span>● {activeDelivery.status || 'OUT FOR DELIVERY'}</span>
+                          <span>● {activeDelivery.status || 'DRIVER ASSIGNED'}</span>
                         </span>
                       </div>
                       <div className="text-left sm:text-right">
-                        <span className="font-headline-md text-2xl text-onyx-black font-serif block">₹{activeDelivery.amount || 150}</span>
+                        <span className="font-headline-md text-2xl text-onyx-black font-serif block">
+                          ₹{activeDelivery.driverEarning || activeDelivery.payout || activeDelivery.amount || 'Pending'}
+                        </span>
                         <span className="font-label-caps text-[11px] text-secondary uppercase">Guaranteed Payout</span>
+                      </div>
+                    </div>
+
+                    {/* Real Payment Breakdown Box */}
+                    <div className="p-3.5 bg-stone-50 border border-stone-200 flex flex-wrap items-center justify-between gap-4 text-xs">
+                      <div>
+                        <span className="text-stone-500 uppercase tracking-wider text-[10px] block font-bold">Tiffin Order Total</span>
+                        <span className="font-bold text-onyx-black text-sm">₹{activeDelivery.tiffinPayment || activeDelivery.amount || 'N/A'}</span>
+                      </div>
+                      <div className="h-6 w-px bg-stone-300 hidden sm:block" />
+                      <div>
+                        <span className="text-emerald-800 uppercase tracking-wider text-[10px] block font-bold">Driver Delivery Earning</span>
+                        <span className="font-bold text-emerald-900 text-sm">₹{activeDelivery.driverEarning || activeDelivery.payout || 'Pending'}</span>
+                      </div>
+                      <div className="h-6 w-px bg-stone-300 hidden sm:block" />
+                      <div>
+                        <span className="text-stone-500 uppercase tracking-wider text-[10px] block font-bold">Items</span>
+                        <span className="font-semibold text-onyx-black text-xs">{activeDelivery.tiffinName || `${activeDelivery.itemCount || 1} Tiffin Box`}</span>
                       </div>
                     </div>
 
@@ -385,31 +490,59 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
                       {/* Pickup Kitchen */}
                       <div className="p-4 bg-surface-container-low border border-sand-neutral">
                         <span className="font-label-caps text-[11px] text-secondary uppercase tracking-wider block mb-1">Provider Kitchen</span>
-                        <h4 className="font-headline-md text-lg text-onyx-black font-serif">{activeDelivery.providerName || activeDelivery.pickupAddress?.street || 'Spice Route Kitchen'}</h4>
-                        <p className="font-body-md text-xs text-on-surface-variant mt-1">{activeDelivery.pickupAddress?.street || 'Pali Hill, Bandra West'}</p>
+                        <h4 className="font-headline-md text-lg text-onyx-black font-serif">
+                          {activeDelivery.providerName || (typeof activeDelivery.pickupAddress === 'string' ? activeDelivery.pickupAddress : activeDelivery.pickupAddress?.street) || 'Provider Kitchen'}
+                        </h4>
+                        <p className="font-body-md text-xs text-on-surface-variant mt-1">
+                          {typeof activeDelivery.pickupAddress === 'string' ? activeDelivery.pickupAddress : (activeDelivery.pickupAddress?.street || activeDelivery.pickupAddress?.city || 'Pickup address recorded')}
+                        </p>
                       </div>
 
                       {/* Customer Destination */}
                       <div className="p-4 bg-surface-container-low border border-sand-neutral">
                         <span className="font-label-caps text-[11px] text-secondary uppercase tracking-wider block mb-1">Customer Destination</span>
-                        <h4 className="font-headline-md text-lg text-onyx-black font-serif">{activeDelivery.customerName || 'Customer'}</h4>
-                        <p className="font-body-md text-xs text-on-surface-variant mt-1">{activeDelivery.deliveryAddress?.street || activeDelivery.customerAddress || 'Khar West, Mumbai'}</p>
+                        <h4 className="font-headline-md text-lg text-onyx-black font-serif">
+                          {activeDelivery.customerName || 'Customer'}
+                        </h4>
+                        <p className="font-body-md text-xs text-on-surface-variant mt-1">
+                          {typeof activeDelivery.deliveryAddress === 'string' ? activeDelivery.deliveryAddress : (activeDelivery.deliveryAddress?.street || activeDelivery.customerAddress || 'Delivery address recorded')}
+                        </p>
                       </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-sand-neutral text-xs font-body-md">
                       <div className="flex items-center gap-4 text-secondary">
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-onyx-black">navigation</span> {activeDelivery.distanceKm || 2.8} km</span>
+                        <span className="flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[16px] text-onyx-black">navigation</span> 
+                          {activeDelivery.distanceKm ? `${activeDelivery.distanceKm} km` : 'Distance pending'}
+                        </span>
                         <span>/</span>
-                        <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-onyx-black">schedule</span> Est. {activeDelivery.etaMinutes || 12} mins</span>
+                        <span className="flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[16px] text-onyx-black">schedule</span> 
+                          {activeDelivery.etaMinutes ? `Est. ${activeDelivery.etaMinutes} mins` : 'ETA pending'}
+                        </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('live-map')}
-                        className="w-full sm:w-auto px-6 py-2.5 bg-onyx-black text-on-primary hover:bg-stone-800 font-button-text text-xs uppercase tracking-wider transition-colors"
-                      >
-                        View Live Map
-                      </button>
+                      <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenGoogleMapsNavigation(
+                            typeof activeDelivery.deliveryAddress === 'string' 
+                              ? activeDelivery.deliveryAddress 
+                              : (activeDelivery.deliveryAddress?.street || activeDelivery.customerAddress || 'Ahmedabad')
+                          )}
+                          className="px-4 py-2.5 bg-stone-200 hover:bg-stone-300 text-onyx-black font-button-text text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">near_me</span>
+                          <span>GPS Nav</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('live-map')}
+                          className="w-full sm:w-auto px-6 py-2.5 bg-onyx-black text-on-primary hover:bg-stone-800 font-button-text text-xs uppercase tracking-wider transition-colors"
+                        >
+                          View Live Map
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (

@@ -92,21 +92,8 @@ export default function MealRequestModal({ isOpen, onClose, onSubmitSuccess }) {
         }, 3000);
       }
     } catch (error) {
-      console.error(error);
-      // Mock Success Fallback
-      setSubmitted(true);
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.5 }
-      });
-      if (onSubmitSuccess) {
-        onSubmitSuccess();
-      }
-      setTimeout(() => {
-        setSubmitted(false);
-        onClose();
-      }, 3000);
+      console.error('Error submitting meal request:', error);
+      alert('Failed to submit meal request. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }

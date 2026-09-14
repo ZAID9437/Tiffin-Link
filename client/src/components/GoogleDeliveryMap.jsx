@@ -16,7 +16,7 @@ function getDistanceInMeters(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRole = 'provider' }) {
+export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRole = 'provider', hideOuterCard = false }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const directionsRendererRef = useRef(null);
@@ -414,11 +414,29 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
     );
   }
 
+  if (hideOuterCard) {
+    return (
+      <div className="w-full h-full relative overflow-hidden bg-[#E5ECE8]">
+        <div ref={mapRef} className="w-full h-full z-0" />
+        {!mapLoaded && (
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex items-center justify-center z-10">
+            <div className="text-center space-y-2">
+              <RefreshCw size={24} className="animate-spin text-[#0A8B5F]" />
+              <p className="text-xs font-black text-[#111827]">Loading Navigation Map...</p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-[#F9FBF9] rounded-2xl border-2 border-[#0A8B5F]/40 p-4 space-y-3 relative overflow-hidden shadow-xs">
+    <div className={`bg-[#F9FBF9] rounded-2xl border-2 border-[#0A8B5F]/40 p-4 space-y-3 relative overflow-hidden shadow-xs ${
+      height === '100%' ? 'h-full flex flex-col justify-between' : ''
+    }`}>
       
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5ECE8] pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5ECE8] pb-3 shrink-0">
         <div>
           <div className="flex items-center gap-2 text-xs font-black text-[#0A8B5F] uppercase tracking-wider">
             <Radio size={15} className={`text-[#0A8B5F] ${isConnected ? 'animate-pulse' : 'text-amber-500'}`} />
@@ -479,7 +497,7 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
 
       {/* Main Interactive Google Map View Container */}
       <div 
-        style={{ height }} 
+        style={height === '100%' ? { flex: 1, minHeight: '380px' } : { height }} 
         className="w-full bg-[#E5ECE8] rounded-xl border-2 border-[#0A8B5F]/30 relative overflow-hidden shadow-inner flex flex-col justify-between"
       >
         <div ref={mapRef} className="w-full h-full z-0" />

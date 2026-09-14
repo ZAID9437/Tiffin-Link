@@ -69,29 +69,41 @@ const getTiffins = async (req, res) => {
     }
 
     if (await isDbConnected()) {
-      const tiffins = await Tiffin.find(query).sort({ createdAt: -1 });
+      const tiffins = await Tiffin.find(query).sort({ createdAt: -1 }).lean();
 
-      // Dynamically calculate rating for each tiffin from MongoDB Review collection
-      const enrichedTiffins = await Promise.all(tiffins.map(async (t) => {
-        const tObj = t.toObject ? t.toObject() : { ...t };
-        const reviews = await Review.find({
-          $or: [
-            { tiffinId: t._id.toString() },
-            { tiffinName: t.name }
-          ]
-        });
+      // Batch fetch reviews in a single query to eliminate N+1 database queries
+      const allReviews = providerId
+        ? await Review.find({ providerId }).select('tiffinId tiffinName rating').lean()
+        : [];
 
-        if (reviews.length > 0) {
-          const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 5), 0);
-          const avg = (sum / reviews.length).toFixed(1);
-          tObj.rating = Number(avg);
-          tObj.reviewCount = reviews.length;
-        } else {
-          tObj.rating = tObj.rating || 4.8;
-          tObj.reviewCount = tObj.reviewCount || 5;
+      const reviewMap = {};
+      allReviews.forEach(r => {
+        const key = r.tiffinId || r.tiffinName;
+        if (key) {
+          if (!reviewMap[key]) reviewMap[key] = { sum: 0, count: 0 };
+          reviewMap[key].sum += Number(r.rating) || 5;
+          reviewMap[key].count += 1;
         }
-        return tObj;
-      }));
+      });
+
+      const enrichedTiffins = tiffins.map(t => {
+        const keyId = t._id.toString();
+        const keyName = t.name;
+        const revData = reviewMap[keyId] || reviewMap[keyName];
+
+        if (revData && revData.count > 0) {
+          return {
+            ...t,
+            rating: Number((revData.sum / revData.count).toFixed(1)),
+            reviewCount: revData.count
+          };
+        }
+        return {
+          ...t,
+          rating: t.rating || 4.8,
+          reviewCount: t.reviewCount || 5
+        };
+      });
 
       return res.json({ success: true, data: enrichedTiffins, source: 'database', databaseName: 'tiffinlink' });
     } else {

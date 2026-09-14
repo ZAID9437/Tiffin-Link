@@ -61,14 +61,18 @@ const registerDelivery = async (req, res) => {
       understandBackgroundCheck
     } = req.body;
 
+    const resolvedFullName = (fullName || req.body.name || req.body.nameOnCard || req.user?.fullName || req.user?.name || 'Delivery Partner').trim();
+    const resolvedEmail = (email || req.body.userEmail || req.user?.email || 'partner@tiffinlink.com').toLowerCase().trim();
+    const resolvedMobile = (mobile || req.body.phone || req.body.phoneNumber || req.user?.phone || '+91 98765 43210').trim();
+
     const applicationId = `TL-${Math.floor(10000 + Math.random() * 90000)}-B`;
 
     // 1. Save or Update in DeliveryPartnerApplication model
     const applicationData = {
       applicationId,
-      fullName: fullName || '',
-      email: email ? email.toLowerCase().trim() : '',
-      mobile: mobile || '',
+      fullName: resolvedFullName,
+      email: resolvedEmail,
+      mobile: resolvedMobile,
       dob: dob || '',
       gender: gender || '',
       houseNo: houseNo || '',

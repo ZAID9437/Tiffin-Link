@@ -136,14 +136,99 @@ const defaultInitialOrders = [
   }
 ];
 
-// @desc    Get all orders from MongoDB
+// @desc    Get provider orders from MongoDB with server-side pagination, search, filters & summary counts
 // @route   GET /api/orders
 const getOrders = async (req, res) => {
   try {
     const providerId = req.providerId;
+    if (!providerId) {
+      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+    }
+
+    const {
+      status = 'All',
+      search = '',
+      paymentStatus = 'All',
+      page,
+      limit
+    } = req.query;
+
     if (await isDbConnected()) {
-      const orders = await Order.find({ providerId }).sort({ createdAt: -1 });
-      return res.json({ success: true, data: orders, source: 'database', databaseName: 'tiffinlink' });
+      // Non-blocking background reconciliation if needed
+      try {
+        const { reconcileMissingDeliveryRequests } = require('./deliveryDispatchController');
+        reconcileMissingDeliveryRequests().catch(rErr => console.warn('Background reconciliation error:', rErr.message));
+      } catch (rErr) {}
+
+      // Build MongoDB query
+      const query = { providerId };
+
+      if (status && status !== 'All') {
+        query.status = status;
+      }
+      if (paymentStatus && paymentStatus !== 'All') {
+        query.paymentStatus = paymentStatus;
+      }
+
+      if (search && search.trim()) {
+        const s = search.trim();
+        query.$or = [
+          { orderId: { $regex: s, $options: 'i' } },
+          { customerName: { $regex: s, $options: 'i' } },
+          { customerPhone: { $regex: s, $options: 'i' } },
+          { tiffinName: { $regex: s, $options: 'i' } }
+        ];
+      }
+
+      // If pagination is requested
+      if (page || limit) {
+        const pageNum = parseInt(page, 10) || 1;
+        const limitNum = parseInt(limit, 10) || 20;
+        const skip = (pageNum - 1) * limitNum;
+
+        const [orders, total, statusCountsAgg] = await Promise.all([
+          Order.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limitNum)
+            .lean(),
+          Order.countDocuments(query),
+          Order.aggregate([
+            { $match: { providerId } },
+            { $group: { _id: '$status', count: { $sum: 1 } } }
+          ])
+        ]);
+
+        const formattedOrders = orders.map(o => ({ ...o, id: o._id.toString() }));
+
+        const statusCounts = { All: 0, New: 0, Preparing: 0, Ready: 0, Completed: 0, Cancelled: 0 };
+        statusCountsAgg.forEach(item => {
+          if (item._id && statusCounts.hasOwnProperty(item._id)) {
+            statusCounts[item._id] = item.count;
+          }
+          statusCounts.All += item.count;
+        });
+
+        return res.json({
+          success: true,
+          data: formattedOrders,
+          pagination: {
+            total,
+            page: pageNum,
+            limit: limitNum,
+            totalPages: Math.ceil(total / limitNum) || 1
+          },
+          statusCounts,
+          source: 'database',
+          databaseName: 'tiffinlink'
+        });
+      }
+
+      // Default: lightweight projected query if no pagination explicitly requested
+      const orders = await Order.find(query).sort({ createdAt: -1 }).lean();
+      const formattedOrders = orders.map(o => ({ ...o, id: o._id.toString() }));
+
+      return res.json({ success: true, data: formattedOrders, source: 'database', databaseName: 'tiffinlink' });
     } else {
       return res.json({ success: true, data: [], source: 'in-memory' });
     }
@@ -248,16 +333,23 @@ const createOrder = async (req, res) => {
       ...bill,
       paymentStatus: paymentStatus || 'Paid',
       status: status || 'New',
-      deliveryStatus: 'Unassigned'
+      deliveryStatus: 'Searching'
     };
 
     if (await isDbConnected()) {
       const newOrder = new Order(orderData);
       await newOrder.save();
+      try {
+        const { reconcileMissingDeliveryRequests } = require('./deliveryDispatchController');
+        await reconcileMissingDeliveryRequests();
+      } catch (rErr) {
+        console.warn('Reconciliation error in createOrder:', rErr.message);
+      }
+      const refreshedOrder = await Order.findById(newOrder._id);
       return res.status(201).json({ 
         success: true, 
-        message: 'Order created successfully with Bill Receipt', 
-        data: newOrder, 
+        message: 'Order created successfully with Bill Receipt and Driver Dispatch', 
+        data: refreshedOrder || newOrder, 
         source: 'database' 
       });
     } else {
@@ -291,7 +383,14 @@ const updateOrder = async (req, res) => {
       if (!updated) {
         return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
       }
-      return res.json({ success: true, message: 'Order updated successfully', data: updated });
+      try {
+        const { reconcileMissingDeliveryRequests } = require('./deliveryDispatchController');
+        await reconcileMissingDeliveryRequests();
+      } catch (rErr) {
+        console.warn('Reconciliation error in updateOrder:', rErr.message);
+      }
+      const refreshed = await Order.findById(id);
+      return res.json({ success: true, message: 'Order updated successfully', data: refreshed || updated });
     }
     return res.json({ success: true, message: 'Order updated (in-memory)', data: req.body });
   } catch (error) {

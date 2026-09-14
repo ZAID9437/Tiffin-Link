@@ -28,21 +28,21 @@ import AnimatedCounter from './AnimatedCounter';
 import { apiRequest } from '../services/api';
 
 export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
-  const providerName = currentUser?.name || 'Xoxo Men';
+  const providerName = currentUser?.name || currentUser?.businessName || 'Provider';
 
   const [stats, setStats] = useState({
     liveRequestsCount: 0,
     todaysOrdersCount: 0,
     revenueToday: 0,
-    rating: 4.4,
-    reviewCount: 5
+    rating: 0,
+    reviewCount: 0
   });
 
   const [allRawOrders, setAllRawOrders] = useState([]);
 
   const [todaysOrders, setTodaysOrders] = useState([]);
   const [kitchenCapacity, setKitchenCapacity] = useState({
-    maxMeals: 40,
+    maxMeals: 50,
     cookedMeals: 0
   });
   const [deliveryCounts, setDeliveryCounts] = useState({
@@ -110,72 +110,64 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     return `${day}/${month}/${year} • ${timeStr}`;
   };
 
-  // Poll MongoDB Database for Real Dashboard Data
+  // Fetch Real Dashboard Data from MongoDB
   useEffect(() => {
     const fetchDashboardDataFromDb = async () => {
       try {
-        // 1. Fetch Orders from MongoDB
-        const ordJson = await apiRequest('/orders');
-        
-        if (ordJson.success && Array.isArray(ordJson.data)) {
-          const fetchedOrders = ordJson.data;
-          setAllRawOrders(fetchedOrders);
+        const [dashRes, reqRes] = await Promise.all([
+          apiRequest('/providers/dashboard'),
+          apiRequest('/requests')
+        ]);
 
-          // Todays Orders (or recent orders if today filter yields empty)
-          const todaysOrdersOnly = fetchedOrders.filter(o => isTodayDate(o.createdAt || o.date));
-          const activeOrdersList = todaysOrdersOnly.length > 0 ? todaysOrdersOnly : fetchedOrders;
-          const todaysCount = activeOrdersList.length;
+        const dashJson = typeof dashRes?.json === 'function' ? await dashRes.json() : dashRes;
+        const reqJson = typeof reqRes?.json === 'function' ? await reqRes.json() : reqRes;
 
-          // Revenue Today (for non-cancelled orders)
-          const revToday = activeOrdersList
-            .filter(o => o.status !== 'Cancelled')
-            .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
-
-          // Active Orders for Table (Top 5 active/recent)
-          const activeOrdersFormatted = fetchedOrders.slice(0, 5).map(o => {
-            let statusBg = 'bg-gray-100 text-[#111827] border-gray-200';
-            if (o.status === 'Preparing') statusBg = 'bg-amber-100 text-amber-800 border-amber-200';
-            if (o.status === 'Ready') statusBg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
-            if (o.status === 'New') statusBg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
-            if (o.deliveryPartnerName) statusBg = 'bg-blue-100 text-blue-800 border-blue-200';
-
-            return {
-              id: o.orderId || '#1027',
-              customer: o.customerName || 'Customer',
-              items: `${o.tiffinName || 'Tiffin Meal'} × ${o.quantity || 1}`,
-              time: o.createdAt ? formatDateFormatted(o.createdAt) : 'Today',
-              amount: o.totalAmount || 120,
-              status: o.deliveryPartnerName ? `Partner: ${o.deliveryPartnerName}` : o.status,
-              statusBg
-            };
-          });
-
-          setTodaysOrders(activeOrdersFormatted);
-
-          // Kitchen Capacity Calculation (cooked meals today)
-          const totalCooked = activeOrdersList
-            .filter(o => o.status !== 'Cancelled')
-            .reduce((sum, o) => sum + (Number(o.quantity) || 1), 0);
-
-          setKitchenCapacity(prev => ({ ...prev, cookedMeals: totalCooked }));
-
-          // Delivery Status Widget Counts
-          const rdy = fetchedOrders.filter(o => o.status === 'Ready').length;
-          const asg = fetchedOrders.filter(o => o.deliveryPartnerName && o.deliveryPartnerName.trim() !== '').length;
-          const src = fetchedOrders.filter(o => o.status === 'Ready' && (!o.deliveryPartnerName || o.deliveryPartnerName.trim() === '')).length;
-
-          setDeliveryCounts({ ready: rdy, assigned: asg, searching: src });
-
+        if (dashJson && dashJson.success && dashJson.data) {
+          const d = dashJson.data;
           setStats(prev => ({
             ...prev,
-            todaysOrdersCount: todaysCount,
-            revenueToday: revToday
+            todaysOrdersCount: d.todaysOrdersCount !== undefined ? d.todaysOrdersCount : prev.todaysOrdersCount,
+            revenueToday: d.revenueToday !== undefined ? d.revenueToday : prev.revenueToday,
+            rating: d.rating !== undefined ? d.rating : prev.rating,
+            reviewCount: d.reviewCount !== undefined ? d.reviewCount : prev.reviewCount,
+            liveRequestsCount: d.liveRequestsCount !== undefined ? d.liveRequestsCount : prev.liveRequestsCount
           }));
+
+          if (d.kitchenCapacity) {
+            setKitchenCapacity({
+              maxMeals: Number(d.kitchenCapacity.maxMeals) || 50,
+              cookedMeals: Number(d.kitchenCapacity.cookedMeals) || 0
+            });
+          } else {
+            setKitchenCapacity({
+              maxMeals: 50,
+              cookedMeals: d.todaysOrdersCount || 0
+            });
+          }
+
+          if (d.deliveryCounts) {
+            setDeliveryCounts({
+              ready: d.deliveryCounts.ready || 0,
+              assigned: d.deliveryCounts.assigned || 0,
+              searching: d.deliveryCounts.searching || 0
+            });
+          }
+
+          if (Array.isArray(d.todaysOrders)) {
+            const formatted = d.todaysOrders.map(o => ({
+              id: o.id || '#1027',
+              customer: o.customer || 'Customer',
+              items: o.qtyText || 'Tiffin Meal',
+              time: 'Today',
+              amount: o.amount || 120,
+              status: o.status,
+              statusBg: o.statusBg || 'bg-indigo-100 text-indigo-800 border-indigo-200'
+            }));
+            setTodaysOrders(formatted);
+          }
         }
 
-        // 2. Fetch Live Requests from MongoDB
-        const reqJson = await apiRequest('/requests');
-        if (reqJson.success && Array.isArray(reqJson.data)) {
+        if (reqJson && reqJson.success && Array.isArray(reqJson.data)) {
           const pendingList = reqJson.data.filter(r => r.status === 'pending');
           setStats(prev => ({ ...prev, liveRequestsCount: pendingList.length }));
 
@@ -195,29 +187,15 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
             setLiveRequest(null);
           }
         }
-
-        // 3. Fetch Reviews Rating from MongoDB
-        const revJson = await apiRequest('/reviews');
-        if (revJson.success && revJson.stats) {
-          setStats(prev => ({
-            ...prev,
-            rating: Number(revJson.stats.overallRating || 4.4),
-            reviewCount: Number(revJson.stats.totalReviews || 5)
-          }));
-        } else if (revJson.success && Array.isArray(revJson.data) && revJson.data.length > 0) {
-          const avg = (revJson.data.reduce((sum, r) => sum + (r.rating || 5), 0) / revJson.data.length).toFixed(1);
-          setStats(prev => ({ ...prev, rating: Number(avg), reviewCount: revJson.data.length }));
-        }
-
       } catch (err) {
         console.error('Error fetching dashboard data from MongoDB:', err);
       }
     };
 
-    fetchDashboardDataFromDb();
-    const interval = setInterval(fetchDashboardDataFromDb, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    if (currentUser) {
+      fetchDashboardDataFromDb();
+    }
+  }, [currentUser]);
 
   // Filter Orders for Modal Report
   const getFilteredReportOrders = () => {

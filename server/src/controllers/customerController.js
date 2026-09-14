@@ -37,6 +37,10 @@ const filterByDateRange = (dateStr, range) => {
 const getCustomers = async (req, res) => {
   try {
     const providerId = req.providerId;
+    if (!providerId) {
+      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+    }
+
     const {
       search = '',
       status = 'All',
@@ -52,62 +56,67 @@ const getCustomers = async (req, res) => {
     let customerList = [];
 
     if (await isDbConnected()) {
-      // Fetch orders strictly belonging to this provider
-      const providerOrders = await Order.find({ providerId }).sort({ createdAt: -1 });
+      const groupedCustomers = await Order.aggregate([
+        { $match: { providerId } },
+        { $sort: { createdAt: -1 } },
+        {
+          $group: {
+            _id: { $toLower: { $ifNull: ['$customerPhone', '$customerName'] } },
+            id: { $first: '$_id' },
+            name: { $first: '$customerName' },
+            phone: { $first: { $ifNull: ['$customerPhone', '+91 98250 12345'] } },
+            email: { $first: { $ifNull: ['$customerEmail', ''] } },
+            address: { $first: '$customerAddress' },
+            totalOrdersCount: { $sum: 1 },
+            totalSpent: { $sum: '$totalAmount' },
+            completedCount: {
+              $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] }
+            },
+            cancelledCount: {
+              $sum: { $cond: [{ $eq: ['$status', 'Cancelled'] }, 1, 0] }
+            },
+            activeCount: {
+              $sum: {
+                $cond: [{ $in: ['$status', ['New', 'Preparing', 'Ready', 'Out for Delivery']] }, 1, 0]
+              }
+            },
+            lastOrderDate: { $max: '$createdAt' }
+          }
+        },
+        { $sort: { lastOrderDate: -1 } }
+      ]);
 
-      // Map of customers who have relationship with this provider
-      const customerMap = new Map();
-
-      providerOrders.forEach(o => {
-        const key = (o.customerPhone || o.customerName || 'customer').toLowerCase();
-        if (!customerMap.has(key)) {
-          customerMap.set(key, {
-            id: o._id,
-            name: o.customerName,
-            phone: o.customerPhone || '+91 98250 12345',
-            email: o.customerEmail || '',
-            address: typeof o.customerAddress === 'string' ? o.customerAddress : (o.customerAddress?.street || 'Ahmedabad'),
-            latitude: o.deliveryAddress?.lat || 23.0300,
-            longitude: o.deliveryAddress?.lng || 72.5650,
-            status: 'Active',
-            totalOrdersCount: 0,
-            totalSpent: 0,
-            completedCount: 0,
-            cancelledCount: 0,
-            activeCount: 0,
-            lastOrderDate: o.createdAt,
-            orders: []
-          });
-        }
-
-        const entry = customerMap.get(key);
-        entry.totalOrdersCount += 1;
-        entry.totalSpent += o.totalAmount || 0;
-        if (o.status === 'Completed') entry.completedCount += 1;
-        if (o.status === 'Cancelled') entry.cancelledCount += 1;
-        if (['New', 'Preparing', 'Ready', 'Out for Delivery'].includes(o.status)) entry.activeCount += 1;
-        if (new Date(o.createdAt) > new Date(entry.lastOrderDate)) entry.lastOrderDate = o.createdAt;
-        entry.orders.push({ ...o.toObject(), id: o._id });
-      });
-
-      customerList = Array.from(customerMap.values());
+      customerList = groupedCustomers.map(c => ({
+        id: c.id,
+        name: c.name || 'Customer',
+        phone: c.phone || '+91 98250 12345',
+        email: c.email || '',
+        address: typeof c.address === 'string' ? c.address : (c.address?.street || 'Ahmedabad'),
+        status: 'Active',
+        totalOrdersCount: c.totalOrdersCount,
+        totalSpent: c.totalSpent,
+        completedCount: c.completedCount,
+        cancelledCount: c.cancelledCount,
+        activeCount: c.activeCount,
+        lastOrderDate: c.lastOrderDate,
+        orders: [] // Keep lightweight array for UI summary drawer
+      }));
     } else {
       customerList = defaultInitialUsers.map((u, idx) => ({
         id: `usr_${idx}`,
         ...u,
-        totalOrdersCount: Math.floor(Math.random() * 20) + 5,
-        totalSpent: Math.floor(Math.random() * 4000) + 1000,
-        completedCount: 5,
-        cancelledCount: 1,
+        totalOrdersCount: 5,
+        totalSpent: 1200,
+        completedCount: 4,
+        cancelledCount: 0,
         activeCount: 1,
         lastOrderDate: new Date(),
         orders: []
       }));
     }
 
-    // Apply Server-Side Filtering
+    // Apply Filters
     let filtered = customerList.filter(c => {
-      // Search filter
       const q = search.toLowerCase().trim();
       const matchesSearch = !q ||
         (c.name && c.name.toLowerCase().includes(q)) ||
@@ -115,33 +124,27 @@ const getCustomers = async (req, res) => {
         (c.email && c.email.toLowerCase().includes(q)) ||
         (c.address && c.address.toLowerCase().includes(q));
 
-      // Status filter
       const matchesStatus = status === 'All' || c.status === status;
 
-      // Order frequency filter
       let matchesOrderFreq = true;
       if (orderFilter === 'Frequent') matchesOrderFreq = c.totalOrdersCount >= 5;
       if (orderFilter === 'New') matchesOrderFreq = c.totalOrdersCount <= 2;
 
-      // Date range filter
       const matchesDate = filterByDateRange(c.lastOrderDate, dateRange);
 
       return matchesSearch && matchesStatus && matchesOrderFreq && matchesDate;
     });
 
-    // Summary metrics calculation across full filtered dataset
     const totalCustomers = customerList.length;
     const activeCustomers = customerList.filter(c => c.status === 'Active').length;
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const newToday = customerList.filter(c => 
-      c.orders && c.orders.some(o => new Date(o.createdAt).toISOString().split('T')[0] === todayStr)
-    ).length || 6;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const newToday = customerList.filter(c => new Date(c.lastOrderDate) >= startOfToday).length;
 
-    const totalOrders = customerList.reduce((sum, c) => sum + (c.totalOrdersCount || 0), 0);
-    const totalRevenue = customerList.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
+    const totalOrders = customerList.reduce((sum, c) => sum + c.totalOrdersCount, 0);
+    const totalRevenue = customerList.reduce((sum, c) => sum + c.totalSpent, 0);
 
-    // Apply Pagination
     const totalFiltered = filtered.length;
     const totalPages = Math.ceil(totalFiltered / limitNum) || 1;
     const startIndex = (pageNum - 1) * limitNum;

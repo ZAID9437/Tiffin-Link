@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { X, Search, Navigation, PackageCheck, Clock, Phone, MapPin, Truck } from 'lucide-react';
 import GoogleDeliveryMap from './GoogleDeliveryMap';
 import { apiRequest } from '../services/api';
+import { 
+  joinDeliveryRoom, 
+  leaveDeliveryRoom, 
+  subscribeToLocationUpdates, 
+  subscribeToDeliveryLifecycle 
+} from '../services/socket';
 
 export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initialOrderId = '' }) {
   const [orderIdInput, setOrderIdInput] = useState(initialOrderId || 'REQ-1001');
@@ -15,10 +21,56 @@ export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initial
         setOrderIdInput(initialOrderId);
         fetchCustomerDelivery(initialOrderId);
       } else {
-        fetchCustomerDelivery('REQ-1001');
+        fetchCustomerDelivery('#1024');
       }
     }
   }, [isOpen, initialOrderId]);
+
+  // Real-Time Socket.IO Subscriptions for Customer Delivery Tracking
+  useEffect(() => {
+    if (!activeDelivery) return;
+    const cleanId = activeDelivery.requestId || activeDelivery.orderId || activeDelivery._id;
+    if (!cleanId) return;
+
+    joinDeliveryRoom(cleanId);
+
+    const unsubscribeLocation = subscribeToLocationUpdates((data) => {
+      if (data && data.location) {
+        setActiveDelivery(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            status: data.status || prev.status,
+            etaMinutes: data.etaMinutes || prev.etaMinutes,
+            assignedDriver: {
+              ...(prev.assignedDriver || {}),
+              location: data.location
+            }
+          };
+        });
+      }
+    });
+
+    const unsubscribeLifecycle = subscribeToDeliveryLifecycle({
+      onStatusUpdate: (data) => {
+        if (data && data.status) {
+          setActiveDelivery(prev => prev ? { ...prev, status: data.status } : prev);
+        }
+      },
+      onPickup: (data) => {
+        setActiveDelivery(prev => prev ? { ...prev, status: 'Out for Delivery' } : prev);
+      },
+      onCompleted: (data) => {
+        setActiveDelivery(prev => prev ? { ...prev, status: 'Delivered' } : prev);
+      }
+    });
+
+    return () => {
+      leaveDeliveryRoom(cleanId);
+      unsubscribeLocation();
+      unsubscribeLifecycle();
+    };
+  }, [activeDelivery?.requestId, activeDelivery?.orderId, activeDelivery?._id]);
 
   const fetchCustomerDelivery = async (idToFetch) => {
     const queryId = (idToFetch || orderIdInput || '').trim();
@@ -33,7 +85,8 @@ export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initial
         const found = res.requests.find(r => 
           String(r.requestId).toLowerCase() === queryId.toLowerCase() ||
           String(r.orderId).toLowerCase() === queryId.toLowerCase() ||
-          String(r._id).toLowerCase() === queryId.toLowerCase()
+          String(r._id).toLowerCase() === queryId.toLowerCase() ||
+          String(r.orderId).toLowerCase() === `#${queryId.toLowerCase().replace(/^#+/, '')}`
         );
 
         if (found) {

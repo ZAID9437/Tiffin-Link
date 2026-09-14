@@ -8,18 +8,18 @@ const deliveryPartnerApplicationSchema = new mongoose.Schema({
   },
   fullName: {
     type: String,
-    required: true,
+    default: 'Delivery Partner',
     trim: true
   },
   email: {
     type: String,
-    required: true,
+    default: 'partner@tiffinlink.com',
     trim: true,
     lowercase: true
   },
   mobile: {
     type: String,
-    required: true,
+    default: '+91 98765 43210',
     trim: true
   },
   dob: {

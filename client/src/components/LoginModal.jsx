@@ -345,11 +345,11 @@ export default function LoginModal({
 
   return (
     <div 
-      className="login-modal-overlay fixed inset-0 bg-black/45 backdrop-blur-sm z-[9999] flex justify-center items-center px-margin-mobile"
+      className="login-modal-overlay fixed inset-0 bg-black/45 backdrop-blur-sm z-[9999] flex justify-center items-center px-3 sm:px-4 py-4"
       onClick={onClose}
     >
       <div 
-        className={`login-modal-card bg-surface w-full max-w-[560px] p-8 md:py-8 md:px-12 relative shadow-2xl border border-outline-variant/30 reveal ${isActive ? 'active' : ''}`}
+        className={`login-modal-card bg-surface w-full max-w-[560px] p-4 sm:p-8 md:py-8 md:px-12 relative shadow-2xl border border-outline-variant/30 reveal ${isActive ? 'active' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         <style>{`

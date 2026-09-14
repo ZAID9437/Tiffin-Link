@@ -3,117 +3,22 @@ const MealRequest = require('../models/MealRequest');
 const Order = require('../models/Order');
 const { ensureConnected } = require('../config/db');
 
-const localRequests = [];
 const isDbConnected = async () => await ensureConnected();
-
-const SIMULATED_SAMPLES = [
-  {
-    customerName: 'Ananya Roy',
-    customerPhone: '+91 98251 34912',
-    customerAddress: 'B-604, Venus Atlantis, Prahlad Nagar, Ahmedabad',
-    location: 'Prahlad Nagar, Ahmedabad',
-    mealType: 'Kathiyawadi Royal Thali',
-    category: 'Kathiyawadi',
-    items: [{ name: 'Kathiyawadi Royal Thali (Ringan Bharthu, Bajra Rotla, Chhas)', qty: 2, price: 160 }],
-    quantity: 2,
-    budget: 160,
-    totalAmount: 320,
-    distance: '1.4 km',
-    specialInstructions: 'Please add extra garlic chutney',
-    deliveryType: 'Delivery'
-  },
-  {
-    customerName: 'Rohan Patel',
-    customerPhone: '+91 97240 88219',
-    customerAddress: 'C-201, Goyal Park, Vastrapur, Ahmedabad',
-    location: 'Vastrapur, Ahmedabad',
-    mealType: 'Gujarati Executive Thali',
-    category: 'Gujarati',
-    items: [{ name: 'Gujarati Executive Thali (2 Sabzi, 5 Phulka, Dal Rice, Sweet)', qty: 1, price: 140 }],
-    quantity: 1,
-    budget: 140,
-    totalAmount: 140,
-    distance: '2.1 km',
-    specialInstructions: 'Medium spicy, piping hot rotis please',
-    deliveryType: 'Delivery'
-  },
-  {
-    customerName: 'Pooja Desai',
-    customerPhone: '+91 98982 71630',
-    customerAddress: '12, Shivalik Villa, Bodakdev, Ahmedabad',
-    location: 'Bodakdev, Ahmedabad',
-    mealType: 'Jain Special Swaminarayan Thali',
-    category: 'Jain',
-    items: [{ name: 'Jain Special Thali (No Onion/Garlic/Potato, Puri, Halwa)', qty: 3, price: 150 }],
-    quantity: 3,
-    budget: 150,
-    totalAmount: 450,
-    distance: '2.8 km',
-    specialInstructions: 'Strictly Jain preparation please',
-    deliveryType: 'Delivery'
-  },
-  {
-    customerName: 'Vikramaditya Sharma',
-    customerPhone: '+91 94285 41092',
-    customerAddress: 'Flat 402, Titanium City Center, Satellite, Ahmedabad',
-    location: 'Satellite, Ahmedabad',
-    mealType: 'Punjabi Deluxe Paneer Combo',
-    category: 'Punjabi',
-    items: [{ name: 'Paneer Lababdar Deluxe Thali + Extra Butter Naan', qty: 2, price: 180 }],
-    quantity: 2,
-    budget: 180,
-    totalAmount: 360,
-    distance: '1.9 km',
-    specialInstructions: 'Deliver to 4th floor door, ring bell twice',
-    deliveryType: 'Delivery'
-  },
-  {
-    customerName: 'Sneha Kulkarni',
-    customerPhone: '+91 98790 15632',
-    customerAddress: 'A-102, Maple County, Thaltej, Ahmedabad',
-    location: 'Thaltej, Ahmedabad',
-    mealType: 'Healthy Organic Khichdi & Kadhi Bowl',
-    category: 'Healthy',
-    items: [{ name: 'Organic Bajra Khichdi & Gujarati Kadhi Combo + Papad', qty: 1, price: 130 }],
-    quantity: 1,
-    budget: 130,
-    totalAmount: 130,
-    distance: '3.2 km',
-    specialInstructions: 'Low oil and low salt, thank you',
-    deliveryType: 'Delivery'
-  },
-  {
-    customerName: 'Hardik Joshi',
-    customerPhone: '+91 99042 33811',
-    customerAddress: '501, Iscon Elegance, SG Highway, Ahmedabad',
-    location: 'SG Highway, Ahmedabad',
-    mealType: 'Authentic Marwari Dal Baati Churma',
-    category: 'Rajasthani',
-    items: [{ name: 'Authentic Marwari Dal Baati Churma (4 Baati + Pure Desi Ghee)', qty: 2, price: 170 }],
-    quantity: 2,
-    budget: 170,
-    totalAmount: 340,
-    distance: '2.5 km',
-    specialInstructions: 'Serve with spicy green chutney and lemon wedges',
-    deliveryType: 'Delivery'
-  }
-];
 
 // Helper to format/enrich request object with live dynamic remaining seconds (max 2 minutes = 120s)
 const enrichRequestWithLiveTimer = (reqObj) => {
   const now = Date.now();
   let expiresAtMs;
 
-  if (reqObj.expiresAt) {
+  if (reqObj.expiresAt && new Date(reqObj.expiresAt).getTime() > now) {
     expiresAtMs = new Date(reqObj.expiresAt).getTime();
-  } else if (reqObj.createdAt) {
-    expiresAtMs = new Date(reqObj.createdAt).getTime() + 120 * 1000; // Strictly 2 minutes
   } else {
+    // If pending request expired or has no active expiresAt, refresh to 2 minutes from now
     expiresAtMs = now + 120 * 1000;
   }
 
   let calcSec = Math.floor((expiresAtMs - now) / 1000);
-  let secondsLeft = calcSec > 0 ? Math.min(120, calcSec) : 90;
+  let secondsLeft = Math.max(15, Math.min(120, calcSec));
 
   const plain = typeof reqObj.toObject === 'function' ? reqObj.toObject() : { ...reqObj };
   
@@ -131,13 +36,20 @@ const getRequests = async (req, res) => {
   try {
     if (await isDbConnected()) {
       let requests = await MealRequest.find({ status: 'pending' }).sort({ createdAt: -1 });
+
+      // Refresh expiresAt for pending requests in DB if expired
+      const now = Date.now();
+      for (const r of requests) {
+        if (!r.expiresAt || new Date(r.expiresAt).getTime() <= now) {
+          r.expiresAt = new Date(now + 120 * 1000);
+          await r.save();
+        }
+      }
+
       const enriched = requests.map(enrichRequestWithLiveTimer);
       return res.json({ success: true, count: enriched.length, data: enriched, source: 'database' });
-    } else {
-      const pending = localRequests.filter(r => r.status === 'pending');
-      const enriched = pending.map(enrichRequestWithLiveTimer);
-      return res.json({ success: true, count: enriched.length, data: enriched.reverse(), source: 'in-memory' });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error getting live requests:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -207,15 +119,8 @@ const createRequest = async (req, res) => {
       await newRequest.save();
       const enriched = enrichRequestWithLiveTimer(newRequest);
       return res.status(201).json({ success: true, data: enriched, source: 'database' });
-    } else {
-      const mockRequest = {
-        _id: 'mr_' + Math.random().toString(36).substr(2, 9),
-        ...reqData
-      };
-      localRequests.push(mockRequest);
-      const enriched = enrichRequestWithLiveTimer(mockRequest);
-      return res.status(201).json({ success: true, data: enriched, source: 'in-memory' });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error creating live request:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -287,14 +192,8 @@ const acceptRequest = async (req, res) => {
           order: newOrder
         }
       });
-    } else {
-      const idx = localRequests.findIndex(r => r._id === id);
-      if (idx !== -1) {
-        localRequests[idx].status = 'accepted';
-        return res.json({ success: true, message: 'Request accepted', data: { request: localRequests[idx] } });
-      }
-      return res.status(404).json({ success: false, message: 'Request not found' });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error accepting live request:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -315,14 +214,8 @@ const declineRequest = async (req, res) => {
         updated = await MealRequest.findOneAndUpdate({ _id: id }, { status: 'declined' }, { new: true });
       }
       return res.json({ success: true, message: 'Request declined', data: updated });
-    } else {
-      const idx = localRequests.findIndex(r => r._id === id);
-      if (idx !== -1) {
-        localRequests[idx].status = 'declined';
-        return res.json({ success: true, message: 'Request declined', data: localRequests[idx] });
-      }
-      return res.status(404).json({ success: false, message: 'Request not found' });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error declining live request:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -333,16 +226,24 @@ const declineRequest = async (req, res) => {
 // @route   POST /api/requests/simulate
 const simulateLiveRequest = async (req, res) => {
   try {
-    const randomSample = SIMULATED_SAMPLES[Math.floor(Math.random() * SIMULATED_SAMPLES.length)];
+    const Tiffin = require('../models/Tiffin');
+    const dbTiffin = await Tiffin.findOne() || { name: 'Kathiyawadi Royal Thali', price: 160, category: 'Kathiyawadi' };
     const expiresAt = new Date(Date.now() + 120 * 1000); // 2 minutes validity
-    
-    // Slight jitter to phone number to make each simulated order unique
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const customerPhone = randomSample.customerPhone.slice(0, -4) + randomSuffix;
 
     const reqData = {
-      ...randomSample,
-      customerPhone,
+      customerName: req.body.customerName || 'Aarav Patel',
+      customerPhone: req.body.customerPhone || '+91 98250 ' + Math.floor(10000 + Math.random() * 90000),
+      customerAddress: req.body.customerAddress || 'Prahlad Nagar, Ahmedabad',
+      location: req.body.location || 'Prahlad Nagar, Ahmedabad',
+      mealType: dbTiffin.name,
+      category: dbTiffin.category || 'Gujarati',
+      items: [{ name: dbTiffin.name, qty: 1, price: dbTiffin.price || 140 }],
+      quantity: 1,
+      budget: dbTiffin.price || 140,
+      totalAmount: dbTiffin.price || 140,
+      distance: '2.1 km',
+      specialInstructions: req.body.specialInstructions || 'Please make it hot & fresh',
+      deliveryType: 'Delivery',
       status: 'pending',
       date: 'Today',
       time: new Date(Date.now() + 45 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -360,20 +261,8 @@ const simulateLiveRequest = async (req, res) => {
         data: enriched,
         source: 'database'
       });
-    } else {
-      const mockRequest = {
-        _id: 'mr_' + Math.random().toString(36).substr(2, 9),
-        ...reqData
-      };
-      localRequests.push(mockRequest);
-      const enriched = enrichRequestWithLiveTimer(mockRequest);
-      return res.status(201).json({
-        success: true,
-        message: 'New live customer meal request simulated successfully!',
-        data: enriched,
-        source: 'in-memory'
-      });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error simulating live request:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -390,14 +279,8 @@ const updateRequest = async (req, res) => {
     if (await isDbConnected()) {
       const updated = await MealRequest.findByIdAndUpdate(id, { status }, { new: true });
       return res.json({ success: true, data: updated });
-    } else {
-      const idx = localRequests.findIndex(r => r._id === id);
-      if (idx !== -1) {
-        localRequests[idx].status = status;
-        return res.json({ success: true, data: localRequests[idx] });
-      }
-      return res.status(404).json({ success: false, message: 'Request not found' });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error updating request:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -413,13 +296,8 @@ const deleteRequest = async (req, res) => {
     if (await isDbConnected()) {
       await MealRequest.findByIdAndDelete(id);
       return res.json({ success: true, message: 'Request deleted' });
-    } else {
-      const idx = localRequests.findIndex(r => r._id === id);
-      if (idx !== -1) {
-        localRequests.splice(idx, 1);
-      }
-      return res.json({ success: true, message: 'Request deleted' });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error deleting request:', error);
     res.status(500).json({ success: false, message: 'Server Error' });

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Provider = require('../models/Provider');
+const Driver = require('../models/Driver');
 
 const protect = async (req, res, next) => {
   let token;
@@ -54,38 +55,31 @@ const protect = async (req, res, next) => {
         req.providerId = provider._id.toString();
       }
 
+      // If user is a Driver/Delivery partner, bind their authenticated Driver record & driverId
+      if (user.role === 'delivery' || user.role === 'driver') {
+        let driver = await Driver.findOne({
+          $or: [
+            { userId: user._id },
+            { email: user.email },
+            { phone: user.phone }
+          ]
+        });
+
+        if (driver) {
+          req.driver = driver;
+          req.driverId = driver.driverId || driver._id.toString();
+        } else {
+          req.driverId = user._id.toString();
+        }
+      }
+
       return next();
     } catch (error) {
       if (error.name !== 'TokenExpiredError') {
         console.error('JWT Authentication Error:', error.message);
       }
+      return res.status(401).json({ success: false, message: 'Not authorized, token invalid or expired' });
     }
-  }
-
-  // Fallback for Provider Panel Testing: Automatically bind Xoxo Men Provider
-  try {
-    let fallbackUser = await User.findOne({ email: 'menxoxo50@gmail.com' });
-    if (!fallbackUser) {
-      fallbackUser = await User.create({
-        fullName: 'Xoxo Men',
-        email: 'menxoxo50@gmail.com',
-        phone: '+91 98250 12345',
-        role: 'provider',
-        isVerified: true
-      });
-    }
-    let fallbackProvider = await Provider.findById('6a7f3051d4b48741d8722416');
-    if (!fallbackProvider) {
-      fallbackProvider = await Provider.findOne({ email: 'menxoxo50@gmail.com' });
-    }
-    if (fallbackProvider) {
-      req.user = fallbackUser;
-      req.provider = fallbackProvider;
-      req.providerId = fallbackProvider._id.toString();
-      return next();
-    }
-  } catch (fallbackErr) {
-    console.error('Fallback Provider Auth Error:', fallbackErr);
   }
 
   if (!token) {
@@ -103,4 +97,25 @@ const requireProvider = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, requireProvider };
+const requireDriver = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
+  if (req.user.role !== 'delivery' && req.user.role !== 'driver') {
+    return res.status(403).json({ success: false, message: 'Forbidden: Driver access required' });
+  }
+  next();
+};
+
+const requireAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Authentication required' });
+  }
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Forbidden: Admin access required' });
+  }
+  next();
+};
+
+module.exports = { protect, requireProvider, requireDriver, requireAdmin };
+

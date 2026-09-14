@@ -45,7 +45,7 @@ const getReviews = async (req, res) => {
     let reviewList = [];
 
     if (await isDbConnected()) {
-      reviewList = await Review.find({ providerId }).sort({ createdAt: -1 });
+      reviewList = await Review.find({ providerId }).sort({ createdAt: -1 }).lean();
     }
 
     // Dynamic Summary Calculations across ALL provider reviews

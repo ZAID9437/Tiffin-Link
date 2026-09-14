@@ -16,7 +16,7 @@ import {
 
 import { apiRequest } from '../services/api';
 
-export default function CapacityTab() {
+export default function CapacityTab({ currentUser }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
@@ -43,10 +43,14 @@ export default function CapacityTab() {
   const [editingCapacityVal, setEditingCapacityVal] = useState(50);
 
   useEffect(() => {
-    fetchCapacityFromDb();
-    const interval = setInterval(fetchCapacityFromDb, 3000);
+    if (currentUser) {
+      fetchCapacityFromDb();
+    }
+    const interval = setInterval(() => {
+      if (currentUser) fetchCapacityFromDb();
+    }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentUser]);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -55,9 +59,10 @@ export default function CapacityTab() {
 
   const fetchCapacityFromDb = async () => {
     try {
-      const json = await apiRequest('/capacity');
+      const res = await apiRequest('/capacity');
+      const json = typeof res?.json === 'function' ? await res.json() : res;
 
-      if (json.success && json.data) {
+      if (json && json.success && json.data) {
         if (json.data.today) {
           setTodaySummary(json.data.today);
         }

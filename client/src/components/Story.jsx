@@ -2,13 +2,13 @@ import React from 'react';
 
 export default function Story() {
   return (
-    <section className="pt-8 pb-12 px-margin-desktop bg-bone-white" id="story">
-      <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-gutter items-center">
+    <section className="pt-8 pb-12 px-4 sm:px-6 md:px-margin-desktop bg-bone-white" id="story">
+      <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-gutter items-center">
         {/* Left Side: Text */}
         <div className="lg:col-span-5 reveal-on-scroll">
-          <p className="font-label-caps text-label-caps text-secondary mb-8">OUR HERITAGE</p>
-          <h2 className="font-headline-lg text-headline-lg mb-12">Traditional home-cooking, scaled for modern life.</h2>
-          <div className="space-y-6 text-body-lg font-body-lg text-secondary">
+          <p className="font-label-caps text-xs md:text-label-caps text-secondary mb-4 md:mb-8">OUR HERITAGE</p>
+          <h2 className="font-headline-lg text-3xl sm:text-5xl md:text-headline-lg mb-8 md:mb-12">Traditional home-cooking, scaled for modern life.</h2>
+          <div className="space-y-6 text-base sm:text-body-lg font-body-lg text-secondary">
             <p>
               TiffinLink was born to empower India's talented home chefs and local cloud kitchens. Our story is written by the passionate culinary creators who wake up every morning to dry-roast whole spices, hand-grind masalas, and slow-cook regional delicacies in micro-kitchens across the country.
             </p>

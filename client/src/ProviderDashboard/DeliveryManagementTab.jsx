@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../services/api';
+import { getSocket } from '../services/socket';
 import {
   Truck,
   Zap,
@@ -58,6 +59,118 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
   const [isSubmittingPickup, setIsSubmittingPickup] = useState(false);
   const [pickupSuccessData, setPickupSuccessData] = useState(null);
   const [isTrackingDrawerOpen, setIsTrackingDrawerOpen] = useState(false);
+
+  // Customer Arrival Email OTP Verification States
+  const [isCustomerArrivalModalOpen, setIsCustomerArrivalModalOpen] = useState(false);
+  const [customerArrivalTarget, setCustomerArrivalTarget] = useState(null);
+  const [customerArrivalOtpInput, setCustomerArrivalOtpInput] = useState('');
+  const [customerArrivalMaskedEmail, setCustomerArrivalMaskedEmail] = useState('');
+  const [customerArrivalCustomerName, setCustomerArrivalCustomerName] = useState('');
+  const [isSendingArrivalOtp, setIsSendingArrivalOtp] = useState(false);
+  const [isVerifyingArrivalOtp, setIsVerifyingArrivalOtp] = useState(false);
+  const [arrivalOtpCooldown, setArrivalOtpCooldown] = useState(0);
+
+  // Cooldown countdown timer for Customer Arrival OTP
+  useEffect(() => {
+    if (arrivalOtpCooldown <= 0) return;
+    const t = setInterval(() => setArrivalOtpCooldown(prev => prev - 1), 1000);
+    return () => clearInterval(t);
+  }, [arrivalOtpCooldown]);
+
+  // Trigger Send Customer Arrival Real Email OTP
+  const handleOpenCustomerArrivalModal = async (item) => {
+    setCustomerArrivalTarget(item);
+    setIsCustomerArrivalModalOpen(true);
+    setCustomerArrivalOtpInput('');
+    setCustomerArrivalMaskedEmail('');
+    setCustomerArrivalCustomerName(item.customerName || 'Customer');
+
+    await triggerSendCustomerArrivalOtp(item);
+  };
+
+  const triggerSendCustomerArrivalOtp = async (item) => {
+    const target = item || customerArrivalTarget;
+    if (!target || isSendingArrivalOtp) return;
+    const reqId = target.requestId || target.orderId || target._id;
+
+    try {
+      setIsSendingArrivalOtp(true);
+      const res = await apiRequest(`/delivery/${reqId}/customer-arrival-otp/send`, {
+        method: 'POST',
+        body: JSON.stringify({ requestId: reqId })
+      });
+      const data = typeof res?.json === 'function' ? await res.json() : res;
+
+      if (data && data.success) {
+        if (data.alreadyConfirmed) {
+          showToast('✓ Customer arrival has already been confirmed.');
+          setIsCustomerArrivalModalOpen(false);
+          fetchDeliveryData();
+          return;
+        }
+
+        setCustomerArrivalMaskedEmail(data.maskedEmail || 'p****@gmail.com');
+        setCustomerArrivalCustomerName(data.customerName || target.customerName || 'Customer');
+        showToast(data.message || `Verification code sent to customer email (${data.maskedEmail})!`);
+        setArrivalOtpCooldown(30);
+      } else {
+        showToast(data?.message || 'Unable to send arrival OTP code.');
+      }
+    } catch (err) {
+      console.error('Error sending customer arrival OTP:', err);
+      showToast('⚠️ Unable to send verification code. Please check customer email configuration.');
+    } finally {
+      setIsSendingArrivalOtp(false);
+    }
+  };
+
+  // Verify Customer Arrival Real Email OTP
+  const handleVerifyCustomerArrivalOtp = async () => {
+    if (!customerArrivalTarget || isVerifyingArrivalOtp) return;
+    const code = String(customerArrivalOtpInput || '').trim();
+
+    if (!code || code.length !== 6 || isNaN(code)) {
+      showToast('⚠️ Please enter the 6-digit numeric OTP sent to the customer.');
+      return;
+    }
+
+    const reqId = customerArrivalTarget.requestId || customerArrivalTarget.orderId || customerArrivalTarget._id;
+
+    try {
+      setIsVerifyingArrivalOtp(true);
+      const res = await apiRequest(`/delivery/${reqId}/customer-arrival-otp/verify`, {
+        method: 'POST',
+        body: JSON.stringify({ requestId: reqId, otp: code })
+      });
+      const data = typeof res?.json === 'function' ? await res.json() : res;
+
+      if (data && data.success) {
+        showToast('✓ Customer arrival confirmed successfully! Delivery status updated to Arrived at Customer.');
+
+        setDeliveries(prev => prev.map(d => {
+          if (isDeliveryMatch(d, customerArrivalTarget)) {
+            return { ...d, status: 'ARRIVED_CUSTOMER', deliveryStatus: 'Arrived at Customer', customerArrivalConfirmed: true };
+          }
+          return d;
+        }));
+
+        if (selectedDelivery && isDeliveryMatch(selectedDelivery, customerArrivalTarget)) {
+          setSelectedDelivery(prev => ({ ...prev, status: 'ARRIVED_CUSTOMER', deliveryStatus: 'Arrived at Customer', customerArrivalConfirmed: true }));
+        }
+
+        setIsCustomerArrivalModalOpen(false);
+        setCustomerArrivalOtpInput('');
+        fetchDeliveryData();
+      } else {
+        showToast(data?.message || 'Invalid verification code. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error verifying customer arrival OTP:', err);
+      showToast('⚠️ Error verifying arrival code. Please try again.');
+    } finally {
+      setIsVerifyingArrivalOtp(false);
+    }
+  };
 
   // Send OTP Handler with real SMS and WhatsApp application integration
   const handleSendOtpCode = async () => {
@@ -141,7 +254,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
   const handleConfirmPickup = async (bypassOtp = false) => {
     if (!pickupTarget) return;
 
-    const driver = getDriverInfo(pickupTarget) || { name: 'Rahul Sharma' };
+    const driver = getDriverInfo(pickupTarget) || { name: pickupTarget?.deliveryPartnerName || 'Delivery Partner' };
     const targetOtp = String(pickupTarget.pickupOtp || '4821').trim();
     const enteredCode = String(otpInput || '').trim();
 
@@ -250,9 +363,87 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
 
   useEffect(() => {
     fetchDeliveryData();
-    const interval = setInterval(fetchDeliveryData, 4000);
-    return () => clearInterval(interval);
   }, []);
+
+  // Real-Time Socket.IO Subscriptions for Provider Active Deliveries Queue
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+      if (currentUser?.providerId || currentUser?.id || currentUser?._id) {
+        const pId = currentUser.providerId || currentUser.id || currentUser._id;
+        socket.emit('join:provider', { providerId: pId });
+      }
+    } catch (e) {
+      console.warn('Socket connection warning in DeliveryManagementTab:', e);
+    }
+    if (!socket) return;
+
+    const handleRealtimeDeliveryEvent = (data) => {
+      console.log('⚡ [Provider Queue Realtime Event]:', data);
+      fetchDeliveryData();
+    };
+
+    const handleDriverLocationEvent = (data) => {
+      if (!data) return;
+      const { requestId, orderId, driverId, location } = data;
+      if (!location) return;
+
+      setDeliveries(prev => prev.map(d => {
+        const matches = (requestId && (d.requestId === requestId || d._id === requestId)) ||
+                        (orderId && d.orderId === orderId) ||
+                        (driverId && d.assignedDriver?.driverId === driverId);
+        if (matches && d.assignedDriver) {
+          return {
+            ...d,
+            assignedDriver: {
+              ...d.assignedDriver,
+              location: { ...d.assignedDriver.location, ...location }
+            }
+          };
+        }
+        return d;
+      }));
+    };
+
+    const handleOtpSentEvent = (data) => {
+      console.log('🔑 [Kitchen Pickup OTP Received]:', data);
+      if (data && data.otp) {
+        const targetId = data.orderId || data.deliveryId || data.requestId;
+        const msg = `🔑 Kitchen Pickup OTP Code: ${data.otp} (Order ${targetId})`;
+        showToast(msg);
+        setDeliveries(prev => prev.map(d => {
+          if (isDeliveryMatch(d, { requestId: targetId, orderId: targetId, _id: targetId })) {
+            return { ...d, pickupOtp: data.otp };
+          }
+          return d;
+        }));
+      }
+      fetchDeliveryData();
+    };
+
+    socket.on('delivery:assigned', handleRealtimeDeliveryEvent);
+    socket.on('delivery:request:accepted', handleRealtimeDeliveryEvent);
+    socket.on('delivery:request:new', handleRealtimeDeliveryEvent);
+    socket.on('delivery:otp:sent', handleOtpSentEvent);
+    socket.on('delivery:status:updated', handleRealtimeDeliveryEvent);
+    socket.on('delivery:status-updated', handleRealtimeDeliveryEvent);
+    socket.on('delivery:completed', handleRealtimeDeliveryEvent);
+    socket.on('driver:location:updated', handleDriverLocationEvent);
+    socket.on('delivery:location:changed', handleDriverLocationEvent);
+
+    return () => {
+      socket.off('delivery:assigned', handleRealtimeDeliveryEvent);
+      socket.off('delivery:request:accepted', handleRealtimeDeliveryEvent);
+      socket.off('delivery:request:new', handleRealtimeDeliveryEvent);
+      socket.off('delivery:otp:sent', handleOtpSentEvent);
+      socket.off('delivery:status:updated', handleRealtimeDeliveryEvent);
+      socket.off('delivery:status-updated', handleRealtimeDeliveryEvent);
+      socket.off('delivery:completed', handleRealtimeDeliveryEvent);
+      socket.off('driver:location:updated', handleDriverLocationEvent);
+      socket.off('delivery:location:changed', handleDriverLocationEvent);
+    };
+  }, [currentUser]);
 
   const fetchDeliveryData = async () => {
     try {
@@ -260,16 +451,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
       const delJson = await apiRequest('/delivery/requests');
 
       if (delJson.success && Array.isArray(delJson.requests)) {
-        setDeliveries(prev => {
-          if (!prev || prev.length === 0) return delJson.requests;
-          return delJson.requests.map(fresh => {
-            const matchInPrev = prev.find(p => isDeliveryMatch(p, fresh));
-            if (matchInPrev && (matchInPrev.status === 'Out for Delivery' || matchInPrev.status === 'Picked Up')) {
-              return { ...fresh, status: matchInPrev.status, pickedUpAt: matchInPrev.pickedUpAt || fresh.pickedUpAt };
-            }
-            return fresh;
-          });
-        });
+        setDeliveries(delJson.requests);
       }
 
       // 2. Fetch Ready Orders from MongoDB
@@ -338,21 +520,18 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
           setAssignedDriverResult(json.request.assignedDriver);
           showToast(`✓ Driver ${json.request.assignedDriver.name} accepted the delivery request!`);
         } else {
-          const fallback = nearbyDrivers[0] || { name: 'Rahul Sharma', rating: 4.9, vehicleNo: 'GJ-01-AB-1029', distanceKm: 0.8 };
-          setAssignedDriverResult(fallback);
-          showToast(`✓ Driver ${fallback.name} accepted the delivery request!`);
+          showToast('📡 Request broadcasted to all online delivery partners nearby!');
         }
         fetchDeliveryData();
-      }, 2500);
+      }, 2000);
 
     } catch (err) {
       console.error('Error auto dispatching delivery:', err);
       setTimeout(() => {
         setIsAutoSearching(false);
-        const fallback = nearbyDrivers[0] || { name: 'Rahul Sharma', rating: 4.9, vehicleNo: 'GJ-01-AB-1029', distanceKm: 0.8 };
-        setAssignedDriverResult(fallback);
+        showToast('⚠️ Broadcast initiated. Waiting for driver acceptance.');
         fetchDeliveryData();
-      }, 2500);
+      }, 2000);
     }
   };
 
@@ -363,22 +542,25 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
     const assigned = item.assignedDriver;
     const name = (typeof assigned === 'object' && assigned?.name) ? assigned.name : item.deliveryPartnerName;
 
-    if (name && String(name).trim() !== '') {
-      // Cross-reference with MongoDB live drivers list for 100% accurate phone, rating & vehicle details
-      const dbMatch = nearbyDrivers.find(d =>
-        (assigned?.driverId && (d.driverId === assigned.driverId || d._id === assigned.driverId)) ||
-        (d.name && d.name.toLowerCase().trim() === String(name).toLowerCase().trim())
-      );
-
-      return {
-        driverId: dbMatch?.driverId || assigned?.driverId || 'DRV-101',
-        name: dbMatch?.name || name,
-        phone: dbMatch?.phone || assigned?.phone || item.deliveryPartnerPhone || '+91 98251 44556',
-        rating: dbMatch?.rating || assigned?.rating || 4.8,
-        vehicleNo: dbMatch?.vehicleNo || assigned?.vehicleNo || 'Bike'
-      };
+    // Do not return driver info if order is still searching or unassigned
+    const statusNorm = normalizeStatus(item.status);
+    if (statusNorm === 'Assignment Pending' || statusNorm === 'Searching Drivers' || !name || String(name).trim() === '') {
+      return null;
     }
-    return null;
+
+    // Cross-reference with MongoDB live drivers list for 100% accurate phone, rating & vehicle details
+    const dbMatch = nearbyDrivers.find(d =>
+      (assigned?.driverId && (String(d.driverId) === String(assigned.driverId) || String(d._id) === String(assigned.driverId))) ||
+      (d.name && d.name.toLowerCase().trim() === String(name).toLowerCase().trim())
+    );
+
+    return {
+      driverId: dbMatch?.driverId || dbMatch?._id || assigned?.driverId || '',
+      name: dbMatch?.name || assigned?.name || name,
+      phone: dbMatch?.phone || assigned?.phone || item.deliveryPartnerPhone || '',
+      rating: dbMatch?.rating || assigned?.rating || null,
+      vehicleNo: dbMatch?.vehicleNo || dbMatch?.vehicleNumber || assigned?.vehicleNo || ''
+    };
   };
 
   // Helper to cleanly format Order IDs without double hashes
@@ -618,7 +800,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
           >
             <option value="All">All Delivery Partners</option>
             {nearbyDrivers.map(d => (
-              <option key={d.driverId} value={d.name}>{d.name} ({d.status})</option>
+              <option key={d._id || d.driverId || d.name} value={d.name}>{d.name} ({d.status || 'AVAILABLE'})</option>
             ))}
           </select>
 
@@ -708,6 +890,12 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                       {/* Order ID & Time */}
                       <td className="py-3.5 px-4">
                         <div className="font-black text-[#0A8B5F]">{item.orderId || item.requestId}</div>
+                        {item.pickupOtp && (
+                          <div className="mt-1 text-[11px] font-black text-emerald-900 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                            <span>🔑 OTP:</span>
+                            <span className="tracking-widest font-mono font-bold text-emerald-950">{item.pickupOtp}</span>
+                          </div>
+                        )}
                         <div className="text-[10px] text-[#6B7280] font-normal mt-0.5">
                           {new Date(item.requestedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -806,6 +994,18 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                             </button>
                           )}
 
+                          {/* Confirm Customer Arrival Action */}
+                          {(statusNorm === 'Out for Delivery' || statusNorm === 'Picked Up') && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCustomerArrivalModal(item)}
+                              className="bg-emerald-800 hover:bg-emerald-900 text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center gap-1 active:scale-95"
+                            >
+                              <CheckCircle2 size={12} />
+                              <span>CONFIRM ARRIVAL AT CUSTOMER LOCATION</span>
+                            </button>
+                          )}
+
                           {/* Track Live Action */}
                           {(statusNorm === 'Out for Delivery' || statusNorm === 'Picked Up') && (
                             <button
@@ -882,7 +1082,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
               </thead>
               <tbody className="divide-y divide-[#E5ECE8] font-medium text-[#111827]">
                 {nearbyDrivers.map(drv => (
-                  <tr key={drv._id || drv.driverId} className="hover:bg-[#F9FBF9]">
+                  <tr key={drv._id || drv.driverId || drv.name} className="hover:bg-[#F9FBF9]">
                     <td className="py-3.5 px-3">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-full bg-emerald-100 text-[#0A8B5F] font-black flex items-center justify-center text-xs border border-emerald-300">
@@ -890,18 +1090,18 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                         </div>
                         <div>
                           <div className="font-extrabold text-[#111827]">{drv.name}</div>
-                          <div className="text-[10px] text-[#0A8B5F] font-bold">{drv.driverId || 'DRV-101'}</div>
+                          <div className="text-[10px] text-[#0A8B5F] font-bold">{drv.driverId || String(drv._id).substring(0, 8)}</div>
                         </div>
                       </div>
                     </td>
                     <td className="py-3.5 px-3">
-                      <div className="font-bold text-[#4B5563]">{drv.vehicleNo || 'GJ-01-AB-1029'} ({drv.vehicleType || drv.vehicle || 'Bike'})</div>
-                      <div className="text-[10px] text-[#6B7280]">{drv.phone}</div>
+                      <div className="font-bold text-[#4B5563]">{drv.vehicleNo || drv.vehicleNumber || 'Vehicle not registered'} ({drv.vehicleType || drv.vehicle || 'Bike'})</div>
+                      <div className="text-[10px] text-[#6B7280]">{drv.phone || 'N/A'}</div>
                     </td>
                     <td className="py-3.5 px-3">
                       <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-black rounded-lg flex items-center gap-1 w-max">
                         <Star size={12} className="text-amber-500 fill-amber-500" />
-                        <span>{drv.rating || 4.8}</span>
+                        <span>{drv.rating ? drv.rating : 'N/A'}</span>
                       </span>
                     </td>
                     <td className="py-3.5 px-3 font-bold text-[#4B5563]">
@@ -1101,27 +1301,33 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
 
                 {/* DELIVERY PARTNER SECTION */}
                 {(() => {
-                  const targetDriver = getDriverInfo(pickupTarget) || { name: 'Rahul Sharma', phone: '+91 98251 44556', rating: 4.8, vehicleNo: 'Bike GJ-01-AB-1029' };
-                  return (
+                  const targetDriver = getDriverInfo(pickupTarget);
+                  return targetDriver ? (
                     <div className="p-3.5 bg-white rounded-xl border border-[#E5ECE8] space-y-2 text-xs">
                       <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#6B7280]">DELIVERY PARTNER</div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-[#E8F0EC] text-[#0A8B5F] flex items-center justify-center font-black text-sm border border-[#0A8B5F]/20">
-                            {targetDriver.name ? targetDriver.name.charAt(0) : 'R'}
+                            {targetDriver.name ? targetDriver.name.charAt(0) : 'D'}
                           </div>
                           <div>
                             <div className="font-black text-[#111827] flex items-center gap-1.5">
                               <span>{targetDriver.name}</span>
-                              <span className="text-[10px] text-amber-600 flex items-center">★ {targetDriver.rating || 4.8}</span>
+                              {targetDriver.rating && <span className="text-[10px] text-amber-600 flex items-center">★ {targetDriver.rating}</span>}
                             </div>
-                            <div className="text-[10px] text-[#6B7280] font-medium">{targetDriver.vehicleNo || 'Bike'} • {targetDriver.phone}</div>
+                            <div className="text-[10px] text-[#6B7280] font-medium">
+                              {targetDriver.vehicleNo || 'Vehicle not registered'} • {targetDriver.phone || 'No phone'}
+                            </div>
                           </div>
                         </div>
                         <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black rounded-lg">
                           ● Arrived at Pickup
                         </span>
                       </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 font-bold text-center">
+                      No delivery partner assigned yet.
                     </div>
                   );
                 })()}
@@ -1358,6 +1564,20 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                 Close Drawer
               </button>
 
+              {['Out for Delivery', 'Picked Up'].includes(normalizeStatus(selectedDelivery.status)) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsTrackingDrawerOpen(false);
+                    handleOpenCustomerArrivalModal(selectedDelivery);
+                  }}
+                  className="bg-emerald-800 hover:bg-emerald-900 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <CheckCircle2 size={14} />
+                  <span>CONFIRM ARRIVAL AT CUSTOMER LOCATION</span>
+                </button>
+              )}
+
               {normalizeStatus(selectedDelivery.status) === 'Failed / Cancelled' && (
                 <button
                   type="button"
@@ -1368,6 +1588,90 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                   <span>Retry Assignment</span>
                 </button>
               )}
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 21. CUSTOMER ARRIVAL EMAIL OTP VERIFICATION MODAL */}
+      {isCustomerArrivalModalOpen && (
+        <div className="fixed inset-0 z-[6000] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#E5ECE8] space-y-5 animate-scale-up text-center font-sans text-xs">
+            
+            <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
+              <div className="flex items-center gap-2 text-[#0A8B5F]">
+                <ShieldCheck size={20} />
+                <h3 className="text-sm font-black text-[#111827] uppercase tracking-wider">Confirm Customer Arrival</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsCustomerArrivalModalOpen(false); setCustomerArrivalOtpInput(''); }}
+                className="text-[#9CA3AF] hover:text-[#111827] cursor-pointer p-1 rounded-full"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 bg-[#F9FBF9] rounded-2xl border border-[#E5ECE8] text-left space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-extrabold text-[#6B7280]">Customer Name</span>
+                <span className="font-black text-[#111827]">{customerArrivalCustomerName}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-[#E5ECE8] pt-2">
+                <span className="text-[10px] uppercase font-extrabold text-[#6B7280]">Registered Email</span>
+                <span className="font-extrabold text-[#0A8B5F] font-mono">{customerArrivalMaskedEmail || 'p****@gmail.com'}</span>
+              </div>
+              <div className="text-[11px] text-[#6B7280] pt-1">
+                📧 A 6-digit security verification code has been dispatched to the customer's registered email address.
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-left text-xs font-black text-[#111827] uppercase tracking-wider">
+                Verification Code (6-Digit OTP)
+              </label>
+              
+              <input
+                type="text"
+                maxLength={6}
+                placeholder="• • • • • •"
+                value={customerArrivalOtpInput}
+                onChange={(e) => setCustomerArrivalOtpInput(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
+                className="w-full text-center text-2xl font-mono font-black tracking-[0.5em] py-3.5 bg-[#F9FBF9] border-2 border-[#E5ECE8] focus:border-[#0A8B5F] focus:bg-white rounded-2xl outline-none transition-all text-[#111827]"
+              />
+
+              <div className="flex items-center justify-between text-[11px] font-bold text-[#6B7280] px-1">
+                <span>Passcode expires in 5 minutes</span>
+                <button
+                  type="button"
+                  disabled={isSendingArrivalOtp || arrivalOtpCooldown > 0}
+                  onClick={() => triggerSendCustomerArrivalOtp()}
+                  className="text-[#0A8B5F] hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer font-black"
+                >
+                  {isSendingArrivalOtp ? 'Sending...' : arrivalOtpCooldown > 0 ? `Resend in ${arrivalOtpCooldown}s` : 'RESEND CODE'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => { setIsCustomerArrivalModalOpen(false); setCustomerArrivalOtpInput(''); }}
+                className="py-3 px-4 border border-[#E5ECE8] hover:bg-gray-100 text-[#4B5563] font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                CANCEL
+              </button>
+              
+              <button
+                type="button"
+                disabled={isVerifyingArrivalOtp || customerArrivalOtpInput.length !== 6}
+                onClick={handleVerifyCustomerArrivalOtp}
+                className="py-3 px-4 bg-[#0A8B5F] hover:bg-[#08734e] disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+              >
+                <CheckCircle2 size={16} />
+                <span>{isVerifyingArrivalOtp ? 'VERIFYING...' : 'VERIFY ARRIVAL'}</span>
+              </button>
             </div>
 
           </div>

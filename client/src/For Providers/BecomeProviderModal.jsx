@@ -636,7 +636,7 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
           </p>
 
           <form onSubmit={handleVerifyOtpSubmit} className="w-full space-y-8">
-            <div className={`flex justify-between w-full max-w-[380px] mx-auto gap-2 sm:gap-3 ${shakeOtp ? 'shake' : ''}`} onPaste={handleOtpPaste}>
+            <div className={`flex justify-between w-full max-w-[380px] mx-auto gap-1.5 sm:gap-3 ${shakeOtp ? 'shake' : ''}`} onPaste={handleOtpPaste}>
               {otp.map((digit, idx) => (
                 <input
                   key={idx}
@@ -649,7 +649,7 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                   onChange={(e) => handleOtpChange(e.target.value, idx)}
                   onKeyDown={(e) => handleOtpKeyDown(e, idx)}
                   disabled={loading}
-                  className="w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-bold border-2 border-sand-neutral/80 rounded-lg focus:outline-none focus:border-onyx-black bg-bone-white text-onyx-black shadow-sm transition-all"
+                  className="w-10 h-12 sm:w-14 sm:h-16 text-center text-xl sm:text-2xl font-bold border-2 border-sand-neutral/80 rounded-lg focus:outline-none focus:border-onyx-black bg-bone-white text-onyx-black shadow-sm transition-all"
                 />
               ))}
             </div>

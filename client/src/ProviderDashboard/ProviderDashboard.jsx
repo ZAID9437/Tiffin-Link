@@ -75,42 +75,26 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
   useEffect(() => {
     const fetchSidebarBadges = async () => {
       try {
-        // 1. Fetch live pending requests count from MongoDB
-        const reqRes = await apiRequest('/requests');
-        const reqJson = await reqRes.json();
-        let reqCount = 0;
-        if (reqJson.success && Array.isArray(reqJson.data)) {
-          reqCount = reqJson.data.filter(r => r.status === 'pending').length;
-        }
-
-        // 2. Fetch new orders count from MongoDB
-        const ordRes = await apiRequest('/orders');
-        const ordJson = await ordRes.json();
-        let newCount = 0;
-        if (ordJson.success && Array.isArray(ordJson.data)) {
-          newCount = ordJson.data.filter(o => o.status === 'New').length;
-        }
-
-        // 3. Fetch provider online status from MongoDB
         const dashRes = await apiRequest('/providers/dashboard');
-        const dashJson = await dashRes.json();
-        if (dashJson.success && dashJson.data && dashJson.data.acceptingOrders !== undefined) {
-          setIsKitchenOnline(Boolean(dashJson.data.acceptingOrders));
+        const dashJson = typeof dashRes?.json === 'function' ? await dashRes.json() : dashRes;
+        if (dashJson && dashJson.success && dashJson.data) {
+          if (dashJson.data.acceptingOrders !== undefined) {
+            setIsKitchenOnline(Boolean(dashJson.data.acceptingOrders));
+          }
+          setBadgeCounts({
+            liveRequests: dashJson.data.liveRequestsCount || 0,
+            newOrders: dashJson.data.newOrdersCount || 0
+          });
         }
-
-        setBadgeCounts({
-          liveRequests: reqCount,
-          newOrders: newCount
-        });
       } catch (err) {
         console.error('Error fetching sidebar badge counts from MongoDB:', err);
       }
     };
 
-    fetchSidebarBadges();
-    const interval = setInterval(fetchSidebarBadges, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    if (currentUser) {
+      fetchSidebarBadges();
+    }
+  }, [currentUser]);
 
   const handleToggleKitchenOnline = async () => {
     const nextStatus = !isKitchenOnline;
@@ -144,49 +128,49 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         case 'dashboard':
           return <DashboardOverviewTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
         case 'requests':
-          return <LiveRequestsTab onNavigateTab={setActiveTab} onAcceptRequest={() => setActiveTab('orders-preparing')} />;
+          return <LiveRequestsTab currentUser={currentUser} onNavigateTab={setActiveTab} onAcceptRequest={() => setActiveTab('orders-preparing')} />;
         case 'tiffins':
-          return <MyTiffinsTab key="all" initialSubView="all" onNavigateTab={setActiveTab} />;
+          return <MyTiffinsTab currentUser={currentUser} key="all" initialSubView="all" onNavigateTab={setActiveTab} />;
         case 'add-tiffin':
-          return <MyTiffinsTab key="add" initialSubView="add" initialOpenModal={true} onNavigateTab={setActiveTab} />;
+          return <MyTiffinsTab currentUser={currentUser} key="add" initialSubView="add" initialOpenModal={true} onNavigateTab={setActiveTab} />;
         case 'availability':
-          return <MyTiffinsTab key="availability" initialSubView="availability" onNavigateTab={setActiveTab} />;
+          return <MyTiffinsTab currentUser={currentUser} key="availability" initialSubView="availability" onNavigateTab={setActiveTab} />;
         case 'categories':
-          return <MyTiffinsTab key="categories" initialSubView="categories" onNavigateTab={setActiveTab} />;
+          return <MyTiffinsTab currentUser={currentUser} key="categories" initialSubView="categories" onNavigateTab={setActiveTab} />;
         case 'orders':
         case 'orders-all':
-          return <OrdersTab initialStatus="All" />;
+          return <OrdersTab currentUser={currentUser} initialStatus="All" />;
         case 'orders-new':
-          return <OrdersTab initialStatus="New" />;
+          return <OrdersTab currentUser={currentUser} initialStatus="New" />;
         case 'orders-preparing':
-          return <OrdersTab initialStatus="Preparing" />;
+          return <OrdersTab currentUser={currentUser} initialStatus="Preparing" />;
         case 'orders-ready':
-          return <OrdersTab initialStatus="Ready" />;
+          return <OrdersTab currentUser={currentUser} initialStatus="Ready" />;
         case 'orders-delivery':
         case 'delivery':
           return <DeliveryManagementTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
         case 'orders-completed':
-          return <OrdersTab initialStatus="Completed" />;
+          return <OrdersTab currentUser={currentUser} initialStatus="Completed" />;
         case 'orders-cancelled':
-          return <OrdersTab initialStatus="Cancelled" />;
+          return <OrdersTab currentUser={currentUser} initialStatus="Cancelled" />;
         case 'customers':
-          return <CustomersTab />;
+          return <CustomersTab currentUser={currentUser} />;
         case 'subscriptions':
-          return <SubscriptionsTab />;
+          return <SubscriptionsTab currentUser={currentUser} />;
         case 'reviews':
-          return <ReviewsTab />;
+          return <ReviewsTab currentUser={currentUser} />;
         case 'earnings':
-          return <EarningsTab />;
+          return <EarningsTab currentUser={currentUser} />;
         case 'analytics':
-          return <AnalyticsTab />;
+          return <AnalyticsTab currentUser={currentUser} />;
         case 'capacity':
-          return <CapacityTab />;
+          return <CapacityTab currentUser={currentUser} />;
         case 'service-area':
-          return <ServiceAreaTab />;
+          return <ServiceAreaTab currentUser={currentUser} />;
         case 'schedule':
-          return <ScheduleTab />;
+          return <ScheduleTab currentUser={currentUser} />;
         case 'notifications':
-          return <NotificationsTab onNavigateTab={setActiveTab} />;
+          return <NotificationsTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
         case 'settings':
           return <SettingsTab currentUser={currentUser} onUpdateUser={onUpdateUser} />;
         case 'help':
@@ -215,7 +199,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-            className="md:hidden p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F9FBF9] rounded-xl transition-colors cursor-pointer"
+            className="lg:hidden p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F9FBF9] rounded-xl transition-colors cursor-pointer"
           >
             {isMobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>

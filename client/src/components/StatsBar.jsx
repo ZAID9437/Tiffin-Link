@@ -33,6 +33,23 @@ export default function StatsBar() {
     };
   }, []);
 
+  const [targets, setTargets] = useState({ target1: 1, target2: 1, target3: 98, target4: 1 });
+
+  useEffect(() => {
+    const fetchPlatformStats = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/providers');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setTargets(prev => ({ ...prev, target2: Math.max(1, json.data.length) }));
+        }
+      } catch (err) {
+        console.error('Error fetching platform stats:', err);
+      }
+    };
+    fetchPlatformStats();
+  }, []);
+
   useEffect(() => {
     if (!hasStarted) return;
 
@@ -40,10 +57,7 @@ export default function StatsBar() {
     const steps = 60;
     const intervalTime = duration / steps;
 
-    const target1 = 12;
-    const target2 = 450;
-    const target3 = 98;
-    const target4 = 15;
+    const { target1, target2, target3, target4 } = targets;
 
     let step = 0;
 
@@ -61,7 +75,7 @@ export default function StatsBar() {
     }, intervalTime);
 
     return () => clearInterval(timer);
-  }, [hasStarted]);
+  }, [hasStarted, targets]);
 
   const STATS_ITEMS = [
     {
@@ -107,20 +121,20 @@ export default function StatsBar() {
       ref={sectionRef} 
       className="relative bg-surface-container pt-8 pb-24 overflow-hidden border-b border-sand-neutral/30 select-none"
     >
-      <div className="px-margin-desktop max-w-[1440px] mx-auto relative flex flex-col items-center">
+      <div className="px-4 sm:px-6 md:px-margin-desktop max-w-[1440px] mx-auto relative flex flex-col items-center">
         
         {/* Sleek Horizontal Supporting Rod */}
         <div className="absolute top-0 left-4 right-4 h-[3px] bg-gradient-to-r from-clay-earth/20 via-clay-earth/60 to-clay-earth/20 rounded z-20 shadow-sm" />
 
         {/* Hanging Signboards Grid */}
-        <div className="w-full grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16 items-start justify-items-center pt-3">
+        <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-12 sm:gap-y-16 items-start justify-items-center pt-3">
           {STATS_ITEMS.map((item) => {
             const isHovered = hoveredId === item.id;
             
             return (
               <div 
                 key={item.id} 
-                className="flex flex-col items-center relative"
+                className="flex flex-col items-center relative w-full"
                 style={{
                   height: '100%',
                   zIndex: isHovered ? 30 : 10
@@ -163,7 +177,7 @@ export default function StatsBar() {
 
                   {/* Hanging Stat Card */}
                   <div 
-                    className="relative bg-surface-bright border border-clay-earth/20 rounded-xl p-5 w-44 md:w-48 shadow-md hover:shadow-xl hover:border-clay-earth/35 transition-all duration-[1200ms] cubic-bezier(0.175, 0.885, 0.32, 1.275) flex flex-col items-center text-center -mt-[1px] z-10"
+                    className="relative bg-surface-bright border border-clay-earth/20 rounded-xl p-4 sm:p-5 w-40 sm:w-44 md:w-48 shadow-md hover:shadow-xl hover:border-clay-earth/35 transition-all duration-[1200ms] cubic-bezier(0.175, 0.885, 0.32, 1.275) flex flex-col items-center text-center -mt-[1px] z-10"
                     style={{
                       transform: isHovered ? 'scale(1.05)' : 'scale(1)',
                       opacity: hasStarted ? 1 : 0,

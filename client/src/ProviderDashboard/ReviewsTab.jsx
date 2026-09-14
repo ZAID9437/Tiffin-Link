@@ -29,18 +29,18 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '../services/api';
 
-export default function ReviewsTab() {
+export default function ReviewsTab({ currentUser }) {
   const [reviews, setReviews] = useState([]);
   const [stats, setStats] = useState({
-    overallRating: '4.8',
-    totalReviews: 6,
-    positivePercent: 92,
-    needAttentionCount: 2,
-    thisMonthCount: 6,
-    breakdownCounts: { 5: 4, 4: 2, 3: 0, 2: 0, 1: 0 },
+    overallRating: '0.0',
+    totalReviews: 0,
+    positivePercent: 0,
+    needAttentionCount: 0,
+    thisMonthCount: 0,
+    breakdownCounts: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
     ratingDistribution: {
-      5: { count: 4, percent: 67 },
-      4: { count: 2, percent: 33 },
+      5: { count: 0, percent: 0 },
+      4: { count: 0, percent: 0 },
       3: { count: 0, percent: 0 },
       2: { count: 0, percent: 0 },
       1: { count: 0, percent: 0 }
@@ -79,12 +79,14 @@ export default function ReviewsTab() {
 
   // Polling for Real-Time Live Updates
   useEffect(() => {
-    fetchReviewsFromDb();
+    if (currentUser) {
+      fetchReviewsFromDb();
+    }
     const interval = setInterval(() => {
-      fetchReviewsFromDb(false);
+      if (currentUser) fetchReviewsFromDb(false);
     }, 10000); // 10s polling for real-time live sync
     return () => clearInterval(interval);
-  }, [searchTerm, ratingFilter, statusFilter, tiffinFilter, dateRangeFilter, sortBy, currentPage]);
+  }, [currentUser, searchTerm, ratingFilter, statusFilter, tiffinFilter, dateRangeFilter, sortBy, currentPage]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -107,7 +109,8 @@ export default function ReviewsTab() {
         limit: 5
       });
 
-      const json = await apiRequest(`/reviews?${queryParams.toString()}`);
+      const res = await apiRequest(`/reviews?${queryParams.toString()}`);
+      const json = typeof res?.json === 'function' ? await res.json() : res;
 
       if (json.success && json.data) {
         if (Array.isArray(json.data.reviews)) {

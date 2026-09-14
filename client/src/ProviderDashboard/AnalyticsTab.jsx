@@ -21,7 +21,7 @@ import {
 
 import { apiRequest } from '../services/api';
 
-export default function AnalyticsTab() {
+export default function AnalyticsTab({ currentUser }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
@@ -33,15 +33,10 @@ export default function AnalyticsTab() {
   const [hoveredDay, setHoveredDay] = useState(null);
 
   useEffect(() => {
-    fetchAnalyticsData();
-
-    // Live Auto-Sync every 5 seconds to keep Analytics 100% Real-Time
-    const intervalId = setInterval(() => {
-      fetchAnalyticsData(true);
-    }, 5000);
-
-    return () => clearInterval(intervalId);
-  }, []);
+    if (currentUser) {
+      fetchAnalyticsData();
+    }
+  }, [currentUser]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -51,8 +46,9 @@ export default function AnalyticsTab() {
   const fetchAnalyticsData = async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true);
-      const json = await apiRequest('/analytics');
-      if (json.success) {
+      const res = await apiRequest('/analytics');
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+      if (json && json.success) {
         setData(json);
       }
     } catch (err) {
@@ -70,10 +66,10 @@ export default function AnalyticsTab() {
       ['Total Orders', data.summary?.ordersCount || 0],
       ['Gross Revenue (INR)', data.summary?.revenue || 0],
       ['Unique Customers', data.summary?.customersCount || 0],
-      ['Average Rating', data.summary?.avgRating || '4.7'],
+      ['Average Rating', data.summary?.avgRating || 0],
       ['New Customers', data.customerInsights?.newCustomers || 0],
       ['Returning Customers', data.customerInsights?.returningCustomers || 0],
-      ['Repeat Rate (%)', `${data.customerInsights?.repeatRate || 64}%`]
+      ['Repeat Rate (%)', `${data.customerInsights?.repeatRate || 0}%`]
     ];
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -97,11 +93,11 @@ export default function AnalyticsTab() {
     );
   }
 
-  const summary = data?.summary || { ordersCount: 24, revenue: 4850, customersCount: 19, avgRating: '4.7' };
+  const summary = data?.summary || { ordersCount: 0, revenue: 0, customersCount: 0, avgRating: 0 };
   const topTiffins = data?.topTiffins || [];
-  const orderPerf = data?.orderPerformance || { counts: {}, percentages: { Completed: 82, Preparing: 8, Ready: 4, Cancelled: 6, Pending: 0 } };
-  const custInsights = data?.customerInsights || { newCustomers: 19, returningCustomers: 34, repeatRate: 64 };
-  const ratingAnalytics = data?.ratingAnalytics || { overallRating: '4.7', totalReviews: 5, distribution: { 5: 3, 4: 1, 3: 1, 2: 0, 1: 0 } };
+  const orderPerf = data?.orderPerformance || { counts: {}, percentages: { Completed: 0, Preparing: 0, Ready: 0, Cancelled: 0, Pending: 0 } };
+  const custInsights = data?.customerInsights || { newCustomers: 0, returningCustomers: 0, repeatRate: 0 };
+  const ratingAnalytics = data?.ratingAnalytics || { overallRating: '0.0', totalReviews: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
   const chartDataDays = data?.chartData || [];
   const businessInsights = data?.businessInsights || [];  // Dynamic Chart Data Calculation based on chartRange (7D, 30D, 90D, 1Y)
   const getDynamicChartData = () => {

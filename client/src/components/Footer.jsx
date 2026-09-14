@@ -6,20 +6,20 @@ export default function Footer({ onOpenBecomeProviderModal, onOpenCookieConsentM
   };
 
   return (
-    <footer className="bg-bone-white pt-section-gap pb-margin-mobile border-t border-sand-neutral">
-      <div className="px-margin-desktop max-w-[1440px] mx-auto">
-        <div className="mb-24 overflow-hidden">
+    <footer className="bg-bone-white pt-12 md:pt-section-gap pb-margin-mobile border-t border-sand-neutral">
+      <div className="px-4 sm:px-6 md:px-margin-desktop max-w-[1440px] mx-auto">
+        <div className="mb-12 md:mb-24 overflow-hidden">
           <marquee scrollamount="8" behavior="scroll" direction="left" className="block select-none">
             <h2 
-              className="font-display-lg text-display-lg uppercase tracking-tighter text-onyx-black opacity-[0.12] hover:opacity-20 hover:tracking-normal hover:text-clay-earth transition-all duration-1000 ease-out cursor-default select-none whitespace-nowrap"
+              className="font-display-lg text-4xl sm:text-7xl md:text-display-lg uppercase tracking-tighter text-onyx-black opacity-[0.12] hover:opacity-20 hover:tracking-normal hover:text-clay-earth transition-all duration-1000 ease-out cursor-default select-none whitespace-nowrap"
             >
               TIFFINLINK &nbsp;&nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;&nbsp; TIFFINLINK &nbsp;&nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;&nbsp; TIFFINLINK &nbsp;&nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;&nbsp; TIFFINLINK &nbsp;&nbsp;&nbsp;&nbsp; • &nbsp;&nbsp;&nbsp;&nbsp; TIFFINLINK
             </h2>
           </marquee>
         </div>
-        <div className="grid grid-cols-12 gap-gutter">
-          <div className="col-span-12 md:col-span-4 mb-12 md:mb-0">
-            <p className="font-label-caps text-label-caps mb-8 text-secondary">NEWSLETTER</p>
+        <div className="grid grid-cols-12 gap-6 md:gap-gutter">
+          <div className="col-span-12 md:col-span-4 mb-8 md:mb-0">
+            <p className="font-label-caps text-label-caps mb-4 md:mb-8 text-secondary">NEWSLETTER</p>
             <form onSubmit={(e) => e.preventDefault()} className="flex pb-2 relative group/form">
               <input 
                 className="bg-transparent border-none p-0 flex-grow focus:ring-0 font-label-caps text-label-caps placeholder-secondary/30 text-onyx-black" 
@@ -34,7 +34,7 @@ export default function Footer({ onOpenBecomeProviderModal, onOpenCookieConsentM
             </form>
           </div>
           <div className="col-span-6 md:col-span-2 md:col-start-7">
-            <p className="font-label-caps text-label-caps mb-8 text-secondary">NAVIGATION</p>
+            <p className="font-label-caps text-label-caps mb-4 md:mb-8 text-secondary">NAVIGATION</p>
             <ul className="space-y-4 font-label-caps text-label-caps">
               <li><a className="hover:opacity-50 transition-opacity" href="#kitchens">KITCHENS</a></li>
               <li><a className="hover:opacity-50 transition-opacity" href="#process">THE PROCESS</a></li>
@@ -51,7 +51,7 @@ export default function Footer({ onOpenBecomeProviderModal, onOpenCookieConsentM
             </ul>
           </div>
           <div className="col-span-6 md:col-span-2">
-            <p className="font-label-caps text-label-caps mb-8 text-secondary">SOCIAL</p>
+            <p className="font-label-caps text-label-caps mb-4 md:mb-8 text-secondary">SOCIAL</p>
             <ul className="space-y-4 font-label-caps text-label-caps">
               <li><a className="hover:opacity-50 transition-opacity" href="#instagram">INSTAGRAM</a></li>
               <li><a className="hover:opacity-50 transition-opacity" href="#linkedin">LINKEDIN</a></li>
@@ -59,7 +59,7 @@ export default function Footer({ onOpenBecomeProviderModal, onOpenCookieConsentM
             </ul>
           </div>
           <div className="col-span-12 md:col-span-2">
-            <p className="font-label-caps text-label-caps mb-8 text-secondary">LEGAL</p>
+            <p className="font-label-caps text-label-caps mb-4 md:mb-8 text-secondary">LEGAL</p>
             <ul className="space-y-4 font-label-caps text-label-caps">
               <li><a className="hover:opacity-50 transition-opacity" href="#privacy">PRIVACY</a></li>
               <li><a className="hover:opacity-50 transition-opacity" href="#terms">TERMS</a></li>
@@ -74,11 +74,11 @@ export default function Footer({ onOpenBecomeProviderModal, onOpenCookieConsentM
             </ul>
           </div>
         </div>
-        <div className="mt-24 pt-8 border-t border-sand-neutral/30 flex justify-between items-center">
-          <p className="font-body-md text-body-md text-secondary opacity-50">© 2024 TIFFINLINK. ARTISANAL CRAFT.</p>
+        <div className="mt-12 md:mt-24 pt-6 md:pt-8 border-t border-sand-neutral/30 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
+          <p className="font-body-md text-xs sm:text-body-md text-secondary opacity-50">© 2024 TIFFINLINK. ARTISANAL CRAFT.</p>
           <button 
             onClick={handleBackToTop}
-            className="font-label-caps text-label-caps text-secondary hover:text-onyx-black transition-colors" 
+            className="font-label-caps text-xs sm:text-label-caps text-secondary hover:text-onyx-black transition-colors" 
             id="back-to-top"
           >
             BACK TO TOP ↑

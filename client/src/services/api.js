@@ -34,6 +34,8 @@ export const removeCookie = (name) => {
 export const setAuthTokens = (accessToken, refreshToken) => {
   if (accessToken) {
     localStorage.setItem('tiffinlink_access_token', accessToken);
+    localStorage.setItem('tiffinlink_token', accessToken);
+    localStorage.setItem('token', accessToken);
     setCookie('tiffinlink_token', accessToken, 30);
   }
   if (refreshToken) {
@@ -44,6 +46,7 @@ export const setAuthTokens = (accessToken, refreshToken) => {
 export const saveUserSession = (userObj, accessToken, refreshToken) => {
   if (userObj) {
     localStorage.setItem('tiffinlink_user', JSON.stringify(userObj));
+    localStorage.setItem('user', JSON.stringify(userObj));
     if (userObj.role) {
       localStorage.setItem('tiffinlink_user_role', userObj.role);
       setCookie('tiffinlink_role', userObj.role, 30);
@@ -57,8 +60,11 @@ export const saveUserSession = (userObj, accessToken, refreshToken) => {
 
 export const clearAuthTokens = () => {
   localStorage.removeItem('tiffinlink_access_token');
+  localStorage.removeItem('tiffinlink_token');
+  localStorage.removeItem('token');
   localStorage.removeItem('tiffinlink_refresh_token');
   localStorage.removeItem('tiffinlink_user');
+  localStorage.removeItem('user');
   localStorage.removeItem('tiffinlink_user_role');
   removeCookie('tiffinlink_user');
   removeCookie('tiffinlink_role');
@@ -111,17 +117,24 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
   }
 
-  // Safely parse JSON payload and attach fields to response so callers get both Response methods and parsed JSON object fields
   try {
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
-      const jsonBody = await response.clone().json();
+      const jsonBody = await response.json();
       if (jsonBody && typeof jsonBody === 'object') {
-        Object.assign(response, jsonBody);
+        return {
+          ...jsonBody,
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          json: async () => jsonBody
+        };
       }
+      return jsonBody;
     }
   } catch (err) {
-    // Ignore JSON parsing errors for non-JSON responses
+    console.warn('JSON parsing error in apiRequest:', err);
   }
 
   return response;

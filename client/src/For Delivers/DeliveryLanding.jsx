@@ -136,7 +136,7 @@ export default function DeliveryLanding({ onOpenBecomeDeliveryPartnerModal, onOp
 
         {/* Stats Bar */}
         <section ref={statsRef} className="bg-onyx-black text-bone-white py-16">
-          <div className="max-w-[1440px] mx-auto px-margin-desktop grid grid-cols-2 md:grid-cols-4 gap-12 text-center reveal-on-scroll">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 md:px-margin-desktop grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 text-center reveal-on-scroll">
             <div>
               <p className="font-headline-lg text-headline-lg">{partnersCount}+</p>
               <p className="font-label-caps text-label-caps text-surface-dim uppercase tracking-widest mt-2">Active Partners</p>
@@ -157,7 +157,7 @@ export default function DeliveryLanding({ onOpenBecomeDeliveryPartnerModal, onOp
         </section>
 
         {/* Why Deliver */}
-        <section className="px-margin-desktop py-section-gap max-w-[1440px] mx-auto relative">
+        <section className="px-4 sm:px-6 md:px-margin-desktop py-16 md:py-section-gap max-w-[1440px] mx-auto relative">
           <div className="mb-24 text-center reveal-on-scroll">
             <span className="font-label-caps text-label-caps text-secondary uppercase tracking-widest">The Tiffin Advantage</span>
             <h2 className="font-headline-lg text-headline-lg mt-4">Why Deliver with TiffinLink?</h2>
@@ -273,7 +273,7 @@ export default function DeliveryLanding({ onOpenBecomeDeliveryPartnerModal, onOp
 
         {/* Earnings Calculator */}
         <section className="bg-surface py-section-gap overflow-hidden">
-          <div className="max-w-[1440px] mx-auto px-margin-desktop architectural-grid items-center">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 md:px-margin-desktop architectural-grid items-center">
             <div className="col-span-12 md:col-span-6 reveal-on-scroll">
               <h2 className="font-headline-lg text-headline-lg mb-8">How much could you earn?</h2>
               <p className="font-body-lg text-secondary mb-12">Earnings vary based on time spent, location, and the number of deliveries you complete. Estimate your monthly potential below.</p>
@@ -329,7 +329,7 @@ export default function DeliveryLanding({ onOpenBecomeDeliveryPartnerModal, onOp
         </section>
 
         {/* How Delivery Works */}
-        <section className="px-margin-desktop py-section-gap max-w-[1440px] mx-auto relative">
+        <section className="px-4 sm:px-6 md:px-margin-desktop py-16 md:py-section-gap max-w-[1440px] mx-auto relative">
           <div className="text-center mb-24 reveal-on-scroll">
             <h2 className="font-headline-lg text-headline-lg">Simple Workflow</h2>
           </div>
@@ -474,7 +474,7 @@ export default function DeliveryLanding({ onOpenBecomeDeliveryPartnerModal, onOp
 
         {/* Requirements & FAQ */}
         <section className="bg-surface-container py-section-gap">
-          <div className="max-w-[1440px] mx-auto px-margin-desktop architectural-grid">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 md:px-margin-desktop architectural-grid">
             <div className="col-span-12 md:col-span-4 reveal-on-scroll">
               <h2 className="font-headline-lg text-headline-lg mb-12">Requirements to Join</h2>
               <ul className="space-y-6">
@@ -570,7 +570,7 @@ export default function DeliveryLanding({ onOpenBecomeDeliveryPartnerModal, onOp
             className="w-full h-full object-cover absolute inset-0 parallax-img"
             src="/make_one_video_for_website_of.mp4"
           />
-          <div className="relative z-20 h-full flex flex-col items-center justify-center text-center px-margin-desktop reveal-on-scroll">
+          <div className="relative z-20 h-full flex flex-col items-center justify-center text-center px-4 sm:px-6 md:px-margin-desktop reveal-on-scroll">
             <h2 className="font-display-lg text-display-lg text-bone-white mb-8">Ready to Start Delivering?</h2>
             <p className="font-body-lg text-bone-white mb-12 max-w-2xl">Join our community of artisanal delivery partners and redefine your earning potential.</p>
             <button 

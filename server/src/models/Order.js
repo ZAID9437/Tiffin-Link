@@ -95,10 +95,17 @@ const orderSchema = new mongoose.Schema({
     default: ''
   },
   
-  // Delivery Partner Integrated Fields
   deliveryStatus: {
     type: String,
-    enum: ['Unassigned', 'Searching', 'Assigned', 'Accepted', 'Arrived at Pickup', 'Picked Up', 'On The Way', 'Delivered'],
+    enum: [
+      'Unassigned', 'Searching', 'SEARCHING_DRIVERS',
+      'Assigned', 'ASSIGNED', 'Accepted',
+      'Arrived at Pickup', 'Arrived at Provider', 'ARRIVED_PROVIDER', 'At Kitchen',
+      'Picked Up', 'PICKED_UP',
+      'On The Way', 'Out for Delivery', 'OUT_FOR_DELIVERY',
+      'Arrived at Customer', 'ARRIVED_CUSTOMER',
+      'Delivered', 'DELIVERED', 'Completed'
+    ],
     default: 'Unassigned'
   },
   deliveryPartnerName: {
@@ -132,5 +139,7 @@ const orderSchema = new mongoose.Schema({
 });
 
 orderSchema.index({ providerId: 1, createdAt: -1 });
+orderSchema.index({ providerId: 1, status: 1, createdAt: -1 });
+orderSchema.index({ providerId: 1, deliveryStatus: 1 });
 
 module.exports = mongoose.model('Order', orderSchema);

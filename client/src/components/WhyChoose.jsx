@@ -123,21 +123,21 @@ export default function WhyChoose() {
     <div ref={containerRef} className="relative h-[220vh] bg-onyx-black z-10">
       
       {/* Sticky Content Wrapper */}
-      <div className="sticky top-[96px] h-[calc(100vh-96px)] w-full flex flex-col justify-between overflow-hidden bg-onyx-black text-bone-white z-10 px-margin-desktop pt-12 pb-24">
+      <div className="sticky top-[70px] md:top-[96px] h-[calc(100vh-70px)] md:h-[calc(100vh-96px)] w-full flex flex-col justify-between overflow-hidden bg-onyx-black text-bone-white z-10 px-4 sm:px-6 md:px-margin-desktop pt-6 md:pt-12 pb-12 md:pb-24">
         
         {/* Soft glowing ambient lighting */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
 
         <div className="max-w-[1200px] mx-auto w-full relative z-10 flex flex-col flex-grow">
-          <p className="font-label-caps text-label-caps opacity-50 mb-10 text-center tracking-[0.25em]">THE TIFFINLINK STANDARD</p>
+          <p className="font-label-caps text-xs md:text-label-caps opacity-50 mb-4 md:mb-10 text-center tracking-[0.25em]">THE TIFFINLINK STANDARD</p>
           
           {/* Main Visual Layout */}
-          <div className="relative flex-grow w-full flex flex-col md:flex-row items-center justify-between gap-8 md:gap-12 min-h-[400px]">
+          <div className="relative flex-grow w-full flex flex-col md:flex-row items-center justify-between gap-6 md:gap-12 min-h-[350px] md:min-h-[400px]">
             
             {/* Left/Right Navigation Arrows */}
             <button 
               onClick={handlePrev}
-              className="absolute left-[-20px] lg:left-[-60px] top-1/2 -translate-y-1/2 w-12 h-12 rounded-full border border-white/10 hover:border-white/30 bg-[#1A1A1A] flex items-center justify-center transition-all duration-300 active:scale-90 z-30 group"
+              className="hidden sm:flex absolute left-[-10px] lg:left-[-60px] top-1/2 -translate-y-1/2 w-10 md:w-12 h-10 md:h-12 rounded-full border border-white/10 hover:border-white/30 bg-[#1A1A1A] items-center justify-center transition-all duration-300 active:scale-90 z-30 group"
               aria-label="Previous step"
             >
               <ChevronLeft size={20} className="text-white opacity-60 group-hover:opacity-100 transition-opacity" />
@@ -145,14 +145,14 @@ export default function WhyChoose() {
 
             <button 
               onClick={handleNext}
-              className="absolute right-[-20px] lg:right-[-60px] top-1/2 -translate-y-1/2 w-12 h-12 rounded-full border border-white/10 hover:border-white/30 bg-[#1A1A1A] flex items-center justify-center transition-all duration-300 active:scale-90 z-30 group"
+              className="hidden sm:flex absolute right-[-10px] lg:right-[-60px] top-1/2 -translate-y-1/2 w-10 md:w-12 h-10 md:h-12 rounded-full border border-white/10 hover:border-white/30 bg-[#1A1A1A] items-center justify-center transition-all duration-300 active:scale-90 z-30 group"
               aria-label="Next step"
             >
               <ChevronRight size={20} className="text-white opacity-60 group-hover:opacity-100 transition-opacity" />
             </button>
 
             {/* Left Side: Timeline column (Centered vertically and horizontally on the left) */}
-            <div className="relative w-full md:w-[35%] h-[80px] md:h-[300px] flex items-center justify-center z-10">
+            <div className="relative w-full md:w-[35%] h-[60px] md:h-[300px] flex items-center justify-center z-10">
               
               {/* Vertical Line for Desktop */}
               <div className="absolute left-4 right-4 md:left-1/2 md:right-auto md:top-4 md:bottom-4 h-[2px] md:h-auto md:w-[2px] bg-white/10 rounded-full md:-translate-x-1/2 w-[calc(100%-32px)] md:w-[2px] top-1/2 -translate-y-1/2 md:translate-y-0">
@@ -203,7 +203,7 @@ export default function WhyChoose() {
             </div>
 
             {/* Right Side: Centered Details Card Column (Stable Vertical Position) */}
-            <div className="relative w-full md:w-[60%] h-[260px] md:h-[240px] flex items-center justify-center z-10">
+            <div className="relative w-full md:w-[60%] h-[280px] md:h-[240px] flex items-center justify-center z-10">
               {steps.map((step, idx) => {
                 const isCurrent = idx === activeIndex;
                 
@@ -211,7 +211,7 @@ export default function WhyChoose() {
                   <div
                     key={idx}
                     onClick={() => handleDotClick(idx)}
-                    className={`transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] absolute p-8 md:p-10 rounded-2xl border flex flex-col justify-between cursor-pointer w-full h-[220px] md:h-[220px] ${
+                    className={`transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] absolute p-5 sm:p-8 md:p-10 rounded-2xl border flex flex-col justify-between cursor-pointer w-full h-[260px] sm:h-[220px] md:h-[220px] ${
                       isCurrent
                         ? 'bg-[#1C1B1A]/90 border-white/15 text-bone-white opacity-100 scale-100 shadow-[0_20px_50px_rgba(0,0,0,0.45)] translate-y-0 z-20 pointer-events-auto backdrop-blur-md'
                         : 'text-bone-white opacity-0 scale-95 translate-y-8 pointer-events-none z-10 border-transparent'

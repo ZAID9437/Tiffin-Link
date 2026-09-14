@@ -19,7 +19,7 @@ import {
 
 import { apiRequest } from '../services/api';
 
-export default function EarningsTab() {
+export default function EarningsTab({ currentUser }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -40,8 +40,10 @@ export default function EarningsTab() {
   const itemsPerPage = 5;
 
   useEffect(() => {
-    fetchOrdersFromDb();
-  }, []);
+    if (currentUser) {
+      fetchOrdersFromDb();
+    }
+  }, [currentUser]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -51,8 +53,9 @@ export default function EarningsTab() {
   const fetchOrdersFromDb = async () => {
     try {
       setLoading(true);
-      const json = await apiRequest('/orders');
-      if (json.success && Array.isArray(json.data)) {
+      const res = await apiRequest('/orders');
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+      if (json && json.success && Array.isArray(json.data)) {
         setOrders(json.data.map(o => ({
           ...o,
           id: o._id || o.id

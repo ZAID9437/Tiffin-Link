@@ -119,7 +119,7 @@ const getSubscriptions = async (req, res) => {
     let subList = [];
 
     if (await isDbConnected()) {
-      subList = await Subscription.find({ providerId }).sort({ createdAt: -1 });
+      subList = await Subscription.find({ providerId }).sort({ createdAt: -1 }).lean();
     } else {
       subList = [];
     }

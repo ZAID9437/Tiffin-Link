@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '../services/api';
 
-export default function LiveRequestsTab({ onNavigateTab, onAcceptRequest }) {
+export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRequest }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toastMsg, setToastMsg] = useState('');
@@ -28,29 +28,32 @@ export default function LiveRequestsTab({ onNavigateTab, onAcceptRequest }) {
   }, [requests]);
 
   useEffect(() => {
-    fetchLiveRequests();
+    if (currentUser) {
+      fetchLiveRequests();
+    }
     // Poll for new requests every 5 seconds without overwriting ticking countdown
     const interval = setInterval(() => {
-      fetchLiveRequests(false);
+      if (currentUser) fetchLiveRequests(false);
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentUser]);
 
   const fetchLiveRequests = async (isInitial = true) => {
     try {
       if (isInitial) setLoading(true);
-      const json = await apiRequest('/requests');
-      if (json.success && Array.isArray(json.data)) {
+      const res = await apiRequest('/requests');
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+      if (json && json.success && Array.isArray(json.data)) {
         const now = Date.now();
         setRequests(prev => {
           return json.data.map((r, i) => {
             // Find existing request in state to maintain continuous second countdown
             const existing = prev.find(p => (p.dbId === r._id || p.id === r.id));
 
-            let secondsLeft = r.secondsLeft !== undefined ? Math.min(120, r.secondsLeft) : 120;
-            if (r.expiresAt) {
-              secondsLeft = Math.max(0, Math.min(120, Math.floor((new Date(r.expiresAt).getTime() - now) / 1000)));
-            } else if (existing && existing.secondsLeft !== undefined) {
+            let secondsLeft = r.secondsLeft !== undefined && r.secondsLeft > 0 ? Math.min(120, r.secondsLeft) : 120;
+            if (r.expiresAt && new Date(r.expiresAt).getTime() > now) {
+              secondsLeft = Math.max(15, Math.min(120, Math.floor((new Date(r.expiresAt).getTime() - now) / 1000)));
+            } else if (existing && existing.secondsLeft > 0) {
               secondsLeft = Math.min(120, existing.secondsLeft);
             }
 
@@ -103,7 +106,7 @@ export default function LiveRequestsTab({ onNavigateTab, onAcceptRequest }) {
           return { ...req, secondsLeft: nextSec };
         });
 
-        return updated.filter(r => r.secondsLeft > 0 && r.status === 'pending');
+        return updated.filter(r => r.status === 'pending' && r.secondsLeft > 0);
       });
     }, 1000);
     return () => clearInterval(timer);

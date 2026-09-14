@@ -22,8 +22,8 @@ export function AuthProvider({ children }) {
       if (token || currentUser?.email) {
         try {
           const res = await apiRequest('/auth/me');
-          const data = await res.json();
-          if (data.success && data.user) {
+          const data = typeof res?.json === 'function' ? await res.json() : res;
+          if (data && data.success && data.user) {
             setCurrentUser(data.user);
             localStorage.setItem('tiffinlink_user', JSON.stringify(data.user));
           }

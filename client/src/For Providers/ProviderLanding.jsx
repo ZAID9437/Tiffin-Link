@@ -166,10 +166,10 @@ function ProviderStats() {
       ref={statsSectionRef} 
       className="relative bg-bone-white pt-8 pb-24 overflow-hidden border-b border-sand-neutral/30 select-none"
     >
-      <div className="px-margin-desktop max-w-[1440px] mx-auto relative flex flex-col items-center">
+      <div className="px-4 sm:px-6 md:px-margin-desktop max-w-[1440px] mx-auto relative flex flex-col items-center">
         <div className="absolute top-0 left-4 right-4 h-[3px] bg-gradient-to-r from-clay-earth/20 via-clay-earth/60 to-clay-earth/20 rounded z-20 shadow-sm" />
 
-        <div className="w-full grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-16 items-start justify-items-center pt-3">
+        <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-12 sm:gap-y-16 items-start justify-items-center pt-3">
           {PROVIDER_STATS_ITEMS.map((item) => {
             const isHovered = hoveredStatId === item.id;
             
@@ -293,7 +293,7 @@ function ProviderFeatures() {
   ];
 
   return (
-    <section className="py-32 px-margin-desktop max-w-[1440px] mx-auto reveal-on-scroll relative">
+    <section className="py-16 md:py-32 px-4 sm:px-6 md:px-margin-desktop max-w-[1440px] mx-auto reveal-on-scroll relative">
       <div className="flex flex-col md:flex-row justify-between items-end mb-24 gap-8">
         <div className="max-w-2xl text-left">
           <span className="font-label-caps text-label-caps text-secondary mb-4 block uppercase tracking-widest">Efficiency Redefined</span>
@@ -519,7 +519,7 @@ export default function ProviderLanding({ onOpenBecomeProviderModal }) {
       <div className="line-draw w-full h-[1px] bg-sand-neutral/30"></div>
 
       {/* Dashboard Preview (Editorial Reveal) */}
-      <section id="demo-section" className="py-32 bg-onyx-black text-bone-white overflow-hidden px-margin-desktop">
+      <section id="demo-section" className="py-16 md:py-32 bg-onyx-black text-bone-white overflow-hidden px-4 sm:px-6 md:px-margin-desktop">
         <div className="max-w-[1440px] mx-auto grid grid-cols-12 gap-gutter items-center">
           
           <div className="col-span-12 lg:col-span-5 mb-16 lg:mb-0 reveal-on-scroll">
@@ -567,7 +567,7 @@ export default function ProviderLanding({ onOpenBecomeProviderModal }) {
       </section>
 
       {/* Benefits (Narrative Section) */}
-      <section className="py-32 px-margin-desktop">
+      <section className="py-16 md:py-32 px-4 sm:px-6 md:px-margin-desktop">
         <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-section-gap items-center">
           
           <div className="order-2 lg:order-1 relative flex justify-center items-center overflow-hidden">
@@ -618,7 +618,7 @@ export default function ProviderLanding({ onOpenBecomeProviderModal }) {
       <div className="line-draw w-full h-[1px] bg-sand-neutral/30"></div>
 
       {/* Pricing */}
-      <section id="pricing-section" className="py-32 bg-bone-white px-margin-desktop">
+      <section id="pricing-section" className="py-16 md:py-32 bg-bone-white px-4 sm:px-6 md:px-margin-desktop">
         <div className="max-w-[1440px] mx-auto text-center mb-24 reveal-on-scroll">
           <span className="font-label-caps text-label-caps text-secondary mb-4 block uppercase tracking-[0.3em]">No Subscriptions</span>
           <h2 className="font-display-lg text-[32px] sm:text-[48px] md:text-[56px] leading-[1.1] uppercase tracking-tighter reveal-text">
@@ -688,7 +688,7 @@ export default function ProviderLanding({ onOpenBecomeProviderModal }) {
       </section>
 
       {/* Final CTA */}
-      <section className="py-32 px-margin-desktop overflow-hidden">
+      <section className="py-16 md:py-32 px-4 sm:px-6 md:px-margin-desktop overflow-hidden">
         <div className="max-w-[1440px] mx-auto relative h-[65vh] flex items-center justify-center bg-onyx-black group rounded-none overflow-hidden">
           
           <div className="absolute inset-0 z-0">

@@ -7,13 +7,7 @@ const Otp = require('../models/Otp');
 const { sendOtpEmail } = require('../services/emailService');
 const { generateAccessToken, generateRefreshToken } = require('../utils/generateToken');
 
-const localProviders = [
-  { _id: "p1", name: "Mom's Kitchen", description: "Home-style Gujarati Food", rating: 4.9, eta: "30-40 min", price: 100, tags: ["Pure Veg"], image: "/assets/provider_1.png" },
-  { _id: "p2", name: "Healthy Meals Kitchen", description: "High Protein & Healthy Meals", rating: 4.8, eta: "25-35 min", price: 110, tags: ["Pure Veg"], image: "/assets/provider_2.png" },
-  { _id: "p3", name: "Ghar Ka Khana", description: "Authentic Homemade Food", rating: 4.7, eta: "20-30 min", price: 100, tags: ["Jain Food"], image: "/assets/provider_3.png" },
-  { _id: "p4", name: "Shree Tiffin Service", description: "Simple, Hygienic & Tasty", rating: 4.9, eta: "30-40 min", price: 90, tags: ["Pure Veg"], image: "/assets/provider_4.png" },
-  { _id: "p5", name: "Foodie Home Kitchen", description: "Variety Thalis & Tiffins", rating: 4.6, eta: "35-45 min", price: 120, tags: ["Veg & Non-Veg"], image: "/assets/provider_5.png" }
-];
+
 
 const { ensureConnected } = require('../config/db');
 
@@ -41,13 +35,6 @@ const getProviders = async (req, res) => {
   try {
     if (await isDbConnected()) {
       let providers = await Provider.find();
-      if (providers.length === 0) {
-        await Provider.insertMany(localProviders.map(p => {
-          const { _id, ...rest } = p;
-          return rest;
-        }));
-        providers = await Provider.find();
-      }
 
       // Calculate dynamic real-time rating and review count from Review collection
       const enrichedProviders = await Promise.all(providers.map(async (p) => {
@@ -57,7 +44,6 @@ const getProviders = async (req, res) => {
         const reviews = await Review.find({
           $or: [
             { providerId: pIdStr },
-            { providerId: '6a7f3051d4b48741d8722416' },
             { customerEmail: p.email }
           ]
         });
@@ -68,16 +54,15 @@ const getProviders = async (req, res) => {
           pObj.rating = Number(avg);
           pObj.reviewCount = reviews.length;
         } else {
-          pObj.rating = pObj.rating || 4.8;
-          pObj.reviewCount = pObj.reviewCount || 5;
+          pObj.rating = pObj.rating || 0;
+          pObj.reviewCount = 0;
         }
         return pObj;
       }));
 
       return res.json({ success: true, data: enrichedProviders, source: 'database' });
-    } else {
-      return res.json({ success: true, data: localProviders, source: 'in-memory' });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error fetching providers with dynamic ratings:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -262,22 +247,8 @@ const registerProvider = async (req, res) => {
         refreshToken,
         source: 'database' 
       });
-    } else {
-      const mockProvider = {
-        _id: 'p_' + Math.random().toString(36).substr(2, 9),
-        ...providerData,
-        createdAt: new Date()
-      };
-      localProviders.push(mockProvider);
-      return res.status(201).json({ 
-        success: true, 
-        message: 'Kitchen registered successfully (in-memory)',
-        data: mockProvider, 
-        accessToken: 'mock_access_token',
-        refreshToken: 'mock_refresh_token',
-        source: 'in-memory' 
-      });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error registering provider:', error);
     res.status(500).json({ success: false, message: 'Provider registration failed: ' + error.message });
@@ -292,28 +263,121 @@ const getProviderDashboardStats = async (req, res) => {
   try {
     const Order = require('../models/Order');
     const Tiffin = require('../models/Tiffin');
-    const providerId = req.providerId;
+    const Review = require('../models/Review');
+    const MealRequest = require('../models/MealRequest');
+    let providerId = req.providerId;
+
+    if (!providerId && req.user) {
+      const p = await Provider.findOne({ $or: [{ userId: req.user._id }, { email: req.user.email }] });
+      if (p) providerId = p._id.toString();
+    }
+
+    if (!providerId) {
+      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+    }
 
     if (await isDbConnected()) {
-      const p = await Provider.findById(providerId);
-      const acceptingOrders = p ? Boolean(p.isAcceptingOrders) : true;
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
-      const dbOrders = await Order.find({ providerId }).sort({ createdAt: -1 });
-      const activeTiffinsCount = await Tiffin.countDocuments({ providerId });
+      const [
+        providerDoc,
+        activeTiffinsCount,
+        recentOrders,
+        todayAggResult,
+        totalOrdersCount,
+        pendingRequestsCount,
+        newOrdersCount,
+        reviewAggResult
+      ] = await Promise.all([
+        Provider.findById(providerId).select('isAcceptingOrders maxMeals').lean(),
+        Tiffin.countDocuments({ providerId }),
+        Order.find({ providerId })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .select('orderId customerName totalAmount quantity tiffinName status deliveryPartnerName createdAt')
+          .lean(),
+        Order.aggregate([
+          { $match: { providerId, createdAt: { $gte: startOfDay, $lte: endOfDay } } },
+          {
+            $group: {
+              _id: null,
+              count: { $sum: 1 },
+              totalMeals: {
+                $sum: {
+                  $cond: [{ $ne: ['$status', 'Cancelled'] }, { $ifNull: ['$quantity', 1] }, 0]
+                }
+              },
+              revenue: {
+                $sum: {
+                  $cond: [{ $ne: ['$status', 'Cancelled'] }, '$totalAmount', 0]
+                }
+              },
+              customers: { $addToSet: { $ifNull: ['$customerPhone', '$customerName'] } }
+            }
+          }
+        ]),
+        Order.countDocuments({ providerId }),
+        MealRequest.countDocuments({ status: 'pending' }),
+        Order.countDocuments({ providerId, status: 'New' }),
+        Review.aggregate([
+          { $match: { providerId } },
+          {
+            $group: {
+              _id: null,
+              avgRating: { $avg: '$rating' },
+              totalReviews: { $sum: 1 }
+            }
+          }
+        ])
+      ]);
 
-      const todaysOrdersCount = dbOrders.length;
-      const revenueToday = dbOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
-      const uniqueCustomers = new Set(dbOrders.map(o => o.customerPhone || o.customerName).filter(Boolean));
-      const todaysCustomersCount = uniqueCustomers.size;
+      const acceptingOrders = providerDoc ? Boolean(providerDoc.isAcceptingOrders) : true;
 
-      const formattedOrders = dbOrders.slice(0, 10).map((o, i) => {
+      // Extract today metrics or fallback to total count/revenue if no orders placed today
+      const todayAgg = todayAggResult[0] || { count: 0, totalMeals: 0, revenue: 0, customers: [] };
+      const todaysOrdersCount = todayAgg.count > 0 ? todayAgg.count : totalOrdersCount;
+
+      const totalRevenue = recentOrders
+        .filter(o => o.status !== 'Cancelled')
+        .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+
+      const revenueToday = todayAgg.revenue > 0 ? todayAgg.revenue : totalRevenue;
+
+      const uniqueCustomersSet = new Set(recentOrders.map(o => o.customerPhone || o.customerName).filter(Boolean));
+      const todaysCustomersCount = todayAgg.customers.length > 0 ? todayAgg.customers.length : uniqueCustomersSet.size;
+
+      const reviewAgg = reviewAggResult[0] || { avgRating: 4.8, totalReviews: 0 };
+      const rating = Number((reviewAgg.avgRating || 4.8).toFixed(1));
+      const reviewCount = reviewAgg.totalReviews;
+
+      // Kitchen Capacity Calculations
+      const parsedMaxMeals = Number(providerDoc?.maxMeals);
+      const maxMeals = (!isNaN(parsedMaxMeals) && parsedMaxMeals > 0) ? parsedMaxMeals : 50;
+      const recentMealsSum = recentOrders.filter(o => o.status !== 'Cancelled').reduce((sum, o) => sum + (Number(o.quantity) || 1), 0);
+      const cookedMeals = todayAgg.totalMeals > 0 ? todayAgg.totalMeals : recentMealsSum;
+
+      // Delivery Status Counts
+      const DeliveryRequest = require('../models/DeliveryRequest');
+      const deliveryRequests = await DeliveryRequest.find({ providerId }).lean();
+      const readyCount = deliveryRequests.filter(r => r.status === 'Ready' || r.status === 'PICKUP_OTP_PENDING' || r.status === 'Arrived at Provider').length;
+      const assignedCount = deliveryRequests.filter(r => r.status === 'Assigned' || r.status === 'Heading to Provider' || r.status === 'Picked Up' || r.status === 'Out for Delivery').length;
+      const searchingCount = deliveryRequests.filter(r => r.status === 'Searching Drivers' || r.status === 'SEARCHING_DRIVERS').length;
+
+      const formattedOrders = recentOrders.map((o, i) => {
+        let statusBg = 'bg-[#E8F0EC] text-[#0A8B5F] border-[#C5DDD2]';
+        if (o.status === 'Preparing') statusBg = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+        if (o.status === 'Ready') statusBg = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        if (o.status === 'New') statusBg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
+
         return {
           id: o.orderId || `#${1024 + i}`,
           customer: o.customerName || 'Customer',
           amount: o.totalAmount || 240,
           qtyText: `${o.quantity || 1} x ${o.tiffinName || 'Tiffin'}`,
           status: o.status || 'Preparing',
-          statusBg: o.status === 'Preparing' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : o.status === 'Ready' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-[#E8F0EC] text-[#0A8B5F] border-[#C5DDD2]'
+          statusBg
         };
       });
 
@@ -326,8 +390,21 @@ const getProviderDashboardStats = async (req, res) => {
           activeTiffinsCount,
           todaysCustomersCount,
           revenueToday,
+          rating,
+          reviewCount,
+          liveRequestsCount: pendingRequestsCount,
+          newOrdersCount,
           todaysOrders: formattedOrders,
-          acceptingOrders
+          acceptingOrders,
+          kitchenCapacity: {
+            maxMeals,
+            cookedMeals
+          },
+          deliveryCounts: {
+            ready: readyCount,
+            assigned: assignedCount,
+            searching: searchingCount
+          }
         }
       });
     } else {
@@ -339,6 +416,10 @@ const getProviderDashboardStats = async (req, res) => {
           activeTiffinsCount: 0,
           todaysCustomersCount: 0,
           revenueToday: 0,
+          rating: 4.8,
+          reviewCount: 0,
+          liveRequestsCount: 0,
+          newOrdersCount: 0,
           todaysOrders: [],
           acceptingOrders: true
         }

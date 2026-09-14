@@ -54,20 +54,20 @@ export default function ContactSection() {
   return (
     <>
       {/* Contact Section */}
-      <section className="pt-8 pb-section-gap bg-surface-container-low px-margin-desktop" id="contact">
-        <div className="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-gutter">
+      <section className="pt-8 pb-16 md:pb-section-gap bg-surface-container-low px-4 sm:px-6 md:px-margin-desktop" id="contact">
+        <div className="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-gutter">
           <div className="md:col-span-4 reveal-on-scroll">
-            <p className="font-label-caps text-label-caps text-secondary mb-8">GET IN TOUCH</p>
-            <h2 className="font-headline-lg text-headline-lg mb-12">Start your culinary journey.</h2>
+            <p className="font-label-caps text-xs md:text-label-caps text-secondary mb-4 md:mb-8">GET IN TOUCH</p>
+            <h2 className="font-headline-lg text-3xl sm:text-5xl md:text-headline-lg mb-8 md:mb-12">Start your culinary journey.</h2>
             <div className="space-y-4">
-              <p className="font-body-lg text-body-lg">hello@tiffinlink.com</p>
-              <p className="font-body-lg text-body-lg">+1 (800) TIFFIN-CRAFT</p>
-              <p className="font-body-lg text-body-lg">840 Artisanal Way, Suite 400<br/>San Francisco, CA 94103</p>
+              <p className="font-body-lg text-base sm:text-body-lg">hello@tiffinlink.com</p>
+              <p className="font-body-lg text-base sm:text-body-lg">+1 (800) TIFFIN-CRAFT</p>
+              <p className="font-body-lg text-base sm:text-body-lg">840 Artisanal Way, Suite 400<br/>San Francisco, CA 94103</p>
             </div>
           </div>
           <div className="md:col-span-7 md:col-start-6 reveal-on-scroll">
-            <form onSubmit={handleSubmit} className="space-y-12">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            <form onSubmit={handleSubmit} className="space-y-8 md:space-y-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12">
                 <div className="relative pb-4 group">
                   <label className="font-label-caps text-label-caps text-secondary">FIRST NAME</label>
                   <input 
@@ -124,7 +124,7 @@ export default function ContactSection() {
               <button 
                 disabled={loading}
                 type="submit"
-                className="bg-onyx-black text-bone-white px-12 py-4 font-button-text hover:bg-clay-earth transition-all duration-500 scale-100 active:scale-95 hover:tracking-widest disabled:opacity-50"
+                className="w-full sm:w-auto bg-onyx-black text-bone-white px-8 md:px-12 py-3.5 md:py-4 font-button-text hover:bg-clay-earth transition-all duration-500 scale-100 active:scale-95 hover:tracking-widest disabled:opacity-50"
               >
                 {loading ? 'SENDING...' : 'SEND MESSAGE'}
               </button>

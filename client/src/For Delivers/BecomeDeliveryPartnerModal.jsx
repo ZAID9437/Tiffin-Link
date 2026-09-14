@@ -493,10 +493,10 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
           </div>
         </main>
       ) : (
-        <main className="flex-grow max-w-[1440px] w-full mx-auto px-margin-mobile md:px-margin-desktop pt-32 pb-12 md:pt-40 md:pb-24">
+        <main className="flex-grow max-w-[1440px] w-full mx-auto px-4 sm:px-6 md:px-margin-desktop pt-24 pb-12 md:pt-40 md:pb-24">
           
           {/* Hero Banner Section */}
-          <div className="relative w-full h-[380px] md:h-[500px] overflow-hidden flex flex-col justify-end p-8 md:p-16 mb-20 group">
+          <div className="relative w-full h-[320px] sm:h-[380px] md:h-[500px] overflow-hidden flex flex-col justify-end p-4 sm:p-8 md:p-16 mb-12 md:mb-20 group">
             {/* Background Image Container with Zoom effect */}
             <div className="absolute inset-0 z-0 transition-transform duration-[1.5s] ease-out group-hover:scale-105">
               <img 

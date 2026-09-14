@@ -31,6 +31,18 @@ const deliveryRequestSchema = new mongoose.Schema({
     type: String,
     default: '+91 98765 43210'
   },
+  customerEmail: {
+    type: String,
+    default: ''
+  },
+  customerId: {
+    type: String,
+    default: ''
+  },
+  userId: {
+    type: String,
+    default: ''
+  },
   deliveryAddress: {
     street: { type: String, default: '102, Shivalik Residency, CG Road' },
     city: { type: String, default: 'Ahmedabad' },
@@ -64,7 +76,19 @@ const deliveryRequestSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Searching Drivers', 'Driver Assigned', 'Arrived at Provider', 'Picked Up', 'Out for Delivery', 'Delivered', 'Cancelled'],
+    enum: [
+      'Searching Drivers', 'SEARCHING_DRIVERS',
+      'Driver Assigned', 'Assigned', 'ASSIGNED',
+      'Heading to Provider', 'HEADING_TO_PROVIDER',
+      'Arrived at Provider', 'ARRIVED_PROVIDER', 'Arrived at Pickup',
+      'Pickup OTP Pending', 'PICKUP_OTP_PENDING',
+      'Picked Up', 'PICKED_UP',
+      'Out for Delivery', 'OUT_FOR_DELIVERY',
+      'Arrived at Customer', 'ARRIVED_CUSTOMER',
+      'Delivery OTP Pending', 'DELIVERY_OTP_PENDING',
+      'Delivered', 'DELIVERED',
+      'Cancelled', 'CANCELLED', 'EXPIRED'
+    ],
     default: 'Searching Drivers'
   },
   distanceKm: {
@@ -130,5 +154,7 @@ const deliveryRequestSchema = new mongoose.Schema({
 });
 
 deliveryRequestSchema.index({ providerId: 1, requestedAt: -1 });
+deliveryRequestSchema.index({ providerId: 1, status: 1, requestedAt: -1 });
+deliveryRequestSchema.index({ providerEmail: 1, requestedAt: -1 });
 
 module.exports = mongoose.model('DeliveryRequest', deliveryRequestSchema);

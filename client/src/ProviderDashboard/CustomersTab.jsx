@@ -26,11 +26,11 @@ import { apiRequest } from '../services/api';
 export default function CustomersTab() {
   const [customers, setCustomers] = useState([]);
   const [metrics, setMetrics] = useState({
-    totalCustomers: 128,
-    activeCustomers: 94,
-    newToday: 6,
-    totalOrders: 342,
-    totalRevenue: 64200
+    totalCustomers: 0,
+    activeCustomers: 0,
+    newToday: 0,
+    totalOrders: 0,
+    totalRevenue: 0
   });
   const [pagination, setPagination] = useState({
     total: 0,

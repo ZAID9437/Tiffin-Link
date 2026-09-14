@@ -15,25 +15,32 @@ const createTransporter = (user, pass) => {
   });
 };
 
-const sendOtpEmail = async (email, otp, user, pass) => {
-  const cleanPass = pass ? pass.replace(/\s+/g, '') : '';
+const sendOtpEmail = async (email, otp, user, pass, subjectTitle = 'Your TiffinLink Security Verification Code') => {
+  const emailUser = user || process.env.EMAIL_USER || process.env.SMTP_USER;
+  const emailPass = pass ? pass.replace(/\s+/g, '') : (process.env.EMAIL_PASS || process.env.SMTP_PASS || '');
+
+  if (!emailUser || !emailPass) {
+    console.log(`[EmailService Mock] ${subjectTitle} prepared for ${email} (OTP: ${otp})`);
+    return { success: true, mock: true };
+  }
+
   const dynamicTransporter = nodemailer.createTransport({
     service: 'gmail',
-    auth: { user, pass: cleanPass },
+    auth: { user: emailUser, pass: emailPass },
     tls: {
       rejectUnauthorized: false
     }
   });
 
   const mailOptions = {
-    from: `"TiffinLink Concierge" <${user}>`,
+    from: `"TiffinLink Concierge" <${emailUser}>`,
     to: email,
-    subject: 'Your TiffinLink Security Verification Code',
+    subject: subjectTitle,
     html: `
       <div style="font-family: 'Hanken Grotesk', sans-serif; background-color: #fbf9f5; color: #1b1c1a; padding: 40px; border-radius: 8px; max-width: 600px; margin: auto; border: 1px solid #d6d0c2;">
         <h2 style="font-family: 'EB Garamond', serif; font-size: 28px; color: #4a4238; margin-bottom: 20px; text-align: center; border-bottom: 1px solid #d6d0c2; padding-bottom: 15px;">TiffinLink</h2>
         <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">Welcome to TiffinLink.</p>
-        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">Use the following secure one-time passcode to authenticate your access request:</p>
+        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">Use the following secure one-time passcode for verification:</p>
         <div style="background-color: #f5f3ef; border: 1px dashed #4a4238; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #1b1c1a; margin: 30px 0; border-radius: 4px;">
           ${otp}
         </div>

@@ -2,10 +2,10 @@ import React from 'react';
 
 export default function FoodSafety() {
   return (
-    <section className="pt-section-gap pb-28 px-margin-desktop bg-bone-white" id="process">
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-gutter items-center">
+    <section className="pt-12 md:pt-section-gap pb-16 md:pb-28 px-4 sm:px-6 md:px-margin-desktop bg-bone-white" id="process">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-gutter items-center">
         <div className="md:col-span-5 reveal-on-scroll">
-          <h2 className="font-headline-lg text-headline-lg mb-16">Four steps to absolute trust.</h2>
+          <h2 className="font-headline-lg text-3xl sm:text-5xl md:text-headline-lg mb-8 md:mb-16">Four steps to absolute trust.</h2>
           <div className="space-y-16">
             <div className="flex gap-8 group">
               <span className="font-display-lg text-[32px] opacity-20 group-hover:opacity-100 transition-opacity duration-500">01</span>

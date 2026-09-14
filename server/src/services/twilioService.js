@@ -116,10 +116,10 @@ const checkTwilioVerification = async (phoneNumber, code) => {
   if (!isTwilioConfigured()) {
     return {
       success: true,
-      status: 'approved',
+      status: 'pending',
       e164Phone,
       isSimulated: true,
-      message: '✓ OTP verified successfully!'
+      message: 'Simulated mode: checking against stored MongoDB OTP record.'
     };
   }
 

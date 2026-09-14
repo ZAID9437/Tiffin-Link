@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 const ContactInquiry = require('../models/ContactInquiry');
 const { ensureConnected } = require('../config/db');
 
-const localInquiries = [];
 const isDbConnected = async () => await ensureConnected();
 
 // @desc    Submit a contact inquiry
@@ -24,18 +23,8 @@ const submitContact = async (req, res) => {
       });
       await newInquiry.save();
       return res.status(201).json({ success: true, data: newInquiry, source: 'database' });
-    } else {
-      const mockInquiry = {
-        _id: 'ci_' + Math.random().toString(36).substr(2, 9),
-        name,
-        email,
-        subject,
-        message,
-        createdAt: new Date()
-      };
-      localInquiries.push(mockInquiry);
-      return res.status(201).json({ success: true, data: mockInquiry, source: 'in-memory' });
     }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Server Error' });

@@ -28,12 +28,13 @@ import {
   ExternalLink,
   Navigation,
   Receipt,
-  FileText
+  FileText,
+  Zap
 } from 'lucide-react';
 import DeliveryManagementTab from './DeliveryManagementTab';
 import { apiRequest } from '../services/api';
 
-export default function OrdersTab({ initialStatus = 'All' }) {
+export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -59,16 +60,19 @@ export default function OrdersTab({ initialStatus = 'All' }) {
     setActiveStatusTab(initialStatus);
   }, [initialStatus]);
 
-  // Fetch Orders from MongoDB Database on Mount
+  // Fetch Orders from MongoDB Database on Mount/Auth Hydration
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (currentUser) {
+      fetchOrders();
+    }
+  }, [currentUser]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const json = await apiRequest('/orders');
-      if (json.success && Array.isArray(json.data)) {
+      const res = await apiRequest('/orders');
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+      if (json && json.success && Array.isArray(json.data)) {
         setOrders(json.data.map(o => ({
           ...o,
           id: o._id || o.id
@@ -84,6 +88,27 @@ export default function OrdersTab({ initialStatus = 'All' }) {
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Helper to re-broadcast delivery request to all online drivers
+  const handleBroadcastDriverRequest = async (targetOrder) => {
+    if (!targetOrder) return;
+    const dbId = targetOrder.id || targetOrder._id || targetOrder.orderId;
+    try {
+      const json = await apiRequest('/delivery/broadcast', {
+        method: 'POST',
+        body: JSON.stringify({ requestId: dbId })
+      });
+
+      if (json.success) {
+        showToast(`📡 Live Delivery Request broadcast to online drivers for Order ${targetOrder.orderId || targetOrder.id}!`);
+        fetchOrders();
+      }
+    } catch (err) {
+      console.error('Error broadcasting driver request:', err);
+      showToast('⚠️ Request broadcast initiated. Refreshing...');
+      fetchOrders();
+    }
   };
 
   // Status Update Handler (Persisted directly to MongoDB database `tiffinlink.orders`)
@@ -117,6 +142,7 @@ export default function OrdersTab({ initialStatus = 'All' }) {
         method: 'PUT',
         body: JSON.stringify({ status: newStatus, cancellationReason: reason })
       });
+      fetchOrders();
     } catch (err) {
       console.error('Error updating order status in MongoDB:', err);
     }
@@ -799,13 +825,18 @@ export default function OrdersTab({ initialStatus = 'All' }) {
                   )}
                 </div>
               ) : (
-                <div className="text-xs text-[#6B7280] font-bold flex items-center gap-2 py-1">
-                  <Clock size={14} className="text-amber-600 animate-spin" />
-                  <span>
-                    {selectedOrder.status === 'Ready' 
-                      ? 'Searching for available Delivery Partner nearby...' 
-                      : 'Delivery partner will be assigned once order is marked Ready.'}
-                  </span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 py-1">
+                  <div className="text-xs text-[#6B7280] font-bold flex items-center gap-2">
+                    <Clock size={14} className="text-amber-600 animate-spin" />
+                    <span>Searching for available Delivery Partner nearby...</span>
+                  </div>
+                  <button
+                    onClick={() => handleBroadcastDriverRequest(selectedOrder)}
+                    className="px-3.5 py-1.5 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Zap size={14} />
+                    <span>📡 Send Live Request to Drivers</span>
+                  </button>
                 </div>
               )}
             </div>

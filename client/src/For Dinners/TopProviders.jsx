@@ -111,60 +111,8 @@ export default function TopProviders() {
         setProviders(data.data);
       }
     } catch (error) {
-      console.error('Failed to fetch providers:', error);
-      // Fallback local providers matching the screenshot data
-      setProviders([
-        {
-          _id: "p1",
-          name: "Mom's Kitchen",
-          description: "Home-style Gujarati Food",
-          rating: 4.9,
-          eta: "30-40 min",
-          price: 100,
-          tags: ["Pure Veg"],
-          image: "/assets/provider_1.png"
-        },
-        {
-          _id: "p2",
-          name: "Healthy Meals Kitchen",
-          description: "High Protein & Healthy Meals",
-          rating: 4.8,
-          eta: "25-35 min",
-          price: 110,
-          tags: ["Pure Veg"],
-          image: "/assets/provider_2.png"
-        },
-        {
-          _id: "p3",
-          name: "Ghar Ka Khana",
-          description: "Authentic Homemade Food",
-          rating: 4.7,
-          eta: "20-30 min",
-          price: 100,
-          tags: ["Jain Food"],
-          image: "/assets/provider_3.png"
-        },
-        {
-          _id: "p4",
-          name: "Shree Tiffin Service",
-          description: "Simple, Hygienic & Tasty",
-          rating: 4.9,
-          eta: "30-40 min",
-          price: 90,
-          tags: ["Pure Veg"],
-          image: "/assets/provider_4.png"
-        },
-        {
-          _id: "p5",
-          name: "Foodie Home Kitchen",
-          description: "Variety Thalis & Tiffins",
-          rating: 4.6,
-          eta: "35-45 min",
-          price: 120,
-          tags: ["Veg & Non-Veg"],
-          image: "/assets/provider_5.png"
-        }
-      ]);
+      console.error('Failed to fetch providers from API:', error);
+      setProviders([]);
     } finally {
       setLoading(false);
     }
@@ -172,10 +120,6 @@ export default function TopProviders() {
 
   useEffect(() => {
     fetchProviders();
-    const interval = setInterval(() => {
-      fetchProviders();
-    }, 4000); // 4-second live poll for real-time rating updates on Diner cards
-    return () => clearInterval(interval);
   }, []);
 
   const scroll = (direction) => {
@@ -191,11 +135,11 @@ export default function TopProviders() {
 
 
   return (
-    <section className="pt-section-gap pb-8 px-margin-desktop bg-bone-white" id="kitchens">
+    <section className="pt-12 md:pt-section-gap pb-8 px-4 sm:px-6 md:px-margin-desktop bg-bone-white" id="kitchens">
       <div className="max-w-[1440px] mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-12">
-          <h2 className="font-bold text-3xl tracking-tight text-onyx-black">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-8 md:mb-12">
+          <h2 className="font-bold text-2xl sm:text-3xl tracking-tight text-onyx-black">
             Top Tiffin Providers Near You
           </h2>
           <a className="font-semibold text-onyx-black hover:opacity-50 flex items-center gap-1 transition-colors text-sm" href="#">

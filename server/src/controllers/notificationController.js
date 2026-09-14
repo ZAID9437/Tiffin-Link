@@ -19,7 +19,7 @@ const getNotifications = async (req, res) => {
     const recipientIds = getRecipientIds(req);
 
     if (await isDbConnected() && recipientIds.length > 0) {
-      const notifications = await Notification.find({ recipientId: { $in: recipientIds } }).sort({ createdAt: -1 });
+      const notifications = await Notification.find({ recipientId: { $in: recipientIds } }).sort({ createdAt: -1 }).lean();
 
       const summary = {
         all: notifications.length,
@@ -133,10 +133,45 @@ const deleteNotification = async (req, res) => {
   }
 };
 
+// Helper to create notification in MongoDB and emit real-time Socket.IO count update
+const createAndEmitNotification = async ({ recipientId, title, message, category, metadata }) => {
+  try {
+    if (!recipientId || !(await isDbConnected())) return null;
+
+    const notif = await Notification.create({
+      notificationId: `#NOTIF-${Math.floor(1000 + Math.random() * 9000)}`,
+      recipientId: String(recipientId),
+      title,
+      message,
+      category: category || 'Orders',
+      read: false,
+      metadata: metadata || {}
+    });
+
+    const unreadCount = await Notification.countDocuments({ recipientId: String(recipientId), read: false });
+
+    try {
+      const { emitToUser, emitToProvider } = require('../services/socketService');
+      emitToUser(recipientId, 'notification:new', { notification: notif, unreadCount });
+      emitToUser(recipientId, 'notification:count:update', { unreadCount });
+      emitToProvider(recipientId, 'notification:new', { notification: notif, unreadCount });
+      emitToProvider(recipientId, 'notification:count:update', { unreadCount });
+    } catch (sErr) {
+      console.warn('Socket notification emit error:', sErr.message);
+    }
+
+    return notif;
+  } catch (err) {
+    console.error('Error in createAndEmitNotification:', err);
+    return null;
+  }
+};
+
 module.exports = {
   getNotifications,
   markAsRead,
   markAllAsRead,
   markAsUnread,
-  deleteNotification
+  deleteNotification,
+  createAndEmitNotification
 };
