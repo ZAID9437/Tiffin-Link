@@ -1,0 +1,20 @@
+[
+  {
+    "_id": "6aa5116d436ccfe097e0ef02",
+    "ticketId": "#TCK-4001",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "providerEmail": "menxoxo50@gmail.com",
+    "subject": "Inquiry regarding dynamic payout settlement speed",
+    "category": "Payments",
+    "priority": "Normal",
+    "relatedOrderId": "#PAY-9003",
+    "description": "Requesting confirmation on whether pending payout #PAY-9003 will be settled by end of today.",
+    "attachmentUrl": "",
+    "status": "In Progress",
+    "assignedTo": "TiffinLink Support Team",
+    "messages": [],
+    "createdAt": "2026-09-12T08:46:37.195Z",
+    "updatedAt": "2026-09-12T08:46:37.195Z",
+    "__v": 0
+  }
+]

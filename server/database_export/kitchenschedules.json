@@ -1,0 +1,73 @@
+[
+  {
+    "_id": "6aa5116d436ccfe097e0eef7",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "weeklySchedule": [
+      {
+        "day": "Monday",
+        "isOpen": true,
+        "openTime": "09:00 AM",
+        "closeTime": "09:30 PM"
+      },
+      {
+        "day": "Tuesday",
+        "isOpen": true,
+        "openTime": "09:00 AM",
+        "closeTime": "09:30 PM"
+      },
+      {
+        "day": "Wednesday",
+        "isOpen": true,
+        "openTime": "09:00 AM",
+        "closeTime": "09:30 PM"
+      },
+      {
+        "day": "Thursday",
+        "isOpen": true,
+        "openTime": "09:00 AM",
+        "closeTime": "09:30 PM"
+      },
+      {
+        "day": "Friday",
+        "isOpen": true,
+        "openTime": "09:00 AM",
+        "closeTime": "09:30 PM"
+      },
+      {
+        "day": "Saturday",
+        "isOpen": true,
+        "openTime": "09:00 AM",
+        "closeTime": "09:30 PM"
+      },
+      {
+        "day": "Sunday",
+        "isOpen": true,
+        "openTime": "09:00 AM",
+        "closeTime": "04:00 PM"
+      }
+    ],
+    "orderWindows": [
+      {
+        "name": "Lunch Express Window",
+        "icon": "☀️",
+        "cutoffTime": "11:30 AM",
+        "deliveryStartTime": "12:00 PM",
+        "deliveryEndTime": "02:00 PM",
+        "isActive": true,
+        "_id": "6aa5116d436ccfe097e0eef8"
+      },
+      {
+        "name": "Dinner Special Window",
+        "icon": "🌙",
+        "cutoffTime": "06:30 PM",
+        "deliveryStartTime": "07:30 PM",
+        "deliveryEndTime": "09:30 PM",
+        "isActive": true,
+        "_id": "6aa5116d436ccfe097e0eef9"
+      }
+    ],
+    "specialDates": [],
+    "updatedAt": "2026-09-12T08:46:37.183Z",
+    "__v": 0
+  }
+]

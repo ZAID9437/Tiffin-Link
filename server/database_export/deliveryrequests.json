@@ -1,0 +1,150 @@
+[
+  {
+    "_id": "6aa5128dd113b6519c5154b3",
+    "requestId": "#DEL-5759",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "orderId": "#ORD-2773",
+    "providerEmail": "menxoxo50@gmail.com",
+    "providerName": "Xoxo Men Kitchen",
+    "customerName": "Bhavin Shah (Coromandel Corp)",
+    "customerPhone": "+91 98980 99887",
+    "deliveryAddress": {
+      "street": "802 Mondeal Square, SG Highway, Ahmedabad",
+      "city": "Ahmedabad",
+      "lat": 23.0225,
+      "lng": 72.5714
+    },
+    "pickupAddress": {
+      "street": "Shreeji Tiffin Kitchen, Satellite",
+      "city": "Ahmedabad",
+      "lat": 23.03,
+      "lng": 72.565
+    },
+    "assignedDriver": {
+      "driverId": "6aa03a9d09b952ceb1a40c21",
+      "name": "Ziyan Mansuri",
+      "phone": "+91 9558601570",
+      "rating": 4.8,
+      "vehicleNo": "Vehicle not registered",
+      "location": {
+        "lat": 23.028,
+        "lng": 72.567,
+        "accuracy": 0,
+        "updatedAt": "2026-09-12T08:51:25.428Z"
+      }
+    },
+    "driverLocation": {
+      "accuracy": 0
+    },
+    "status": "DELIVERED",
+    "distanceKm": 3.5,
+    "etaMinutes": 19,
+    "amount": 1958,
+    "itemCount": 15,
+    "candidateDrivers": [],
+    "tiffinName": "Gujarati Special Kathiyawadi Thali × 15",
+    "tiffinCategory": "Gujarati",
+    "pickupOtp": "574621",
+    "deliveryOtp": "",
+    "pickupOtpVerified": true,
+    "deliveryOtpVerified": false,
+    "requestedAt": "2026-09-12T08:51:25.084Z",
+    "__v": 0,
+    "acceptedAt": "2026-09-12T08:53:02.097Z",
+    "pickedUpAt": "2026-09-14T07:58:30.904Z",
+    "completedAt": "2026-09-14T09:04:48.980Z",
+    "containerReturnCredit": 15,
+    "dabbaReturned": true,
+    "deliveredAt": "2026-09-14T09:04:48.980Z",
+    "driverEarning": 93,
+    "rating": 4.8,
+    "reviewComment": "Tiffin was piping hot and courier was very courteous when swapping the dabba container!"
+  },
+  {
+    "_id": "6aa7bbf2a5c4aabe58ae49f7",
+    "requestId": "#DEL-1002",
+    "orderId": "#ORD-4113",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "providerEmail": "menxoxo50@gmail.com",
+    "providerName": "Ghar Ka Khana",
+    "customerName": "Rahul Patel",
+    "customerPhone": "+91 98765 43210",
+    "deliveryAddress": {
+      "street": "Prahlad Nagar, Ahmedabad",
+      "city": "Ahmedabad"
+    },
+    "pickupAddress": {
+      "street": "Satellite, Ahmedabad",
+      "city": "Ahmedabad"
+    },
+    "assignedDriver": {
+      "driverId": "6aa03a9d09b952ceb1a40c21",
+      "name": "Ziyan Mansuri",
+      "phone": "+91 9558601570"
+    },
+    "status": "CANCELLED",
+    "cancellationReason": "Customer requested cancellation prior to pickup",
+    "amount": 320,
+    "driverEarning": 0,
+    "tiffinName": "Gujarati Thali Special × 2",
+    "requestedAt": "2026-09-13T12:50:00.000Z",
+    "createdAt": "2026-09-13T12:50:00.000Z"
+  },
+  {
+    "_id": "6aa8147beec3a20305f36e7d",
+    "requestId": "#DEL-7035",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "orderId": "#9559",
+    "providerEmail": "menxoxo50@gmail.com",
+    "providerName": "Xoxo Men Kitchen",
+    "customerName": "Zaid Mansuri",
+    "customerPhone": "9558601570",
+    "customerEmail": "",
+    "customerId": "",
+    "userId": "",
+    "deliveryAddress": {
+      "street": "A-402, Titanium City Center, Anand Nagar, Ahmedabad",
+      "city": "Ahmedabad",
+      "lat": 23.0225,
+      "lng": 72.5714
+    },
+    "pickupAddress": {
+      "street": "Shreeji Tiffin Kitchen, Satellite",
+      "city": "Ahmedabad",
+      "lat": 23.03,
+      "lng": 72.565
+    },
+    "assignedDriver": {
+      "driverId": "6aa03a9d09b952ceb1a40c21",
+      "name": "Ziyan Mansuri",
+      "phone": "+91 9558601570",
+      "rating": 4.8,
+      "vehicleNo": "Vehicle not registered",
+      "location": {
+        "lat": 23.027559999999998,
+        "lng": 72.567352,
+        "accuracy": 0,
+        "updatedAt": "2026-09-14T15:39:19.421Z"
+      }
+    },
+    "driverLocation": {
+      "accuracy": 0
+    },
+    "status": "Delivered",
+    "distanceKm": 3,
+    "etaMinutes": 17,
+    "amount": 192,
+    "itemCount": 1,
+    "candidateDrivers": [],
+    "tiffinName": "Gujarati Special Kathiyawadi Thali × 1",
+    "tiffinCategory": "Gujarati",
+    "pickupOtp": "532511",
+    "deliveryOtp": "996722",
+    "pickupOtpVerified": true,
+    "deliveryOtpVerified": true,
+    "requestedAt": "2026-09-14T15:36:27.379Z",
+    "__v": 0,
+    "acceptedAt": "2026-09-14T15:38:18.401Z",
+    "pickedUpAt": "2026-09-14T15:39:00.220Z"
+  }
+]

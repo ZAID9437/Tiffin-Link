@@ -1,0 +1,54 @@
+[
+  {
+    "_id": "6aa5116d436ccfe097e0eefb",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "areaName": "Satellite & Jodhpur",
+    "radiusKm": 4,
+    "latitude": 23.03,
+    "longitude": 72.565,
+    "customersCount": 42,
+    "status": "ACTIVE",
+    "createdAt": "2026-09-12T08:46:37.188Z",
+    "updatedAt": "2026-09-12T08:46:37.188Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aa5116d436ccfe097e0eefc",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "areaName": "Prahlad Nagar & Anand Nagar",
+    "radiusKm": 5,
+    "latitude": 23.038,
+    "longitude": 72.558,
+    "customersCount": 38,
+    "status": "ACTIVE",
+    "createdAt": "2026-09-12T08:46:37.189Z",
+    "updatedAt": "2026-09-12T08:46:37.189Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aa5116d436ccfe097e0eefd",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "areaName": "Navrangpura & CG Road",
+    "radiusKm": 6,
+    "latitude": 23.0225,
+    "longitude": 72.5714,
+    "customersCount": 29,
+    "status": "ACTIVE",
+    "createdAt": "2026-09-12T08:46:37.189Z",
+    "updatedAt": "2026-09-12T08:46:37.189Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aa5116d436ccfe097e0eefe",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "areaName": "Vastrapur & Bodakdev",
+    "radiusKm": 5,
+    "latitude": 23.035,
+    "longitude": 72.53,
+    "customersCount": 31,
+    "status": "ACTIVE",
+    "createdAt": "2026-09-12T08:46:37.189Z",
+    "updatedAt": "2026-09-12T08:46:37.189Z",
+    "__v": 0
+  }
+]

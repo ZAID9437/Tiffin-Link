@@ -1,0 +1,65 @@
+[
+  {
+    "_id": "6a7f45b730250251d354247d",
+    "name": "Gujarati",
+    "__v": 0,
+    "createdAt": "2026-08-14T16:43:35.564Z",
+    "description": "Traditional home-style Gujarati meals",
+    "image": "/assets/provider_1.png",
+    "status": "Active"
+  },
+  {
+    "_id": "6a7f45b730250251d354247e",
+    "name": "Jain",
+    "__v": 0,
+    "createdAt": "2026-08-14T16:43:35.627Z",
+    "description": "Pure satvik meal options without onion & garlic",
+    "image": "/assets/provider_3.png",
+    "status": "Active"
+  },
+  {
+    "_id": "6a7f45b730250251d354247f",
+    "name": "Kathiyawadi",
+    "__v": 0,
+    "createdAt": "2026-08-14T16:43:35.629Z",
+    "description": "Spicy & flavorful traditional Kathiyawadi feast",
+    "image": "/assets/provider_2.png",
+    "status": "Active"
+  },
+  {
+    "_id": "6a7f45b730250251d3542480",
+    "name": "Panjabi",
+    "__v": 0,
+    "createdAt": "2026-08-14T16:43:35.631Z",
+    "description": "Rich North-Indian curry thalis prepared in pure butter",
+    "image": "/assets/provider_4.png",
+    "status": "Active"
+  },
+  {
+    "_id": "6a7f45b730250251d3542481",
+    "name": "South Indian",
+    "__v": 0,
+    "createdAt": "2026-08-14T16:43:35.633Z",
+    "description": "Dosa, Idli & Sambhar daily combos",
+    "image": "/assets/food_south_indian.png",
+    "status": "Active"
+  },
+  {
+    "_id": "6a7f45b730250251d3542482",
+    "name": "Fitness / Diet",
+    "__v": 0,
+    "createdAt": "2026-08-14T16:43:35.635Z",
+    "description": "High-protein salad & lean thali options",
+    "image": "/assets/provider_5.png",
+    "status": "Active"
+  },
+  {
+    "_id": "6a7f45e3272d40ebb6ed329e",
+    "name": "Chinese",
+    "description": "Delicious home-cooked meal category.",
+    "status": "Active",
+    "image": "/assets/provider_1.png",
+    "createdAt": "2026-08-14T16:44:19.026Z",
+    "__v": 0
+  }
+]

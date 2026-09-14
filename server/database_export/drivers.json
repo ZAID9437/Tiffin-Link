@@ -1,0 +1,22 @@
+[
+  {
+    "_id": "6a81854ee02713c533b5e0b4",
+    "driverId": "TL-65013-B",
+    "name": "Ziyan Mansuri",
+    "phone": "+91 9558601570",
+    "email": "zaidmansuri3654@gmail.com",
+    "rating": 4.7,
+    "vehicleNo": "GJ 27 DX 3654",
+    "vehicleType": "motorcycle",
+    "status": "AVAILABLE",
+    "activeDeliveries": 9,
+    "distanceKm": 1.9,
+    "currentLocation": {
+      "lat": 23.0225,
+      "lng": 72.5714,
+      "address": "Amber Tower , Ahmedabad"
+    },
+    "createdAt": "2026-08-16T09:39:26.938Z",
+    "__v": 0
+  }
+]

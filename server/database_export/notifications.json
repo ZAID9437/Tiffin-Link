@@ -1,0 +1,54 @@
+[
+  {
+    "_id": "6aa5116d436ccfe097e0eef0",
+    "notificationId": "NOTIF-1789202797171-1",
+    "recipientId": "6a7f3051d4b48741d8722416",
+    "title": "New Order Received (#1027)",
+    "message": "Vikram Mehta placed an order for 2x Healthy Low-Cal Thalis.",
+    "category": "Orders",
+    "read": false,
+    "referenceId": "#1027",
+    "referenceType": "order",
+    "createdAt": "2026-09-12T08:36:37.126Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aa5116d436ccfe097e0eef1",
+    "notificationId": "NOTIF-1789202797171-2",
+    "recipientId": "6a7f3051d4b48741d8722416",
+    "title": "Driver Assigned (#DEL-1029)",
+    "message": "Rahul Sharma accepted the delivery dispatch for Raj Patel.",
+    "category": "Orders",
+    "read": true,
+    "referenceId": "#DEL-1029",
+    "referenceType": "order",
+    "createdAt": "2026-09-12T08:26:37.126Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aa5116d436ccfe097e0eef2",
+    "notificationId": "NOTIF-1789202797171-3",
+    "recipientId": "6a7f3051d4b48741d8722416",
+    "title": "Weekly Payout Processed",
+    "message": "₹4,850 has been successfully credited to your HDFC Bank account.",
+    "category": "Payments",
+    "read": true,
+    "referenceId": "#PAY-9001",
+    "referenceType": "payment",
+    "createdAt": "2026-09-10T08:46:37.126Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aa5116d436ccfe097e0eef3",
+    "notificationId": "NOTIF-1789202797171-4",
+    "recipientId": "6a7f3051d4b48741d8722416",
+    "title": "New 5-Star Review!",
+    "message": "Raj Patel gave 5 stars: \"Authentic home taste! Soft rotlis...\"",
+    "category": "Reviews",
+    "read": false,
+    "referenceId": "#1024",
+    "referenceType": "review",
+    "createdAt": "2026-09-12T06:46:37.126Z",
+    "__v": 0
+  }
+]

@@ -1,0 +1,15 @@
+[
+  {
+    "_id": "6aa5116d436ccfe097e0eef5",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "date": "2026-09-12",
+    "dateLabel": "Today",
+    "maxCapacity": 50,
+    "autoStopOrders": true,
+    "allowOverbooking": false,
+    "status": "OPEN",
+    "createdAt": "2026-09-12T08:46:37.178Z",
+    "updatedAt": "2026-09-12T08:46:37.178Z",
+    "__v": 0
+  }
+]

@@ -1,0 +1,40 @@
+[
+  {
+    "_id": "6aa5116d436ccfe097e0eeec",
+    "payoutId": "#PAY-9001",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "providerName": "Xoxo Men Kitchen",
+    "amount": 4850,
+    "bankName": "HDFC Bank",
+    "accountNumber": "•••• 8902",
+    "status": "Completed",
+    "requestedAt": "2026-09-09T08:46:37.126Z",
+    "processedAt": "2026-09-10T08:46:37.126Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aa5116d436ccfe097e0eeed",
+    "payoutId": "#PAY-9002",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "providerName": "Xoxo Men Kitchen",
+    "amount": 3200,
+    "bankName": "HDFC Bank",
+    "accountNumber": "•••• 8902",
+    "status": "Completed",
+    "requestedAt": "2026-09-05T08:46:37.126Z",
+    "processedAt": "2026-09-06T08:46:37.126Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aa5116d436ccfe097e0eeee",
+    "payoutId": "#PAY-9003",
+    "providerId": "6a7f3051d4b48741d8722416",
+    "providerName": "Xoxo Men Kitchen",
+    "amount": 2150,
+    "bankName": "HDFC Bank",
+    "accountNumber": "•••• 8902",
+    "status": "Pending",
+    "requestedAt": "2026-09-12T02:46:37.126Z",
+    "__v": 0
+  }
+]

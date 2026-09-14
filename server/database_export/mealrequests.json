@@ -1,0 +1,30 @@
+[
+  {
+    "_id": "6aa5116d436ccfe097e0ef00",
+    "customerName": "Bhavin Shah (Coromandel Corp)",
+    "customerPhone": "+91 98980 99887",
+    "customerAddress": "802 Mondeal Square, SG Highway, Ahmedabad",
+    "mealType": "Corporate Thali Combo",
+    "category": "Gujarati",
+    "items": [
+      {
+        "name": "Gujarati Special Kathiyawadi Thali",
+        "qty": 15,
+        "price": 120
+      }
+    ],
+    "quantity": 15,
+    "date": "Today",
+    "time": "01:00 PM",
+    "deliveryType": "Delivery",
+    "location": "SG Highway, Ahmedabad",
+    "distance": "3.5 km",
+    "budget": 120,
+    "totalAmount": 1800,
+    "specialInstructions": "Please deliver in hot insulated boxes with extra papad.",
+    "status": "accepted",
+    "expiresAt": "2026-09-12T08:52:57.425Z",
+    "createdAt": "2026-09-12T08:46:37.192Z",
+    "__v": 0
+  }
+]
