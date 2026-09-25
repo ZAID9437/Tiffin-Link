@@ -129,6 +129,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         case 'dashboard':
           return <DashboardOverviewTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
         case 'requests':
+        case 'live-requests':
           return <LiveRequestsTab currentUser={currentUser} onNavigateTab={setActiveTab} onAcceptRequest={() => setActiveTab('orders-preparing')} />;
         case 'tiffins':
           return <MyTiffinsTab currentUser={currentUser} key="all" initialSubView="all" onNavigateTab={setActiveTab} />;
