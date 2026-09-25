@@ -32,6 +32,31 @@ export default function LoginModal({
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [otpMessage, setOtpMessage] = useState('');
   const [shakeInputs, setShakeInputs] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Auto focus first OTP input when step changes to 'otp'
+  useEffect(() => {
+    if (step === 'otp') {
+      const timer = setTimeout(() => {
+        const firstInput = document.getElementById('otp-input-0');
+        if (firstInput) firstInput.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [step]);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    let timer = null;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => {
+        setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [resendCooldown]);
 
   // Update activeRole when initialRole prop changes or modal opens
   useEffect(() => {
@@ -59,6 +84,7 @@ export default function LoginModal({
       setOtpMessage('');
       setShakeInputs(false);
       setSubmitStatus('idle');
+      setResendCooldown(0);
     }
   }, [isOpen, initialRole]);
 
@@ -129,7 +155,6 @@ export default function LoginModal({
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
-    // If user is in Provider or Deliverer mode and clicks Sign Up, open their dedicated onboarding application
     if (mode === 'signup') {
       if (activeRole === 'provider' && onOpenBecomeProviderModal) {
         onClose();
@@ -167,10 +192,11 @@ export default function LoginModal({
       if (data.success) {
         setSubmitStatus('idle');
         setStep('otp');
+        setResendCooldown(60);
         setOtpMessage(`Security code dispatched to ${email}. Please check your Inbox.`);
       } else {
         setSubmitStatus('idle');
-        setOtpMessage(data.message || 'Authentication failed.');
+        setOtpMessage(data.message || 'Unable to send verification email. Please try again.');
         if (data.message && data.message.toLowerCase().includes('email')) {
           setErrors(prev => ({ ...prev, email: data.message }));
         }
@@ -178,7 +204,7 @@ export default function LoginModal({
     } catch (error) {
       console.error('Submission error:', error);
       setSubmitStatus('idle');
-      setOtpMessage('Connecting to server failed.');
+      setOtpMessage('Unable to send verification email. Please check server connection.');
     }
   };
 
@@ -210,10 +236,29 @@ export default function LoginModal({
         if (data.accessToken) {
           setAuthTokens(data.accessToken, data.refreshToken);
         }
-        const authenticatedUser = {
+
+        let authenticatedUser = {
           ...(data.user || { email: email.trim(), name: name.trim() || email.split('@')[0] }),
-          role: activeRole || data.user?.role || 'customer'
+          role: activeRole || data.user?.role || 'customer',
+          isVerified: true,
+          emailVerified: true
         };
+
+        // Fetch fresh user profile from DB to enforce DB source of truth (Requirement 16)
+        if (data.accessToken) {
+          try {
+            const meRes = await fetch('http://localhost:5000/api/auth/me', {
+              headers: { 'Authorization': `Bearer ${data.accessToken}` }
+            });
+            const meData = await meRes.json();
+            if (meData.success && meData.user) {
+              authenticatedUser = { ...meData.user, emailVerified: true };
+            }
+          } catch (meErr) {
+            console.warn('Profile sync fetch error:', meErr);
+          }
+        }
+
         saveUserSession(authenticatedUser, data.accessToken, data.refreshToken);
         if (onLoginSuccess) {
           onLoginSuccess(authenticatedUser);
@@ -224,14 +269,14 @@ export default function LoginModal({
         }, 1200);
       } else {
         setSubmitStatus('idle');
-        setOtpMessage(data.message || 'Invalid code.');
+        setOtpMessage(data.message || 'Invalid verification code.');
         setShakeInputs(true);
         setTimeout(() => setShakeInputs(false), 500);
       }
     } catch (error) {
       console.error('OTP verify error:', error);
       setSubmitStatus('idle');
-      setOtpMessage('Verification request failed.');
+      setOtpMessage('Verification request failed. Please try again.');
       setShakeInputs(true);
       setTimeout(() => setShakeInputs(false), 500);
     }
@@ -280,8 +325,10 @@ export default function LoginModal({
   };
 
   const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
     setOtp(['', '', '', '', '', '']);
-    setOtpMessage('Sending new code...');
+    setOtpMessage('Sending new verification key...');
+    setResendCooldown(60);
 
     try {
       const endpoint = mode === 'signup' 
@@ -301,11 +348,13 @@ export default function LoginModal({
       if (data.success) {
         setOtpMessage('A new verification key has been sent to your email.');
       } else {
-        setOtpMessage(data.message || 'Failed to resend code.');
+        setOtpMessage(data.message || 'Failed to resend verification code.');
+        setResendCooldown(0);
       }
     } catch (error) {
       console.error(error);
-      setOtpMessage('Resend request failed.');
+      setOtpMessage('Unable to send verification email. Please try again.');
+      setResendCooldown(0);
     }
   };
 
@@ -757,10 +806,11 @@ export default function LoginModal({
                     </button>
                     <button
                       type="button"
+                      disabled={resendCooldown > 0}
                       onClick={handleResendOtp}
-                      className="font-label-caps text-label-caps text-on-secondary-fixed-variant underline-animate cursor-pointer bg-transparent border-none p-0 focus:outline-none"
+                      className="font-label-caps text-label-caps text-on-secondary-fixed-variant underline-animate cursor-pointer bg-transparent border-none p-0 focus:outline-none disabled:opacity-50 disabled:no-underline"
                     >
-                      Resend verification code
+                      {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend verification code'}
                     </button>
                   </div>
                 </div>

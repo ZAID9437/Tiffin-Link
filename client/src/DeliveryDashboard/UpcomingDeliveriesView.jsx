@@ -15,6 +15,7 @@ const formatOrderRef = (ref) => {
 export default function UpcomingDeliveriesView({
   activeDelivery = null,
   currentUser = null,
+  isOnline = true,
   onNavigateTab = null,
   onStatusUpdate = null
 }) {
@@ -86,10 +87,21 @@ export default function UpcomingDeliveriesView({
       });
 
       const res = await fetch(`http://localhost:5000/api/delivery/upcoming?${params.toString()}`, { headers });
-      const json = await res.json();
+      let json = {};
+      try {
+        json = await res.json();
+      } catch (e) {}
 
       if (!res.ok || !json.success) {
-        setError(json.message || 'Unable to load upcoming deliveries');
+        if (res.status === 401) {
+          setError('Your session has expired. Please sign in again.');
+        } else if (res.status === 403) {
+          setError('You are not authorized to view these deliveries.');
+        } else if (res.status >= 500) {
+          setError(json.message || 'Server error while loading upcoming deliveries.');
+        } else {
+          setError(json.message || 'Unable to load upcoming deliveries');
+        }
         return;
       }
 
@@ -107,7 +119,7 @@ export default function UpcomingDeliveriesView({
       }
     } catch (err) {
       console.error('Error fetching upcoming deliveries:', err);
-      setError('Server connection error while loading upcoming queue.');
+      setError('Unable to connect to the delivery server.');
     } finally {
       setLoading(false);
     }
@@ -224,8 +236,14 @@ export default function UpcomingDeliveriesView({
                   : 'text-amber-800 bg-amber-50 border-amber-200'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${isSocketConnected ? 'bg-[#1b8743] animate-pulse' : 'bg-amber-500'}`}></span>
-                {isSocketConnected ? 'LIVE QUEUE' : 'OFFLINE MODE'}
+                {isSocketConnected ? 'LIVE QUEUE' : 'SYNCING'}
               </span>
+              {!isOnline && (
+                <span className="inline-flex items-center gap-1 ml-1 px-2 py-0.5 rounded border text-stone-600 bg-stone-100 border-stone-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
+                  OFFLINE
+                </span>
+              )}
             </div>
             <h2 className="font-serif text-3xl font-normal tracking-tight text-[#181816] leading-tight">Upcoming Deliveries</h2>
             <p className="text-xs text-[#706c64] mt-0.5">Your scheduled and assigned deliveries queued for fulfillment</p>

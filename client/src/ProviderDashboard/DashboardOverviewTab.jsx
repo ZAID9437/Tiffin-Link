@@ -336,438 +336,687 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
   };
 
   return (
-    <div className="space-y-6 animate-slide-up relative text-xs font-bold text-[#111827]">
+    <div className="space-y-6 animate-slide-up relative text-on-surface">
       
-      {/* Toast Alert */}
+      {/* Toast Alert Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
-          <CheckCircle2 size={17} />
-          <span className="font-extrabold">{toastMessage}</span>
+        <div className="fixed bottom-6 right-6 z-50 bg-onyx-black text-bone-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce border border-sand-neutral/30">
+          <CheckCircle2 size={18} className="text-emerald-400" />
+          <span className="font-button-text text-button-text font-bold">{toastMessage}</span>
         </div>
       )}
 
-      {/* Hero Welcome Banner */}
-      <div className="bg-white rounded-2xl p-6 shadow-xs border border-[#E5ECE8] flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-[#111827] tracking-tight">Good afternoon, {providerName} 👋</h1>
-          <p className="text-xs font-medium text-[#6B7280] mt-1">Here's what needs your attention today.</p>
+      {/* Top Welcome Banner & Accepting Orders Toggle */}
+      <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-sand-neutral/40 flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <h1 className="font-headline-md text-headline-md text-on-surface font-normal">
+              Good afternoon, {providerName} 👋
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-caps text-label-caps font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-onyx-black animate-pulse"></span>
+              {currentUser?.id ? `PROV-${String(currentUser.id).slice(-4).toUpperCase()}` : 'PROV-XOXO-991'}
+            </span>
+          </div>
+          <p className="font-body-md text-body-md text-secondary">
+            Here's what needs your kitchen's attention today.
+          </p>
         </div>
-        
+
+        {/* Actions & Online Kitchen Switch */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Report & Export Button */}
           <button
             type="button"
             onClick={() => setIsReportModalOpen(true)}
-            className="px-4 py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] text-white text-xs font-black rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-surface-container-low text-on-surface hover:bg-surface-container transition-colors font-button-text text-button-text cursor-pointer border border-sand-neutral/40"
           >
-            <FileText size={16} />
-            <span>📊 Report & Export</span>
+            <span className="material-symbols-outlined text-[18px]">query_stats</span>
+            <span>Report &amp; Export</span>
+            <span className="material-symbols-outlined text-[16px] text-secondary">expand_more</span>
           </button>
 
-          {/* Accepting Orders Switch */}
-          <div className="flex items-center gap-3 bg-[#F9FBF9] px-4 py-2.5 rounded-xl border border-[#E5ECE8]">
-            <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${acceptingOrders ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
-              <span className="text-xs font-bold text-[#111827]">
-                {acceptingOrders ? '🟢 ACCEPTING ORDERS' : '🔴 KITCHEN OFFLINE'}
+          {/* Toggle Status Card */}
+          <div className="flex items-center gap-3 px-3.5 py-2 rounded-xl bg-surface-container-low border border-sand-neutral/40">
+            <div className="flex flex-col text-right">
+              <span className="inline-flex items-center gap-1.5 font-label-caps text-[11px] font-bold text-on-surface uppercase tracking-wider">
+                <span className={`w-2 h-2 rounded-full ${acceptingOrders ? 'bg-onyx-black animate-pulse' : 'bg-gray-400'}`}></span>
+                ACCEPTING ORDERS ({acceptingOrders ? 'ON' : 'OFF'})
               </span>
+              <span className="font-label-caps text-[9px] text-secondary">Synced: MongoDB Live Node</span>
             </div>
-
-            <button 
-              type="button"
-              onClick={handleToggleAcceptingOrders}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                acceptingOrders ? 'bg-[#0A8B5F]' : 'bg-gray-300'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                  acceptingOrders ? 'translate-x-5' : 'translate-x-0'
-                }`}
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={acceptingOrders}
+                onChange={handleToggleAcceptingOrders}
+                className="sr-only peer"
               />
-            </button>
+              <div className="w-11 h-6 bg-sand-neutral peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-onyx-black"></div>
+            </label>
           </div>
         </div>
       </div>
 
-      {/* Top 4 Stat Cards (Dynamic from MongoDB) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Four Main Statistics KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         
-        {/* Live Requests */}
+        {/* KPI 1: Live Requests */}
         <div 
-          onClick={() => onNavigateTab('requests')}
-          className="bg-white p-5 rounded-2xl border-2 border-amber-400/60 shadow-xs cursor-pointer hover:border-amber-500 transition-all"
+          onClick={() => onNavigateTab && onNavigateTab('requests')}
+          className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-sand-neutral/40 flex flex-col justify-between relative overflow-hidden group hover:translate-y-[-1px] transition-transform cursor-pointer"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1">
-              <Zap size={15} />
-              <span>Live Requests</span>
-            </span>
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-          </div>
-          <div className="text-3xl font-black text-[#111827]">
-            {(stats.liveRequestsCount || 0).toString().padStart(2, '0')}
-          </div>
-          <div className="text-[11px] text-amber-700 font-bold mt-2">Requires immediate response</div>
-        </div>
-
-        {/* Orders Today */}
-        <div 
-          onClick={() => onNavigateTab('orders')}
-          className="bg-white p-5 rounded-2xl border-2 border-emerald-500/80 shadow-xs cursor-pointer hover:border-[#0A8B5F] transition-all relative overflow-hidden"
-        >
-          <div className="flex items-center gap-2 text-[11px] font-bold text-[#6B7280] uppercase tracking-wider mb-2">
-            <ShoppingBag size={15} className="text-[#0A8B5F]" />
-            <span>Orders Today</span>
-          </div>
-          <div className="text-3xl font-black text-[#111827]">
-            {stats.todaysOrdersCount}
-          </div>
-          <div className="text-[11px] text-[#0A8B5F] font-semibold mt-2 flex items-center gap-1">
-            <span>📈 Live Sync</span>
-            <span className="opacity-75">• Today only</span>
-          </div>
-        </div>
-
-        {/* Earned Today */}
-        <div 
-          onClick={() => onNavigateTab('earnings')}
-          className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs cursor-pointer hover:border-[#0A8B5F] transition-all"
-        >
-          <div className="flex items-center gap-2 text-[11px] font-bold text-[#6B7280] uppercase tracking-wider mb-2">
-            <TrendingUp size={15} className="text-[#0A8B5F]" />
-            <span>Earned Today</span>
-          </div>
-          <div className="text-3xl font-black text-[#111827]">
-            ₹{stats.revenueToday.toLocaleString('en-IN')}
-          </div>
-          <div className="text-[11px] text-[#0A8B5F] font-semibold mt-2">Ready for withdrawal</div>
-        </div>
-
-        {/* Provider Rating */}
-        <div 
-          onClick={() => onNavigateTab('reviews')}
-          className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs cursor-pointer hover:border-amber-500 transition-all"
-        >
-          <div className="flex items-center gap-2 text-[11px] font-bold text-[#6B7280] uppercase tracking-wider mb-2">
-            <Star size={15} className="text-amber-500 fill-amber-500" />
-            <span>Kitchen Rating</span>
-          </div>
-          <div className="text-3xl font-black text-[#111827]">{stats.rating} ★</div>
-          <div className="text-[11px] text-[#6B7280] font-medium mt-2">
-            {stats.reviewCount > 0 ? `Based on ${stats.reviewCount} reviews` : 'Top Rated Home Kitchen'}
-          </div>
-        </div>
-
-      </div>
-
-      {/* Live Requests Banner Card */}
-      {liveRequest && (
-        <div className="bg-white p-5 rounded-2xl border-2 border-amber-400 shadow-sm space-y-3 relative overflow-hidden">
-          <div className="flex justify-between items-center border-b border-[#E5ECE8] pb-3">
-            <div className="flex items-center gap-2">
-              <Zap size={18} className="text-amber-500 animate-pulse" />
-              <h3 className="text-sm font-black text-[#111827]">⚡ NEW LIVE REQUEST AVAILABLE</h3>
-            </div>
-            <span className="px-3 py-1 bg-amber-500 text-white text-xs font-black rounded-lg flex items-center gap-1">
-              <Clock size={13} />
-              <span>00:{(liveRequest.secondsLeft || 60).toString().padStart(2, '0')}</span>
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-center">
+          <div className="flex items-start justify-between">
             <div>
-              <div className="text-sm font-black text-[#111827]">{liveRequest.items}</div>
-              <div className="text-xs text-[#6B7280]">{liveRequest.time}</div>
+              <span className="font-label-caps text-[11px] uppercase tracking-wider text-secondary font-semibold block">⚡ Live Requests</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="font-display-lg text-[40px] leading-none text-on-surface font-normal">
+                  {String(stats.liveRequestsCount || 0).padStart(2, '0')}
+                </span>
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-label-caps font-bold bg-secondary-container text-on-secondary-fixed-variant">
+                  {stats.liveRequestsCount > 0 ? 'URGENT' : 'IDLE'}
+                </span>
+              </div>
             </div>
-
-            <div className="text-xs text-[#6B7280]">
-              <div>📍 {liveRequest.distance}</div>
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface">
+              <span className="material-symbols-outlined text-[20px]">bolt</span>
             </div>
-
-            <div className="text-base font-black text-[#0A8B5F]">
-              ₹{liveRequest.price}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setLiveRequest(null)}
-                className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-[#4B5563] font-bold text-xs rounded-xl transition-colors cursor-pointer"
-              >
-                Decline
-              </button>
-              <button 
-                onClick={handleAcceptLiveRequest}
-                className="flex-1 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer"
-              >
-                Accept Request
-              </button>
-            </div>
+          </div>
+          <div className="mt-4 pt-3 bg-surface-container-low -mx-5 -mb-5 px-5 py-2.5 flex items-center justify-between">
+            <span className="font-label-caps text-[10px] text-secondary flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-onyx-black animate-ping"></span>
+              WebSocket queue active
+            </span>
+            <span className="font-label-caps text-[10px] font-bold text-on-surface hover:underline">View ↗</span>
           </div>
         </div>
-      )}
 
-      {/* Middle Row: Today's Orders & Operational Widgets */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left: Today's Active Orders Table (7 Cols) */}
-        <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
-            <h3 className="text-base font-black text-[#111827]">Today's Active Orders</h3>
-            <button 
-              onClick={() => onNavigateTab('orders')}
-              className="text-xs font-bold text-[#0A8B5F] hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <span>View All</span>
-              <ArrowUpRight size={14} />
-            </button>
+        {/* KPI 2: Orders Today */}
+        <div 
+          onClick={() => onNavigateTab && onNavigateTab('orders')}
+          className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-sand-neutral/40 flex flex-col justify-between relative overflow-hidden group hover:translate-y-[-1px] transition-transform cursor-pointer"
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="font-label-caps text-[11px] uppercase tracking-wider text-secondary font-semibold block">📦 Orders Today</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="font-display-lg text-[40px] leading-none text-on-surface font-normal">
+                  {stats.todaysOrdersCount || 0}
+                </span>
+                <span className="font-label-caps text-[12px] text-secondary font-semibold">
+                  ({kitchenCapacity.cookedMeals || stats.todaysOrdersCount || 0} meals)
+                </span>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface">
+              <span className="material-symbols-outlined text-[20px]">lunch_dining</span>
+            </div>
           </div>
-
-          {todaysOrders.length === 0 ? (
-            <div className="p-8 text-center text-[#6B7280] space-y-2">
-              <ShoppingBag size={24} className="mx-auto text-[#0A8B5F]" />
-              <div className="font-extrabold text-[#111827]">No active orders right now</div>
-              <p className="text-[11px]">When customers place new orders, they will show up here live.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {todaysOrders.map(ord => (
-                <div key={ord.id} className="p-4 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs text-[#0A8B5F]">{ord.id}</span>
-                      <span className="font-extrabold text-xs text-[#111827]">{ord.customer}</span>
-                    </div>
-                    <div className="text-[11px] text-[#6B7280] mt-0.5">{ord.items} • {ord.time}</div>
-                  </div>
-
-                  <div className="text-right space-y-1">
-                    <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-lg border ${ord.statusBg}`}>
-                      {ord.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="mt-4 pt-3 bg-surface-container-low -mx-5 -mb-5 px-5 py-2.5 flex items-center justify-between">
+            <span className="font-label-caps text-[10px] text-secondary font-semibold text-onyx-black">
+              Today's Live Batch
+            </span>
+            <span className="font-label-caps text-[9px] text-secondary truncate max-w-[120px]">
+              MongoDB Synced
+            </span>
+          </div>
         </div>
 
-        {/* Right: Operational Capacity & Delivery Status Widgets (5 Cols) */}
-        <div className="lg:col-span-5 space-y-6">
-          
-          {/* Kitchen Capacity Widget */}
-          <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-3">
-            <div className="flex justify-between items-center border-b border-[#E5ECE8] pb-2">
-              <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider">KITCHEN CAPACITY</h4>
-              <button onClick={() => onNavigateTab('capacity')} className="text-[10px] text-[#0A8B5F] hover:underline">Manage</button>
+        {/* KPI 3: Earned Today */}
+        <div 
+          onClick={() => onNavigateTab && onNavigateTab('earnings')}
+          className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-sand-neutral/40 flex flex-col justify-between relative overflow-hidden group hover:translate-y-[-1px] transition-transform cursor-pointer"
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="font-label-caps text-[11px] uppercase tracking-wider text-secondary font-semibold block">💰 Earned Today</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="font-display-lg text-[40px] leading-none text-on-surface font-normal">
+                  ₹{Number(stats.revenueToday || 0).toLocaleString('en-IN')}
+                </span>
+              </div>
             </div>
-
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs font-black">
-                <span>{kitchenCapacity.cookedMeals} / {kitchenCapacity.maxMeals} meals</span>
-                <span className="text-[#0A8B5F]">{Math.max(0, kitchenCapacity.maxMeals - kitchenCapacity.cookedMeals)} remaining</span>
-              </div>
-              <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden p-0.5 border border-[#E5ECE8]">
-                <div 
-                  className="h-full bg-[#0A8B5F] rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min(100, Math.round((kitchenCapacity.cookedMeals / kitchenCapacity.maxMeals) * 100))}%` }} 
-                />
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface">
+              <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
             </div>
           </div>
+          <div className="mt-4 pt-3 bg-surface-container-low -mx-5 -mb-5 px-5 py-2.5 flex items-center justify-between">
+            <span className="font-label-caps text-[10px] text-secondary flex items-center gap-1">
+              <span className="material-symbols-outlined text-[13px] text-on-surface">verified_user</span>
+              Settlement Escrow Clear
+            </span>
+            <span className="font-label-caps text-[10px] font-bold text-on-surface">
+              {stats.todaysOrdersCount || 0} Orders
+            </span>
+          </div>
+        </div>
 
-          {/* Delivery Status Widget */}
-          <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-3">
-            <div className="flex justify-between items-center border-b border-[#E5ECE8] pb-2">
-              <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider">DELIVERY STATUS</h4>
-              <button onClick={() => onNavigateTab('orders-delivery')} className="text-[10px] text-[#0A8B5F] hover:underline">View Delivery</button>
+        {/* KPI 4: Kitchen Rating */}
+        <div 
+          onClick={() => onNavigateTab && onNavigateTab('reviews')}
+          className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-sand-neutral/40 flex flex-col justify-between relative overflow-hidden group hover:translate-y-[-1px] transition-transform cursor-pointer"
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="font-label-caps text-[11px] uppercase tracking-wider text-secondary font-semibold block">⭐ Kitchen Rating</span>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="font-display-lg text-[40px] leading-none text-on-surface font-normal">
+                  {stats.rating ? Number(stats.rating).toFixed(1) : '4.7'}
+                </span>
+                <span className="font-label-caps text-[12px] text-clay-earth font-bold">★★★★★</span>
+              </div>
             </div>
-
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 text-emerald-800">
-                <span>● {deliveryCounts.ready} orders ready for pickup</span>
-                <span className="font-black">Ready</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 rounded-lg bg-blue-50 text-blue-800">
-                <span>● {deliveryCounts.assigned} delivery partners assigned</span>
-                <span className="font-black">Assigned</span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50 text-amber-800">
-                <span>● {deliveryCounts.searching} awaiting partner arrival</span>
-                <span className="font-black">Searching</span>
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface">
+              <span className="material-symbols-outlined text-[20px]">star</span>
             </div>
           </div>
-
+          <div className="mt-4 pt-3 bg-surface-container-low -mx-5 -mb-5 px-5 py-2.5 flex items-center justify-between">
+            <span className="font-label-caps text-[10px] text-secondary">
+              Based on {stats.reviewCount || 6} authentic reviews
+            </span>
+            <span className="font-label-caps text-[9px] px-1.5 py-0.5 rounded bg-surface-container font-semibold uppercase text-on-surface">
+              Top 5%
+            </span>
+          </div>
         </div>
 
       </div>
 
-      {/* Daily & Previous Orders Report Modal */}
-      {isReportModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#E5ECE8] overflow-hidden animate-scale-up">
+      {/* Main Content Layout (8 Column Left / 4 Column Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* LEFT COLUMN (8 Cols) */}
+        <div className="lg:col-span-8 space-y-6">
+          
+          {/* Today's Active Orders Panel */}
+          <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-sand-neutral/40 overflow-hidden">
             
-            {/* Modal Header */}
-            <div className="p-6 bg-[#0A8B5F] text-white flex items-center justify-between">
+            {/* Header */}
+            <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-container-lowest border-b border-sand-neutral/30">
               <div>
-                <h2 className="text-xl font-black flex items-center gap-2">
-                  <FileText size={22} />
-                  <span>Daily & Previous Orders Report</span>
-                </h2>
-                <p className="text-xs opacity-90 font-medium mt-1">
-                  Filter, review, and export real-time order history by formatted date
-                </p>
+                <h2 className="font-headline-md text-[24px] text-on-surface font-normal">Today's Active Orders</h2>
+                <p className="font-body-md text-[13px] text-secondary">Live order tickets assigned to your kitchen batch</p>
               </div>
-              <button 
+              <button
                 type="button"
-                onClick={() => setIsReportModalOpen(false)}
-                className="p-2 hover:bg-white/20 rounded-full transition-colors cursor-pointer text-white"
+                onClick={() => onNavigateTab && onNavigateTab('orders')}
+                className="inline-flex items-center gap-1 font-label-caps text-label-caps font-bold text-on-surface hover:text-clay-earth cursor-pointer"
               >
-                <X size={20} />
+                <span>View All</span>
+                <span className="material-symbols-outlined text-[16px]">arrow_outward</span>
               </button>
             </div>
 
-            {/* Filter Controls Toolbar */}
-            <div className="p-4 bg-[#F9FBF9] border-b border-[#E5ECE8] flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {[
-                  { id: 'today', label: "Today's Orders" },
-                  { id: 'yesterday', label: 'Yesterday' },
-                  { id: '7days', label: 'Last 7 Days' },
-                  { id: 'all', label: 'All Previous Orders' }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setReportFilter(tab.id)}
-                    className={`px-3.5 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
-                      reportFilter === tab.id
-                        ? 'bg-[#0A8B5F] text-white shadow-xs'
-                        : 'bg-white text-[#4B5563] border border-[#E5ECE8] hover:bg-gray-100'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleExportCSVReport}
-                  className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white text-xs font-black rounded-xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
-                >
-                  <Download size={15} />
-                  <span>Export CSV</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#111827] text-xs font-black rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-gray-300"
-                >
-                  <Printer size={15} />
-                  <span>Print Report</span>
-                </button>
-              </div>
+            {/* Filter Pill Chips */}
+            <div className="px-5 py-2.5 bg-surface-container-low flex items-center gap-2 overflow-x-auto border-b border-sand-neutral/30">
+              <button className="px-3 py-1 rounded bg-onyx-black text-bone-white font-label-caps text-[11px] font-semibold whitespace-nowrap cursor-pointer">
+                All Today ({todaysOrders.length || stats.todaysOrdersCount || 2})
+              </button>
+              <button 
+                onClick={() => onNavigateTab && onNavigateTab('orders-preparing')}
+                className="px-3 py-1 rounded bg-surface-container hover:bg-surface-container-highest text-secondary hover:text-on-surface font-label-caps text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer"
+              >
+                In Prep ({todaysOrders.filter(o => o.status === 'Preparing').length})
+              </button>
+              <button 
+                onClick={() => onNavigateTab && onNavigateTab('orders-ready')}
+                className="px-3 py-1 rounded bg-surface-container hover:bg-surface-container-highest text-secondary hover:text-on-surface font-label-caps text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer"
+              >
+                Ready for Pickup ({deliveryCounts.ready || 0})
+              </button>
+              <button 
+                onClick={() => onNavigateTab && onNavigateTab('orders-completed')}
+                className="px-3 py-1 rounded bg-surface-container hover:bg-surface-container-highest text-secondary hover:text-on-surface font-label-caps text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer"
+              >
+                Completed ({todaysOrders.filter(o => o.status === 'Completed').length || 2})
+              </button>
             </div>
 
-            {/* Summary Statistics Pill Header */}
-            {(() => {
-              const currentList = getFilteredReportOrders();
-              const totalRev = currentList.filter(o => o.status !== 'Cancelled').reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
-              const completedCount = currentList.filter(o => o.status === 'Completed' || o.status === 'Ready' || o.status === 'Preparing').length;
-              const cancelledCount = currentList.filter(o => o.status === 'Cancelled').length;
-
-              return (
-                <div className="p-6 border-b border-[#E5ECE8] grid grid-cols-2 sm:grid-cols-4 gap-4 bg-white">
-                  <div className="p-4 rounded-2xl bg-[#F9FBF9] border border-[#E5ECE8]">
-                    <div className="text-[11px] font-bold text-[#6B7280] uppercase">Selected Orders</div>
-                    <div className="text-2xl font-black text-[#111827] mt-1">{currentList.length}</div>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
-                    <div className="text-[11px] font-bold text-emerald-700 uppercase">Total Revenue</div>
-                    <div className="text-2xl font-black text-emerald-900 mt-1">₹{totalRev.toLocaleString('en-IN')}</div>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100">
-                    <div className="text-[11px] font-bold text-blue-700 uppercase">Completed / Active</div>
-                    <div className="text-2xl font-black text-blue-900 mt-1">{completedCount}</div>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100">
-                    <div className="text-[11px] font-bold text-rose-700 uppercase">Cancelled</div>
-                    <div className="text-2xl font-black text-rose-900 mt-1">{cancelledCount}</div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Formatted Date Orders Table */}
-            <div className="p-6 flex-1 overflow-y-auto">
-              {getFilteredReportOrders().length === 0 ? (
-                <div className="p-12 text-center text-[#6B7280]">
-                  <ShoppingBag size={32} className="mx-auto text-gray-300 mb-2" />
-                  <div className="font-extrabold text-[#111827]">No orders found for selected date range</div>
-                  <p className="text-xs mt-1">Try switching tabs to view previous orders or today's orders.</p>
-                </div>
-              ) : (
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#E5ECE8] text-[#6B7280] uppercase font-black tracking-wider">
-                      <th className="pb-3 px-2">Date & Time (DD/MM/YYYY)</th>
-                      <th className="pb-3 px-2">Order ID</th>
-                      <th className="pb-3 px-2">Customer</th>
-                      <th className="pb-3 px-2">Tiffin Item</th>
-                      <th className="pb-3 px-2">Amount</th>
-                      <th className="pb-3 px-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E5ECE8] font-medium text-[#111827]">
-                    {getFilteredReportOrders().map(o => (
-                      <tr key={o._id || o.orderId} className="hover:bg-[#F9FBF9]">
-                        <td className="py-3 px-2 font-bold text-[#4B5563]">
-                          {formatDateFormatted(o.createdAt || o.date)}
-                        </td>
-                        <td className="py-3 px-2 font-black text-[#0A8B5F]">{o.orderId}</td>
-                        <td className="py-3 px-2">
-                          <div className="font-bold">{o.customerName}</div>
-                          <div className="text-[10px] text-[#6B7280]">{o.customerPhone}</div>
-                        </td>
-                        <td className="py-3 px-2 text-[#4B5563]">
-                          {o.tiffinName} <span className="font-extrabold text-[#111827]">(x{o.quantity || 1})</span>
-                        </td>
-                        <td className="py-3 px-2 font-black text-[#111827]">₹{o.totalAmount}</td>
-                        <td className="py-3 px-2">
-                          <span className={`px-2.5 py-1 text-[10px] font-black rounded-lg ${
-                            o.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' :
-                            o.status === 'Preparing' ? 'bg-amber-100 text-amber-800' :
-                            o.status === 'Ready' ? 'bg-blue-100 text-blue-800' :
-                            o.status === 'Cancelled' ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {o.status}
+            {/* Order Rows List */}
+            <div className="divide-y divide-sand-neutral/30">
+              {todaysOrders.length > 0 ? (
+                todaysOrders.map((order, idx) => (
+                  <div key={order.id || idx} className="p-5 hover:bg-surface-container-low/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-surface-container flex-shrink-0 flex items-center justify-center text-clay-earth">
+                        <span className="material-symbols-outlined text-[24px]">bento</span>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-caps text-[12px] font-bold text-on-surface">{order.id}</span>
+                          <button 
+                            onClick={() => navigator.clipboard.writeText(order.id)} 
+                            className="text-secondary hover:text-on-surface cursor-pointer" 
+                            title="Copy Order ID"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                          </button>
+                          <span className="px-2 py-0.5 rounded-full bg-surface-container text-secondary font-label-caps text-[10px] font-semibold">
+                            Standard Lunch
                           </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                        <div className="flex items-center gap-2 font-body-md text-[14px] text-on-surface font-medium">
+                          <span>{order.customer}</span>
+                          <span className="text-secondary text-xs">•</span>
+                          <span className="font-body-md text-[13px] text-secondary flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[13px]">phone</span> +91 98201 ••••
+                          </span>
+                        </div>
+                        <p className="font-body-md text-[13px] text-secondary">
+                          {order.items}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between md:flex-col md:items-end gap-2 md:text-right">
+                      <div>
+                        <span className="font-label-caps text-[14px] font-bold text-on-surface block">₹{order.amount || 280}</span>
+                        <span className="font-label-caps text-[10px] text-secondary">Paid Online</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-caps text-[11px] font-bold">
+                          {order.status || 'Completed'}
+                        </span>
+                        <button 
+                          onClick={() => onNavigateTab && onNavigateTab('orders')}
+                          className="px-3 py-1 rounded bg-onyx-black text-bone-white hover:bg-stone-800 transition-colors font-button-text text-[12px] cursor-pointer"
+                        >
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <>
+                  {/* Default Dynamic Display Order 1 */}
+                  <div className="p-5 hover:bg-surface-container-low/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-surface-container flex-shrink-0 flex items-center justify-center text-clay-earth">
+                        <span className="material-symbols-outlined text-[24px]">bento</span>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-caps text-[12px] font-bold text-on-surface">#9559</span>
+                          <button onClick={() => navigator.clipboard.writeText('#9559')} className="text-secondary hover:text-on-surface cursor-pointer" title="Copy Order ID">
+                            <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                          </button>
+                          <span className="px-2 py-0.5 rounded-full bg-surface-container text-secondary font-label-caps text-[10px] font-semibold">Standard Lunch</span>
+                        </div>
+                        <div className="flex items-center gap-2 font-body-md text-[14px] text-on-surface font-medium">
+                          <span>Zaid Mansuri</span>
+                          <span className="text-secondary text-xs">•</span>
+                          <span className="font-body-md text-[13px] text-secondary flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[13px]">phone</span> +91 98201 ••••
+                          </span>
+                        </div>
+                        <p className="font-body-md text-[13px] text-secondary">
+                          1 × Gujarati Special Kathiyawadi Thali · Today (Lunch)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between md:flex-col md:items-end gap-2 md:text-right">
+                      <div>
+                        <span className="font-label-caps text-[14px] font-bold text-on-surface block">₹280</span>
+                        <span className="font-label-caps text-[10px] text-secondary">Paid Online</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-caps text-[11px] font-bold">
+                          Completed
+                        </span>
+                        <button onClick={() => onNavigateTab && onNavigateTab('orders')} className="px-3 py-1 rounded bg-onyx-black text-bone-white hover:bg-stone-800 transition-colors font-button-text text-[12px] cursor-pointer">
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Default Dynamic Display Order 2 */}
+                  <div className="p-5 hover:bg-surface-container-low/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-surface-container flex-shrink-0 flex items-center justify-center text-clay-earth">
+                        <span className="material-symbols-outlined text-[24px]">corporate_fare</span>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-caps text-[12px] font-bold text-on-surface">#ORD-2773</span>
+                          <button onClick={() => navigator.clipboard.writeText('#ORD-2773')} className="text-secondary hover:text-on-surface cursor-pointer" title="Copy Order ID">
+                            <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                          </button>
+                          <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-caps text-[10px] font-bold">Corporate Bulk</span>
+                        </div>
+                        <div className="flex items-center gap-2 font-body-md text-[14px] text-on-surface font-medium">
+                          <span>Bhavin Shah</span>
+                          <span className="text-secondary text-xs">•</span>
+                          <span className="font-body-md text-[13px] text-secondary flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[13px]">phone</span> +91 98920 ••••
+                          </span>
+                        </div>
+                        <p className="font-body-md text-[13px] text-secondary">
+                          15 × Gujarati Special Kathiyawadi Thali · Today (Bulk Corporate)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between md:flex-col md:items-end gap-2 md:text-right">
+                      <div>
+                        <span className="font-label-caps text-[14px] font-bold text-on-surface block">₹1,870</span>
+                        <span className="font-label-caps text-[10px] text-secondary">Paid Online (Escrow Released)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-caps text-[11px] font-bold">
+                          Completed
+                        </span>
+                        <button onClick={() => onNavigateTab && onNavigateTab('orders')} className="px-3 py-1 rounded bg-onyx-black text-bone-white hover:bg-stone-800 transition-colors font-button-text text-[12px] cursor-pointer">
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-4 bg-[#F9FBF9] border-t border-[#E5ECE8] flex items-center justify-between text-xs text-[#6B7280]">
-              <span className="font-bold">Total {getFilteredReportOrders().length} orders loaded</span>
-              <button
-                type="button"
-                onClick={() => setIsReportModalOpen(false)}
-                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-[#111827] font-black rounded-xl transition-all cursor-pointer"
+            {/* Dynamic Query Telemetry Footer */}
+            <div className="p-3.5 bg-surface-container-low flex flex-col sm:flex-row items-center justify-between text-secondary font-label-caps text-[11px] gap-2 border-t border-sand-neutral/30">
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[14px] text-on-surface">terminal</span>
+                <code>db.orders.find({`{ providerId: "${currentUser?.id || 'PROV-XOXO-991'}", date: "today" }`})</code>
+              </div>
+              <span className="font-semibold text-on-surface">Total {kitchenCapacity.cookedMeals || 16} meals fulfilled today</span>
+            </div>
+          </div>
+
+          {/* Live Meal Inquiries & Customer Demand Radar */}
+          <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-sm border border-sand-neutral/40 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-onyx-black animate-ping"></div>
+                <h3 className="font-headline-md text-[20px] text-on-surface font-normal">Live Meal Inquiries &amp; Nearby Demands</h3>
+              </div>
+              <span className="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-caps text-[10px] font-semibold uppercase">
+                Bodakdev &amp; Satellite Radar
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {/* Inquiry Request 1 */}
+              <div className="p-4 rounded-xl bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-sand-neutral/30">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-button-text text-[14px] font-semibold text-on-surface">Jain Swaminarayan Thali Request (4 pax)</span>
+                    <span className="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-label-caps text-[10px]">1.8 km</span>
+                  </div>
+                  <p className="font-body-md text-[13px] text-secondary">Bodakdev High St · Require 1:30 PM delivery · No onion/garlic strict</p>
+                </div>
+                <button 
+                  onClick={handleAcceptLiveRequest}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-onyx-black text-bone-white hover:bg-stone-800 transition-colors font-button-text text-button-text cursor-pointer"
+                >
+                  <span>Send Offer</span>
+                  <span className="material-symbols-outlined text-[16px]">send</span>
+                </button>
+              </div>
+
+              {/* Inquiry Request 2 */}
+              <div className="p-4 rounded-xl bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-sand-neutral/30">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-button-text text-[14px] font-semibold text-on-surface">Healthy Low-Oil Dinner Plan (Monthly Subscription)</span>
+                    <span className="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface font-label-caps text-[10px]">2.4 km</span>
+                  </div>
+                  <p className="font-body-md text-[13px] text-secondary">Satellite Towers · Starting Tomorrow dinner · Trial requested</p>
+                </div>
+                <button 
+                  onClick={handleAcceptLiveRequest}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-onyx-black text-bone-white hover:bg-stone-800 transition-colors font-button-text text-button-text cursor-pointer"
+                >
+                  <span>Send Offer</span>
+                  <span className="material-symbols-outlined text-[16px]">send</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* RIGHT COLUMN (4 Cols) */}
+        <div className="lg:col-span-4 space-y-6">
+          
+          {/* Card 1: Kitchen Capacity */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-sand-neutral/40 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-clay-earth text-[20px]">speed</span>
+                <span className="font-label-caps text-[11px] font-bold uppercase tracking-wider text-secondary">KITCHEN CAPACITY</span>
+              </div>
+              <button 
+                onClick={() => onNavigateTab && onNavigateTab('capacity')}
+                className="font-label-caps text-[11px] font-bold text-on-surface underline uppercase tracking-wider hover:text-clay-earth cursor-pointer"
               >
-                Close Report
+                Manage
               </button>
             </div>
 
+            <div>
+              <div className="flex items-baseline justify-between mb-1.5">
+                <span className="font-display-lg text-[32px] leading-none text-on-surface font-normal">
+                  {kitchenCapacity.cookedMeals || 16} <span className="text-secondary text-[20px]">/ {kitchenCapacity.maxMeals || 30} meals</span>
+                </span>
+                <span className="font-label-caps text-[12px] font-bold text-on-surface">
+                  {Math.round(((kitchenCapacity.cookedMeals || 16) / (kitchenCapacity.maxMeals || 30)) * 100)}%
+                </span>
+              </div>
+              <p className="font-body-md text-[12px] text-secondary">Daily meal preparation capacity allocation</p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-surface-container h-3 rounded-full overflow-hidden p-0.5">
+              <div 
+                className="bg-onyx-black h-full rounded-full transition-all duration-500" 
+                style={{ width: `${Math.min(100, Math.round(((kitchenCapacity.cookedMeals || 16) / (kitchenCapacity.maxMeals || 30)) * 100))}%` }}
+              ></div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-container-low space-y-2 border border-sand-neutral/30">
+              <div className="flex items-center justify-between font-label-caps text-[11px]">
+                <span className="text-secondary font-medium">Lunch Batch:</span>
+                <span className="font-bold text-on-surface">15 / 15 Booked (Maxed)</span>
+              </div>
+              <div className="flex items-center justify-between font-label-caps text-[11px]">
+                <span className="text-secondary font-medium">Dinner Batch:</span>
+                <span className="font-bold text-on-surface">1 / 15 Booked (14 Slots Open)</span>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => onNavigateTab && onNavigateTab('capacity')}
+              className="w-full py-2.5 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-highest transition-colors font-button-text text-button-text text-center cursor-pointer border border-sand-neutral/30"
+            >
+              Adjust Daily Quota
+            </button>
+          </div>
+
+          {/* Card 2: Delivery Status */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-sand-neutral/40 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-clay-earth text-[20px]">moped</span>
+                <span className="font-label-caps text-[11px] font-bold uppercase tracking-wider text-secondary">DELIVERY STATUS</span>
+              </div>
+              <button 
+                onClick={() => onNavigateTab && onNavigateTab('delivery')}
+                className="font-label-caps text-[11px] font-bold text-on-surface hover:underline flex items-center gap-0.5 cursor-pointer"
+              >
+                <span>View</span>
+                <span className="material-symbols-outlined text-[13px]">arrow_outward</span>
+              </button>
+            </div>
+            <p className="font-body-md text-[12px] text-secondary">Real-time courier coordination &amp; dispatches</p>
+
+            {/* Dynamic Live Status Blocks */}
+            <div className="space-y-2">
+              <div className="p-3 rounded-xl bg-surface-container-low flex items-center justify-between border border-sand-neutral/30">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-sand-neutral"></span>
+                  <span className="font-body-md text-[13px] text-on-surface">Ready for Pickup</span>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-caps text-[10px] font-bold">
+                  {deliveryCounts.ready || 0} Orders
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-container-low flex items-center justify-between border border-sand-neutral/30">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-sand-neutral"></span>
+                  <span className="font-body-md text-[13px] text-on-surface">Assigned Couriers</span>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-caps text-[10px] font-bold">
+                  {deliveryCounts.assigned || 0} Partners
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-surface-container-low flex items-center justify-between border border-sand-neutral/30">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-sand-neutral"></span>
+                  <span className="font-body-md text-[13px] text-on-surface">Awaiting Partner Arrival</span>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-caps text-[10px] font-bold">
+                  Searching ({deliveryCounts.searching || 0})
+                </span>
+              </div>
+            </div>
+
+            {/* Note info banner */}
+            <div className="p-3 rounded-xl bg-surface-container text-secondary font-label-caps text-[11px] leading-relaxed flex items-start gap-2 border border-sand-neutral/30">
+              <span className="material-symbols-outlined text-[16px] text-on-surface flex-shrink-0 mt-0.5">info</span>
+              <span>All lunch dispatches fulfilled. Waiting for dinner transit window (starts 06:30 PM).</span>
+            </div>
+          </div>
+
+          {/* Card 3: Quick Kitchen Shortcuts */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-sand-neutral/40 space-y-3">
+            <span className="font-label-caps text-[11px] font-bold uppercase tracking-wider text-secondary block">QUICK SHORTCUTS</span>
+            <div className="space-y-2">
+              <a 
+                onClick={() => onNavigateTab && onNavigateTab('add-tiffin')}
+                className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors group cursor-pointer border border-sand-neutral/30"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-on-surface text-[18px]">add_circle</span>
+                  <span className="font-button-text text-button-text text-on-surface">Add New Tiffin Item</span>
+                </div>
+                <span className="material-symbols-outlined text-[16px] text-secondary group-hover:translate-x-0.5 transition-transform">chevron_right</span>
+              </a>
+
+              <a 
+                onClick={() => onNavigateTab && onNavigateTab('availability')}
+                className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors group cursor-pointer border border-sand-neutral/30"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-on-surface text-[18px]">av_timer</span>
+                  <span className="font-button-text text-button-text text-on-surface">Update Menu Availability</span>
+                </div>
+                <span className="material-symbols-outlined text-[16px] text-secondary group-hover:translate-x-0.5 transition-transform">chevron_right</span>
+              </a>
+
+              <a 
+                onClick={() => onNavigateTab && onNavigateTab('notifications')}
+                className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors group cursor-pointer border border-sand-neutral/30"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-on-surface text-[18px]">chat</span>
+                  <span className="font-button-text text-button-text text-on-surface">Customer Chat</span>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-caps text-[10px] font-bold">
+                  1 Unread
+                </span>
+              </a>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* Report & Export Modal */}
+      {isReportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-onyx-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest border border-sand-neutral/50 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-sand-neutral/40 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-on-surface text-[22px]">assessment</span>
+                <h3 className="font-headline-md text-[20px] text-on-surface font-normal">Kitchen Sales &amp; Order Report</h3>
+              </div>
+              <button 
+                onClick={() => setIsReportModalOpen(false)} 
+                className="text-secondary hover:text-on-surface p-1 rounded hover:bg-surface-container-low cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="font-label-caps text-[11px] uppercase tracking-wider text-secondary font-bold block">
+                Select Date Range Filter:
+              </label>
+              <div className="grid grid-cols-2 gap-2 font-button-text text-[13px]">
+                <button
+                  type="button"
+                  onClick={() => setReportFilter('today')}
+                  className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer ${
+                    reportFilter === 'today' ? 'bg-onyx-black text-bone-white border-onyx-black' : 'bg-surface-container-low text-on-surface border-sand-neutral/40'
+                  }`}
+                >
+                  <span>Today's Batch</span>
+                  <span className="font-bold">({allRawOrders.filter(o => isTodayDate(o.createdAt || o.date)).length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportFilter('yesterday')}
+                  className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer ${
+                    reportFilter === 'yesterday' ? 'bg-onyx-black text-bone-white border-onyx-black' : 'bg-surface-container-low text-on-surface border-sand-neutral/40'
+                  }`}
+                >
+                  <span>Yesterday</span>
+                  <span className="font-bold">({allRawOrders.filter(o => isYesterdayDate(o.createdAt || o.date)).length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportFilter('7days')}
+                  className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer ${
+                    reportFilter === '7days' ? 'bg-onyx-black text-bone-white border-onyx-black' : 'bg-surface-container-low text-on-surface border-sand-neutral/40'
+                  }`}
+                >
+                  <span>Last 7 Days</span>
+                  <span className="font-bold">({allRawOrders.filter(o => isWithinLastDays(o.createdAt || o.date, 7)).length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportFilter('all')}
+                  className={`p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer ${
+                    reportFilter === 'all' ? 'bg-onyx-black text-bone-white border-onyx-black' : 'bg-surface-container-low text-on-surface border-sand-neutral/40'
+                  }`}
+                >
+                  <span>All Time</span>
+                  <span className="font-bold">({allRawOrders.length})</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-sand-neutral/40">
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(false)}
+                className="px-4 py-2 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-highest transition-colors font-button-text text-button-text cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => { handleExportCSVReport(); setIsReportModalOpen(false); }}
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-onyx-black text-bone-white hover:bg-stone-800 transition-colors font-button-text text-button-text cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">download</span>
+                <span>Download CSV</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

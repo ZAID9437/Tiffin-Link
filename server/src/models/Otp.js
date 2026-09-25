@@ -20,7 +20,7 @@ const otpSchema = new mongoose.Schema({
   purpose: {
     type: String,
     default: 'AUTH',
-    enum: ['AUTH', 'KITCHEN_PICKUP', 'CUSTOMER_DELIVERY', 'CUSTOMER_ARRIVAL', 'CUSTOMER_HANDOVER'],
+    enum: ['AUTH', 'EMAIL_VERIFICATION', 'EMAIL_REVERIFICATION', 'KITCHEN_PICKUP', 'CUSTOMER_DELIVERY', 'CUSTOMER_ARRIVAL', 'CUSTOMER_HANDOVER'],
     index: true
   },
   otp: {

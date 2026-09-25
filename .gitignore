@@ -32,3 +32,10 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Scratch, temporary zip & dumps
+scratch/
+server/scratch/
+*.zip
+tiffinlink_full_database.json
+

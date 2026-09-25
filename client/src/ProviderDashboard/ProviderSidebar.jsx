@@ -9,37 +9,24 @@ export default function ProviderSidebar({
   setActiveTab,
   isMobileSidebarOpen = false,
   setIsMobileSidebarOpen,
-  badgeCounts = { liveRequests: 2, newOrders: 5, notifications: 3 },
+  badgeCounts = { liveRequests: 4, newOrders: 0, notifications: 3 },
   currentUser,
   isKitchenOnline = true,
   onToggleKitchenOnline,
   onLogout
 }) {
-  const providerName = currentUser?.name || "Aria's Artisanal Kitchen";
-  const providerId = currentUser?.id || currentUser?._id || '5021';
-  const initials = providerName
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .substring(0, 2)
-    .toUpperCase() || 'AK';
-
-  const [expandedMenus, setExpandedMenus] = useState({
-    orders: true,
-    tiffins: true
-  });
-
-  const toggleSubMenu = (menu) => {
-    setExpandedMenus((prev) => ({
-      ...prev,
-      [menu]: !prev[menu]
-    }));
-  };
+  const providerName = currentUser?.name || currentUser?.businessName || 'Xoxo Men';
+  const providerId = currentUser?.id || currentUser?._id || 'PROV-XOXO-991';
 
   const handleNavClick = (tabId) => {
     if (setActiveTab) setActiveTab(tabId);
     if (setIsMobileSidebarOpen) setIsMobileSidebarOpen(false);
   };
+
+  const navClass = (tabId) =>
+    activeTab === tabId
+      ? 'flex items-center justify-between px-3 py-2 rounded transition-colors bg-surface-container font-semibold text-on-surface cursor-pointer'
+      : 'flex items-center justify-between px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors cursor-pointer';
 
   return (
     <>
@@ -47,473 +34,305 @@ export default function ProviderSidebar({
       {isMobileSidebarOpen && (
         <div
           onClick={() => setIsMobileSidebarOpen && setIsMobileSidebarOpen(false)}
-          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-30 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-onyx-black/40 backdrop-blur-xs z-40 lg:hidden transition-opacity"
         />
       )}
 
       {/* Left Sidebar Container */}
       <aside
         className={`
-          w-72 bg-[#fbf9f5] border-r border-[#e7e3db] flex-shrink-0 flex flex-col h-screen 
-          sticky top-0 custom-scrollbar overflow-y-auto z-40 transition-transform duration-300 ease-in-out
-          fixed lg:sticky
+          fixed left-0 top-0 h-full w-72 bg-surface-container-lowest flex flex-col z-50 overflow-y-auto
+          border-r border-sand-neutral/50 transition-transform duration-300 ease-in-out
           ${isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
         `}
-        data-purpose="sidebar"
       >
-        {/* Brand Header */}
-        <div className="px-6 pt-7 pb-5 border-b border-[#e7e3db]/60 flex items-center justify-between">
-          <div>
-            <h1 className="font-serif text-2xl font-bold tracking-tight text-black leading-none">
-              TiffinLink
-            </h1>
-            <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-[#726f68] mt-1.5 font-sans">
-              Provider Partner
-            </p>
-          </div>
-          {setIsMobileSidebarOpen && (
-            <button
-              onClick={() => setIsMobileSidebarOpen(false)}
-              className="lg:hidden text-[#726f68] hover:text-black p-1"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Provider Profile Card */}
-        <div className="px-6 py-4 border-b border-[#e7e3db]/60 bg-[#f7f4ee]/40 font-sans">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-[#171717] text-white flex items-center justify-center font-serif text-base font-medium shadow-sm shrink-0">
-              {currentUser?.avatar ? (
-                <img src={currentUser.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
-              ) : (
-                <span>{initials}</span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-1.5">
-                <h4 className="text-xs font-semibold text-[#171717] truncate">{providerName}</h4>
-                <span className="text-emerald-700 text-[11px]" title="FSSAI Verified">
-                  ✓
+        {/* Header Branding & Kitchen Status Profile */}
+        <div className="p-4 pb-3 border-b border-sand-neutral/30 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-onyx-black flex items-center justify-center text-bone-white shadow-sm">
+                <span className="material-symbols-outlined text-[20px]">lunch_dining</span>
+              </div>
+              <div>
+                <span className="font-label-caps text-label-caps text-on-surface uppercase block font-bold tracking-wider">
+                  TiffinLink
+                </span>
+                <span className="font-label-caps text-[10px] tracking-widest uppercase px-1.5 py-0.5 rounded bg-surface-container text-clay-earth font-semibold">
+                  Provider Partner
                 </span>
               </div>
-              <p className="text-[10px] text-[#726f68] truncate">Home Kitchen Provider #{providerId}</p>
             </div>
+
+            {setIsMobileSidebarOpen && (
+              <button
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="lg:hidden text-secondary hover:text-on-surface p-1 rounded hover:bg-surface-container-low"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            )}
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-surface-container-low flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-2 h-2 rounded-full bg-onyx-black ring-4 ring-sand-neutral shrink-0"></div>
+              <div className="truncate">
+                <div className="font-label-caps text-label-caps font-semibold text-on-surface truncate">
+                  {providerName}
+                </div>
+                <div className="font-label-caps text-[10px] text-secondary truncate">
+                  Home Kitchen Provider
+                </div>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-clay-earth text-[16px] shrink-0" title="Verified Provider">
+              verified
+            </span>
           </div>
         </div>
 
-        {/* Kitchen Status Card */}
-        <div className="px-6 py-3.5 border-b border-[#e7e3db]/60 font-sans">
-          <div className="bg-white border border-[#e7e3db] rounded-sm p-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span
-                  className={`inline-block w-2 h-2 rounded-full ${
-                    isKitchenOnline ? 'bg-emerald-600 animate-pulse' : 'bg-rose-500'
-                  }`}
-                />
-                <span className="text-xs font-bold uppercase tracking-wider text-black">
+        {/* Sidebar Navigation */}
+        <nav className="flex-1 px-4 py-3 space-y-4 font-body-md text-body-md">
+          
+          {/* Section: Overview */}
+          <div className="space-y-1">
+            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
+              Overview
+            </div>
+            <a onClick={() => handleNavClick('dashboard')} className={navClass('dashboard')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">dashboard</span>
+                <span className="font-button-text text-button-text">Dashboard</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('requests')} className={navClass('requests')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">flash_on</span>
+                <span className="font-button-text text-button-text">Live Requests</span>
+              </div>
+              {badgeCounts.liveRequests > 0 && (
+                <span className="font-label-caps text-[10px] bg-secondary-container text-on-secondary-fixed-variant px-1.5 py-0.5 rounded font-bold">
+                  {badgeCounts.liveRequests}
+                </span>
+              )}
+            </a>
+          </div>
+
+          {/* Section: Orders */}
+          <div className="space-y-1">
+            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
+              Orders
+            </div>
+            <a onClick={() => handleNavClick('orders')} className={navClass('orders')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                <span className="font-button-text text-button-text">All Orders</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('orders-new')} className={navClass('orders-new')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">notification_important</span>
+                <span className="font-button-text text-button-text">New Orders</span>
+              </div>
+              {badgeCounts.newOrders > 0 && (
+                <span className="font-label-caps text-[10px] bg-onyx-black text-bone-white px-1.5 py-0.5 rounded font-bold">
+                  {badgeCounts.newOrders}
+                </span>
+              )}
+            </a>
+            <a onClick={() => handleNavClick('orders-preparing')} className={navClass('orders-preparing')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">skillet</span>
+                <span className="font-button-text text-button-text">Preparing</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('orders-ready')} className={navClass('orders-ready')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">inventory_2</span>
+                <span className="font-button-text text-button-text">Ready</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('delivery')} className={navClass('delivery')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">moped</span>
+                <span className="font-button-text text-button-text">Delivery</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('orders-completed')} className={navClass('orders-completed')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">task_alt</span>
+                <span className="font-button-text text-button-text">Completed</span>
+              </div>
+            </a>
+          </div>
+
+          {/* Section: Food */}
+          <div className="space-y-1">
+            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
+              Food
+            </div>
+            <a onClick={() => handleNavClick('tiffins')} className={navClass('tiffins')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">restaurant_menu</span>
+                <span className="font-button-text text-button-text">My Tiffins</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('availability')} className={navClass('availability')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">toggle_on</span>
+                <span className="font-button-text text-button-text">Availability</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('categories')} className={navClass('categories')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">category</span>
+                <span className="font-button-text text-button-text">Categories</span>
+              </div>
+            </a>
+          </div>
+
+          {/* Section: Customers */}
+          <div className="space-y-1">
+            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
+              Customers
+            </div>
+            <a onClick={() => handleNavClick('customers')} className={navClass('customers')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">group</span>
+                <span className="font-button-text text-button-text">Customers</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('subscriptions')} className={navClass('subscriptions')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+                <span className="font-button-text text-button-text">Subscriptions</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('reviews')} className={navClass('reviews')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">star</span>
+                <span className="font-button-text text-button-text">Reviews</span>
+              </div>
+            </a>
+          </div>
+
+          {/* Section: Business */}
+          <div className="space-y-1">
+            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
+              Business
+            </div>
+            <a onClick={() => handleNavClick('earnings')} className={navClass('earnings')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">payments</span>
+                <span className="font-button-text text-button-text">Earnings</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('analytics')} className={navClass('analytics')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">monitoring</span>
+                <span className="font-button-text text-button-text">Analytics</span>
+              </div>
+            </a>
+          </div>
+
+          {/* Section: Operations */}
+          <div className="space-y-1">
+            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
+              Operations
+            </div>
+            <a onClick={() => handleNavClick('capacity')} className={navClass('capacity')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">speed</span>
+                <span className="font-button-text text-button-text">Kitchen Capacity</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('service-area')} className={navClass('service-area')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">pin_drop</span>
+                <span className="font-button-text text-button-text">Service Area</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('schedule')} className={navClass('schedule')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">schedule</span>
+                <span className="font-button-text text-button-text">Schedule</span>
+              </div>
+            </a>
+          </div>
+
+          {/* Section: Communication */}
+          <div className="space-y-1">
+            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
+              Communication
+            </div>
+            <a onClick={() => handleNavClick('notifications')} className={navClass('notifications')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">notifications</span>
+                <span className="font-button-text text-button-text">Notifications</span>
+              </div>
+              {badgeCounts.notifications > 0 && (
+                <span className="font-label-caps text-[10px] bg-secondary-container text-on-secondary-fixed-variant px-1.5 py-0.5 rounded font-bold">
+                  {badgeCounts.notifications}
+                </span>
+              )}
+            </a>
+          </div>
+
+          {/* Section: System */}
+          <div className="space-y-1 pb-4">
+            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
+              System
+            </div>
+            <a onClick={() => handleNavClick('settings')} className={navClass('settings')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">settings</span>
+                <span className="font-button-text text-button-text">Settings</span>
+              </div>
+            </a>
+            <a onClick={() => handleNavClick('help')} className={navClass('help')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">help</span>
+                <span className="font-button-text text-button-text">Help &amp; Support</span>
+              </div>
+            </a>
+          </div>
+        </nav>
+
+        {/* Footer Kitchen Online Toggle Box & Logout */}
+        <div className="p-4 border-t border-sand-neutral bg-surface-container-lowest space-y-3 mt-auto sticky bottom-0">
+          <div className="p-3 rounded-lg bg-surface-container-low">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${isKitchenOnline ? 'bg-onyx-black animate-pulse' : 'bg-gray-400'}`}></span>
+                <span className="font-label-caps text-[11px] font-bold text-on-surface uppercase">
                   {isKitchenOnline ? 'ONLINE' : 'OFFLINE'}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={onToggleKitchenOnline}
-                className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 border border-[#e7e3db] hover:bg-[#f7f4ee] rounded text-[#171717] transition-colors cursor-pointer"
+                className="font-label-caps text-[10px] text-secondary hover:text-on-surface underline uppercase tracking-wider font-semibold cursor-pointer"
               >
                 {isKitchenOnline ? 'Go Offline' : 'Go Online'}
               </button>
             </div>
-            <p className="text-[10px] text-[#726f68] mt-1.5 leading-snug">
+            <div className="font-label-caps text-[10px] text-secondary leading-tight flex items-center gap-1">
+              <span className="material-symbols-outlined text-[12px] text-on-surface">check_circle</span>
               {isKitchenOnline ? 'Accepting customer orders in real-time' : 'Kitchen currently paused'}
-            </p>
+            </div>
           </div>
+
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="flex items-center gap-2 px-2 py-1 font-label-caps text-label-caps font-semibold text-error hover:text-on-error-container transition-colors cursor-pointer w-full"
+            >
+              <span className="material-symbols-outlined text-[16px]">logout</span>
+              Log Out
+            </button>
+          )}
         </div>
-
-        {/* Sidebar Navigation Links */}
-        <nav className="flex-1 px-4 py-4 space-y-6 text-xs text-[#524f49] font-sans" data-purpose="sidebar-navigation">
-          
-          {/* Section 1: OVERVIEW */}
-          <div>
-            <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8e8b83] mb-1.5">
-              Overview
-            </p>
-            <div className="space-y-0.5">
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('dashboard'); }}
-                href="#dashboard"
-                className={`flex items-center justify-between px-3 py-2 rounded-sm font-medium transition-colors cursor-pointer ${
-                  activeTab === 'dashboard'
-                    ? 'text-white bg-[#171717]'
-                    : 'text-[#171717] hover:bg-[#f2ece1]'
-                }`}
-              >
-                <span className="flex items-center space-x-2.5">
-                  <span className="text-xs">📊</span>
-                  <span className="tracking-wide">Dashboard</span>
-                </span>
-              </a>
-
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('requests'); }}
-                href="#live-requests"
-                className={`flex items-center justify-between px-3 py-2 rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'requests'
-                    ? 'text-white bg-[#171717] font-medium'
-                    : 'text-[#171717] hover:bg-[#f2ece1]'
-                }`}
-              >
-                <span className="flex items-center space-x-2.5">
-                  <span className="text-xs">⚡</span>
-                  <span>Live Requests</span>
-                </span>
-                {badgeCounts.liveRequests > 0 && (
-                  <span className="px-1.5 py-0.2 bg-[#171717] text-white text-[10px] font-medium rounded-full">
-                    {badgeCounts.liveRequests}
-                  </span>
-                )}
-              </a>
-            </div>
-          </div>
-
-          {/* Section 2: ORDERS MANAGEMENT */}
-          <div>
-            <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8e8b83] mb-1.5">
-              Orders Management
-            </p>
-            <div className="space-y-0.5">
-              <div>
-                <div
-                  onClick={() => toggleSubMenu('orders')}
-                  className="flex items-center justify-between px-3 py-1.5 text-[#171717] font-semibold cursor-pointer hover:bg-[#f2ece1] rounded-sm transition-colors"
-                >
-                  <span className="flex items-center space-x-2.5">
-                    <span className="text-xs">🛍️</span>
-                    <span>Orders</span>
-                  </span>
-                  <span className="text-[10px] text-[#8e8b83]">
-                    {expandedMenus.orders ? '▴' : '▾'}
-                  </span>
-                </div>
-
-                {expandedMenus.orders && (
-                  <div className="ml-5 pl-3 border-l border-[#dcd7ce] space-y-1 mt-1 text-[11px]">
-                    <a
-                      onClick={(e) => { e.preventDefault(); handleNavClick('orders'); }}
-                      href="#all-orders"
-                      className={`block py-1 px-1.5 rounded-sm transition-colors ${
-                        activeTab === 'orders' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                      }`}
-                    >
-                      📋 All Orders
-                    </a>
-
-                    <a
-                      onClick={(e) => { e.preventDefault(); handleNavClick('orders-new'); }}
-                      href="#new-orders"
-                      className={`flex items-center justify-between py-1 px-1.5 rounded-sm transition-colors ${
-                        activeTab === 'orders-new' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                      }`}
-                    >
-                      <span>📥 New Orders</span>
-                      {badgeCounts.newOrders > 0 && (
-                        <span className="px-1.5 py-0.2 bg-[#171717] text-white text-[9px] font-medium rounded-full">
-                          {badgeCounts.newOrders}
-                        </span>
-                      )}
-                    </a>
-
-                    <a
-                      onClick={(e) => { e.preventDefault(); handleNavClick('orders-preparing'); }}
-                      href="#preparing"
-                      className={`block py-1 px-1.5 rounded-sm transition-colors ${
-                        activeTab === 'orders-preparing' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                      }`}
-                    >
-                      🍳 Preparing
-                    </a>
-
-                    <a
-                      onClick={(e) => { e.preventDefault(); handleNavClick('orders-ready'); }}
-                      href="#ready"
-                      className={`block py-1 px-1.5 rounded-sm transition-colors ${
-                        activeTab === 'orders-ready' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                      }`}
-                    >
-                      🎖️ Ready
-                    </a>
-
-                    <a
-                      onClick={(e) => { e.preventDefault(); handleNavClick('delivery-management'); }}
-                      href="#delivery-mgmt"
-                      className={`block py-1 px-1.5 rounded-sm transition-colors ${
-                        activeTab === 'delivery-management' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                      }`}
-                    >
-                      🚚 Delivery Management
-                    </a>
-
-                    <a
-                      onClick={(e) => { e.preventDefault(); handleNavClick('orders-completed'); }}
-                      href="#completed"
-                      className={`block py-1 px-1.5 rounded-sm transition-colors ${
-                        activeTab === 'orders-completed' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                      }`}
-                    >
-                      ✅ Completed
-                    </a>
-
-                    <a
-                      onClick={(e) => { e.preventDefault(); handleNavClick('orders-cancelled'); }}
-                      href="#cancelled"
-                      className={`block py-1 px-1.5 rounded-sm transition-colors ${
-                        activeTab === 'orders-cancelled' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                      }`}
-                    >
-                      ❌ Cancelled
-                    </a>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: FOOD & MENU */}
-          <div>
-            <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8e8b83] mb-1.5">
-              Food &amp; Menu
-            </p>
-            <div>
-              <div
-                onClick={() => toggleSubMenu('tiffins')}
-                className="flex items-center justify-between px-3 py-1.5 text-[#171717] font-medium cursor-pointer hover:bg-[#f2ece1] rounded-sm transition-colors"
-              >
-                <span className="flex items-center space-x-2.5">
-                  <span className="text-xs">🍱</span>
-                  <span>My Tiffins</span>
-                </span>
-                <span className="text-[10px] text-[#8e8b83]">
-                  {expandedMenus.tiffins ? '▴' : '▾'}
-                </span>
-              </div>
-
-              {expandedMenus.tiffins && (
-                <div className="ml-5 pl-3 border-l border-[#dcd7ce] space-y-1 mt-1 text-[11px]">
-                  <a
-                    onClick={(e) => { e.preventDefault(); handleNavClick('tiffins'); }}
-                    href="#all-tiffins"
-                    className={`block py-1 px-1.5 rounded-sm transition-colors ${
-                      activeTab === 'tiffins' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                    }`}
-                  >
-                    📜 All Tiffins
-                  </a>
-                  <a
-                    onClick={(e) => { e.preventDefault(); handleNavClick('add-tiffin'); }}
-                    href="#add-tiffin"
-                    className={`block py-1 px-1.5 rounded-sm transition-colors ${
-                      activeTab === 'add-tiffin' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                    }`}
-                  >
-                    ➕ Add Tiffin
-                  </a>
-                  <a
-                    onClick={(e) => { e.preventDefault(); handleNavClick('availability'); }}
-                    href="#availability"
-                    className={`block py-1 px-1.5 rounded-sm transition-colors ${
-                      activeTab === 'availability' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                    }`}
-                  >
-                    📅 Availability
-                  </a>
-                  <a
-                    onClick={(e) => { e.preventDefault(); handleNavClick('categories'); }}
-                    href="#categories"
-                    className={`block py-1 px-1.5 rounded-sm transition-colors ${
-                      activeTab === 'categories' ? 'font-medium text-black bg-[#f0ebdF]/60' : 'text-[#524f49] hover:text-black'
-                    }`}
-                  >
-                    🏷️ Categories
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Section 4: CUSTOMERS */}
-          <div>
-            <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8e8b83] mb-1.5">
-              Customers
-            </p>
-            <div className="space-y-0.5">
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('customers'); }}
-                href="#customers"
-                className={`flex items-center space-x-2.5 px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'customers' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="text-xs">👥</span>
-                <span>Customers</span>
-              </a>
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('subscriptions'); }}
-                href="#subscriptions"
-                className={`flex items-center space-x-2.5 px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'subscriptions' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="text-xs">🔄</span>
-                <span>Subscriptions</span>
-              </a>
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('reviews'); }}
-                href="#reviews"
-                className={`flex items-center space-x-2.5 px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'reviews' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="text-xs">⭐</span>
-                <span>Reviews &amp; Ratings</span>
-              </a>
-            </div>
-          </div>
-
-          {/* Section 5: BUSINESS & FINANCE */}
-          <div>
-            <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8e8b83] mb-1.5">
-              Business &amp; Finance
-            </p>
-            <div className="space-y-0.5">
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('earnings'); }}
-                href="#earnings"
-                className={`flex items-center space-x-2.5 px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'earnings' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="text-xs">💼</span>
-                <span>Earnings &amp; Payouts</span>
-              </a>
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('analytics'); }}
-                href="#analytics"
-                className={`flex items-center space-x-2.5 px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'analytics' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="text-xs">📈</span>
-                <span>Business Analytics</span>
-              </a>
-            </div>
-          </div>
-
-          {/* Section 6: OPERATIONS */}
-          <div>
-            <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8e8b83] mb-1.5">
-              Operations
-            </p>
-            <div className="space-y-0.5">
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('capacity'); }}
-                href="#capacity"
-                className={`flex items-center space-x-2.5 px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'capacity' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="text-xs">🏪</span>
-                <span>Kitchen Capacity</span>
-              </a>
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('service-area'); }}
-                href="#service-area"
-                className={`flex items-center space-x-2.5 px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'service-area' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="text-xs">📍</span>
-                <span>Service Area</span>
-              </a>
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('schedule'); }}
-                href="#schedule"
-                className={`flex items-center space-x-2.5 px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'schedule' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="text-xs">📅</span>
-                <span>Schedule</span>
-              </a>
-            </div>
-          </div>
-
-          {/* Section 7: COMMUNICATION */}
-          <div>
-            <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8e8b83] mb-1.5">
-              Communication
-            </p>
-            <div className="space-y-0.5">
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('notifications'); }}
-                href="#notifications"
-                className={`flex items-center justify-between px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'notifications' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="flex items-center space-x-2.5">
-                  <span className="text-xs">🔔</span>
-                  <span>Notifications</span>
-                </span>
-                {badgeCounts.notifications > 0 && (
-                  <span className="px-1.5 py-0.2 bg-[#171717] text-white text-[10px] font-medium rounded-full">
-                    {badgeCounts.notifications}
-                  </span>
-                )}
-              </a>
-            </div>
-          </div>
-
-          {/* Section 8: SYSTEM */}
-          <div className="pb-6">
-            <p className="px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#8e8b83] mb-1.5">
-              System
-            </p>
-            <div className="space-y-0.5">
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('settings'); }}
-                href="#settings"
-                className={`flex items-center space-x-2.5 px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'settings' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="text-xs">⚙️</span>
-                <span>Settings</span>
-              </a>
-              <a
-                onClick={(e) => { e.preventDefault(); handleNavClick('help'); }}
-                href="#help"
-                className={`flex items-center space-x-2.5 px-3 py-1.5 text-[#171717] hover:bg-[#f2ece1] rounded-sm transition-colors cursor-pointer ${
-                  activeTab === 'help' ? 'font-bold bg-[#f0ebdF]/60' : ''
-                }`}
-              >
-                <span className="text-xs">❓</span>
-                <span>Help &amp; Support</span>
-              </a>
-              {onLogout && (
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="w-full flex items-center space-x-2.5 px-3 py-1.5 text-rose-800 hover:bg-rose-50 rounded-sm transition-colors text-left cursor-pointer font-medium"
-                >
-                  <span className="text-xs">🚪</span>
-                  <span>Logout Account</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-        </nav>
       </aside>
     </>
   );

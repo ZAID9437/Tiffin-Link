@@ -28,12 +28,25 @@ const notificationSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  readAt: {
+    type: Date,
+    default: null
+  },
+  priority: {
+    type: String,
+    enum: ['HIGH', 'MEDIUM', 'LOW', 'CRITICAL'],
+    default: 'MEDIUM'
+  },
   referenceId: {
     type: String
   },
   referenceType: {
     type: String,
-    enum: ['order', 'review', 'payment', 'tiffin', 'system']
+    enum: ['order', 'review', 'payment', 'tiffin', 'system', 'safety']
+  },
+  metadata: {
+    type: Object,
+    default: {}
   },
   createdAt: {
     type: Date,

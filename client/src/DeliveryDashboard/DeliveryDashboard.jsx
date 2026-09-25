@@ -7,12 +7,33 @@ import CompletedDeliveriesView from './CompletedDeliveriesView';
 import DeliveryHistoryView from './DeliveryHistoryView';
 import LiveMapView from './LiveMapView';
 import RouteNavigationView from './RouteNavigationView';
+import EarningsOverviewView from './EarningsOverviewView';
+import TransactionsView from './TransactionsView';
+import IncentivesBonusesView from './IncentivesBonusesView';
+import WalletWithdrawalsView from './WalletWithdrawalsView';
+import BankPayoutDetailsView from './BankPayoutDetailsView';
+import PerformanceView from './PerformanceView';
+import RatingsReviewsView from './RatingsReviewsView';
+import DutyStatusView from './DutyStatusView';
+import WorkingScheduleView from './WorkingScheduleView';
+import DeliveryPreferencesView from './DeliveryPreferencesView';
+import SafetyEmergencyView from './SafetyEmergencyView';
+import SafetyGuidelinesView from './SafetyGuidelinesView';
+import ReportIssueView from './ReportIssueView';
+import NotificationsView from './NotificationsView';
+import HelpSupportView from './HelpSupportView';
+import AccountSettingsView from './AccountSettingsView';
+import NotificationPreferencesView from './NotificationPreferencesView';
+import PrivacySecurityView from './PrivacySecurityView';
+import AppPreferencesView from './AppPreferencesView';
+
 import GoogleDeliveryMap from '../components/GoogleDeliveryMap';
-import { 
-  sendDriverLocationUpdate, 
-  joinDriverRoom, 
-  subscribeToDeliveryLifecycle, 
-  subscribeToEarnings 
+import {
+  sendDriverLocationUpdate,
+  joinDriverRoom,
+  subscribeToDeliveryLifecycle,
+  subscribeToEarnings,
+  getSocket
 } from '../services/socket';
 
 const formatOrderRef = (ref) => {
@@ -28,6 +49,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [toastMessage, setToastMessage] = useState(null);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   // GPS Watcher state
   const [gpsStatus, setGpsStatus] = useState({ status: 'INIT', message: '', coords: null });
@@ -69,11 +91,39 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
     }
   };
 
+  // Fetch live unread notification count from MongoDB
+  const fetchUnreadNotifCount = async () => {
+    try {
+      const email = currentUser?.email || savedUser?.email || '';
+      const driverId = currentUser?.id || currentUser?._id || savedUser?.id || savedUser?._id || '';
+      const phone = currentUser?.phone || savedUser?.phone || '';
+      const activeToken = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || token;
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
+
+      const res = await fetch(`http://localhost:5000/api/notifications?email=${encodeURIComponent(email)}&driverId=${encodeURIComponent(driverId)}&phone=${encodeURIComponent(phone)}`, {
+        headers
+      });
+      const json = await res.json();
+      if (json.success) {
+        if (json.summary && typeof json.summary.unread === 'number') {
+          setUnreadNotifCount(json.summary.unread);
+        } else if (Array.isArray(json.notifications)) {
+          setUnreadNotifCount(json.notifications.filter(n => !n.read).length);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching unread notification count:', err);
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
+    fetchUnreadNotifCount();
   }, [currentUser]);
 
-  // Subscribe to real-time delivery lifecycle & earnings events
+  // Subscribe to real-time delivery lifecycle, earnings, & notification events
   useEffect(() => {
     if (currentUser?.id || currentUser?._id) {
       joinDriverRoom(currentUser.id || currentUser._id);
@@ -88,9 +138,35 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
 
     const unsubscribeEarnings = subscribeToEarnings(() => fetchDashboardData());
 
+    const socket = getSocket();
+    let handleCountUpdate, handleNewNotif;
+    if (socket) {
+      handleCountUpdate = (data) => {
+        if (data && typeof data.unreadCount === 'number') {
+          setUnreadNotifCount(data.unreadCount);
+        } else {
+          fetchUnreadNotifCount();
+        }
+      };
+      handleNewNotif = (data) => {
+        if (data && typeof data.unreadCount === 'number') {
+          setUnreadNotifCount(data.unreadCount);
+        } else {
+          fetchUnreadNotifCount();
+        }
+      };
+
+      socket.on('notification:count:update', handleCountUpdate);
+      socket.on('notification:new', handleNewNotif);
+    }
+
     return () => {
       unsubscribeLifecycle();
       unsubscribeEarnings();
+      if (socket) {
+        if (handleCountUpdate) socket.off('notification:count:update', handleCountUpdate);
+        if (handleNewNotif) socket.off('notification:new', handleNewNotif);
+      }
     };
   }, [currentUser]);
 
@@ -205,7 +281,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
 
   return (
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen selection:bg-onyx-black selection:text-white">
-      
+
       {/* Toast Alert */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-onyx-black text-on-primary text-xs font-medium px-4 py-3 shadow-2xl flex items-center gap-2 animate-bounce">
@@ -234,9 +310,8 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
           <button
             type="button"
             onClick={handleToggleOnlineStatus}
-            className={`px-2.5 py-1 text-[11px] font-label-caps uppercase font-bold flex items-center gap-1.5 ${
-              isOnline ? 'bg-emerald-100 text-emerald-900' : 'bg-surface-container-high text-secondary'
-            }`}
+            className={`px-2.5 py-1 text-[11px] font-label-caps uppercase font-bold flex items-center gap-1.5 ${isOnline ? 'bg-emerald-100 text-emerald-900' : 'bg-surface-container-high text-secondary'
+              }`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-600 animate-pulse' : 'bg-secondary'}`} />
             <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
@@ -257,7 +332,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
         counts={{
           requests: pendingRequests.length || 0,
           active: activeDelivery ? 1 : 0,
-          notifications: 3
+          notifications: unreadNotifCount
         }}
       />
 
@@ -283,6 +358,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
             <UpcomingDeliveriesView
               activeDelivery={activeDelivery}
               currentUser={currentUser}
+              isOnline={isOnline}
               onNavigateTab={setActiveTab}
               onStatusUpdate={fetchDashboardData}
             />
@@ -306,7 +382,116 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
               currentUser={currentUser}
               onNavigateTab={setActiveTab}
             />
+          ) : activeTab === 'earnings-overview' || activeTab === 'earnings' ? (
+            <EarningsOverviewView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'transactions' ? (
+            <TransactionsView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'incentives-bonuses' || activeTab === 'incentives' || activeTab === 'incentives-and-bonuses' ? (
+            <IncentivesBonusesView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'wallet-withdrawals' || activeTab === 'wallet' || activeTab === 'wallet-and-withdrawals' ? (
+            <WalletWithdrawalsView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'bank-payout-details' || activeTab === 'bank-payout' || activeTab === 'bank-payout-details-page' || activeTab === 'bank' ? (
+            <BankPayoutDetailsView
+              currentUser={currentUser}
+              onNavigate={setActiveTab}
+            />
+          ) : activeTab === 'performance' ? (
+            <PerformanceView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'ratings-reviews' || activeTab === 'reviews' || activeTab === 'ratings' ? (
+            <RatingsReviewsView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'duty-status' || activeTab === 'go-online-offline' ? (
+            <DutyStatusView
+              currentUser={currentUser}
+              isOnline={isOnline}
+              setIsOnline={setIsOnline}
+              activeDelivery={activeDelivery}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'availability-schedule' || activeTab === 'working-schedule' || activeTab === 'schedule' ? (
+            <WorkingScheduleView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'delivery-preferences' || activeTab === 'preferences' || activeTab === 'availability' ? (
+            <DeliveryPreferencesView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+            />
+          ) : activeTab === 'safety-emergency' || activeTab === 'emergency' || activeTab === 'sos' || activeTab === 'safety-sos' ? (
+            <SafetyEmergencyView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onShowToast={showToast}
+            />
+          ) : activeTab === 'safety-guidelines' || activeTab === 'guidelines' ? (
+            <SafetyGuidelinesView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onShowToast={showToast}
+            />
+          ) : activeTab === 'safety-report' || activeTab === 'safety-report-issue' || activeTab === 'report-issue' || activeTab === 'report' || activeTab === 'report-an-issue' ? (
+            <ReportIssueView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onShowToast={showToast}
+            />
+          ) : activeTab === 'notifications' || activeTab === 'notification' ? (
+            <NotificationsView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onShowToast={showToast}
+            />
+          ) : activeTab === 'help-support' || activeTab === 'help' || activeTab === 'support' ? (
+            <HelpSupportView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onShowToast={showToast}
+            />
+          ) : activeTab === 'settings-account' || activeTab === 'settings' || activeTab === 'account' || activeTab === 'profile' ? (
+            <AccountSettingsView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onShowToast={showToast}
+            />
+          ) : activeTab === 'settings-notifications' || activeTab === 'notification-preferences' || activeTab === 'notifications-preferences' ? (
+            <NotificationPreferencesView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onShowToast={showToast}
+            />
+          ) : activeTab === 'settings-privacy' || activeTab === 'privacy-security' || activeTab === 'privacy' || activeTab === 'security' ? (
+            <PrivacySecurityView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onShowToast={showToast}
+            />
+          ) : activeTab === 'settings-app' || activeTab === 'app-preferences' || activeTab === 'preferences' ? (
+            <AppPreferencesView
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onShowToast={showToast}
+            />
           ) : (
+
+
             <div className="flex flex-col w-full space-y-8">
 
               {/* 1. DASHBOARD HEADER */}
@@ -330,11 +515,10 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
                   <button
                     type="button"
                     onClick={handleToggleOnlineStatus}
-                    className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors cursor-pointer font-button-text text-xs font-semibold ${
-                      isOnline
+                    className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors cursor-pointer font-button-text text-xs font-semibold ${isOnline
                         ? 'bg-emerald-950 text-emerald-100 border border-emerald-800'
                         : 'bg-surface-container-high text-onyx-black border border-sand-neutral'
-                    }`}
+                      }`}
                   >
                     <span className={`w-2.5 h-2.5 rounded-full inline-block ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-secondary'}`} />
                     <span className="tracking-wider uppercase">
@@ -353,11 +537,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
 
                   <button
                     type="button"
-                    onClick={() => {
-                      if (window.confirm('⚠️ TRIGGER EMERGENCY SOS ASSISTANCE?\n\nThis will broadcast your live GPS coordinates to TiffinLink Safety Center & local dispatch.')) {
-                        showToast('🚨 SOS Emergency Alert Sent! Safety Desk connected.');
-                      }
-                    }}
+                    onClick={() => setActiveTab('safety-emergency')}
                     className="flex items-center gap-1.5 px-3.5 py-2.5 bg-error text-on-error hover:bg-red-800 transition-colors cursor-pointer text-xs font-bold uppercase tracking-wider"
                   >
                     <span className="material-symbols-outlined text-[18px]">emergency</span>
@@ -368,7 +548,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
 
               {/* 2. FOUR SUMMARY CARDS */}
               <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                
+
                 {/* Card 1: Today's Earnings */}
                 <div className="bg-surface-container-lowest p-6 flex flex-col justify-between h-40 border border-sand-neutral/60 shadow-xs hover:border-onyx-black transition-all">
                   <div className="flex items-center justify-between">
@@ -513,12 +693,12 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-sand-neutral text-xs font-body-md">
                       <div className="flex items-center gap-4 text-secondary">
                         <span className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[16px] text-onyx-black">navigation</span> 
+                          <span className="material-symbols-outlined text-[16px] text-onyx-black">navigation</span>
                           {activeDelivery.distanceKm ? `${activeDelivery.distanceKm} km` : 'Distance pending'}
                         </span>
                         <span>/</span>
                         <span className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[16px] text-onyx-black">schedule</span> 
+                          <span className="material-symbols-outlined text-[16px] text-onyx-black">schedule</span>
                           {activeDelivery.etaMinutes ? `Est. ${activeDelivery.etaMinutes} mins` : 'ETA pending'}
                         </span>
                       </div>
@@ -526,8 +706,8 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
                         <button
                           type="button"
                           onClick={() => handleOpenGoogleMapsNavigation(
-                            typeof activeDelivery.deliveryAddress === 'string' 
-                              ? activeDelivery.deliveryAddress 
+                            typeof activeDelivery.deliveryAddress === 'string'
+                              ? activeDelivery.deliveryAddress
                               : (activeDelivery.deliveryAddress?.street || activeDelivery.customerAddress || 'Ahmedabad')
                           )}
                           className="px-4 py-2.5 bg-stone-200 hover:bg-stone-300 text-onyx-black font-button-text text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5"
@@ -565,7 +745,7 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
 
               {/* 4. PERFORMANCE & EARNINGS BREAKDOWN ROW */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                
+
                 {/* 4A. TODAY'S PERFORMANCE (6 COLS) */}
                 <section className="lg:col-span-6 bg-surface-container-lowest p-6 lg:p-8 border border-sand-neutral/60 shadow-xs">
                   <div className="flex items-center justify-between mb-6 pb-3 border-b border-sand-neutral">

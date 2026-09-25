@@ -15,42 +15,90 @@ const createTransporter = (user, pass) => {
   });
 };
 
-const sendOtpEmail = async (email, otp, user, pass, subjectTitle = 'Your TiffinLink Security Verification Code') => {
-  const emailUser = user || process.env.EMAIL_USER || process.env.SMTP_USER;
-  const emailPass = pass ? pass.replace(/\s+/g, '') : (process.env.EMAIL_PASS || process.env.SMTP_PASS || '');
-
-  if (!emailUser || !emailPass) {
-    console.log(`[EmailService Mock] ${subjectTitle} prepared for ${email} (OTP: ${otp})`);
-    return { success: true, mock: true };
-  }
-
-  const dynamicTransporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: emailUser, pass: emailPass },
-    tls: {
-      rejectUnauthorized: false
-    }
-  });
+const sendOtpEmail = async (email, otp, user, pass, subjectTitle = 'TiffinLink — Your Email Verification Code', customerName = '') => {
+  const emailUser = user || process.env.SMTP_USER || process.env.EMAIL_USER;
+  const emailPass = pass ? pass.replace(/\s+/g, '') : (process.env.SMTP_PASS || process.env.EMAIL_PASS || '');
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = process.env.SMTP_PORT;
+  const smtpFrom = process.env.SMTP_FROM || `"TiffinLink Concierge" <${emailUser || 'no-reply@tiffinlink.com'}>`;
+  const nameDisplay = customerName || (email ? email.split('@')[0] : 'Customer');
 
   const mailOptions = {
-    from: `"TiffinLink Concierge" <${emailUser}>`,
+    from: smtpFrom,
     to: email,
     subject: subjectTitle,
     html: `
-      <div style="font-family: 'Hanken Grotesk', sans-serif; background-color: #fbf9f5; color: #1b1c1a; padding: 40px; border-radius: 8px; max-width: 600px; margin: auto; border: 1px solid #d6d0c2;">
+      <div style="font-family: 'Hanken Grotesk', Helvetica, Arial, sans-serif; background-color: #fbf9f5; color: #1b1c1a; padding: 40px; border-radius: 8px; max-width: 600px; margin: auto; border: 1px solid #d6d0c2;">
         <h2 style="font-family: 'EB Garamond', serif; font-size: 28px; color: #4a4238; margin-bottom: 20px; text-align: center; border-bottom: 1px solid #d6d0c2; padding-bottom: 15px;">TiffinLink</h2>
-        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">Welcome to TiffinLink.</p>
-        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">Use the following secure one-time passcode for verification:</p>
-        <div style="background-color: #f5f3ef; border: 1px dashed #4a4238; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #1b1c1a; margin: 30px 0; border-radius: 4px;">
+        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 10px;">Hello <strong>${nameDisplay}</strong>,</p>
+        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">Your TiffinLink email verification code is:</p>
+        <div style="background-color: #f5f3ef; border: 1px dashed #4a4238; padding: 20px; text-align: center; font-size: 36px; font-weight: bold; letter-spacing: 6px; color: #1b1c1a; margin: 25px 0; border-radius: 6px;">
           ${otp}
         </div>
-        <p style="font-size: 12px; color: #665d52; line-height: 1.4; border-top: 1px solid #d6d0c2; padding-top: 15px; margin-top: 30px;">
-          This verification key will expire in 5 minutes. If you did not make this request, you can safely ignore this email.
+        <p style="font-size: 14px; color: #4a4238; line-height: 1.5; margin-bottom: 20px;">
+          This code expires in 10 minutes.
+        </p>
+        <p style="font-size: 13px; color: #665d52; line-height: 1.4; border-top: 1px solid #d6d0c2; padding-top: 15px; margin-top: 25px;">
+          If you did not request this verification, please ignore this email.
+        </p>
+        <p style="font-size: 13px; color: #4a4238; margin-top: 15px; font-weight: 600;">
+          Regards,<br/>TiffinLink Team
         </p>
       </div>
     `
   };
-  return dynamicTransporter.sendMail(mailOptions);
+
+  let transporter = null;
+
+  if (smtpHost && smtpPort) {
+    transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: Number(smtpPort),
+      secure: Number(smtpPort) === 465,
+      auth: (emailUser && emailPass) ? { user: emailUser, pass: emailPass } : undefined,
+      tls: { rejectUnauthorized: false }
+    });
+  } else if (emailUser && emailPass) {
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: emailUser, pass: emailPass },
+      tls: { rejectUnauthorized: false }
+    });
+  }
+
+  if (transporter) {
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[EmailService] Real-time OTP email delivered to ${email} (MessageId: ${info.messageId})`);
+      return { success: true, messageId: info.messageId };
+    } catch (err) {
+      console.error(`[EmailService Error] SMTP email delivery failed for ${email}:`, err.message);
+      console.log(`[EmailService] Attempting Ethereal test server fallback...`);
+    }
+  }
+
+  // Fallback to Nodemailer Ethereal test account if direct SMTP credentials fail or are missing
+  try {
+    const testAccount = await nodemailer.createTestAccount();
+    const etherealTransporter = nodemailer.createTransport({
+      host: testAccount.smtp.host,
+      port: testAccount.smtp.port,
+      secure: testAccount.smtp.secure,
+      auth: { user: testAccount.user, pass: testAccount.pass }
+    });
+    mailOptions.from = `"TiffinLink Concierge" <${testAccount.user}>`;
+    const info = await etherealTransporter.sendMail(mailOptions);
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    console.log(`\n==================================================`);
+    console.log(`[EmailService] OTP email sent to ${email}`);
+    console.log(`[EmailService] OTP CODE: [ ${otp} ]`);
+    console.log(`[EmailService] View live formatted email: ${previewUrl}`);
+    console.log(`==================================================\n`);
+    return { success: true, messageId: info.messageId, previewUrl };
+  } catch (etherealErr) {
+    console.error(`[EmailService Error] Ethereal fallback failed:`, etherealErr.message);
+    return { success: false, error: etherealErr.message };
+  }
 };
 
 // Send Verification Success Email to Delivery Partner

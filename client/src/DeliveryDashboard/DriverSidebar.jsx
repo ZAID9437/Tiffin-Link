@@ -300,7 +300,7 @@ export default function DriverSidebar({
                 onClick={(e) => { e.preventDefault(); handleNav('bank-payout-details'); }}
                 href="#"
                 className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors cursor-pointer ${
-                  activeTab === 'bank-payout-details'
+                  activeTab === 'bank-payout-details' || activeTab === 'bank-payout' || activeTab === 'bank'
                     ? 'bg-[#1A1A1A] text-white font-medium shadow-xs'
                     : 'text-[#444444] hover:bg-[#EBE7DF] hover:text-[#1A1A1A]'
                 }`}
@@ -432,9 +432,13 @@ export default function DriverSidebar({
               {expandedGroups.availability && (
                 <div className="ml-5 border-l-2 border-[#DED9D1] pl-3 py-1 space-y-1">
                   <a
-                    onClick={(e) => { e.preventDefault(); setIsOnline && setIsOnline(!isOnline); }}
+                    onClick={(e) => { e.preventDefault(); handleNav('duty-status'); }}
                     href="#"
-                    className="flex items-center justify-between px-3 py-1.5 rounded-md transition-colors text-xs cursor-pointer text-[#555555] hover:bg-[#EBE7DF] hover:text-[#1A1A1A]"
+                    className={`flex items-center justify-between px-3 py-1.5 rounded-md transition-colors text-xs cursor-pointer ${
+                      activeTab === 'duty-status' || activeTab === 'go-online-offline' || activeTab === 'availability'
+                        ? 'bg-[#1A1A1A] text-white font-medium'
+                        : 'text-[#555555] hover:bg-[#EBE7DF] hover:text-[#1A1A1A]'
+                    }`}
                   >
                     <span>Go Online / Offline</span>
                     <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-600' : 'bg-gray-400'}`}></span>
@@ -605,7 +609,7 @@ export default function DriverSidebar({
                     onClick={(e) => { e.preventDefault(); handleNav('settings-notifications'); }}
                     href="#"
                     className={`flex items-center px-3 py-1.5 rounded-md transition-colors text-xs cursor-pointer ${
-                      activeTab === 'settings-notifications'
+                      activeTab === 'settings-notifications' || activeTab === 'notification-preferences'
                         ? 'bg-[#1A1A1A] text-white font-medium'
                         : 'text-[#555555] hover:bg-[#EBE7DF] hover:text-[#1A1A1A]'
                     }`}

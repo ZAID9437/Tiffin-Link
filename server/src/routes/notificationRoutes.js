@@ -11,8 +11,11 @@ const {
 
 router.get('/', protect, getNotifications);
 router.put('/read-all', protect, markAllAsRead);
+router.patch('/read-all', protect, markAllAsRead);
 router.put('/:id/read', protect, markAsRead);
+router.patch('/:id/read', protect, markAsRead);
 router.put('/:id/unread', protect, markAsUnread);
+router.patch('/:id/unread', protect, markAsUnread);
 router.delete('/:id', protect, deleteNotification);
 
 module.exports = router;

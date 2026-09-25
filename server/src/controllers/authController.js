@@ -2,13 +2,23 @@ const mongoose = require('mongoose');
 const path = require('path');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const { sendOtpEmail } = require('../services/emailService');
 const { generateAccessToken, generateRefreshToken } = require('../utils/generateToken');
 
-const otpStore = new Map();
 const isDbConnected = () => mongoose.connection.readyState === 1;
+
+// Cryptographically secure 6-digit numeric OTP generator
+const generateSecureOtp = () => {
+  return crypto.randomInt(100000, 1000000).toString();
+};
+
+// SHA-256 OTP hashing helper
+const hashOtp = (otp) => {
+  return crypto.createHash('sha256').update(String(otp)).digest('hex');
+};
 
 // Format user payload safely without passwords
 const formatUserPayload = (user) => ({
@@ -19,6 +29,7 @@ const formatUserPayload = (user) => ({
   role: user.role || 'customer',
   isActive: user.isActive !== false,
   isVerified: user.isVerified !== false,
+  emailVerified: user.isVerified !== false,
   lastLogin: user.lastLogin
 });
 
@@ -45,7 +56,6 @@ const register = async (req, res) => {
     name = name ? name.trim() : email.split('@')[0];
     phone = phone ? phone.trim() : '';
 
-    // Enforce role security: frontend user cannot register directly as 'admin'
     const allowedRole = (role === 'provider' || role === 'delivery' || role === 'customer') ? role : 'customer';
 
     if (isDbConnected()) {
@@ -77,50 +87,46 @@ const register = async (req, res) => {
 
       await user.save();
 
-      // Generate 6-digit OTP, save in MongoDB, and send Email
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      // Generate cryptographically secure 6-digit OTP & store hashed OTP with 10 min expiry
+      const otpCode = generateSecureOtp();
+      const hashedOtpCode = hashOtp(otpCode);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
       await Otp.deleteMany({ email });
-      await Otp.create({ email, otp });
+      await Otp.create({
+        email,
+        otp: otpCode,
+        hashedOtp: hashedOtpCode,
+        purpose: 'EMAIL_VERIFICATION',
+        attempts: 0,
+        expiresAt
+      });
 
       dotenv.config({ path: path.join(__dirname, '../../.env') });
-      const emailUser = process.env.EMAIL_USER;
-      const emailPass = process.env.EMAIL_PASS;
+      const emailUser = process.env.EMAIL_USER || process.env.SMTP_USER;
+      const emailPass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
 
-      if (emailUser && emailPass) {
-        try {
-          await sendOtpEmail(email, otp, emailUser, emailPass);
-          return res.status(201).json({
-            success: true,
-            message: `Verification code sent to ${email}. Please check Inbox and Spam/Junk folder.`,
-            source: 'database'
-          });
-        } catch (mailErr) {
-          console.error('\x1b[31m[Nodemailer Error]\x1b[0m', mailErr.message);
-          return res.status(201).json({
-            success: true,
-            message: `Verification code sent to ${email}. Please check Inbox and Spam/Junk folder.`,
-            source: 'database'
-          });
-        }
-      } else {
-        return res.status(201).json({
-          success: true,
-          message: `Verification code sent to ${email}. Please check Inbox and Spam/Junk folder.`,
-          source: 'database'
+      const mailResult = await sendOtpEmail(email, otpCode, emailUser, emailPass, 'TiffinLink — Your Email Verification Code', name);
+
+      if (!mailResult.success) {
+        console.error(`[OTP Send Failure] Failed to send verification email to ${email}:`, mailResult.error);
+        return res.status(500).json({
+          success: false,
+          message: 'Unable to send verification email. Please try again.'
         });
       }
-    } else {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
       return res.status(201).json({
         success: true,
-        message: `Verification code sent to ${email}.`,
-        devOtp: otp,
-        source: 'in-memory'
+        message: `Verification code sent to ${email}. Please check Inbox and Spam/Junk folder.`,
+        source: 'database'
       });
+    } else {
+      return res.status(500).json({ success: false, message: 'Database connection error' });
     }
   } catch (error) {
     console.error('Error in registration:', error);
-    res.status(500).json({ success: false, message: 'Registration failed. ' + error.message });
+    res.status(500).json({ success: false, message: 'Registration failed: ' + error.message });
   }
 };
 
@@ -161,7 +167,6 @@ const login = async (req, res) => {
         });
       }
 
-      // Password comparison if password is provided
       if (password && user.password) {
         const isMatch = await user.matchPassword(password);
         if (!isMatch) {
@@ -176,7 +181,6 @@ const login = async (req, res) => {
       user.lastLogin = new Date();
       await user.save();
 
-      // Set HTTP-Only auth token cookie and session user
       res.cookie('tiffinlink_token', accessToken, {
         httpOnly: true,
         secure: false,
@@ -197,7 +201,7 @@ const login = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error in login:', error);
-    res.status(500).json({ success: false, message: 'Login failed. ' + error.message });
+    res.status(500).json({ success: false, message: 'Login failed: ' + error.message });
   }
 };
 
@@ -270,7 +274,6 @@ const logout = async (req, res) => {
       }
     }
 
-    // Clear session cookies & destroy session
     res.clearCookie('tiffinlink_token');
     res.clearCookie('tiffinlink_session');
     if (req.session) {
@@ -284,7 +287,7 @@ const logout = async (req, res) => {
   }
 };
 
-// @desc    Get current authenticated user profile
+// @desc    Get current authenticated user profile from MongoDB
 // @route   GET /api/auth/me
 const getMe = async (req, res) => {
   try {
@@ -292,9 +295,14 @@ const getMe = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
+    const freshUser = await User.findById(req.user._id || req.user.id);
+    if (!freshUser) {
+      return res.status(404).json({ success: false, message: 'User record not found' });
+    }
+
     return res.json({
       success: true,
-      user: formatUserPayload(req.user),
+      user: formatUserPayload(freshUser),
       source: 'database'
     });
   } catch (error) {
@@ -307,27 +315,21 @@ const getMe = async (req, res) => {
 // @route   POST /api/auth/send-otp
 const sendOtp = async (req, res) => {
   try {
-    let { email } = req.body;
+    let email = req.user?.email || req.body.email;
 
-    // 1. Email presence check
     if (!email || typeof email !== 'string' || !email.trim()) {
       return res.status(400).json({ success: false, message: 'Email address is required' });
     }
 
-    // 2. Email format validation
+    const normalizedEmail = email.trim().toLowerCase();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    if (!emailRegex.test(normalizedEmail)) {
       return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
     }
 
-    // 3. Email normalization
-    const normalizedEmail = email.trim().toLowerCase();
-
-    // 4. Search MongoDB User collection BEFORE generating or sending OTP
     if (isDbConnected()) {
       const existingUser = await User.findOne({ email: normalizedEmail });
 
-      // DO NOT GENERATE OTP, DO NOT SAVE OTP, DO NOT SEND EMAIL IF USER DOES NOT EXIST IN MONGO DB
       if (!existingUser) {
         return res.status(404).json({
           success: false,
@@ -343,43 +345,43 @@ const sendOtp = async (req, res) => {
         });
       }
 
-      // ONLY AFTER USER EXISTS -> Generate OTP, Save, and Send
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      // Generate cryptographically secure 6-digit OTP & store hashed OTP with 10 min expiry
+      const otpCode = generateSecureOtp();
+      const hashedOtpCode = hashOtp(otpCode);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+      // Invalidate existing OTPs for this email before creating new one (Requirement 10)
       await Otp.deleteMany({ email: normalizedEmail });
-      await Otp.create({ email: normalizedEmail, otp });
+      await Otp.create({
+        email: normalizedEmail,
+        otp: otpCode,
+        hashedOtp: hashedOtpCode,
+        purpose: 'EMAIL_VERIFICATION',
+        attempts: 0,
+        expiresAt
+      });
 
       dotenv.config({ path: path.join(__dirname, '../../.env') });
-      const emailUser = process.env.EMAIL_USER;
-      const emailPass = process.env.EMAIL_PASS;
+      const emailUser = process.env.EMAIL_USER || process.env.SMTP_USER;
+      const emailPass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
 
-      if (emailUser && emailPass) {
-        try {
-          await sendOtpEmail(normalizedEmail, otp, emailUser, emailPass);
-          return res.json({
-            success: true,
-            message: `Verification code sent to ${normalizedEmail}. Please check Inbox and Spam/Junk folder.`,
-            source: 'database'
-          });
-        } catch (mailErr) {
-          console.error('\x1b[31m[Nodemailer Error]\x1b[0m', mailErr.message);
-          return res.json({
-            success: true,
-            message: `Verification code sent to ${normalizedEmail}. Please check Inbox and Spam/Junk folder.`,
-            source: 'database'
-          });
-        }
-      } else {
-        return res.json({
-          success: true,
-          message: `Verification code sent to ${normalizedEmail}. Please check Inbox and Spam/Junk folder.`,
-          source: 'database'
+      const mailResult = await sendOtpEmail(normalizedEmail, otpCode, emailUser, emailPass, 'TiffinLink — Your Email Verification Code', existingUser.name);
+
+      if (!mailResult.success) {
+        console.error(`[OTP Send Failure] Failed to send verification email to ${normalizedEmail}:`, mailResult.error);
+        return res.status(500).json({
+          success: false,
+          message: 'Unable to send verification email. Please try again.'
         });
       }
-    } else {
-      return res.status(404).json({
-        success: false,
-        message: 'No account found with this email'
+
+      return res.json({
+        success: true,
+        message: `Verification code sent to ${normalizedEmail}. Please check Inbox and Spam/Junk folder.`,
+        source: 'database'
       });
+    } else {
+      return res.status(500).json({ success: false, message: 'Database connection error' });
     }
   } catch (error) {
     console.error('Error sending OTP:', error);
@@ -393,26 +395,75 @@ const forgotPassword = async (req, res) => {
   return sendOtp(req, res);
 };
 
-// @desc    Verify OTP and return authenticated session
-// @route   POST /api/auth/verify-otp
+// @desc    Verify OTP and update user email verification status in MongoDB
+// @route   POST /api/auth/verify-otp & POST /api/auth/verify-email-otp
 const verifyOtp = async (req, res) => {
   try {
-    let { email, otp } = req.body;
-    if (!email || !otp) {
-      return res.status(400).json({ success: false, message: 'Email and verification code are required' });
+    let email = req.user?.email || req.body.email;
+    let submittedOtp = req.body.otp;
+
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ success: false, message: 'Email address is required' });
     }
-    email = email.trim().toLowerCase();
-    otp = otp.trim();
+
+    if (!submittedOtp || typeof submittedOtp !== 'string' || submittedOtp.trim().length !== 6) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 6-digit verification code' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    submittedOtp = submittedOtp.trim();
+    const submittedHash = hashOtp(submittedOtp);
 
     if (isDbConnected()) {
-      const otpRecord = await Otp.findOne({ email, otp });
+      const otpRecord = await Otp.findOne({ email: normalizedEmail }).sort({ createdAt: -1 });
+
       if (!otpRecord) {
         return res.status(400).json({ success: false, message: 'Invalid or expired verification code' });
       }
 
-      await Otp.deleteMany({ email });
+      // Check Expiration (Requirement 9: 10 mins max)
+      if (otpRecord.expiresAt && new Date(otpRecord.expiresAt) < new Date()) {
+        await Otp.deleteMany({ email: normalizedEmail });
+        return res.status(400).json({
+          success: false,
+          message: 'Verification code has expired. Please request a new code.'
+        });
+      }
 
-      let user = await User.findOne({ email });
+      // Check Attempt Limit (Requirement 8: Max 5 attempts)
+      if ((otpRecord.attempts || 0) >= 5) {
+        await Otp.deleteMany({ email: normalizedEmail });
+        return res.status(400).json({
+          success: false,
+          message: 'Maximum verification attempts exceeded. Please request a new code.'
+        });
+      }
+
+      // Compare OTP (Hash comparison or fallback plaintext match)
+      const isMatch = (otpRecord.hashedOtp === submittedHash) || (otpRecord.otp === submittedOtp);
+
+      if (!isMatch) {
+        otpRecord.attempts = (otpRecord.attempts || 0) + 1;
+        await otpRecord.save();
+
+        if (otpRecord.attempts >= 5) {
+          await Otp.deleteMany({ email: normalizedEmail });
+          return res.status(400).json({
+            success: false,
+            message: 'Maximum verification attempts exceeded. Please request a new code.'
+          });
+        }
+
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid verification code.'
+        });
+      }
+
+      // OTP MATCH SUCCESS (Requirement 7)
+      await Otp.deleteMany({ email: normalizedEmail });
+
+      let user = await User.findOne({ email: normalizedEmail });
       if (user) {
         if (req.body.role && user.role !== req.body.role) {
           const expectedRoleTitle = getRoleDisplayName(user.role);
@@ -424,13 +475,13 @@ const verifyOtp = async (req, res) => {
 
         user.lastLogin = new Date();
         user.isVerified = true;
-        if (req.body.name) user.name = req.body.name;
-        if (req.body.phone) user.phone = req.body.phone;
+        if (req.body.name) user.name = req.body.name.trim();
+        if (req.body.phone) user.phone = req.body.phone.trim();
         await user.save();
       } else {
         user = await User.create({
-          email,
-          name: req.body.name || email.split('@')[0],
+          email: normalizedEmail,
+          name: req.body.name || normalizedEmail.split('@')[0],
           phone: req.body.phone || '',
           role: req.body.role || 'customer',
           isVerified: true,
@@ -447,13 +498,14 @@ const verifyOtp = async (req, res) => {
 
       return res.json({
         success: true,
-        message: 'Access granted successfully.',
+        message: 'Email verified successfully.',
         user: formatUserPayload(user),
         accessToken,
         refreshToken,
         source: 'database'
       });
     }
+
     return res.status(500).json({ success: false, message: 'Database connection error' });
   } catch (error) {
     console.error('Error verifying OTP:', error);
@@ -469,5 +521,6 @@ module.exports = {
   getMe,
   sendOtp,
   forgotPassword,
-  verifyOtp
+  verifyOtp,
+  verifyEmailOtp: verifyOtp
 };

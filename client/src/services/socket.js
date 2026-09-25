@@ -194,6 +194,10 @@ export const subscribeToConnectionStatus = (onConnect, onDisconnect) => {
   const connectHandler = () => onConnect && onConnect();
   const disconnectHandler = () => onDisconnect && onDisconnect();
 
+  if (s && s.connected && onConnect) {
+    onConnect();
+  }
+
   s.on('connect', connectHandler);
   s.on('disconnect', disconnectHandler);
 

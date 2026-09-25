@@ -190,526 +190,162 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F7F5] font-sans antialiased text-[#111827] selection:bg-[#0A8B5F] selection:text-white flex flex-col">
+    <div className="min-h-screen bg-surface font-body-md text-body-md text-on-surface antialiased">
 
-      {/* TOP NAVIGATION BAR */}
-      <header className="h-16 bg-white border-b border-[#E5ECE8] px-4 md:px-6 flex items-center justify-between sticky top-0 z-40 shadow-2xs">
+      {/* LEFT FIXED SIDEBAR */}
+      <ProviderSidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isMobileSidebarOpen={isMobileSidebarOpen}
+        setIsMobileSidebarOpen={setIsMobileSidebarOpen}
+        badgeCounts={badgeCounts}
+        currentUser={currentUser}
+        isKitchenOnline={isKitchenOnline}
+        onToggleKitchenOnline={handleToggleKitchenOnline}
+        onLogout={onLogout}
+      />
 
-        {/* Left Branding & Mobile Toggle */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-            className="lg:hidden p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F9FBF9] rounded-xl transition-colors cursor-pointer"
-          >
-            {isMobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+      {/* TOP HEADER & MAIN CONTAINER */}
+      <div className="lg:pl-72">
+        <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 bg-surface-container-lowest/90 backdrop-blur-xl z-40 flex items-center justify-between px-4 lg:px-6 shadow-[0_1px_8px_rgba(0,0,0,0.04)] border-b border-sand-neutral/30">
+          
+          {/* Mobile Menu Toggle & Search Bar */}
+          <div className="flex items-center gap-3 flex-1 max-w-xl">
+            <button
+              type="button"
+              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              className="lg:hidden p-2 text-secondary hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer"
+            >
+              <Menu size={20} />
+            </button>
 
-          <a href="#" className="flex items-center gap-2.5 text-decoration-none">
-            <div className="w-9 h-9 rounded-xl bg-[#0A8B5F] text-white flex items-center justify-center font-black text-lg shadow-sm">
-              🍱
+            <div className="w-full flex items-center bg-surface-container-low rounded-lg px-3 py-2 border border-sand-neutral/30">
+              <span className="material-symbols-outlined text-secondary text-[20px] mr-2.5">search</span>
+              <input
+                type="text"
+                placeholder="Search orders, tiffins, customers... (Order ID, Name, Phone)"
+                className="bg-transparent w-full text-sm placeholder:text-secondary focus:outline-none text-on-surface font-body-md"
+              />
+              <kbd className="hidden sm:inline-block font-label-caps text-[10px] bg-surface-container text-on-surface-variant px-1.5 py-0.5 rounded border border-sand-neutral">
+                ⌘K
+              </kbd>
             </div>
-            <div className="flex flex-col">
-              <span className="font-extrabold text-base tracking-tight text-[#111827] leading-none">
-                Tiffin<span className="text-[#0A8B5F]">Link</span>
+          </div>
+
+          {/* Right Header Status & Controls */}
+          <div className="flex items-center gap-3 ml-4">
+            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface-container-low border border-sand-neutral/30">
+              <span className={`w-2 h-2 rounded-full ${isKitchenOnline ? 'bg-onyx-black animate-pulse' : 'bg-gray-400'}`}></span>
+              <span className="font-label-caps text-[11px] font-bold uppercase text-on-surface tracking-wider">
+                {isKitchenOnline ? 'ONLINE' : 'OFFLINE'}
               </span>
-              <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mt-0.5">Provider Partner</span>
-            </div>
-          </a>
-        </div>
-
-        {/* Search Bar */}
-        <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
-          <div className="relative w-full">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-            <input
-              type="text"
-              placeholder="Search orders, tiffins, customers..."
-              className="w-full pl-10 pr-4 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-medium text-[#111827] focus:outline-none focus:border-[#0A8B5F] focus:bg-white transition-all"
-            />
-          </div>
-        </div>
-
-        {/* Right Actions & Profile */}
-        <div className="flex items-center gap-2 md:gap-3">
-          {/* Quick Kitchen Online Status Header Badge */}
-          <button
-            type="button"
-            onClick={handleToggleKitchenOnline}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
-              isKitchenOnline
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                : 'bg-red-50 text-red-800 border-red-300 hover:bg-red-100'
-            }`}
-            title="Click to toggle Kitchen Status"
-          >
-            <span className={`w-2 h-2 rounded-full ${isKitchenOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-            <span>{isKitchenOnline ? 'ONLINE' : 'OFFLINE'}</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('notifications')}
-            className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F9FBF9] rounded-xl transition-colors relative cursor-pointer"
-            title="Notifications"
-          >
-            <Bell size={18} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
-
-          <button
-            onClick={() => setActiveTab('help')}
-            className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F9FBF9] rounded-xl transition-colors cursor-pointer"
-            title="Help & Support"
-          >
-            <CircleHelp size={18} />
-          </button>
-
-          <div className="h-6 w-px bg-[#E5ECE8] mx-1" />
-
-          {/* Profile Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-              className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-[#F9FBF9] transition-colors cursor-pointer"
-            >
-              <div className="w-8 h-8 rounded-lg bg-[#E8F0EC] text-[#0A8B5F] font-bold flex items-center justify-center text-xs overflow-hidden border border-[#C5DDD2]">
-                <img
-                  src={currentUser?.avatar || "/assets/provider_1.png"}
-                  alt="Provider"
-                  className="w-full h-full object-cover"
-                  onError={(e) => { e.target.src = "/assets/provider_1.png"; }}
-                />
-              </div>
-              <div className="hidden lg:flex flex-col text-left">
-                <span className="text-xs font-bold text-[#111827] leading-tight">
-                  {currentUser?.name || "Xoxo Men"}
-                </span>
-                <span className="text-[10px] text-[#6B7280] font-semibold">Home Kitchen Provider</span>
-              </div>
-              <ChevronDown size={14} className="text-[#6B7280] hidden lg:block" />
-            </button>
-
-            {isProfileDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-[#E5ECE8] py-1.5 z-50 animate-scale-in text-xs font-medium">
-                <div className="px-4 py-2 border-b border-[#E5ECE8]">
-                  <p className="font-bold text-[#111827]">{currentUser?.name || "Xoxo Men"}</p>
-                  <p className="text-[10px] text-[#6B7280] truncate">{currentUser?.email || "menxoxo50@gmail.com"}</p>
-                </div>
-
-                <button
-                  onClick={() => { setActiveTab('settings'); setIsProfileDropdownOpen(false); }}
-                  className="w-full text-left px-4 py-2 text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827] flex items-center gap-2 cursor-pointer"
-                >
-                  <Settings size={14} />
-                  <span>Account Settings</span>
-                </button>
-
-                <button
-                  onClick={() => { setActiveTab('help'); setIsProfileDropdownOpen(false); }}
-                  className="w-full text-left px-4 py-2 text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827] flex items-center gap-2 cursor-pointer"
-                >
-                  <HelpCircle size={14} />
-                  <span>Help Concierge</span>
-                </button>
-
-                <div className="my-1 border-t border-[#E5ECE8]" />
-
-                <button
-                  onClick={onLogout}
-                  className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer font-bold"
-                >
-                  <LogOut size={14} />
-                  <span>Log Out</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* DASHBOARD LAYOUT BODY (FULL SCREEN EDGE-TO-EDGE) */}
-      <div className="flex-1 flex w-full min-h-[calc(100vh-64px)]">
-
-        {/* HIGH-DENSITY FLUSH PROVIDER SIDEBAR */}
-        <aside className={`
-          fixed md:sticky top-16 left-0 z-30 w-64 bg-white border-r border-[#E5ECE8] p-4 
-          h-[calc(100vh-64px)] overflow-y-auto transform transition-transform duration-200 ease-in-out md:transform-none flex flex-col justify-between shrink-0
-          ${isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}
-        `}>
-          <div className="space-y-4">
-
-            {/* Authenticated Provider Identity Header */}
-            <div className="p-3 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] space-y-1">
-              <div className="flex items-center gap-2 text-xs font-black text-[#111827]">
-                <span className="w-2 h-2 rounded-full bg-[#0A8B5F] animate-pulse" />
-                <span>🍱 TiffinLink</span>
-              </div>
-              <div className="text-[10px] text-[#6B7280] font-bold uppercase tracking-wider">PROVIDER PARTNER</div>
-              <div className="pt-1.5 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-xs font-black text-[#0A8B5F] truncate">{currentUser?.name || "Xoxo Men"}</span>
-              </div>
-              <div className="text-[10px] text-[#6B7280]">Home Kitchen Provider</div>
-            </div>
-
-            {/* Navigation Groups */}
-            <div className="space-y-1">
-
-              {/* GROUP 1: OVERVIEW */}
-              <div>
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">OVERVIEW</div>
-
-                <button
-                  onClick={() => { setActiveTab('dashboard'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'dashboard' ? 'bg-[#0A8B5F] text-white shadow-xs' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <LayoutDashboard size={17} />
-                    <span>Dashboard</span>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => { setActiveTab('requests'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'requests' ? 'bg-amber-500 text-white shadow-xs' : 'text-amber-700 hover:bg-amber-50'
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Zap size={17} className="text-amber-500 group-hover:text-amber-600" />
-                    <span className="font-extrabold">Live Requests</span>
-                  </div>
-                  {badgeCounts.liveRequests > 0 && (
-                    <span className="px-2 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-full animate-pulse">
-                      {badgeCounts.liveRequests}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* GROUP 2: ORDERS */}
-              <div className="pt-2">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">ORDERS</div>
-                <div>
-                  <div
-                    onClick={() => toggleSubMenu('orders')}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all cursor-pointer ${activeTab.startsWith('orders') ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                      }`}
-                  >
-                    <div className="flex items-center gap-3 font-bold text-xs">
-                      <ShoppingBag size={17} />
-                      <span>Orders</span>
-                    </div>
-                    <ChevronDown size={14} className={`transition-transform duration-200 ${expandedMenus.orders ? 'rotate-180' : ''}`} />
-                  </div>
-
-                  {expandedMenus.orders && (
-                    <div className="pl-6 pr-1 py-1 space-y-0.5">
-                      <button
-                        onClick={() => { setActiveTab('orders-all'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'orders' || activeTab === 'orders-all' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <ListOrdered size={14} />
-                          <span>All Orders</span>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveTab('orders-new'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'orders-new' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Inbox size={14} />
-                          <span>New Orders</span>
-                        </div>
-                        {badgeCounts.newOrders > 0 && (
-                          <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[9px] font-black rounded-full">
-                            {badgeCounts.newOrders}
-                          </span>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveTab('orders-preparing'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'orders-preparing' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <Utensils size={14} />
-                        <span>Preparing</span>
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveTab('orders-ready'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'orders-ready' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <BadgeCheck size={14} />
-                        <span>Ready</span>
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveTab('orders-delivery'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'orders-delivery' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <Truck size={14} />
-                        <span>Delivery</span>
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveTab('orders-completed'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'orders-completed' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <CheckCircle size={14} />
-                        <span>Completed</span>
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveTab('orders-cancelled'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'orders-cancelled' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <CircleX size={14} />
-                        <span>Cancelled</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* GROUP 3: FOOD */}
-              <div className="pt-2">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">FOOD</div>
-                <div>
-                  <div
-                    onClick={() => toggleSubMenu('tiffins')}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all cursor-pointer ${activeTab.startsWith('tiffin') || activeTab === 'add-tiffin' || activeTab === 'availability' || activeTab === 'categories' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                      }`}
-                  >
-                    <div className="flex items-center gap-3 font-bold text-xs">
-                      <Utensils size={17} />
-                      <span>My Tiffins</span>
-                    </div>
-                    <ChevronDown size={14} className={`transition-transform duration-200 ${expandedMenus.tiffins ? 'rotate-180' : ''}`} />
-                  </div>
-
-                  {expandedMenus.tiffins && (
-                    <div className="pl-6 pr-1 py-1 space-y-0.5">
-                      <button
-                        onClick={() => { setActiveTab('tiffins'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'tiffins' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <List size={14} />
-                        <span>All Tiffins</span>
-                      </button>
-                      <button
-                        onClick={() => { setActiveTab('add-tiffin'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'add-tiffin' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <PlusCircle size={14} />
-                        <span>Add Tiffin</span>
-                      </button>
-                      <button
-                        onClick={() => { setActiveTab('availability'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'availability' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <CalendarCheck size={14} />
-                        <span>Availability</span>
-                      </button>
-                      <button
-                        onClick={() => { setActiveTab('categories'); setIsMobileSidebarOpen(false); }}
-                        className={`w-full flex items-center gap-2 py-1.5 px-2.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${activeTab === 'categories' ? 'text-[#0A8B5F] font-extrabold bg-[#E8F0EC]' : 'text-[#6B7280] hover:text-[#111827]'
-                          }`}
-                      >
-                        <Tag size={14} />
-                        <span>Categories</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* GROUP 4: CUSTOMERS */}
-              <div className="pt-2">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">CUSTOMERS</div>
-                <button
-                  onClick={() => { setActiveTab('customers'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'customers' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <Users size={17} />
-                  <span>Customers</span>
-                </button>
-
-                <button
-                  onClick={() => { setActiveTab('subscriptions'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'subscriptions' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <Repeat size={17} />
-                  <span>Subscriptions</span>
-                </button>
-
-                <button
-                  onClick={() => { setActiveTab('reviews'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'reviews' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <Star size={17} />
-                  <span>Reviews</span>
-                </button>
-              </div>
-
-              {/* GROUP 5: BUSINESS */}
-              <div className="pt-2">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">BUSINESS</div>
-                <button
-                  onClick={() => { setActiveTab('earnings'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'earnings' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <Wallet size={17} />
-                  <span>Earnings</span>
-                </button>
-
-                <button
-                  onClick={() => { setActiveTab('analytics'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'analytics' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <BarChart3 size={17} />
-                  <span>Analytics</span>
-                </button>
-              </div>
-
-              {/* GROUP 6: OPERATIONS */}
-              <div className="pt-2">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">OPERATIONS</div>
-                <button
-                  onClick={() => { setActiveTab('capacity'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'capacity' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <Store size={17} />
-                  <span>Kitchen Capacity</span>
-                </button>
-
-                <button
-                  onClick={() => { setActiveTab('service-area'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'service-area' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <MapPin size={17} />
-                  <span>Service Area</span>
-                </button>
-
-                <button
-                  onClick={() => { setActiveTab('schedule'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'schedule' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <Calendar size={17} />
-                  <span>Schedule</span>
-                </button>
-              </div>
-
-              {/* GROUP 7: COMMUNICATION */}
-              <div className="pt-2">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">COMMUNICATION</div>
-                <button
-                  onClick={() => { setActiveTab('notifications'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'notifications' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Bell size={17} />
-                    <span>Notifications</span>
-                  </div>
-                  <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-full">3</span>
-                </button>
-              </div>
-
-              {/* GROUP 8: SYSTEM */}
-              <div className="pt-2">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#9CA3AF] px-3 mb-1">SYSTEM</div>
-                <button
-                  onClick={() => { setActiveTab('settings'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'settings' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <Settings size={17} />
-                  <span>Settings</span>
-                </button>
-
-                <button
-                  onClick={() => { setActiveTab('help'); setIsMobileSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'help' ? 'bg-[#E8F0EC] text-[#0A8B5F]' : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                    }`}
-                >
-                  <CircleHelp size={17} />
-                  <span>Help & Support</span>
-                </button>
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* Sidebar Footer Online Switch & Logout */}
-          <div className="pt-4 border-t border-[#E5ECE8] space-y-3">
-            <div className="p-3 bg-white rounded-2xl border border-[#E5ECE8] shadow-2xs space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-xs font-black shrink-0">
-                  <span className={`w-2.5 h-2.5 rounded-full ${isKitchenOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                  <span className={isKitchenOnline ? 'text-emerald-700 font-extrabold' : 'text-red-600 font-extrabold'}>
-                    {isKitchenOnline ? 'ONLINE' : 'OFFLINE'}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleToggleKitchenOnline}
-                  className={`px-3 py-1 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer border shrink-0 ${
-                    isKitchenOnline
-                      ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 shadow-2xs'
-                      : 'bg-[#0A8B5F] text-white border-[#0A8B5F] hover:bg-[#08734E] shadow-xs'
-                  }`}
-                >
-                  {isKitchenOnline ? 'Go Offline' : 'Go Online'}
-                </button>
-              </div>
-
-              <div className="text-[10px] text-[#6B7280] font-medium leading-tight pt-1 border-t border-[#F0F5F2]">
-                {isKitchenOnline ? '✓ Accepting customer orders in real-time' : '✕ Kitchen is currently paused'}
-              </div>
             </div>
 
             <button
-              onClick={onLogout}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+              type="button"
+              onClick={() => setActiveTab('notifications')}
+              aria-label="Notifications"
+              className="relative p-2 rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer"
             >
-              <LogOut size={16} />
-              <span>Log Out</span>
+              <span className="material-symbols-outlined text-[20px]">notifications</span>
+              <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-clay-earth text-bone-white font-label-caps text-[9px] flex items-center justify-center font-bold">
+                {badgeCounts.notifications || 3}
+              </span>
             </button>
-          </div>
-        </aside>
 
-        {/* MAIN TAB CONTENT CONTAINER */}
-        <main className="flex-1 bg-[#F4F6F8] min-w-0 p-6 md:p-8 overflow-y-auto min-h-[calc(100vh-64px)]">
-          {renderActiveTabContent()}
+            <button
+              type="button"
+              onClick={() => setActiveTab('help')}
+              aria-label="Help & Support"
+              className="p-2 rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[20px]">help</span>
+            </button>
+
+            {/* Profile Dropdown Trigger */}
+            <div className="relative border-l border-sand-neutral/40 pl-2">
+              <button
+                type="button"
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="flex items-center gap-2.5 p-1 rounded-lg hover:bg-surface-container-low transition-colors cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-full bg-onyx-black flex items-center justify-center text-bone-white font-bold text-xs overflow-hidden">
+                  {currentUser?.avatar ? (
+                    <img src={currentUser.avatar} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="material-symbols-outlined text-bone-white text-[18px]">person</span>
+                  )}
+                </div>
+                <div className="hidden md:block text-left">
+                  <div className="font-label-caps text-[11px] font-bold text-on-surface leading-tight">
+                    {currentUser?.name || currentUser?.businessName || 'Xoxo Men'}
+                  </div>
+                  <div className="font-label-caps text-[9px] text-secondary leading-tight">
+                    Home Kitchen Provider
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-secondary text-[16px]">expand_more</span>
+              </button>
+
+              {/* Profile Menu Popup */}
+              {isProfileDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-surface-container-lowest border border-sand-neutral rounded-2xl shadow-xl py-2 z-50 animate-scale-in">
+                  <div className="px-4 py-2 border-b border-sand-neutral/40">
+                    <p className="font-button-text font-bold text-on-surface text-[13px]">
+                      {currentUser?.name || currentUser?.businessName || 'Xoxo Men'}
+                    </p>
+                    <p className="font-label-caps text-[10px] text-secondary truncate">
+                      {currentUser?.email || 'menxoxo50@gmail.com'}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => { setActiveTab('settings'); setIsProfileDropdownOpen(false); }}
+                    className="w-full text-left px-4 py-2 text-on-surface hover:bg-surface-container-low font-button-text text-[13px] flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">settings</span>
+                    <span>Account Settings</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setActiveTab('help'); setIsProfileDropdownOpen(false); }}
+                    className="w-full text-left px-4 py-2 text-on-surface hover:bg-surface-container-low font-button-text text-[13px] flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">help</span>
+                    <span>Help Concierge</span>
+                  </button>
+
+                  <div className="my-1 border-t border-sand-neutral/40" />
+
+                  {onLogout && (
+                    <button
+                      type="button"
+                      onClick={() => { setIsProfileDropdownOpen(false); onLogout(); }}
+                      className="w-full text-left px-4 py-2 text-error hover:bg-error-container/20 font-button-text text-[13px] flex items-center gap-2.5 cursor-pointer font-bold"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">logout</span>
+                      <span>Log Out</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* MAIN BODY AREA */}
+        <main className="w-full pt-16 bg-surface min-h-screen p-4 sm:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto">
+            {renderActiveTabContent()}
+          </div>
         </main>
-
       </div>
 
       {/* Status Toast Banner */}
       {statusToast && (
-        <div className="fixed bottom-6 right-6 z-[9999] bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce font-extrabold text-xs">
+        <div className="fixed bottom-6 right-6 z-[9999] bg-onyx-black text-bone-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce font-button-text text-button-text border border-sand-neutral/40">
           <span>{statusToast}</span>
         </div>
       )}

@@ -5,6 +5,21 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext'
 import "maplibre-gl/dist/maplibre-gl.css"
 
+// Initialize theme from localStorage on startup
+(function initTheme() {
+  try {
+    const savedTheme = localStorage.getItem('tiffinlink_theme');
+    const root = document.documentElement;
+    if (savedTheme === 'dark' || (savedTheme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      root.classList.add('dark');
+      root.setAttribute('data-theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
+    }
+  } catch (e) {}
+})();
+
 class RootErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
