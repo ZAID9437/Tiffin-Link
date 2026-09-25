@@ -150,6 +150,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
           return <OrdersTab currentUser={currentUser} initialStatus="Ready" />;
         case 'orders-delivery':
         case 'delivery':
+        case 'delivery-management':
           return <DeliveryManagementTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
         case 'orders-completed':
           return <OrdersTab currentUser={currentUser} initialStatus="Completed" />;
@@ -159,10 +160,15 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
           return <CustomersTab currentUser={currentUser} />;
         case 'subscriptions':
           return <SubscriptionsTab currentUser={currentUser} />;
+        case 'performance':
         case 'reviews':
           return <ReviewsTab currentUser={currentUser} />;
         case 'earnings':
-          return <EarningsTab currentUser={currentUser} />;
+        case 'transactions':
+        case 'incentives':
+        case 'wallet':
+        case 'bank-payout':
+          return <EarningsTab currentUser={currentUser} initialSubTab={activeTab} />;
         case 'analytics':
           return <AnalyticsTab currentUser={currentUser} />;
         case 'capacity':
@@ -174,7 +180,11 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         case 'notifications':
           return <NotificationsTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
         case 'settings':
-          return <SettingsTab currentUser={currentUser} onUpdateUser={onUpdateUser} />;
+        case 'settings-account':
+        case 'settings-notifications':
+        case 'settings-privacy':
+        case 'settings-preferences':
+          return <SettingsTab currentUser={currentUser} onUpdateUser={onUpdateUser} initialSubTab={activeTab} />;
         case 'help':
           return <HelpSupportTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
         default:

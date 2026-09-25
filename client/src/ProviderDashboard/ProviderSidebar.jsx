@@ -1,8 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * ProviderSidebar Component
- * Exact UI Layout, Typography, and Styling matching the TiffinLink Provider Partner Dashboard specification.
+ * Redesigned with hierarchical collapsible accordion dropdowns according to the exact TiffinLink specification:
+ * - Dashboard
+ * - Live Requests
+ * - Orders (All Orders, New Orders, Preparing, Ready, Delivery, Completed, Cancelled)
+ * - My Tiffins (All Tiffins, Add Tiffin, Availability)
+ * - Delivery Management
+ * - Earnings & Payments (Earnings Overview, Transactions, Incentives, Wallet, Bank & Payout)
+ * - Performance (Ratings & Reviews)
+ * - Notifications
+ * - Help & Support
+ * - Settings (Account, Notifications, Privacy & Security, App Preferences)
  */
 export default function ProviderSidebar({
   activeTab = 'dashboard',
@@ -18,15 +28,68 @@ export default function ProviderSidebar({
   const providerName = currentUser?.name || currentUser?.businessName || 'Xoxo Men';
   const providerId = currentUser?.id || currentUser?._id || 'PROV-XOXO-991';
 
+  // Section Accordion Collapsible States
+  const [openSections, setOpenSections] = useState({
+    orders: true,
+    tiffins: false,
+    earnings: false,
+    performance: false,
+    settings: false
+  });
+
+  // Auto-expand accordion if child tab becomes active
+  useEffect(() => {
+    if (['orders', 'orders-all', 'orders-new', 'orders-preparing', 'orders-ready', 'orders-completed', 'orders-cancelled'].includes(activeTab)) {
+      setOpenSections(prev => ({ ...prev, orders: true }));
+    } else if (['tiffins', 'add-tiffin', 'availability', 'categories'].includes(activeTab)) {
+      setOpenSections(prev => ({ ...prev, tiffins: true }));
+    } else if (['earnings', 'transactions', 'incentives', 'wallet', 'bank-payout'].includes(activeTab)) {
+      setOpenSections(prev => ({ ...prev, earnings: true }));
+    } else if (['performance', 'reviews'].includes(activeTab)) {
+      setOpenSections(prev => ({ ...prev, performance: true }));
+    } else if (['settings', 'settings-account', 'settings-notifications', 'settings-privacy', 'settings-preferences'].includes(activeTab)) {
+      setOpenSections(prev => ({ ...prev, settings: true }));
+    }
+  }, [activeTab]);
+
+  const toggleSection = (sectionKey) => {
+    setOpenSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
+  };
+
   const handleNavClick = (tabId) => {
     if (setActiveTab) setActiveTab(tabId);
     if (setIsMobileSidebarOpen) setIsMobileSidebarOpen(false);
   };
 
-  const navClass = (tabId) =>
-    activeTab === tabId
-      ? 'flex items-center justify-between px-3 py-2 rounded transition-colors bg-surface-container font-semibold text-on-surface cursor-pointer'
-      : 'flex items-center justify-between px-3 py-2 rounded text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors cursor-pointer';
+  const isTabActive = (tabId) => activeTab === tabId;
+
+  const parentClass = (sectionKey, childTabs = []) => {
+    const isChildActive = childTabs.includes(activeTab);
+    return `flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+      isChildActive
+        ? 'bg-surface-container font-semibold text-on-surface'
+        : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+    }`;
+  };
+
+  const childClass = (tabId) => `
+    flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
+      isTabActive(tabId)
+        ? 'bg-onyx-black text-bone-white font-bold shadow-2xs'
+        : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface font-medium'
+    }
+  `;
+
+  const singleClass = (tabId) => `
+    flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+      isTabActive(tabId)
+        ? 'bg-surface-container font-bold text-on-surface'
+        : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
+    }
+  `;
 
   return (
     <>
@@ -47,7 +110,7 @@ export default function ProviderSidebar({
         `}
       >
         {/* Header Branding & Kitchen Status Profile */}
-        <div className="p-4 pb-3 border-b border-sand-neutral/30 space-y-3">
+        <div className="p-4 pb-3 border-b border-sand-neutral/30 space-y-3 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-onyx-black flex items-center justify-center text-bone-white shadow-sm">
@@ -65,8 +128,9 @@ export default function ProviderSidebar({
 
             {setIsMobileSidebarOpen && (
               <button
+                type="button"
                 onClick={() => setIsMobileSidebarOpen(false)}
-                className="lg:hidden text-secondary hover:text-on-surface p-1 rounded hover:bg-surface-container-low"
+                className="lg:hidden text-secondary hover:text-on-surface p-1 rounded hover:bg-surface-container-low cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
@@ -92,20 +156,21 @@ export default function ProviderSidebar({
         </div>
 
         {/* Sidebar Navigation */}
-        <nav className="flex-1 px-4 py-3 space-y-4 font-body-md text-body-md">
+        <nav className="flex-1 px-3 py-3 space-y-3 font-body-md text-body-md">
           
-          {/* Section: Overview */}
-          <div className="space-y-1">
-            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
-              Overview
-            </div>
-            <a onClick={() => handleNavClick('dashboard')} className={navClass('dashboard')}>
+          {/* 1. Dashboard */}
+          <div>
+            <div onClick={() => handleNavClick('dashboard')} className={singleClass('dashboard')}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">dashboard</span>
                 <span className="font-button-text text-button-text">Dashboard</span>
               </div>
-            </a>
-            <a onClick={() => handleNavClick('requests')} className={navClass('requests')}>
+            </div>
+          </div>
+
+          {/* 2. Live Requests */}
+          <div>
+            <div onClick={() => handleNavClick('requests')} className={singleClass('requests')}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">flash_on</span>
                 <span className="font-button-text text-button-text">Live Requests</span>
@@ -115,157 +180,166 @@ export default function ProviderSidebar({
                   {badgeCounts.liveRequests}
                 </span>
               )}
-            </a>
+            </div>
           </div>
 
-          {/* Section: Orders */}
+          {/* 3. Orders (Collapsible Accordion Dropdown) */}
           <div className="space-y-1">
-            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
-              Orders
-            </div>
-            <a onClick={() => handleNavClick('orders')} className={navClass('orders')}>
+            <div
+              onClick={() => toggleSection('orders')}
+              className={parentClass('orders', ['orders', 'orders-new', 'orders-preparing', 'orders-ready', 'delivery', 'orders-completed', 'orders-cancelled'])}
+            >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">receipt_long</span>
-                <span className="font-button-text text-button-text">All Orders</span>
+                <span className="font-button-text text-button-text font-bold">Orders</span>
               </div>
-            </a>
-            <a onClick={() => handleNavClick('orders-new')} className={navClass('orders-new')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">notification_important</span>
-                <span className="font-button-text text-button-text">New Orders</span>
-              </div>
-              {badgeCounts.newOrders > 0 && (
-                <span className="font-label-caps text-[10px] bg-onyx-black text-bone-white px-1.5 py-0.5 rounded font-bold">
-                  {badgeCounts.newOrders}
+              <div className="flex items-center gap-1.5">
+                {badgeCounts.newOrders > 0 && (
+                  <span className="font-label-caps text-[10px] bg-onyx-black text-bone-white px-1.5 py-0.5 rounded font-bold">
+                    {badgeCounts.newOrders}
+                  </span>
+                )}
+                <span className="material-symbols-outlined text-[18px] text-secondary transition-transform duration-200" style={{ transform: openSections.orders ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                  expand_more
                 </span>
-              )}
-            </a>
-            <a onClick={() => handleNavClick('orders-preparing')} className={navClass('orders-preparing')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">skillet</span>
-                <span className="font-button-text text-button-text">Preparing</span>
               </div>
-            </a>
-            <a onClick={() => handleNavClick('orders-ready')} className={navClass('orders-ready')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">inventory_2</span>
-                <span className="font-button-text text-button-text">Ready</span>
+            </div>
+
+            {openSections.orders && (
+              <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
+                <div onClick={() => handleNavClick('orders')} className={childClass('orders')}>
+                  <span>All Orders</span>
+                </div>
+                <div onClick={() => handleNavClick('orders-new')} className={childClass('orders-new')}>
+                  <span>New Orders</span>
+                  {badgeCounts.newOrders > 0 && (
+                    <span className="font-label-caps text-[9px] bg-onyx-black text-bone-white px-1 rounded font-bold">
+                      {badgeCounts.newOrders}
+                    </span>
+                  )}
+                </div>
+                <div onClick={() => handleNavClick('orders-preparing')} className={childClass('orders-preparing')}>
+                  <span>Preparing</span>
+                </div>
+                <div onClick={() => handleNavClick('orders-ready')} className={childClass('orders-ready')}>
+                  <span>Ready</span>
+                </div>
+                <div onClick={() => handleNavClick('delivery')} className={childClass('delivery')}>
+                  <span>Delivery</span>
+                </div>
+                <div onClick={() => handleNavClick('orders-completed')} className={childClass('orders-completed')}>
+                  <span>Completed</span>
+                </div>
+                <div onClick={() => handleNavClick('orders-cancelled')} className={childClass('orders-cancelled')}>
+                  <span>Cancelled</span>
+                </div>
               </div>
-            </a>
-            <a onClick={() => handleNavClick('delivery')} className={navClass('delivery')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">moped</span>
-                <span className="font-button-text text-button-text">Delivery</span>
-              </div>
-            </a>
-            <a onClick={() => handleNavClick('orders-completed')} className={navClass('orders-completed')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">task_alt</span>
-                <span className="font-button-text text-button-text">Completed</span>
-              </div>
-            </a>
+            )}
           </div>
 
-          {/* Section: Food */}
+          {/* 4. My Tiffins (Collapsible Accordion Dropdown) */}
           <div className="space-y-1">
-            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
-              Food
-            </div>
-            <a onClick={() => handleNavClick('tiffins')} className={navClass('tiffins')}>
+            <div
+              onClick={() => toggleSection('tiffins')}
+              className={parentClass('tiffins', ['tiffins', 'add-tiffin', 'availability'])}
+            >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">restaurant_menu</span>
-                <span className="font-button-text text-button-text">My Tiffins</span>
+                <span className="font-button-text text-button-text font-bold">My Tiffins</span>
               </div>
-            </a>
-            <a onClick={() => handleNavClick('availability')} className={navClass('availability')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">toggle_on</span>
-                <span className="font-button-text text-button-text">Availability</span>
+              <span className="material-symbols-outlined text-[18px] text-secondary transition-transform duration-200" style={{ transform: openSections.tiffins ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                expand_more
+              </span>
+            </div>
+
+            {openSections.tiffins && (
+              <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
+                <div onClick={() => handleNavClick('tiffins')} className={childClass('tiffins')}>
+                  <span>All Tiffins</span>
+                </div>
+                <div onClick={() => handleNavClick('add-tiffin')} className={childClass('add-tiffin')}>
+                  <span>Add Tiffin</span>
+                </div>
+                <div onClick={() => handleNavClick('availability')} className={childClass('availability')}>
+                  <span>Availability</span>
+                </div>
               </div>
-            </a>
-            <a onClick={() => handleNavClick('categories')} className={navClass('categories')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">category</span>
-                <span className="font-button-text text-button-text">Categories</span>
-              </div>
-            </a>
+            )}
           </div>
 
-          {/* Section: Customers */}
-          <div className="space-y-1">
-            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
-              Customers
+          {/* 5. Delivery Management */}
+          <div>
+            <div onClick={() => handleNavClick('delivery-management')} className={singleClass('delivery-management')}>
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">moped</span>
+                <span className="font-button-text text-button-text">Delivery Management</span>
+              </div>
             </div>
-            <a onClick={() => handleNavClick('customers')} className={navClass('customers')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">group</span>
-                <span className="font-button-text text-button-text">Customers</span>
-              </div>
-            </a>
-            <a onClick={() => handleNavClick('subscriptions')} className={navClass('subscriptions')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-                <span className="font-button-text text-button-text">Subscriptions</span>
-              </div>
-            </a>
-            <a onClick={() => handleNavClick('reviews')} className={navClass('reviews')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">star</span>
-                <span className="font-button-text text-button-text">Reviews</span>
-              </div>
-            </a>
           </div>
 
-          {/* Section: Business */}
+          {/* 6. Earnings & Payments (Collapsible Accordion Dropdown) */}
           <div className="space-y-1">
-            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
-              Business
-            </div>
-            <a onClick={() => handleNavClick('earnings')} className={navClass('earnings')}>
+            <div
+              onClick={() => toggleSection('earnings')}
+              className={parentClass('earnings', ['earnings', 'transactions', 'incentives', 'wallet', 'bank-payout'])}
+            >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">payments</span>
-                <span className="font-button-text text-button-text">Earnings</span>
+                <span className="font-button-text text-button-text font-bold">Earnings & Payments</span>
               </div>
-            </a>
-            <a onClick={() => handleNavClick('analytics')} className={navClass('analytics')}>
+              <span className="material-symbols-outlined text-[18px] text-secondary transition-transform duration-200" style={{ transform: openSections.earnings ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                expand_more
+              </span>
+            </div>
+
+            {openSections.earnings && (
+              <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
+                <div onClick={() => handleNavClick('earnings')} className={childClass('earnings')}>
+                  <span>Earnings Overview</span>
+                </div>
+                <div onClick={() => handleNavClick('transactions')} className={childClass('transactions')}>
+                  <span>Transactions</span>
+                </div>
+                <div onClick={() => handleNavClick('incentives')} className={childClass('incentives')}>
+                  <span>Incentives</span>
+                </div>
+                <div onClick={() => handleNavClick('wallet')} className={childClass('wallet')}>
+                  <span>Wallet</span>
+                </div>
+                <div onClick={() => handleNavClick('bank-payout')} className={childClass('bank-payout')}>
+                  <span>Bank & Payout</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 7. Performance (Collapsible Accordion Dropdown) */}
+          <div className="space-y-1">
+            <div
+              onClick={() => toggleSection('performance')}
+              className={parentClass('performance', ['performance', 'reviews'])}
+            >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">monitoring</span>
-                <span className="font-button-text text-button-text">Analytics</span>
+                <span className="font-button-text text-button-text font-bold">Performance</span>
               </div>
-            </a>
+              <span className="material-symbols-outlined text-[18px] text-secondary transition-transform duration-200" style={{ transform: openSections.performance ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                expand_more
+              </span>
+            </div>
+
+            {openSections.performance && (
+              <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
+                <div onClick={() => handleNavClick('reviews')} className={childClass('reviews')}>
+                  <span>Ratings & Reviews</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Section: Operations */}
-          <div className="space-y-1">
-            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
-              Operations
-            </div>
-            <a onClick={() => handleNavClick('capacity')} className={navClass('capacity')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">speed</span>
-                <span className="font-button-text text-button-text">Kitchen Capacity</span>
-              </div>
-            </a>
-            <a onClick={() => handleNavClick('service-area')} className={navClass('service-area')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">pin_drop</span>
-                <span className="font-button-text text-button-text">Service Area</span>
-              </div>
-            </a>
-            <a onClick={() => handleNavClick('schedule')} className={navClass('schedule')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">schedule</span>
-                <span className="font-button-text text-button-text">Schedule</span>
-              </div>
-            </a>
-          </div>
-
-          {/* Section: Communication */}
-          <div className="space-y-1">
-            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
-              Communication
-            </div>
-            <a onClick={() => handleNavClick('notifications')} className={navClass('notifications')}>
+          {/* 8. Notifications */}
+          <div>
+            <div onClick={() => handleNavClick('notifications')} className={singleClass('notifications')}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">notifications</span>
                 <span className="font-button-text text-button-text">Notifications</span>
@@ -275,32 +349,57 @@ export default function ProviderSidebar({
                   {badgeCounts.notifications}
                 </span>
               )}
-            </a>
+            </div>
           </div>
 
-          {/* Section: System */}
-          <div className="space-y-1 pb-4">
-            <div className="px-3 font-label-caps text-[10px] uppercase text-secondary tracking-widest mb-1.5 font-bold">
-              System
-            </div>
-            <a onClick={() => handleNavClick('settings')} className={navClass('settings')}>
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">settings</span>
-                <span className="font-button-text text-button-text">Settings</span>
-              </div>
-            </a>
-            <a onClick={() => handleNavClick('help')} className={navClass('help')}>
+          {/* 9. Help & Support */}
+          <div>
+            <div onClick={() => handleNavClick('help')} className={singleClass('help')}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">help</span>
-                <span className="font-button-text text-button-text">Help &amp; Support</span>
+                <span className="font-button-text text-button-text">Help & Support</span>
               </div>
-            </a>
+            </div>
           </div>
+
+          {/* 10. Settings (Collapsible Accordion Dropdown) */}
+          <div className="space-y-1 pb-4">
+            <div
+              onClick={() => toggleSection('settings')}
+              className={parentClass('settings', ['settings', 'settings-account', 'settings-notifications', 'settings-privacy', 'settings-preferences'])}
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[18px]">settings</span>
+                <span className="font-button-text text-button-text font-bold">Settings</span>
+              </div>
+              <span className="material-symbols-outlined text-[18px] text-secondary transition-transform duration-200" style={{ transform: openSections.settings ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                expand_more
+              </span>
+            </div>
+
+            {openSections.settings && (
+              <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
+                <div onClick={() => handleNavClick('settings-account')} className={childClass('settings-account')}>
+                  <span>Account</span>
+                </div>
+                <div onClick={() => handleNavClick('settings-notifications')} className={childClass('settings-notifications')}>
+                  <span>Notifications</span>
+                </div>
+                <div onClick={() => handleNavClick('settings-privacy')} className={childClass('settings-privacy')}>
+                  <span>Privacy & Security</span>
+                </div>
+                <div onClick={() => handleNavClick('settings-preferences')} className={childClass('settings-preferences')}>
+                  <span>App Preferences</span>
+                </div>
+              </div>
+            )}
+          </div>
+
         </nav>
 
         {/* Footer Kitchen Online Toggle Box & Logout */}
-        <div className="p-4 border-t border-sand-neutral bg-surface-container-lowest space-y-3 mt-auto sticky bottom-0">
-          <div className="p-3 rounded-lg bg-surface-container-low">
+        <div className="p-4 border-t border-sand-neutral bg-surface-container-lowest space-y-3 mt-auto sticky bottom-0 shrink-0">
+          <div className="p-3 rounded-lg bg-surface-container-low border border-sand-neutral/30">
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${isKitchenOnline ? 'bg-onyx-black animate-pulse' : 'bg-gray-400'}`}></span>
