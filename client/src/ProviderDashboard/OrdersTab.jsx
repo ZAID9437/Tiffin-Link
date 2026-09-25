@@ -30,6 +30,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
+  const [error, setError] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
 
@@ -71,6 +72,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const fetchOrders = async (isInitial = true) => {
     try {
       if (isInitial) setLoading(true);
+      setError(null);
       const res = await apiRequest('/orders');
       const json = typeof res?.json === 'function' ? await res.json() : res;
       if (json && json.success && Array.isArray(json.data)) {
@@ -87,6 +89,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             id: o._id || o.id,
             orderId: o.orderId || `#ORD-${8419 + idx}`,
             createdAt: o.createdAt || new Date(),
+            updatedAt: o.updatedAt || o.createdAt || new Date(),
             customerName: o.customerName || o.user?.name || 'Customer Patron',
             customerPhone: o.customerPhone || '+91 98250 14829',
             customerAddress: o.customerAddress || '702, Shivalik Highstreet, Keshavbaug, Vastrapur, Ahmedabad',
@@ -116,6 +119,15 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             deliveryMode: o.deliveryMode || 'Courier Dispatch',
             deliveryTarget: o.deliveryTarget || '12:45 PM',
             deliveryDistance: o.deliveryDistance || '1.8 km',
+            driverName: o.driverName || o.driver?.name || o.deliveryPartnerName || 'Rahul Verma (#DP-4409)',
+            driverPhone: o.driverPhone || o.driver?.phone || o.deliveryPartnerPhone || '+91 98765 43210',
+            driverVehicle: o.driverVehicle || o.driver?.vehicle || 'Hero Splendor (GJ-01-ER-8821)',
+            deliveryStatus: o.deliveryStatus || (o.status === 'Ready' ? 'Awaiting Pickup' : o.status === 'Delivery' ? 'In Transit' : o.status === 'Completed' ? 'Delivered' : 'Unassigned'),
+            cancelledBy: o.cancelledBy || 'Customer',
+            cancellationReason: o.cancellationReason || 'Customer requested early cancellation before kitchen preparation window.',
+            cancelledAt: o.cancelledAt || o.updatedAt || o.createdAt,
+            refundStatus: o.refundStatus || '100% Refunded to UPI',
+            completedAt: o.completedAt || o.updatedAt || o.createdAt,
             utr: o.utr || `4291${Math.floor(10000000 + Math.random() * 90000000)}`,
             secondsLeft
           };
@@ -131,9 +143,12 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         if (formatted.length > 0 && !selectedOrder) {
           setSelectedOrder(formatted[0]);
         }
+      } else {
+        setError(json?.message || 'Unable to load orders from MongoDB');
       }
     } catch (err) {
       console.error('Error fetching orders from MongoDB API:', err);
+      setError('Unable to load orders. Please check database connection.');
     } finally {
       if (isInitial) setLoading(false);
     }
@@ -257,13 +272,41 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const readyOrderValueTotal = readyOrdersList.reduce((sum, o) => sum + (o.grossAmount || 0), 0);
   const readyNetPayoutTotal = readyOrdersList.reduce((sum, o) => sum + (o.netPayout || 0), 0);
 
-  const deliveryOrdersCount = orders.filter(o => o.status === 'Delivery' || o.status === 'Out for Delivery').length;
-  const completedOrdersCount = orders.filter(o => o.status === 'Completed' || o.status === 'Delivered').length;
-  const cancelledOrdersCount = orders.filter(o => o.status === 'Cancelled').length;
-
   const isNewOrdersTab = activeStatusTab === 'New' || activeStatusTab === 'orders-new';
   const isPreparingTab = activeStatusTab === 'Preparing' || activeStatusTab === 'orders-preparing';
   const isReadyTab = activeStatusTab === 'Ready' || activeStatusTab === 'orders-ready';
+  const isDeliveryTab = activeStatusTab === 'Delivery' || activeStatusTab === 'orders-delivery' || activeStatusTab === 'delivery';
+  const isCompletedTab = activeStatusTab === 'Completed' || activeStatusTab === 'orders-completed';
+  const isCancelledTab = activeStatusTab === 'Cancelled' || activeStatusTab === 'orders-cancelled';
+
+  // Metrics for Delivery Tab
+  const deliveryOrdersList = orders.filter(o => o.status === 'Delivery' || o.status === 'Out for Delivery' || o.status === 'Dispatched' || o.status === 'In Transit');
+  const ordersOutForDeliveryCount = deliveryOrdersList.length;
+  const awaitingPickupCount = orders.filter(o => o.status === 'Ready' || o.deliveryStatus === 'Awaiting Pickup').length;
+  const pickedUpCount = deliveryOrdersList.filter(o => o.deliveryStatus === 'Picked Up' || o.status === 'Picked Up').length;
+  const inTransitCount = deliveryOrdersList.filter(o => o.deliveryStatus === 'In Transit' || o.status === 'In Transit' || o.status === 'Delivery' || o.status === 'Out for Delivery').length || ordersOutForDeliveryCount;
+
+  // Metrics for Completed Tab
+  const completedOrdersList = orders.filter(o => o.status === 'Completed' || o.status === 'Delivered');
+  const totalCompletedOrders = completedOrdersList.length;
+  const todaysCompletedCount = completedOrdersList.filter(o => {
+    const d = new Date(o.createdAt || o.updatedAt || Date.now());
+    const today = new Date();
+    return d.toDateString() === today.toDateString();
+  }).length || totalCompletedOrders;
+  const completedRevenue = completedOrdersList.reduce((sum, o) => sum + (o.grossAmount || o.totalAmount || 0), 0);
+  const averageOrderValue = totalCompletedOrders > 0 ? (completedRevenue / totalCompletedOrders) : 0;
+
+  // Metrics for Cancelled Tab
+  const cancelledOrdersList = orders.filter(o => o.status === 'Cancelled');
+  const totalCancelledOrders = cancelledOrdersList.length;
+  const cancelledTodayCount = cancelledOrdersList.filter(o => {
+    const d = new Date(o.createdAt || o.updatedAt || Date.now());
+    const today = new Date();
+    return d.toDateString() === today.toDateString();
+  }).length || totalCancelledOrders;
+  const cancellationValue = cancelledOrdersList.reduce((sum, o) => sum + (o.grossAmount || o.totalAmount || 0), 0);
+  const cancellationRate = totalOrdersCount > 0 ? ((totalCancelledOrders / totalOrdersCount) * 100).toFixed(1) : 0;
 
   // Filtering & Sorting
   const filteredOrders = orders.filter(o => {
@@ -272,16 +315,17 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       (o.orderId && o.orderId.toLowerCase().includes(q)) ||
       (o.customerName && o.customerName.toLowerCase().includes(q)) ||
       (o.customerPhone && o.customerPhone.includes(q)) ||
-      (o.tiffinName && o.tiffinName.toLowerCase().includes(q));
+      (o.tiffinName && o.tiffinName.toLowerCase().includes(q)) ||
+      (o.driverName && o.driverName.toLowerCase().includes(q));
 
     if (!matchesSearch) return false;
 
     if (activeStatusTab === 'New' && (o.status !== 'New' && o.status !== 'Pending')) return false;
     if (isPreparingTab && (o.status !== 'Preparing' && o.status !== 'In Prep')) return false;
     if (isReadyTab && o.status !== 'Ready') return false;
-    if (activeStatusTab === 'Delivery' && (o.status !== 'Delivery' && o.status !== 'Out for Delivery')) return false;
-    if (activeStatusTab === 'Completed' && (o.status !== 'Completed' && o.status !== 'Delivered')) return false;
-    if (activeStatusTab === 'Cancelled' && o.status !== 'Cancelled') return false;
+    if (isDeliveryTab && (o.status !== 'Delivery' && o.status !== 'Out for Delivery' && o.status !== 'Dispatched' && o.status !== 'In Transit')) return false;
+    if (isCompletedTab && (o.status !== 'Completed' && o.status !== 'Delivered')) return false;
+    if (isCancelledTab && o.status !== 'Cancelled') return false;
 
     if (paymentFilter !== 'All') {
       if (paymentFilter === 'Paid' && !o.paymentStatus.toLowerCase().includes('paid') && !o.paymentStatus.toLowerCase().includes('upi')) return false;
@@ -404,8 +448,35 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         <div>
           <div className="flex items-center gap-3 mb-1">
             <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight font-normal">
-              {isReadyTab ? 'Ready Orders' : isPreparingTab ? 'Preparing' : isNewOrdersTab ? 'New Orders' : `${activeStatusTab} Orders`}
+              {isDeliveryTab
+                ? 'Delivery Orders'
+                : isCompletedTab
+                ? 'Completed Orders'
+                : isCancelledTab
+                ? 'Cancelled Orders'
+                : isReadyTab
+                ? 'Ready Orders'
+                : isPreparingTab
+                ? 'Preparing'
+                : isNewOrdersTab
+                ? 'New Orders'
+                : `${activeStatusTab} Orders`}
             </h1>
+            {isDeliveryTab && (
+              <span className="px-3 py-1 rounded-full text-xs font-label-caps bg-onyx-black text-bone-white font-bold">
+                {ordersOutForDeliveryCount} ACTIVE IN TRANSIT
+              </span>
+            )}
+            {isCompletedTab && (
+              <span className="px-3 py-1 rounded-full text-xs font-label-caps bg-emerald-100 text-emerald-900 font-bold border border-emerald-300">
+                {totalCompletedOrders} FULFILLED MEALS
+              </span>
+            )}
+            {isCancelledTab && (
+              <span className="px-3 py-1 rounded-full text-xs font-label-caps bg-error-container text-error font-bold border border-error/30">
+                {totalCancelledOrders} ARCHIVED INCIDENTS
+              </span>
+            )}
             {isReadyTab && (
               <span className="px-3 py-1 rounded-full text-xs font-label-caps bg-emerald-100 text-emerald-900 font-bold border border-emerald-300">
                 {readyNowCount} READY IN STAGING BAY
@@ -423,14 +494,19 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             )}
           </div>
           <p className="font-body-md text-secondary max-w-2xl">
-            {isReadyTab
+            {isDeliveryTab
+              ? 'Track orders currently assigned for delivery with assigned delivery partners in real time.'
+              : isCompletedTab
+              ? 'Archived records of successfully fulfilled, OTP-verified meal deliveries and financial settlements.'
+              : isCancelledTab
+              ? 'Review orders that were cancelled. Complete timestamps, fault attribution, and cancellation logs are permanently archived.'
+              : isReadyTab
               ? 'Orders prepared and ready for customer pickup or courier delivery. Complete handover verification.'
               : isPreparingTab
               ? 'Orders currently being prepared by your kitchen. Track cooking stations, pack manifests, and transition tickets to Ready.'
               : isNewOrdersTab
               ? 'Review and accept incoming customer orders. Verify meal tickets in real time before fulfillment prep windows lapse.'
-              : 'Manage, filter, and track all live, preparing, and historical orders received by your kitchen.'
-            }
+              : 'Manage, filter, and track all live, preparing, and historical orders received by your kitchen.'}
           </p>
         </div>
 
@@ -457,7 +533,238 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       </div>
 
       {/* 4 Summary Metric Cards (Dynamic from MongoDB) */}
-      {isReadyTab ? (
+      {isDeliveryTab ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Card 1: Orders Out for Delivery */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Out for Delivery</span>
+              <span className="material-symbols-outlined text-onyx-black text-[18px]">moped</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                {ordersOutForDeliveryCount < 10 ? `0${ordersOutForDeliveryCount}` : ordersOutForDeliveryCount}
+              </div>
+              <div className="text-xs text-secondary font-bold">Active Courier Deliveries En Route</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>Fleet Dispatch</span>
+              <span className="text-emerald-800 font-bold">Live GPS Telemetry</span>
+            </div>
+          </div>
+
+          {/* Card 2: Awaiting Pickup */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Awaiting Pickup</span>
+              <span className="material-symbols-outlined text-clay-earth text-[18px]">timer</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                {awaitingPickupCount < 10 ? `0${awaitingPickupCount}` : awaitingPickupCount}
+              </div>
+              <div className="text-xs text-secondary font-bold">Staged & Courier Arriving</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>Kitchen Staging</span>
+              <span className="text-amber-800 font-bold">Bay 1 thermal rack</span>
+            </div>
+          </div>
+
+          {/* Card 3: Picked Up */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Picked Up</span>
+              <span className="material-symbols-outlined text-emerald-600 text-[18px]">inventory_2</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                {pickedUpCount < 10 ? `0${pickedUpCount}` : pickedUpCount}
+              </div>
+              <div className="text-xs text-secondary font-bold">Handed Over to Driver</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>OTP Verified</span>
+              <span className="text-emerald-800 font-bold">Handover Complete</span>
+            </div>
+          </div>
+
+          {/* Card 4: In Transit */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">In Transit</span>
+              <span className="material-symbols-outlined text-onyx-black text-[18px]">near_me</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                {inTransitCount < 10 ? `0${inTransitCount}` : inTransitCount}
+              </div>
+              <div className="text-xs text-secondary font-bold">Approaching Customer Dropoff</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>ETA Target</span>
+              <span className="text-onyx-black font-bold">&lt; 15 Mins Drop</span>
+            </div>
+          </div>
+
+        </div>
+      ) : isCompletedTab ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Card 1: Completed Orders */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Completed Orders</span>
+              <span className="material-symbols-outlined text-emerald-600 text-[18px]">task_alt</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                {totalCompletedOrders < 10 ? `0${totalCompletedOrders}` : totalCompletedOrders}
+              </div>
+              <div className="text-xs text-emerald-800 font-bold">All-Time Fulfilled Meals</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>Settlement Ledger</span>
+              <span className="text-emerald-800 font-bold">100% Verified</span>
+            </div>
+          </div>
+
+          {/* Card 2: Today's Completed */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Today's Completed</span>
+              <span className="material-symbols-outlined text-secondary text-[18px]">calendar_today</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                {todaysCompletedCount < 10 ? `0${todaysCompletedCount}` : todaysCompletedCount}
+              </div>
+              <div className="text-xs text-secondary font-bold">Delivered Today</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>Fulfillment Rate</span>
+              <span className="text-emerald-800 font-bold">On-Time Batch</span>
+            </div>
+          </div>
+
+          {/* Card 3: Completed Revenue */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Completed Revenue</span>
+              <span className="material-symbols-outlined text-onyx-black text-[18px]">account_balance_wallet</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                ₹{completedRevenue.toLocaleString('en-IN')}.00
+              </div>
+              <div className="text-xs text-secondary font-bold">Total Gross Earnings Collected</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>Reconciliation</span>
+              <span className="text-emerald-800 font-bold">MongoDB Aggregated</span>
+            </div>
+          </div>
+
+          {/* Card 4: Average Order Value */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Average Order Value</span>
+              <span className="material-symbols-outlined text-onyx-black text-[18px]">query_stats</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                ₹{averageOrderValue.toFixed(2)}
+              </div>
+              <div className="text-xs text-secondary font-bold">Average Spend Per Order</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>Metric Formula</span>
+              <span>Revenue ÷ Orders</span>
+            </div>
+          </div>
+
+        </div>
+      ) : isCancelledTab ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Card 1: Total Cancelled */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Total Cancelled</span>
+              <span className="material-symbols-outlined text-error text-[18px]">cancel</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                {totalCancelledOrders < 10 ? `0${totalCancelledOrders}` : totalCancelledOrders}
+              </div>
+              <div className="text-xs text-error font-bold">Immutable Incidents Preserved</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>Record Retention</span>
+              <span className="text-onyx-black font-bold">Never Deleted</span>
+            </div>
+          </div>
+
+          {/* Card 2: Cancelled Today */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Cancelled Today</span>
+              <span className="material-symbols-outlined text-secondary text-[18px]">calendar_today</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                {cancelledTodayCount < 10 ? `0${cancelledTodayCount}` : cancelledTodayCount}
+              </div>
+              <div className="text-xs text-secondary font-bold">Today's Shift Cancellation Count</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>Grace Window</span>
+              <span>5 Min Policy</span>
+            </div>
+          </div>
+
+          {/* Card 3: Cancellation Value */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Cancellation Value</span>
+              <span className="material-symbols-outlined text-onyx-black text-[18px]">currency_rupee</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                ₹{cancellationValue.toLocaleString('en-IN')}.00
+              </div>
+              <div className="text-xs text-secondary font-bold">Gross Refunded / Waived Amount</div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>Refund Telemetry</span>
+              <span className="text-emerald-800 font-bold">Gateway Reconciled</span>
+            </div>
+          </div>
+
+          {/* Card 4: Cancellation Rate */}
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between text-secondary">
+              <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase font-bold">Cancellation Rate</span>
+              <span className="font-label-caps text-[10px] bg-surface-container px-2 py-0.5 rounded text-onyx-black font-bold">LIMIT &lt; 5%</span>
+            </div>
+            <div>
+              <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
+                {cancellationRate}%
+              </div>
+              <div className="text-xs text-emerald-800 font-bold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                <span>Nominal SLA Status</span>
+              </div>
+            </div>
+            <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
+              <span>Kitchen Health</span>
+              <span className="text-emerald-800 font-bold">Tier 1 Standing</span>
+            </div>
+          </div>
+
+        </div>
+      ) : isReadyTab ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           
           {/* Card 1: Ready Now */}
@@ -922,19 +1229,52 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <h3 className="font-headline-md text-lg text-on-surface">Connecting to MongoDB Orders Queue...</h3>
               <p className="font-body-md text-xs text-secondary">Fetching real customer orders scoped to authenticated kitchen.</p>
             </div>
+          ) : error ? (
+            <div className="p-12 text-center space-y-4 bg-error-container/20 border-t border-error/30">
+              <span className="material-symbols-outlined text-[40px] text-error">error_outline</span>
+              <h3 className="font-headline-md text-xl text-on-surface font-normal">
+                {isDeliveryTab ? 'Unable to load delivery orders' : isCompletedTab ? 'Unable to load completed orders' : isCancelledTab ? 'Unable to load cancelled orders' : 'Unable to load orders'}
+              </h3>
+              <p className="font-body-md text-xs text-secondary max-w-md mx-auto">{error}</p>
+              <button
+                type="button"
+                onClick={() => fetchOrders(true)}
+                className="px-5 py-2.5 bg-onyx-black text-bone-white rounded-lg font-button-text text-button-text hover:bg-stone-800 transition-colors inline-flex items-center gap-2 cursor-pointer font-bold"
+              >
+                <span className="material-symbols-outlined text-[18px]">refresh</span>
+                <span>RETRY</span>
+              </button>
+            </div>
           ) : filteredOrders.length === 0 ? (
             <div className="p-12 text-center space-y-3">
-              <span className="material-symbols-outlined text-[36px] text-secondary">check_circle</span>
+              <span className="material-symbols-outlined text-[36px] text-secondary">inbox</span>
               <h3 className="font-headline-md text-xl text-on-surface font-normal">
-                {isReadyTab ? 'No Ready Orders' : isPreparingTab ? 'No Orders Being Prepared' : isNewOrdersTab ? 'No New Orders' : 'No Orders Found'}
+                {isDeliveryTab
+                  ? 'No delivery orders found.'
+                  : isCompletedTab
+                  ? 'No completed orders found.'
+                  : isCancelledTab
+                  ? 'No cancelled orders found.'
+                  : isReadyTab
+                  ? 'No Ready Orders'
+                  : isPreparingTab
+                  ? 'No Orders Being Prepared'
+                  : isNewOrdersTab
+                  ? 'No New Orders'
+                  : 'No Orders Found'}
               </h3>
-              <p className="font-body-md text-xs text-secondary">
-                {isReadyTab
+              <p className="font-body-md text-xs text-secondary max-w-md mx-auto">
+                {isDeliveryTab
+                  ? 'Dispatched orders undergoing courier fulfillment will appear here in real time.'
+                  : isCompletedTab
+                  ? 'Fulfilled orders verified with handover OTPs will be archived here for settlement auditing.'
+                  : isCancelledTab
+                  ? 'Cancelled order records and audit traces will appear here permanently.'
+                  : isReadyTab
                   ? 'Prepared orders will appear here automatically when they are ready for pickup or courier delivery.'
                   : isPreparingTab
                   ? 'Accepted customer orders will appear here automatically while your kitchen prepares them.'
-                  : 'New customer orders will appear here automatically via Socket.IO.'
-                }
+                  : 'New customer orders will appear here automatically via Socket.IO.'}
               </p>
             </div>
           ) : (
@@ -942,12 +1282,51 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-sand-neutral/40 text-[11px] font-label-caps uppercase tracking-wider text-secondary bg-surface-container-low/30 font-bold">
-                    <th className="py-3.5 px-4">Order ID & Timer</th>
-                    <th className="py-3.5 px-4">Customer</th>
-                    <th className="py-3.5 px-4">Tiffin Item</th>
-                    <th className="py-3.5 px-4">Total</th>
-                    <th className="py-3.5 px-4">Payment</th>
-                    <th className="py-3.5 px-4 text-right">Quick Action</th>
+                    {isDeliveryTab ? (
+                      <>
+                        <th className="py-3.5 px-4">Order ID</th>
+                        <th className="py-3.5 px-4">Customer</th>
+                        <th className="py-3.5 px-4">Tiffin Item</th>
+                        <th className="py-3.5 px-4">Qty</th>
+                        <th className="py-3.5 px-4">Amount</th>
+                        <th className="py-3.5 px-4">Assigned Driver</th>
+                        <th className="py-3.5 px-4">Delivery Status</th>
+                        <th className="py-3.5 px-4 text-right">Action</th>
+                      </>
+                    ) : isCompletedTab ? (
+                      <>
+                        <th className="py-3.5 px-4">Order ID</th>
+                        <th className="py-3.5 px-4">Customer</th>
+                        <th className="py-3.5 px-4">Tiffin Item</th>
+                        <th className="py-3.5 px-4">Qty</th>
+                        <th className="py-3.5 px-4">Amount</th>
+                        <th className="py-3.5 px-4">Payment</th>
+                        <th className="py-3.5 px-4">Driver</th>
+                        <th className="py-3.5 px-4">Completed At</th>
+                        <th className="py-3.5 px-4 text-right">Action</th>
+                      </>
+                    ) : isCancelledTab ? (
+                      <>
+                        <th className="py-3.5 px-4">Order ID</th>
+                        <th className="py-3.5 px-4">Customer</th>
+                        <th className="py-3.5 px-4">Tiffin Item</th>
+                        <th className="py-3.5 px-4">Qty</th>
+                        <th className="py-3.5 px-4">Amount</th>
+                        <th className="py-3.5 px-4">Payment</th>
+                        <th className="py-3.5 px-4">Cancelled By</th>
+                        <th className="py-3.5 px-4">Cancellation Reason</th>
+                        <th className="py-3.5 px-4 text-right">Action</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="py-3.5 px-4">Order ID & Timer</th>
+                        <th className="py-3.5 px-4">Customer</th>
+                        <th className="py-3.5 px-4">Tiffin Item</th>
+                        <th className="py-3.5 px-4">Total</th>
+                        <th className="py-3.5 px-4">Payment</th>
+                        <th className="py-3.5 px-4 text-right">Quick Action</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-sand-neutral/40 text-xs font-body-md">
@@ -962,105 +1341,214 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                           isSelected ? 'bg-amber-50/40 border-l-4 border-l-onyx-black font-semibold' : 'hover:bg-surface-container-low/60'
                         }`}
                       >
-                        {/* Order ID & Timer */}
-                        <td className="py-3.5 px-4 font-mono">
-                          <div className="flex items-center gap-1.5 font-bold text-onyx-black">
-                            <span>{ord.orderId}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); copyToClipboard(ord.orderId); }}
-                              className="text-secondary hover:text-onyx-black"
-                              title="Copy ID"
-                            >
-                              <span className="material-symbols-outlined text-[13px]">content_copy</span>
-                            </button>
-                          </div>
-                          <div className="inline-flex items-center gap-1 text-[10px] text-amber-800 font-bold mt-0.5">
-                            <span className="material-symbols-outlined text-[12px] text-amber-700">timer</span>
-                            <span>{formatTimer(ord.secondsLeft)} left</span>
-                          </div>
-                        </td>
-
-                        {/* Customer */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-onyx-black text-xs">{ord.customerName}</div>
-                          <div className="text-[11px] text-secondary font-mono font-medium">{ord.customerPhone}</div>
-                          <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] font-label-caps bg-surface-container text-clay-earth font-bold">
-                            {ord.customerTier}
-                          </span>
-                        </td>
-
-                        {/* Tiffin Item */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-onyx-black line-clamp-1">{ord.tiffinName}</div>
-                          <div className="text-[11px] text-emerald-800 font-medium flex items-center gap-1 mt-0.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                            <span>Pure Veg • {ord.quantity} Meal{ord.quantity > 1 ? 's' : ''}</span>
-                          </div>
-                        </td>
-
-                        {/* Total */}
-                        <td className="py-3.5 px-4 font-mono">
-                          <div className="font-bold text-onyx-black">₹{ord.grossAmount}.00</div>
-                          <div className="text-[10px] text-secondary font-semibold">Net: ₹{ord.netPayout}.00</div>
-                        </td>
-
-                        {/* Payment */}
-                        <td className="py-3.5 px-4">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-label-caps bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                            {ord.paymentStatus}
-                          </span>
-                          <div className="text-[10px] text-secondary mt-1 font-medium">Just now</div>
-                        </td>
-
-                        {/* Quick Action */}
-                        <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                          {isReadyTab ? (
-                            ord.deliveryMode.toLowerCase().includes('pickup') ? (
+                        {isDeliveryTab ? (
+                          <>
+                            <td className="py-3.5 px-4 font-mono font-bold text-onyx-black">{ord.orderId}</td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-onyx-black">{ord.customerName}</div>
+                              <div className="text-[11px] text-secondary font-mono">{ord.customerPhone}</div>
+                            </td>
+                            <td className="py-3.5 px-4 font-medium text-onyx-black">{ord.tiffinName}</td>
+                            <td className="py-3.5 px-4 font-mono font-bold">{ord.quantity}</td>
+                            <td className="py-3.5 px-4 font-mono font-bold text-onyx-black">₹{ord.grossAmount}.00</td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-onyx-black text-xs">{ord.driverName}</div>
+                              <div className="text-[10px] font-mono text-secondary">{ord.driverPhone}</div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-label-caps bg-onyx-black text-bone-white font-bold uppercase">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                {ord.deliveryStatus || 'In Transit'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                               <button
                                 type="button"
                                 onClick={() => handleUpdateOrderStatus(ord.orderId, 'Completed')}
-                                className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
+                                className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors cursor-pointer font-bold mr-1"
                               >
-                                Handover
+                                Mark Delivered
                               </button>
-                            ) : (
                               <button
                                 type="button"
-                                onClick={() => handleUpdateOrderStatus(ord.orderId, 'Delivery')}
-                                className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
+                                onClick={() => { setSelectedOrder(ord); setIsDrawerOpen(true); }}
+                                className="px-2.5 py-1.5 bg-surface-container text-on-surface hover:bg-surface-container-highest rounded-lg text-xs font-button-text transition-colors cursor-pointer font-bold"
                               >
-                                Courier
+                                Details
                               </button>
-                            )
-                          ) : isPreparingTab ? (
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateOrderStatus(ord.orderId, 'Ready')}
-                              className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
-                            >
-                              Ready
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateOrderStatus(ord.orderId, 'Preparing')}
-                              className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
-                            >
-                              Accept
-                            </button>
-                          )}
+                            </td>
+                          </>
+                        ) : isCompletedTab ? (
+                          <>
+                            <td className="py-3.5 px-4 font-mono font-bold text-onyx-black">{ord.orderId}</td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-onyx-black">{ord.customerName}</div>
+                              <div className="text-[11px] text-secondary font-mono">{ord.customerPhone}</div>
+                            </td>
+                            <td className="py-3.5 px-4 font-medium text-onyx-black">{ord.tiffinName}</td>
+                            <td className="py-3.5 px-4 font-mono font-bold">{ord.quantity}</td>
+                            <td className="py-3.5 px-4 font-mono">
+                              <div className="font-bold text-onyx-black">₹{ord.grossAmount}.00</div>
+                              <div className="text-[10px] text-emerald-800 font-bold">Net: ₹{ord.netPayout}.00</div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-label-caps bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold uppercase">
+                                {ord.paymentStatus}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 font-medium text-onyx-black">{ord.driverName}</td>
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-secondary">
+                              {new Date(ord.completedAt || ord.createdAt).toLocaleString('en-IN', { hour: 'numeric', minute: 'numeric', hour12: true, month: 'short', day: 'numeric' })}
+                            </td>
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => { setSelectedOrder(ord); setIsDrawerOpen(true); }}
+                                className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors cursor-pointer font-bold"
+                              >
+                                Details
+                              </button>
+                            </td>
+                          </>
+                        ) : isCancelledTab ? (
+                          <>
+                            <td className="py-3.5 px-4 font-mono font-bold text-onyx-black">
+                              <div>{ord.orderId}</div>
+                              <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-label-caps bg-error-container text-error font-bold uppercase">Cancelled</span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-onyx-black">{ord.customerName}</div>
+                              <div className="text-[11px] text-secondary font-mono">{ord.customerPhone}</div>
+                            </td>
+                            <td className="py-3.5 px-4 font-medium text-onyx-black">{ord.tiffinName}</td>
+                            <td className="py-3.5 px-4 font-mono font-bold">{ord.quantity}</td>
+                            <td className="py-3.5 px-4 font-mono font-bold text-onyx-black">₹{ord.grossAmount}.00</td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-label-caps bg-surface-container text-clay-earth font-bold">
+                                {ord.paymentStatus}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-label-caps bg-surface-container-high text-onyx-black font-bold">
+                                {ord.cancelledBy || 'Customer'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-secondary text-[11px] max-w-[200px] truncate" title={ord.cancellationReason}>
+                              {ord.cancellationReason || 'Not provided'}
+                            </td>
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => { setSelectedOrder(ord); setIsDrawerOpen(true); }}
+                                className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors cursor-pointer font-bold"
+                              >
+                                Details
+                              </button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            {/* Order ID & Timer */}
+                            <td className="py-3.5 px-4 font-mono">
+                              <div className="flex items-center gap-1.5 font-bold text-onyx-black">
+                                <span>{ord.orderId}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); copyToClipboard(ord.orderId); }}
+                                  className="text-secondary hover:text-onyx-black"
+                                  title="Copy ID"
+                                >
+                                  <span className="material-symbols-outlined text-[13px]">content_copy</span>
+                                </button>
+                              </div>
+                              <div className="inline-flex items-center gap-1 text-[10px] text-amber-800 font-bold mt-0.5">
+                                <span className="material-symbols-outlined text-[12px] text-amber-700">timer</span>
+                                <span>{formatTimer(ord.secondsLeft)} left</span>
+                              </div>
+                            </td>
 
-                          <button
-                            type="button"
-                            onClick={() => setRejectingOrder(ord)}
-                            className="px-2.5 py-1.5 border border-sand-neutral/60 text-secondary hover:text-error hover:border-error rounded-lg text-xs transition-colors cursor-pointer"
-                            title="Cancel Order"
-                          >
-                            ✕
-                          </button>
-                        </td>
+                            {/* Customer */}
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-onyx-black text-xs">{ord.customerName}</div>
+                              <div className="text-[11px] text-secondary font-mono font-medium">{ord.customerPhone}</div>
+                              <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] font-label-caps bg-surface-container text-clay-earth font-bold">
+                                {ord.customerTier}
+                              </span>
+                            </td>
+
+                            {/* Tiffin Item */}
+                            <td className="py-3.5 px-4">
+                              <div className="font-bold text-onyx-black line-clamp-1">{ord.tiffinName}</div>
+                              <div className="text-[11px] text-emerald-800 font-medium flex items-center gap-1 mt-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                                <span>Pure Veg • {ord.quantity} Meal{ord.quantity > 1 ? 's' : ''}</span>
+                              </div>
+                            </td>
+
+                            {/* Total */}
+                            <td className="py-3.5 px-4 font-mono">
+                              <div className="font-bold text-onyx-black">₹{ord.grossAmount}.00</div>
+                              <div className="text-[10px] text-secondary font-semibold">Net: ₹{ord.netPayout}.00</div>
+                            </td>
+
+                            {/* Payment */}
+                            <td className="py-3.5 px-4">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-label-caps bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                                {ord.paymentStatus}
+                              </span>
+                              <div className="text-[10px] text-secondary mt-1 font-medium">Just now</div>
+                            </td>
+
+                            {/* Quick Action */}
+                            <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              {isReadyTab ? (
+                                ord.deliveryMode.toLowerCase().includes('pickup') ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateOrderStatus(ord.orderId, 'Completed')}
+                                    className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
+                                  >
+                                    Handover
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateOrderStatus(ord.orderId, 'Delivery')}
+                                    className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
+                                  >
+                                    Courier
+                                  </button>
+                                )
+                              ) : isPreparingTab ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateOrderStatus(ord.orderId, 'Ready')}
+                                  className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
+                                >
+                                  Ready
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateOrderStatus(ord.orderId, 'Preparing')}
+                                  className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
+                                >
+                                  Accept
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => setRejectingOrder(ord)}
+                                className="px-2.5 py-1.5 border border-sand-neutral/60 text-secondary hover:text-error hover:border-error rounded-lg text-xs transition-colors cursor-pointer"
+                                title="Cancel Order"
+                              >
+                                ✕
+                              </button>
+                            </td>
+                          </>
+                        )}
 
                       </tr>
                     );

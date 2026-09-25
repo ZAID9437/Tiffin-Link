@@ -150,6 +150,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
           return <OrdersTab currentUser={currentUser} initialStatus="Ready" />;
         case 'orders-delivery':
         case 'delivery':
+          return <OrdersTab currentUser={currentUser} initialStatus="Delivery" />;
         case 'delivery-management':
           return <DeliveryManagementTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
         case 'orders-completed':
