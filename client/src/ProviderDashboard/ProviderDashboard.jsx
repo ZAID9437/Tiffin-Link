@@ -36,6 +36,7 @@ import {
   Truck
 } from 'lucide-react';
 
+import ProviderSidebar from './ProviderSidebar';
 import DashboardOverviewTab from './DashboardOverviewTab';
 import LiveRequestsTab from './LiveRequestsTab';
 import MyTiffinsTab from './MyTiffinsTab';

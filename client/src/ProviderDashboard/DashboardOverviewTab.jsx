@@ -890,46 +890,6 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
             </div>
           </div>
 
-          {/* Card 3: Quick Kitchen Shortcuts */}
-          <div className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-sand-neutral/40 space-y-3">
-            <span className="font-label-caps text-[11px] font-bold uppercase tracking-wider text-secondary block">QUICK SHORTCUTS</span>
-            <div className="space-y-2">
-              <a 
-                onClick={() => onNavigateTab && onNavigateTab('add-tiffin')}
-                className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors group cursor-pointer border border-sand-neutral/30"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-on-surface text-[18px]">add_circle</span>
-                  <span className="font-button-text text-button-text text-on-surface">Add New Tiffin Item</span>
-                </div>
-                <span className="material-symbols-outlined text-[16px] text-secondary group-hover:translate-x-0.5 transition-transform">chevron_right</span>
-              </a>
-
-              <a 
-                onClick={() => onNavigateTab && onNavigateTab('availability')}
-                className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors group cursor-pointer border border-sand-neutral/30"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-on-surface text-[18px]">av_timer</span>
-                  <span className="font-button-text text-button-text text-on-surface">Update Menu Availability</span>
-                </div>
-                <span className="material-symbols-outlined text-[16px] text-secondary group-hover:translate-x-0.5 transition-transform">chevron_right</span>
-              </a>
-
-              <a 
-                onClick={() => onNavigateTab && onNavigateTab('notifications')}
-                className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors group cursor-pointer border border-sand-neutral/30"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-on-surface text-[18px]">chat</span>
-                  <span className="font-button-text text-button-text text-on-surface">Customer Chat</span>
-                </div>
-                <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-caps text-[10px] font-bold">
-                  1 Unread
-                </span>
-              </a>
-            </div>
-          </div>
 
         </div>
 
