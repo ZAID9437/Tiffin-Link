@@ -26,6 +26,12 @@ import DeliveryLanding from './For Delivers/DeliveryLanding';
 import BecomeDeliveryPartnerModal from './For Delivers/BecomeDeliveryPartnerModal';
 import DeliveryDashboard from './DeliveryDashboard/DeliveryDashboard';
 
+// Customer Experience Pages
+import CustomerHome from './CustomerExperience/CustomerHome';
+import NearbyTiffinServices from './CustomerExperience/NearbyTiffinServices';
+import ProviderShowcase from './CustomerExperience/ProviderShowcase';
+import LiveOrderTracking from './CustomerExperience/LiveOrderTracking';
+
 // Super Admin Operating System Component
 import AdminDashboard from './AdminDashboard/AdminDashboard';
 
@@ -63,6 +69,15 @@ export default function App() {
     showToastNotification('You have been signed out.');
   };
 
+  // Customer Experience sub-navigation
+  const [customerView, setCustomerView] = useState('customer-home');
+
+  const handleCustomerNavigate = (page) => {
+    setCustomerView(page);
+    setView('customer');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Modal states
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isBecomeProviderModalOpen, setIsBecomeProviderModalOpen] = useState(false);
@@ -80,6 +95,7 @@ export default function App() {
     if (hash.startsWith('#/admin') || hash.startsWith('#admin') || currentUser?.role === 'admin') return 'admin';
     if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || currentUser?.role === 'delivery' || currentUser?.role === 'driver') return 'delivery';
     if (hash.startsWith('#/provider') || hash.startsWith('#provider') || currentUser?.role === 'provider') return 'provider';
+    if (hash.startsWith('#customer')) return 'customer';
     return 'home';
   });
 
@@ -91,6 +107,7 @@ export default function App() {
       if (hash.startsWith('#/admin') || hash.startsWith('#admin') || activeRole === 'admin') currentView = 'admin';
       else if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || activeRole === 'delivery' || activeRole === 'driver') currentView = 'delivery';
       else if (hash.startsWith('#/provider') || hash.startsWith('#provider') || activeRole === 'provider') currentView = 'provider';
+      else if (hash.startsWith('#customer')) currentView = 'customer';
       setView(currentView);
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -482,7 +499,12 @@ export default function App() {
 
       {/* Main Sections */}
       <main>
-        {view === 'provider' ? (
+        {view === 'customer' ? (
+          customerView === 'nearby-tiffin-services' ? <NearbyTiffinServices onNavigate={handleCustomerNavigate} /> :
+          customerView === 'provider-showcase' ? <ProviderShowcase onNavigate={handleCustomerNavigate} /> :
+          customerView === 'live-order-tracking' ? <LiveOrderTracking onNavigate={handleCustomerNavigate} /> :
+          <CustomerHome onNavigate={handleCustomerNavigate} />
+        ) : view === 'provider' ? (
           <ProviderLanding 
             onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)} 
             onOpenDemoModal={() => setIsDemoModalOpen(true)}
