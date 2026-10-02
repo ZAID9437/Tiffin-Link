@@ -76,36 +76,6 @@ export default function Navbar({
 
     const role = (currentUser.role || 'customer').toLowerCase();
 
-    if (role === 'customer' || role === 'diner') {
-      return [
-        { label: 'Home', href: '#', id: 'home' },
-        { label: 'Explore Tiffins', href: '#explore', id: 'explore' },
-        { label: 'My Orders', href: '#orders', id: 'orders' },
-        { label: 'Favorites', href: '#favorites', id: 'favorites' },
-        { label: 'Cart', href: '#cart', id: 'cart' },
-        { label: 'Super Admin', href: '#/admin', id: 'admin' }
-      ];
-    }
-
-    if (role === 'provider') {
-      return [
-        { label: 'Dashboard', href: '#provider', id: 'provider' },
-        { label: 'My Tiffins', href: '#my-tiffins', id: 'my-tiffins' },
-        { label: 'Orders', href: '#provider-orders', id: 'provider-orders' },
-        { label: 'Earnings', href: '#provider-earnings', id: 'provider-earnings' },
-        { label: 'Super Admin', href: '#/admin', id: 'admin' }
-      ];
-    }
-
-    if (role === 'delivery' || role === 'deliverer') {
-      return [
-        { label: 'Dashboard', href: '#delivery', id: 'delivery' },
-        { label: 'My Deliveries', href: '#my-deliveries', id: 'my-deliveries' },
-        { label: 'Earnings', href: '#delivery-earnings', id: 'delivery-earnings' },
-        { label: 'Super Admin', href: '#/admin', id: 'admin' }
-      ];
-    }
-
     if (role === 'admin') {
       return [
         { label: 'Super Admin', href: '#/admin', id: 'admin' },
@@ -116,13 +86,30 @@ export default function Navbar({
       ];
     }
 
+    if (role === 'provider') {
+      return [
+        { label: 'Dashboard', href: '#provider', id: 'provider' },
+        { label: 'My Tiffins', href: '#my-tiffins', id: 'my-tiffins' },
+        { label: 'Orders', href: '#provider-orders', id: 'provider-orders' },
+        { label: 'Earnings', href: '#provider-earnings', id: 'provider-earnings' }
+      ];
+    }
+
+    if (role === 'delivery' || role === 'deliverer') {
+      return [
+        { label: 'Dashboard', href: '#delivery', id: 'delivery' },
+        { label: 'My Deliveries', href: '#my-deliveries', id: 'my-deliveries' },
+        { label: 'Earnings', href: '#delivery-earnings', id: 'delivery-earnings' }
+      ];
+    }
+
+    // Default for Diner / Customer
     return [
       { label: 'Home', href: '#', id: 'home' },
       { label: 'Explore Tiffins', href: '#explore', id: 'explore' },
       { label: 'My Orders', href: '#orders', id: 'orders' },
       { label: 'Favorites', href: '#favorites', id: 'favorites' },
-      { label: 'Cart', href: '#cart', id: 'cart' },
-      { label: 'Super Admin', href: '#/admin', id: 'admin' }
+      { label: 'Cart', href: '#cart', id: 'cart' }
     ];
   };
 
@@ -209,17 +196,19 @@ export default function Navbar({
                     </span>
                   </div>
                   <div className="space-y-1 text-xs">
-                    <a 
-                      href="#/admin" 
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-black/5 font-semibold transition-colors flex items-center justify-between text-onyx-black"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>🛡️</span>
-                        <span>Super Admin Portal</span>
-                      </span>
-                      <span>➔</span>
-                    </a>
+                    {currentUser.role === 'admin' && (
+                      <a 
+                        href="#/admin" 
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-black/5 font-semibold transition-colors flex items-center justify-between text-onyx-black"
+                      >
+                        <span className="flex items-center gap-2">
+                          <span>🛡️</span>
+                          <span>Super Admin Portal</span>
+                        </span>
+                        <span>➔</span>
+                      </a>
+                    )}
                     <button 
                       onClick={() => { setIsUserMenuOpen(false); if (onLogout) onLogout(); }}
                       className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 font-bold transition-colors flex items-center justify-between"
