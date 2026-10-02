@@ -69,12 +69,11 @@ export default function App() {
     showToastNotification('You have been signed out.');
   };
 
-  // Customer Experience sub-navigation
+  // Customer Experience sub-navigation (embedded on home page)
   const [customerView, setCustomerView] = useState('customer-home');
 
   const handleCustomerNavigate = (page) => {
     setCustomerView(page);
-    setView('customer');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -95,7 +94,6 @@ export default function App() {
     if (hash.startsWith('#/admin') || hash.startsWith('#admin') || currentUser?.role === 'admin') return 'admin';
     if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || currentUser?.role === 'delivery' || currentUser?.role === 'driver') return 'delivery';
     if (hash.startsWith('#/provider') || hash.startsWith('#provider') || currentUser?.role === 'provider') return 'provider';
-    if (hash.startsWith('#customer')) return 'customer';
     return 'home';
   });
 
@@ -107,7 +105,6 @@ export default function App() {
       if (hash.startsWith('#/admin') || hash.startsWith('#admin') || activeRole === 'admin') currentView = 'admin';
       else if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || activeRole === 'delivery' || activeRole === 'driver') currentView = 'delivery';
       else if (hash.startsWith('#/provider') || hash.startsWith('#provider') || activeRole === 'provider') currentView = 'provider';
-      else if (hash.startsWith('#customer')) currentView = 'customer';
       setView(currentView);
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -448,6 +445,10 @@ export default function App() {
     return (
       <div className="app-layout">
         <AdminDashboard currentUser={currentUser} onLogout={handleLogout} />
+        <CookieConsentModal 
+          isOpenOverride={isCookieConsentModalOpen}
+          onCloseOverride={() => setIsCookieConsentModalOpen(false)}
+        />
       </div>
     );
   }
@@ -461,6 +462,10 @@ export default function App() {
           onLogout={handleLogout} 
           onUpdateUser={(updatedUser) => updateUser(updatedUser)}
         />
+        <CookieConsentModal 
+          isOpenOverride={isCookieConsentModalOpen}
+          onCloseOverride={() => setIsCookieConsentModalOpen(false)}
+        />
       </div>
     );
   }
@@ -470,6 +475,10 @@ export default function App() {
     return (
       <div className="app-layout">
         <DeliveryDashboard currentUser={currentUser} onLogout={handleLogout} />
+        <CookieConsentModal 
+          isOpenOverride={isCookieConsentModalOpen}
+          onCloseOverride={() => setIsCookieConsentModalOpen(false)}
+        />
       </div>
     );
   }
@@ -499,12 +508,7 @@ export default function App() {
 
       {/* Main Sections */}
       <main>
-        {view === 'customer' ? (
-          customerView === 'nearby-tiffin-services' ? <NearbyTiffinServices onNavigate={handleCustomerNavigate} /> :
-          customerView === 'provider-showcase' ? <ProviderShowcase onNavigate={handleCustomerNavigate} /> :
-          customerView === 'live-order-tracking' ? <LiveOrderTracking onNavigate={handleCustomerNavigate} /> :
-          <CustomerHome onNavigate={handleCustomerNavigate} />
-        ) : view === 'provider' ? (
+        {view === 'provider' ? (
           <ProviderLanding 
             onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)} 
             onOpenDemoModal={() => setIsDemoModalOpen(true)}
@@ -516,43 +520,57 @@ export default function App() {
           />
         ) : (
           <>
-            {/* Hero Section */}
-            <Hero />
+            {/* Customer Experience Sub-Pages — embedded in home flow */}
+            {customerView === 'nearby-tiffin-services' ? (
+              <NearbyTiffinServices onNavigate={handleCustomerNavigate} />
+            ) : customerView === 'provider-showcase' ? (
+              <ProviderShowcase onNavigate={handleCustomerNavigate} />
+            ) : customerView === 'live-order-tracking' ? (
+              <LiveOrderTracking onNavigate={handleCustomerNavigate} />
+            ) : (
+              <>
+                {/* Hero Section */}
+                <Hero />
 
-            {/* Hanging Ropes Animation */}
-            <HangingRopes />
+                {/* Hanging Ropes Animation */}
+                <HangingRopes />
 
-            {/* Meal Request Form */}
-            <MealRequestForm 
-              onSubmitRequestSuccess={handleRequestSubmitSuccess}
-            />
+                {/* Meal Request Form */}
+                <MealRequestForm 
+                  onSubmitRequestSuccess={handleRequestSubmitSuccess}
+                />
 
-            {/* Stats Section */}
-            <StatsBar />
+                {/* Stats Section */}
+                <StatsBar />
 
-            {/* Scroll responsive horizontal brand marquee */}
-            <ScrollMarquee />
+                {/* Scroll responsive horizontal brand marquee */}
+                <ScrollMarquee />
 
-            {/* Top Providers */}
-            <TopProviders />
+                {/* Customer Home — Find Tiffin Section */}
+                <CustomerHome onNavigate={handleCustomerNavigate} />
 
-            {/* Popular Meal Categories */}
-            <Categories />
+                {/* Top Providers */}
+                <TopProviders />
 
-            {/* Value Propositions (Why Choose) */}
-            <WhyChoose />
+                {/* Popular Meal Categories */}
+                <Categories />
 
-            {/* Verification Steps (Food Safety) */}
-            <FoodSafety />
+                {/* Value Propositions (Why Choose) */}
+                <WhyChoose />
 
-            {/* Story Section */}
-            <Story />
+                {/* Verification Steps (Food Safety) */}
+                <FoodSafety />
 
-            {/* Hanging Spices Animation */}
-            <HangingSpices />
+                {/* Story Section */}
+                <Story />
 
-            {/* Contact Section */}
-            <ContactSection />
+                {/* Hanging Spices Animation */}
+                <HangingSpices />
+
+                {/* Contact Section */}
+                <ContactSection />
+              </>
+            )}
           </>
         )}
       </main>

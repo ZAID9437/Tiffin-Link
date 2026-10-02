@@ -42,21 +42,21 @@ export default function CustomerHome({ onNavigate }) {
   ];
 
   return (
-    <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen">
-      {/* Top Banner */}
-      <section className="w-full bg-[#ded9d1]/40 py-2.5">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-20 flex items-center justify-between">
+    <div className="flex flex-col w-full bg-[#fbf9f5]">
+      {/* Tiffin Discovery Section Heading */}
+      <div className="w-full bg-[#1a1a1a] py-3">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-20 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#1b5e20] animate-pulse"></span>
-            <span className="font-semibold text-xs uppercase tracking-widest text-[#1a1a1a]">Neighborhood Culinary Escrow Active</span>
-            <span className="hidden md:inline text-[#665d52] text-xs"> • 18 Artisanal Kitchens Steaming in Satellite</span>
+            <span className="inline-block w-2 h-2 rounded-full bg-[#4caf50] animate-pulse"></span>
+            <span className="font-bold text-xs uppercase tracking-widest text-white">Find Tiffin Near You</span>
+            <span className="hidden md:inline text-white/50 text-xs"> • 18 Artisanal Kitchens Steaming in Satellite</span>
           </div>
-          <div className="flex items-center gap-4 text-xs text-[#665d52] uppercase">
-            <span className="hidden sm:inline">Dispatch Window: 12:00 - 14:30 &amp; 18:30 - 21:00</span>
-            <span className="text-[#1a1a1a] font-semibold">Ahmedabad West</span>
+          <div className="flex items-center gap-4 text-xs text-white/60 uppercase font-semibold">
+            <span className="hidden sm:inline">Dispatch Window: 12:00 – 14:30 &amp; 18:30 – 21:00</span>
+            <span className="text-white">Ahmedabad West</span>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* Hero Discovery Console */}
       <section className="w-full relative overflow-hidden py-12 lg:py-20">

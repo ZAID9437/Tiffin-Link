@@ -68,7 +68,6 @@ export default function Navbar({
     if (!currentUser) {
       return [
         { label: 'For Diners', href: '#', id: 'home' },
-        { label: 'Find Tiffin', href: '#customer', id: 'customer' },
         { label: 'For Providers', href: '#provider', id: 'provider' },
         { label: 'For Deliverers', href: '#delivery', id: 'delivery' },
         { label: 'Super Admin', href: '#/admin', id: 'admin' }
