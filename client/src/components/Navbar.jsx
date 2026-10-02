@@ -106,10 +106,8 @@ export default function Navbar({
     // Default for Diner / Customer
     return [
       { label: 'Home', href: '#', id: 'home' },
-      { label: 'Explore Tiffins', href: '#explore', id: 'explore' },
-      { label: 'My Orders', href: '#orders', id: 'orders' },
-      { label: 'Favorites', href: '#favorites', id: 'favorites' },
-      { label: 'Cart', href: '#cart', id: 'cart' }
+      { label: 'Order Tiffin', href: '#find-tiffin', id: 'find-tiffin' },
+      { label: 'My Orders', href: '#orders', id: 'orders' }
     ];
   };
 

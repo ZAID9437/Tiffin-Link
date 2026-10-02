@@ -24,9 +24,53 @@ const orderSchema = new mongoose.Schema({
     type: String,
     default: '+91 98765 43210'
   },
+  customerEmail: {
+    type: String,
+    default: '',
+    index: true
+  },
+  customerId: {
+    type: String,
+    default: '',
+    index: true
+  },
   customerAddress: {
     type: String,
     default: 'A-402, Titanium City Center, Anand Nagar, Ahmedabad'
+  },
+  deliveryCoordinates: {
+    lat: { type: Number, default: 23.0300 },
+    lng: { type: Number, default: 72.5178 }
+  },
+  deliverySlot: {
+    type: String,
+    default: 'Lunch Slot (12:00 - 13:30)'
+  },
+  items: [
+    {
+      name: String,
+      category: String,
+      price: Number,
+      quantity: Number
+    }
+  ],
+  extras: [
+    {
+      name: String,
+      price: Number
+    }
+  ],
+  rotliCount: {
+    type: Number,
+    default: 4
+  },
+  selectedShaak: {
+    type: String,
+    default: ''
+  },
+  instructions: {
+    type: String,
+    default: ''
   },
   tiffinName: {
     type: String,

@@ -33,6 +33,8 @@ const providerSchema = new mongoose.Schema({
     locality: { type: String, default: '' },
     city: { type: String, default: '' },
     pincode: { type: String, default: '' },
+    lat: { type: Number, default: 23.0300 },
+    lng: { type: Number, default: 72.5178 },
     isLocationPinned: { type: Boolean, default: false }
   },
   cuisines: { type: String, default: '' },

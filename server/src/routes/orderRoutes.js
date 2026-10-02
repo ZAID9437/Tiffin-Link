@@ -5,6 +5,8 @@ const {
   getOrders, 
   getOrderById,
   createOrder, 
+  createCustomerOrder,
+  getCustomerOrders,
   updateOrder, 
   acceptOrder,
   rejectOrder,
@@ -12,6 +14,16 @@ const {
   updateDeliveryStatus,
   deleteOrder 
 } = require('../controllers/orderController');
+
+router.get('/my-orders', (req, res, next) => {
+  if (req.headers.authorization) return protect(req, res, next);
+  next();
+}, getCustomerOrders);
+
+router.post('/customer', (req, res, next) => {
+  if (req.headers.authorization) return protect(req, res, next);
+  next();
+}, createCustomerOrder);
 
 router.get('/', protect, requireProvider, getOrders);
 router.get('/provider', protect, requireProvider, getOrders);

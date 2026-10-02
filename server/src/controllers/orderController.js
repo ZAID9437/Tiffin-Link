@@ -817,10 +817,178 @@ const rejectOrder = async (req, res) => {
   }
 };
 
+// @desc    Customer places an order from cart/dossier
+// @route   POST /api/orders/customer
+const createCustomerOrder = async (req, res) => {
+  try {
+    const {
+      providerId,
+      tiffinId,
+      tiffinName,
+      tiffinCategory,
+      tiffinImage,
+      quantity = 1,
+      unitPrice,
+      customerName,
+      customerPhone,
+      customerEmail,
+      customerAddress,
+      deliveryCoordinates,
+      deliverySlot,
+      items,
+      extras,
+      rotliCount,
+      selectedShaak,
+      instructions,
+      paymentMethod = 'Online Payment'
+    } = req.body;
+
+    if (!providerId) {
+      return res.status(400).json({ success: false, message: 'Provider ID is required' });
+    }
+    if (!customerName || !tiffinName) {
+      return res.status(400).json({ success: false, message: 'Customer name and tiffin name are required' });
+    }
+
+    const customerId = req.user?._id ? req.user._id.toString() : (req.body.customerId || '');
+    const email = req.user?.email || customerEmail || '';
+    const phone = req.user?.phone || customerPhone || '+91 98765 43210';
+
+    // Calculate distance
+    const Provider = require('../models/Provider');
+    let distanceKm = 2.4;
+    const providerDoc = await Provider.findById(providerId);
+    if (providerDoc?.address?.lat && deliveryCoordinates?.lat) {
+      const haversineKm = (lat1, lon1, lat2, lon2) => {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        return Number((2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1));
+      };
+      distanceKm = haversineKm(deliveryCoordinates.lat, deliveryCoordinates.lng, providerDoc.address.lat, providerDoc.address.lng);
+    }
+
+    // Server-side calculation of pricing
+    const qty = Math.max(1, Number(quantity) || 1);
+    const basePrice = Number(unitPrice) || providerDoc?.price || 125;
+    
+    // Extras calculation
+    let extrasTotal = 0;
+    if (Array.isArray(extras)) {
+      extrasTotal = extras.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+    }
+
+    const itemsSubtotal = (basePrice + extrasTotal) * qty;
+    const deliveryFee = Math.max(20, Math.round(15 + distanceKm * 8));
+    const packagingFee = 15;
+    const gstTax = Math.round(itemsSubtotal * 0.05);
+    const totalAmount = itemsSubtotal + deliveryFee;
+
+    const orderNum = Math.floor(1000 + Math.random() * 9000);
+    const orderId = `TL-${orderNum}`;
+
+    const orderData = {
+      orderId,
+      providerId: providerId.toString(),
+      tiffinId: tiffinId || '',
+      customerId,
+      customerName: customerName.trim(),
+      customerPhone: phone,
+      customerEmail: email,
+      customerAddress: customerAddress || 'Satellite, Ahmedabad',
+      deliveryCoordinates: deliveryCoordinates || { lat: 23.0300, lng: 72.5178 },
+      deliverySlot: deliverySlot || 'Lunch Slot (12:00 - 13:30)',
+      tiffinName: tiffinName.trim(),
+      tiffinCategory: tiffinCategory || 'Gujarati',
+      tiffinImage: tiffinImage || '/assets/provider_1.png',
+      quantity: qty,
+      unitPrice: basePrice,
+      subtotal: itemsSubtotal,
+      deliveryKm: distanceKm,
+      deliveryFee,
+      driverEarning: deliveryFee,
+      packagingFee,
+      gstTax,
+      totalAmount,
+      items: items || [],
+      extras: extras || [],
+      rotliCount: rotliCount || 4,
+      selectedShaak: selectedShaak || '',
+      instructions: instructions || '',
+      paymentStatus: (paymentMethod || '').toLowerCase().includes('cash') ? 'Cash on Delivery' : 'Paid',
+      status: 'New',
+      deliveryStatus: 'Searching',
+      pickupAddress: providerDoc?.address?.street 
+        ? `${providerDoc.address.street}, ${providerDoc.address.locality || ''}, ${providerDoc.address.city || 'Ahmedabad'}`
+        : 'Kitchen Hub, Ahmedabad'
+    };
+
+    if (await isDbConnected()) {
+      const newOrder = new Order(orderData);
+      await newOrder.save();
+
+      try {
+        const { reconcileMissingDeliveryRequests } = require('./deliveryDispatchController');
+        await reconcileMissingDeliveryRequests();
+      } catch (rErr) {
+        console.warn('Reconciliation error in createCustomerOrder:', rErr.message);
+      }
+
+      const savedOrder = await Order.findById(newOrder._id);
+      return res.status(201).json({
+        success: true,
+        message: 'Order created successfully!',
+        data: enrichOrderFinancials(savedOrder || newOrder)
+      });
+    } else {
+      return res.status(201).json({
+        success: true,
+        message: 'Order created',
+        data: { _id: 'ord_' + Date.now(), ...orderData }
+      });
+    }
+  } catch (error) {
+    console.error('Error creating customer order:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Customer gets their orders
+// @route   GET /api/orders/my-orders
+const getCustomerOrders = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    const userEmail = req.user?.email || req.query.email;
+    const userPhone = req.user?.phone || req.query.phone;
+
+    let query = {};
+    const conditions = [];
+    if (userId) conditions.push({ customerId: userId.toString() });
+    if (userEmail) conditions.push({ customerEmail: userEmail.toLowerCase() });
+    if (userPhone) conditions.push({ customerPhone: userPhone });
+
+    if (conditions.length > 0) {
+      query = { $or: conditions };
+    }
+
+    if (await isDbConnected()) {
+      const orders = await Order.find(query).sort({ createdAt: -1 }).limit(50);
+      return res.json({ success: true, data: orders.map(enrichOrderFinancials) });
+    }
+    return res.json({ success: true, data: [] });
+  } catch (error) {
+    console.error('Error fetching customer orders:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 module.exports = {
   getOrders,
   getOrderById,
   createOrder,
+  createCustomerOrder,
+  getCustomerOrders,
   updateOrder,
   acceptOrder,
   rejectOrder,

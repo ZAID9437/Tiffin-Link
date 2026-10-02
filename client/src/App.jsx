@@ -29,6 +29,7 @@ import DeliveryDashboard from './DeliveryDashboard/DeliveryDashboard';
 
 // Super Admin Operating System Component
 import AdminDashboard from './AdminDashboard/AdminDashboard';
+import NearbyTiffinServices from './CustomerExperience/NearbyTiffinServices';
 
 // Shared Animations & Modals
 import Preloader from './components/Preloader';
@@ -75,12 +76,15 @@ export default function App() {
   const [activeCustomerOrderId, setActiveCustomerOrderId] = useState('');
   const [preloaderFinished, setPreloaderFinished] = useState(true);
 
+  const [searchFilters, setSearchFilters] = useState({});
+
   // State-based router with session & cookies persistence
   const [view, setView] = useState(() => {
     const hash = window.location.hash || '';
     if (hash.startsWith('#/admin') || hash.startsWith('#admin') || currentUser?.role === 'admin') return 'admin';
     if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || currentUser?.role === 'delivery' || currentUser?.role === 'driver') return 'delivery';
     if (hash.startsWith('#/provider') || hash.startsWith('#provider') || currentUser?.role === 'provider') return 'provider';
+    if (hash.startsWith('#find-tiffin') || hash.startsWith('#order-tiffin')) return 'find-tiffin';
     return 'home';
   });
 
@@ -92,6 +96,7 @@ export default function App() {
       if (hash.startsWith('#/admin') || hash.startsWith('#admin') || activeRole === 'admin') currentView = 'admin';
       else if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || activeRole === 'delivery' || activeRole === 'driver') currentView = 'delivery';
       else if (hash.startsWith('#/provider') || hash.startsWith('#provider') || activeRole === 'provider') currentView = 'provider';
+      else if (hash.startsWith('#find-tiffin') || hash.startsWith('#order-tiffin')) currentView = 'find-tiffin';
       setView(currentView);
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -170,13 +175,12 @@ export default function App() {
     }, 4000);
   };
 
-  const handleRequestSubmitSuccess = (newReqId) => {
-    setHasActiveOrder(true);
-    if (newReqId) {
-      setActiveCustomerOrderId(newReqId);
-      localStorage.setItem('tiffinlink_recent_order', newReqId);
+  const handleRequestSubmitSuccess = (formData) => {
+    if (formData && typeof formData === 'object') {
+      setSearchFilters(formData);
     }
-    showToastNotification('Meal Request submitted successfully! Active tracking is now available.');
+    window.location.hash = '#find-tiffin';
+    showToastNotification('Matching providers found nearby!');
   };
 
   const handleBecomeProviderSuccess = () => {
@@ -503,6 +507,11 @@ export default function App() {
             onOpenBecomeDeliveryPartnerModal={() => setIsBecomeDeliveryPartnerModalOpen(true)}
             onOpenDemoModal={() => setIsDemoModalOpen(true)}
           />
+        ) : view === 'find-tiffin' ? (
+          <NearbyTiffinServices 
+            onNavigate={(hash) => { window.location.hash = hash; }} 
+            initialFilters={searchFilters} 
+          />
         ) : (
           <>
             {/* Hero Section */}
@@ -523,10 +532,10 @@ export default function App() {
             <ScrollMarquee />
 
             {/* Top Providers */}
-            <TopProviders />
+            <TopProviders onExplore={() => { window.location.hash = '#find-tiffin'; }} />
 
             {/* Popular Meal Categories */}
-            <Categories />
+            <Categories onSelectCategory={(cat) => { setSearchFilters({ mealType: cat }); window.location.hash = '#find-tiffin'; }} />
 
             {/* Value Propositions (Why Choose) */}
             <WhyChoose />

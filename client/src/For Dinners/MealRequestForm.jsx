@@ -89,7 +89,7 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
         });
         
         if (onSubmitRequestSuccess) {
-          onSubmitRequestSuccess();
+          onSubmitRequestSuccess(formData);
         }
       }
     } catch (error) {

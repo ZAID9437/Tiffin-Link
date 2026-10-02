@@ -3,6 +3,7 @@ const router = express.Router();
 const { protect, requireProvider } = require('../middleware/authMiddleware');
 const { 
   getProviders, 
+  getProviderById,
   sendProviderOtp, 
   registerProvider, 
   getProviderDashboardStats, 
@@ -68,6 +69,9 @@ router.delete('/settings/sessions/:sessionId', protect, requireProvider, revokeS
 router.get('/settings/preferences', protect, requireProvider, getAppPreferences);
 router.patch('/settings/preferences', protect, requireProvider, updateAppPreferences);
 router.put('/settings/preferences', protect, requireProvider, updateAppPreferences);
+
+// Single provider details by ID or slug
+router.get('/:id', getProviderById);
 
 module.exports = router;
 
