@@ -179,8 +179,20 @@ export default function App() {
     if (formData && typeof formData === 'object') {
       setSearchFilters(formData);
     }
+    setView('find-tiffin');
     window.location.hash = '#find-tiffin';
     showToastNotification('Matching providers found nearby!');
+  };
+
+  const handleSelectTopProvider = (provider) => {
+    setSearchFilters({
+      selectedProviderId: provider._id,
+      selectedProvider: provider,
+      location: provider.address?.locality ? `${provider.address.locality}, Ahmedabad` : 'Satellite, Ahmedabad',
+      mealType: provider.tags?.[0]?.includes('Pure Veg') ? 'Veg Tiffin' : (provider.tags?.[0]?.includes('Jain') ? 'Jain Tiffin' : 'Non-Veg Tiffin')
+    });
+    setView('find-tiffin');
+    window.location.hash = `#find-tiffin?provider=${provider._id}`;
   };
 
   const handleBecomeProviderSuccess = () => {
@@ -532,7 +544,10 @@ export default function App() {
             <ScrollMarquee />
 
             {/* Top Providers */}
-            <TopProviders onExplore={() => { window.location.hash = '#find-tiffin'; }} />
+            <TopProviders 
+              onExplore={() => { setView('find-tiffin'); window.location.hash = '#find-tiffin'; }} 
+              onSelectProvider={handleSelectTopProvider}
+            />
 
             {/* Popular Meal Categories */}
             <Categories onSelectCategory={(cat) => { setSearchFilters({ mealType: cat }); window.location.hash = '#find-tiffin'; }} />

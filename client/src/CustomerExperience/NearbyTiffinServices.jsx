@@ -1,6 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+const AHMEDABAD_LOCALITIES = {
+  'satellite': { lat: 23.0300, lng: 72.5178 },
+  'vastrapur': { lat: 23.0358, lng: 72.5293 },
+  'bodakdev': { lat: 23.0425, lng: 72.5150 },
+  'prahlad': { lat: 23.0125, lng: 72.5100 },
+  'navrangpura': { lat: 23.0370, lng: 72.5600 },
+  'cg road': { lat: 23.0280, lng: 72.5590 },
+  'paldi': { lat: 23.0150, lng: 72.5620 },
+  'gota': { lat: 23.1000, lng: 72.5350 },
+  'bopal': { lat: 23.0350, lng: 72.4650 },
+  'maninagar': { lat: 22.9978, lng: 72.6033 },
+  'makarba': { lat: 22.9960, lng: 72.5020 },
+  'thaltej': { lat: 23.0560, lng: 72.5050 },
+  'memnagar': { lat: 23.0500, lng: 72.5330 }
+};
+
 export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }) {
+  const dossierRef = useRef(null);
+
   // Geolocation & Search Parameters
   const [address, setAddress] = useState(initialFilters.location || 'Satellite, Ahmedabad');
   const [coordinates, setCoordinates] = useState({ lat: 23.0300, lng: 72.5178 });
@@ -19,6 +37,69 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
   });
   const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState(null);
+
+  // Synchronize dynamic initialFilters coming from Kitchen Concierge form or Categories
+  useEffect(() => {
+    if (!initialFilters || Object.keys(initialFilters).length === 0) return;
+
+    if (initialFilters.location) {
+      setAddress(initialFilters.location);
+      setDeliveryAddress(initialFilters.location);
+      const locLower = initialFilters.location.toLowerCase();
+      for (const [key, coords] of Object.entries(AHMEDABAD_LOCALITIES)) {
+        if (locLower.includes(key)) {
+          setCoordinates(coords);
+          break;
+        }
+      }
+    }
+
+    if (initialFilters.mealType) {
+      const mt = initialFilters.mealType.toLowerCase();
+      if (mt.includes('jain')) setDietary('jain');
+      else if (mt.includes('non-veg')) setDietary('non-veg');
+      else if (mt.includes('veg')) setDietary('veg');
+      else setDietary('all');
+    }
+
+    if (initialFilters.budget) {
+      const b = Number(initialFilters.budget);
+      if (b <= 150) setPriceRange('100-150');
+      else if (b <= 200) setPriceRange('150-200');
+      else setPriceRange('200+');
+    }
+
+    if (initialFilters.time) {
+      const t = String(initialFilters.time);
+      if (t.includes('19:') || t.includes('20:') || t.includes('21:') || t.includes('7:') || t.includes('8:')) {
+        setSelectedSlot('Dinner Slot (19:30 - 21:00)');
+      } else {
+        setSelectedSlot('Lunch Slot (12:00 - 13:30)');
+      }
+    }
+
+    if (initialFilters.selectedProvider) {
+      loadProviderDossier(initialFilters.selectedProvider);
+    } else if (initialFilters.selectedProviderId) {
+      loadProviderDossier({ _id: initialFilters.selectedProviderId });
+    }
+  }, [initialFilters]);
+
+  // URL Hash Deep-Linking (e.g. #find-tiffin?provider=ID)
+  useEffect(() => {
+    const handleUrlHash = () => {
+      const hash = window.location.hash || '';
+      if (hash.includes('provider=')) {
+        const provId = hash.split('provider=')[1]?.split('&')[0];
+        if (provId) {
+          loadProviderDossier({ _id: provId });
+        }
+      }
+    };
+    handleUrlHash();
+    window.addEventListener('hashchange', handleUrlHash);
+    return () => window.removeEventListener('hashchange', handleUrlHash);
+  }, []);
 
   // Meal Customization State inside Dossier
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -130,6 +211,13 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
     } catch (e) {
       setSelectedProvider(prov);
       setSelectedCategory(prov.categories?.[0] || 'Gujarati Thali');
+    }
+
+    // Scroll to dossier smoothly if on mobile / tablet or clicking card
+    if (window.innerWidth < 1024) {
+      setTimeout(() => {
+        dossierRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     }
   };
 
@@ -291,15 +379,41 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
                   className="w-full bg-transparent font-body-md text-sm sm:text-base text-[#1a1a1a] placeholder:text-[#665d52]/70 focus:outline-none"
                   placeholder="Change address or landmark within Ahmedabad..." 
                   type="text" 
-                  value={address}
                   onChange={(e) => {
                     setAddress(e.target.value);
                     setDeliveryAddress(e.target.value);
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const locLower = address.toLowerCase();
+                      for (const [key, coords] of Object.entries(AHMEDABAD_LOCALITIES)) {
+                        if (locLower.includes(key)) {
+                          setCoordinates(coords);
+                          break;
+                        }
+                      }
+                      fetchProviders();
+                    }
+                  }}
                 />
                 <button 
+                  onClick={() => {
+                    const locLower = address.toLowerCase();
+                    for (const [key, coords] of Object.entries(AHMEDABAD_LOCALITIES)) {
+                      if (locLower.includes(key)) {
+                        setCoordinates(coords);
+                        break;
+                      }
+                    }
+                    fetchProviders();
+                  }}
+                  className="font-label-caps text-xs uppercase text-[#1a1a1a] hover:bg-[#ded9d1] font-bold px-3 py-1.5 bg-[#ded9d1]/60 rounded transition-colors whitespace-nowrap ml-2 cursor-pointer"
+                >
+                  Search
+                </button>
+                <button 
                   onClick={handleDetectLocation}
-                  className="font-label-caps text-xs uppercase text-[#4a4238] hover:text-[#1a1a1a] font-bold px-3 py-1.5 bg-[#ded9d1]/40 rounded hover:bg-[#ded9d1]/80 transition-colors whitespace-nowrap ml-2 cursor-pointer"
+                  className="font-label-caps text-xs uppercase text-[#4a4238] hover:text-[#1a1a1a] font-bold px-3 py-1.5 bg-[#ded9d1]/40 rounded hover:bg-[#ded9d1]/80 transition-colors whitespace-nowrap ml-1 cursor-pointer"
                 >
                   GPS Locate
                 </button>
@@ -570,7 +684,7 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
             </div>
 
             {/* Right: Interactive Meal Customization & Provider Dossier Drawer (5 Columns Sticky) */}
-            <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-6">
+            <div ref={dossierRef} className="lg:col-span-5 lg:sticky lg:top-24 space-y-6">
               {selectedProvider ? (
                 <div className="bg-[#fbf9f5] rounded-3xl p-6 sm:p-7 shadow-xl border-t-4 border-[#1a1a1a] space-y-6 border border-[#ded9d1]/60">
                   {/* Dossier Header */}

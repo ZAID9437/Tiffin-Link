@@ -53,49 +53,62 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
     });
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSubmit(e);
+    }
+  };
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.mealType || !formData.date || !formData.time || !formData.deliveryType || !formData.location || !formData.budget) return;
+    if (e && e.preventDefault) e.preventDefault();
     
-    setLoading(true);
+    const submissionData = {
+      customerName: formData.customerName || 'Customer Diner',
+      customerPhone: formData.customerPhone || '+91 98250 99881',
+      mealType: formData.mealType || 'Veg Tiffin',
+      date: formData.date || todayStr,
+      time: formData.time || '13:00',
+      deliveryType: formData.deliveryType || 'Delivery',
+      location: formData.location || 'Satellite, Ahmedabad',
+      budget: formData.budget || '140'
+    };
+
+    // Responsive confetti feedback
     try {
-      const response = await fetch('http://localhost:5000/api/requests', {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#1A1A1A', '#4A4238', '#DED9D1']
+      });
+    } catch (err) {}
+
+    // Immediately trigger navigation and auto-filter providers
+    if (onSubmitRequestSuccess) {
+      onSubmitRequestSuccess(submissionData);
+    }
+
+    // Persist request in background
+    try {
+      fetch('http://localhost:5000/api/requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          customerName: formData.customerName || 'Customer Diner',
-          customerPhone: formData.customerPhone || '+91 98250 99881',
-          mealType: formData.mealType,
-          date: formData.date,
-          time: formData.time,
-          deliveryType: formData.deliveryType,
-          location: formData.location,
-          budget: Number(formData.budget),
-          category: formData.mealType.includes('Jain') ? 'Jain' : (formData.mealType.includes('Non-Veg') ? 'Non-Veg' : 'Gujarati')
+          customerName: submissionData.customerName,
+          customerPhone: submissionData.customerPhone,
+          mealType: submissionData.mealType,
+          date: submissionData.date,
+          time: submissionData.time,
+          deliveryType: submissionData.deliveryType,
+          location: submissionData.location,
+          budget: Number(submissionData.budget) || 140,
+          category: submissionData.mealType.includes('Jain') ? 'Jain' : (submissionData.mealType.includes('Non-Veg') ? 'Non-Veg' : 'Gujarati')
         }),
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        // Trigger confetti for premium feel
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#1A1A1A', '#4A4238', '#DED9D1']
-        });
-        
-        if (onSubmitRequestSuccess) {
-          onSubmitRequestSuccess(formData);
-        }
-      }
+      }).catch(err => console.warn('Background request save:', err));
     } catch (error) {
-      console.error('Request submission failed:', error);
-    } finally {
-      setLoading(false);
+      console.warn('Request submission failed:', error);
     }
   };
 
@@ -214,10 +227,11 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
               <div className="border-b border-sand-neutral pb-4 group">
                 <label className="font-label-caps text-label-caps text-secondary group-focus-within:text-onyx-black transition-colors">LOCATION</label>
                 <input 
-                  type="text"
+                  type="text" 
                   name="location"
                   value={formData.location}
                   onChange={handleChange}
+                  onKeyDown={handleKeyDown}
                   placeholder="Iscon Circle, Ahmedabad"
                   className="w-full bg-transparent border-none p-0 py-2 focus:ring-0 text-body-lg font-body-lg text-onyx-black placeholder:opacity-30"
                   required
@@ -232,7 +246,8 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
                   name="budget"
                   value={formData.budget}
                   onChange={handleChange}
-                  placeholder="100"
+                  onKeyDown={handleKeyDown}
+                  placeholder="140"
                   className="w-full bg-transparent border-none p-0 py-2 focus:ring-0 text-body-lg font-body-lg text-onyx-black placeholder:opacity-30"
                   required
                 />
