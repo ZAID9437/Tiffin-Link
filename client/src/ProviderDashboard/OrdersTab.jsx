@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiRequest } from '../services/api';
+import { getSocket } from '../services/socket';
 
 export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const [orders, setOrders] = useState([]);
@@ -48,6 +49,38 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
     return () => clearInterval(interval);
   }, [currentUser]);
 
+  // Socket.IO Realtime Listener with Cleanup
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+      if (socket && currentUser) {
+        const pId = currentUser?.providerId || currentUser?.id || currentUser?._id;
+        if (pId) {
+          socket.emit('join:provider', { providerId: pId });
+        }
+
+        const handleRealtimeOrderEvent = (data) => {
+          fetchOrders(false);
+        };
+
+        socket.on('order:created', handleRealtimeOrderEvent);
+        socket.on('order:updated', handleRealtimeOrderEvent);
+        socket.on('order:status:updated', handleRealtimeOrderEvent);
+        socket.on('delivery:status:updated', handleRealtimeOrderEvent);
+
+        return () => {
+          socket.off('order:created', handleRealtimeOrderEvent);
+          socket.off('order:updated', handleRealtimeOrderEvent);
+          socket.off('order:status:updated', handleRealtimeOrderEvent);
+          socket.off('delivery:status:updated', handleRealtimeOrderEvent);
+        };
+      }
+    } catch (err) {
+      console.warn('Socket setup error in OrdersTab:', err);
+    }
+  }, [currentUser]);
+
   // Audio Chime Generator
   const playChime = () => {
     if (!chimeEnabled) return;
@@ -76,57 +109,71 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       const res = await apiRequest('/orders');
       const json = typeof res?.json === 'function' ? await res.json() : res;
       if (json && json.success && Array.isArray(json.data)) {
+        // Deduplicate incoming order data to prevent duplicate order entries
+        const seenIds = new Set();
+        const seenOrderIds = new Set();
+        const uniqueRawData = json.data.filter(o => {
+          const idStr = String(o._id || o.id || '').trim();
+          const ordIdStr = String(o.orderId || '').trim();
+
+          if (idStr && seenIds.has(idStr)) return false;
+          if (ordIdStr && seenOrderIds.has(ordIdStr)) return false;
+
+          if (idStr) seenIds.add(idStr);
+          if (ordIdStr) seenOrderIds.add(ordIdStr);
+          return true;
+        });
+
         const now = Date.now();
-        const formatted = json.data.map((o, idx) => {
-          const subtotal = o.subtotal || o.totalAmount || (o.quantity || 1) * (o.unitPrice || 160);
-          const gross = o.totalAmount || subtotal;
-          const comm = Math.round(gross * 0.125);
-          const net = gross - comm;
+        const formatted = uniqueRawData.map((o, idx) => {
+          const subtotal = o.pricing?.itemsSubtotal || o.subtotal || (o.quantity || 1) * (o.unitPrice || 120);
+          const deliveryFee = o.pricing?.deliveryCharge || o.deliveryFee || 51;
+          const driverEarning = o.pricing?.driverEarning || o.driverEarning || deliveryFee;
+          const packagingFee = o.pricing?.packagingCharge || o.packagingFee || 15;
+          const gross = o.pricing?.customerPaidTotal || o.totalAmount || (subtotal + deliveryFee + packagingFee);
+          const comm = o.pricing?.platformFee || o.platformCommission || Math.round(gross * 0.125);
+          const net = o.pricing?.providerPayout || o.netPayout || (gross - comm);
 
           let secondsLeft = o.secondsLeft !== undefined ? o.secondsLeft : 165;
+          const mainTiffinName = o.tiffinName || (o.items && o.items[0]?.name) || 'Tiffin Meal';
 
           return {
             id: o._id || o.id,
-            orderId: o.orderId || `#ORD-${8419 + idx}`,
+            orderId: o.orderId || `#ORD-${1000 + idx}`,
             createdAt: o.createdAt || new Date(),
             updatedAt: o.updatedAt || o.createdAt || new Date(),
-            customerName: o.customerName || o.user?.name || 'Customer Patron',
-            customerPhone: o.customerPhone || '+91 98250 14829',
-            customerAddress: o.customerAddress || '702, Shivalik Highstreet, Keshavbaug, Vastrapur, Ahmedabad',
-            customerTier: o.quantity >= 5 ? 'CORPORATE ACCOUNT' : 'TIER 1 SUBSCRIBER',
-            tiffinName: o.tiffinName || (o.items && o.items[0]?.name) || 'Kathiyawadi Deluxe Tiffin',
-            tiffinCategory: o.tiffinCategory || o.category || 'Gujarati',
-            tiffinNotes: o.tiffinNotes || 'Pure Vegetarian, Low Cold-Pressed Mustard Oil',
-            itemsBreakdown: o.itemsBreakdown || [
-              '4 × Phulka Rotis (Desi Ghee Basted)',
-              '1 × Sev Tameta Nu Shaak (Kathiyawadi style)',
-              '1 × Ringan No Olo (Smoked Eggplant Bharta)',
-              '1 × Gujarati Kadi & Vaghareli Khichdi',
-              '1 × Masala Chaas (200ml Glass Sealed Bottle)'
-            ],
-            specialInstructions: o.specialInstructions || 'Please keep green chillies strictly separate. Pack rotis in butter paper.',
+            customerName: o.customerName || o.user?.name || 'Customer',
+            customerPhone: o.customerPhone || '—',
+            customerAddress: o.customerAddress || 'Address unavailable',
+            customerTier: o.quantity >= 5 ? 'CORPORATE ACCOUNT' : 'STANDARD SUBSCRIBER',
+            tiffinName: mainTiffinName,
+            tiffinCategory: o.tiffinCategory || o.category || 'General',
+            tiffinNotes: o.tiffinNotes || '',
+            itemsBreakdown: o.itemsBreakdown || (o.items && o.items.length > 0 ? o.items.map(i => `${i.qty || 1} × ${i.name || i.tiffinName || 'Item'}`) : [mainTiffinName]),
+            specialInstructions: o.specialInstructions || 'None',
             quantity: o.quantity || 1,
             unitPrice: o.unitPrice || 160,
             subtotal,
-            packagingFee: o.packagingFee || 15,
-            deliveryFee: o.deliveryFee || 45,
+            packagingFee,
+            deliveryFee,
+            driverEarning,
             discount: o.discount || 0,
             grossAmount: gross,
             platformCommission: comm,
             netPayout: net,
-            paymentStatus: o.paymentStatus || 'Paid (UPI)',
+            paymentStatus: o.paymentStatus || 'Paid',
             status: o.status || 'New',
             deliveryMode: o.deliveryMode || 'Courier Dispatch',
-            deliveryTarget: o.deliveryTarget || '12:45 PM',
-            deliveryDistance: o.deliveryDistance || '1.8 km',
-            driverName: o.driverName || o.driver?.name || o.deliveryPartnerName || 'Rahul Verma (#DP-4409)',
-            driverPhone: o.driverPhone || o.driver?.phone || o.deliveryPartnerPhone || '+91 98765 43210',
-            driverVehicle: o.driverVehicle || o.driver?.vehicle || 'Hero Splendor (GJ-01-ER-8821)',
+            deliveryTarget: o.deliveryTarget || 'Standard',
+            deliveryDistance: o.deliveryDistance || '—',
+            driverName: o.driverName || o.driver?.name || o.deliveryPartnerName || 'Unassigned',
+            driverPhone: o.driverPhone || o.driver?.phone || o.deliveryPartnerPhone || '—',
+            driverVehicle: o.driverVehicle || o.driver?.vehicle || '—',
             deliveryStatus: o.deliveryStatus || (o.status === 'Ready' ? 'Awaiting Pickup' : o.status === 'Delivery' ? 'In Transit' : o.status === 'Completed' ? 'Delivered' : 'Unassigned'),
             cancelledBy: o.cancelledBy || 'Customer',
-            cancellationReason: o.cancellationReason || 'Customer requested early cancellation before kitchen preparation window.',
+            cancellationReason: o.cancellationReason || 'Order cancelled.',
             cancelledAt: o.cancelledAt || o.updatedAt || o.createdAt,
-            refundStatus: o.refundStatus || '100% Refunded to UPI',
+            refundStatus: o.refundStatus || 'Refund Processed',
             completedAt: o.completedAt || o.updatedAt || o.createdAt,
             utr: o.utr || `4291${Math.floor(10000000 + Math.random() * 90000000)}`,
             secondsLeft
@@ -140,8 +187,16 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
           return formatted;
         });
 
-        if (formatted.length > 0 && !selectedOrder) {
-          setSelectedOrder(formatted[0]);
+        if (formatted.length > 0) {
+          setSelectedOrder(prev => {
+            if (!prev) return formatted[0];
+            const match = formatted.find(o => 
+              (o.id && prev.id && String(o.id) === String(prev.id)) ||
+              (o.orderId && prev.orderId && String(o.orderId) === String(prev.orderId)) ||
+              (o._id && prev._id && String(o._id) === String(prev._id))
+            );
+            return match || prev || formatted[0];
+          });
         }
       } else {
         setError(json?.message || 'Unable to load orders from MongoDB');
@@ -172,6 +227,94 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const handlePrintKOT = (ord) => {
+    if (!ord) return;
+    try {
+      const printWindow = window.open('', '_blank', 'width=600,height=700');
+      if (!printWindow) {
+        showToast('⚠️ Pop-up blocked! Printing window directly...');
+        window.print();
+        return;
+      }
+      
+      const itemsHtml = Array.isArray(ord.itemsBreakdown) && ord.itemsBreakdown.length > 0
+        ? ord.itemsBreakdown.map(i => `<li>${i}</li>`).join('')
+        : `<li>${ord.quantity || 1} × ${ord.tiffinName || 'Tiffin Meal'}</li>`;
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>KOT Ticket - ${ord.orderId}</title>
+          <style>
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              padding: 20px;
+              max-width: 400px;
+              margin: 0 auto;
+              color: #000;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px dashed #000;
+              padding-bottom: 10px;
+              margin-bottom: 15px;
+            }
+            .header h1 { font-size: 18px; margin: 0; }
+            .header p { font-size: 11px; margin: 4px 0 0 0; }
+            .meta { font-size: 12px; margin-bottom: 15px; }
+            .meta div { display: flex; justify-content: space-between; margin-bottom: 4px; }
+            .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 10px 0; margin-bottom: 15px; }
+            .items h3 { margin: 0 0 8px 0; font-size: 13px; }
+            .items ul { margin: 0; padding-left: 20px; }
+            .totals { font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; margin-bottom: 15px; }
+            .footer { text-align: center; font-size: 10px; border-top: 2px dashed #000; padding-top: 10px; }
+            @media print { body { padding: 0; margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>TIFFINLINK KITCHEN KOT</h1>
+            <p>Order Ticket & Manifest</p>
+          </div>
+          <div class="meta">
+            <div><strong>ORDER ID:</strong> <span>${ord.orderId}</span></div>
+            <div><strong>CUSTOMER:</strong> <span>${ord.customerName}</span></div>
+            <div><strong>PHONE:</strong> <span>${ord.customerPhone}</span></div>
+            <div><strong>MODE:</strong> <span>${ord.deliveryMode || 'Courier Dispatch'}</span></div>
+          </div>
+          <div class="items">
+            <h3>ORDER ITEMS:</h3>
+            <div><strong>${ord.quantity} × ${ord.tiffinName}</strong></div>
+            <ul>${itemsHtml}</ul>
+            ${ord.specialInstructions && ord.specialInstructions !== 'None' ? `<div style="margin-top: 8px;"><strong>Notes:</strong> ${ord.specialInstructions}</div>` : ''}
+          </div>
+          <div class="totals">
+            <span>TOTAL PAID:</span>
+            <span>₹${ord.grossAmount}.00</span>
+          </div>
+          <div class="footer">
+            <p>--- END OF KOT TICKET ---</p>
+          </div>
+          <script>
+            window.onload = function() {
+              window.focus();
+              window.print();
+            };
+          </script>
+        </body>
+        </html>
+      `;
+
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      showToast(`🖨️ KOT Ticket printed for Order ${ord.orderId}`);
+    } catch (err) {
+      console.error('Print KOT error:', err);
+      window.print();
+    }
+  };
+
   const formatTimer = (sec) => {
     if (!sec || sec <= 0) return '00:00';
     const m = Math.floor(sec / 60);
@@ -180,31 +323,68 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   };
 
   const handleUpdateOrderStatus = async (orderId, newStatus, reason = '') => {
-    const targetOrder = orders.find(o => o.orderId === orderId || o.id === orderId);
+    const targetOrder = orders.find(o => 
+      (o._id && String(o._id) === String(orderId)) ||
+      (o.id && String(o.id) === String(orderId)) ||
+      (o.orderId && String(o.orderId) === String(orderId))
+    );
     if (!targetOrder) return;
-    const dbId = targetOrder.id || targetOrder.orderId;
+    const dbId = targetOrder.id || targetOrder._id || targetOrder.orderId;
+    const cleanDbId = String(dbId).replace(/^#/, '').trim();
 
-    setOrders(prev => prev.map(o => (o.id === dbId || o.orderId === orderId) ? { ...o, status: newStatus } : o));
-    if (selectedOrder && (selectedOrder.id === dbId || selectedOrder.orderId === orderId)) {
-      setSelectedOrder(prev => ({ ...prev, status: newStatus }));
-    }
+    let apiEndpoint = `/orders/${encodeURIComponent(cleanDbId)}`;
+    let method = 'PUT';
+    let bodyObj = { status: newStatus, cancellationReason: reason };
 
     if (newStatus === 'Preparing' || newStatus === 'Accepted') {
-      showToast(`✓ Order ${targetOrder.orderId} Accepted! Moved to Kitchen Prep Queue.`);
+      apiEndpoint = `/orders/${encodeURIComponent(cleanDbId)}/accept`;
+      method = 'POST';
+      bodyObj = {};
     } else if (newStatus === 'Cancelled') {
-      showToast(`Order ${targetOrder.orderId} Declined. Reason logged.`);
-    } else {
-      showToast(`✓ Order ${targetOrder.orderId} status updated to ${newStatus}`);
+      apiEndpoint = `/orders/${encodeURIComponent(cleanDbId)}/reject`;
+      method = 'POST';
+      bodyObj = { reason: reason || 'Declined by provider' };
     }
 
     try {
-      await apiRequest(`/orders/${dbId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: newStatus, cancellationReason: reason })
+      const res = await apiRequest(apiEndpoint, {
+        method,
+        body: JSON.stringify(bodyObj)
       });
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+
+      if (json && json.success) {
+        setOrders(prev => prev.map(o => {
+          const isMatch = (o.id && String(o.id) === String(targetOrder.id)) ||
+                          (o._id && String(o._id) === String(targetOrder.id)) ||
+                          (o.orderId && String(o.orderId) === String(targetOrder.orderId));
+          return isMatch ? { ...o, status: newStatus } : o;
+        }));
+
+        if (selectedOrder) {
+          const isSelMatch = (selectedOrder.id && String(selectedOrder.id) === String(targetOrder.id)) ||
+                             (selectedOrder.orderId && String(selectedOrder.orderId) === String(targetOrder.orderId));
+          if (isSelMatch) {
+            setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+          }
+        }
+
+        if (newStatus === 'Preparing' || newStatus === 'Accepted') {
+          showToast(`✓ Order ${targetOrder.orderId} Accepted! Moved to Kitchen Prep Queue.`);
+          setActiveStatusTab('Preparing');
+        } else if (newStatus === 'Cancelled') {
+          showToast(`Order ${targetOrder.orderId} Declined. Reason logged.`);
+        } else {
+          showToast(`✓ Order ${targetOrder.orderId} status updated to ${newStatus}`);
+        }
+      } else {
+        showToast(`⚠️ ${json?.message || 'Action could not be completed'}`);
+      }
       fetchOrders(false);
     } catch (err) {
       console.error('Error updating order status in MongoDB:', err);
+      showToast('⚠️ Failed to communicate with database engine');
+      fetchOrders(false);
     }
   };
 
@@ -250,8 +430,14 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const newOrdersList = orders.filter(o => o.status === 'New' || o.status === 'Pending');
   const newOrdersCount = newOrdersList.length;
 
-  const onlinePaymentsCount = newOrdersList.filter(o => o.paymentStatus.toLowerCase().includes('paid') || o.paymentStatus.toLowerCase().includes('upi') || o.paymentStatus.toLowerCase().includes('escrow')).length;
-  const codPaymentsCount = newOrdersList.filter(o => o.paymentStatus.toLowerCase().includes('cash') || o.paymentStatus.toLowerCase().includes('cod')).length;
+  const onlinePaymentsCount = newOrdersList.filter(o => {
+    const ps = (o.paymentStatus || '').toLowerCase();
+    return ps.includes('paid') || ps.includes('upi') || ps.includes('escrow');
+  }).length;
+  const codPaymentsCount = newOrdersList.filter(o => {
+    const ps = (o.paymentStatus || '').toLowerCase();
+    return ps.includes('cash') || ps.includes('cod');
+  }).length;
   const totalPendingAmount = newOrdersList.reduce((sum, o) => sum + (o.grossAmount || 0), 0);
   const totalNetPayoutPending = newOrdersList.reduce((sum, o) => sum + (o.netPayout || 0), 0);
 
@@ -267,8 +453,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const netPrepPayout = preparingOrdersList.reduce((sum, o) => sum + (o.netPayout || 0), 0);
   const readyOrdersList = orders.filter(o => o.status === 'Ready');
   const readyNowCount = readyOrdersList.length;
-  const readyForDeliveryCount = readyOrdersList.filter(o => !o.deliveryMode.toLowerCase().includes('pickup')).length;
-  const readyCustomerPickupCount = readyOrdersList.filter(o => o.deliveryMode.toLowerCase().includes('pickup')).length;
+  const readyForDeliveryCount = readyOrdersList.filter(o => !(o.deliveryMode || '').toLowerCase().includes('pickup')).length;
+  const readyCustomerPickupCount = readyOrdersList.filter(o => (o.deliveryMode || '').toLowerCase().includes('pickup')).length;
   const readyOrderValueTotal = readyOrdersList.reduce((sum, o) => sum + (o.grossAmount || 0), 0);
   const readyNetPayoutTotal = readyOrdersList.reduce((sum, o) => sum + (o.netPayout || 0), 0);
 
@@ -308,6 +494,28 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const cancellationValue = cancelledOrdersList.reduce((sum, o) => sum + (o.grossAmount || o.totalAmount || 0), 0);
   const cancellationRate = totalOrdersCount > 0 ? ((totalCancelledOrders / totalOrdersCount) * 100).toFixed(1) : 0;
 
+  const isDriverAcceptedForOrder = (ord) => {
+    if (!ord) return false;
+    const dName = ord.driverName || ord.deliveryPartnerName || ord.driver?.name;
+    const dStatus = (ord.deliveryStatus || '').toLowerCase();
+    const ordStatus = (ord.status || '').toLowerCase();
+
+    if (ordStatus === 'completed' || ordStatus === 'delivered' || dStatus === 'delivered' || dStatus === 'completed') {
+      return true;
+    }
+
+    const isAcceptedName = Boolean(
+      dName &&
+      dName !== 'Unassigned' &&
+      dName !== 'Searching...' &&
+      !dName.toLowerCase().includes('searching') &&
+      dName !== '—' &&
+      !dName.includes('—')
+    );
+    const isAcceptedStatus = Boolean(dStatus && !dStatus.includes('searching') && dStatus !== 'unassigned' && dStatus !== 'pending');
+    return isAcceptedName || isAcceptedStatus;
+  };
+
   // Filtering & Sorting
   const filteredOrders = orders.filter(o => {
     const q = searchQuery.toLowerCase();
@@ -328,25 +536,32 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
     if (isCancelledTab && o.status !== 'Cancelled') return false;
 
     if (paymentFilter !== 'All') {
-      if (paymentFilter === 'Paid' && !o.paymentStatus.toLowerCase().includes('paid') && !o.paymentStatus.toLowerCase().includes('upi')) return false;
-      if (paymentFilter === 'COD' && !o.paymentStatus.toLowerCase().includes('cash') && !o.paymentStatus.toLowerCase().includes('cod')) return false;
-      if (paymentFilter === 'Escrow' && !o.paymentStatus.toLowerCase().includes('escrow')) return false;
+      const ps = (o.paymentStatus || '').toLowerCase();
+      if (paymentFilter === 'Paid' && !ps.includes('paid') && !ps.includes('upi')) return false;
+      if (paymentFilter === 'COD' && !ps.includes('cash') && !ps.includes('cod')) return false;
+      if (paymentFilter === 'Escrow' && !ps.includes('escrow')) return false;
     }
 
     if (deliveryFilter !== 'All') {
-      if (deliveryFilter === 'Courier' && !o.deliveryMode.toLowerCase().includes('courier') && !o.deliveryMode.toLowerCase().includes('dispatch')) return false;
-      if (deliveryFilter === 'Pickup' && !o.deliveryMode.toLowerCase().includes('pickup') && !o.deliveryMode.toLowerCase().includes('counter')) return false;
+      const dm = (o.deliveryMode || '').toLowerCase();
+      if (deliveryFilter === 'Courier' && !dm.includes('courier') && !dm.includes('dispatch')) return false;
+      if (deliveryFilter === 'Pickup' && !dm.includes('pickup') && !dm.includes('counter')) return false;
     }
 
     if (isPreparingTab && stationFilter !== 'All') {
-      if (stationFilter === 'Station1' && !o.tiffinName.toLowerCase().includes('roti') && !o.tiffinName.toLowerCase().includes('deluxe') && !o.tiffinName.toLowerCase().includes('thali')) return false;
-      if (stationFilter === 'Station2' && !o.tiffinName.toLowerCase().includes('curry') && !o.tiffinName.toLowerCase().includes('dal') && !o.tiffinName.toLowerCase().includes('jain') && !o.tiffinName.toLowerCase().includes('kathiyawadi')) return false;
-      if (stationFilter === 'Station3' && !o.tiffinName.toLowerCase().includes('bowl') && !o.tiffinName.toLowerCase().includes('combo') && !o.tiffinName.toLowerCase().includes('khichdi') && !o.tiffinName.toLowerCase().includes('health')) return false;
+      const tn = (o.tiffinName || '').toLowerCase();
+      if (stationFilter === 'Station1' && !tn.includes('roti') && !tn.includes('deluxe') && !tn.includes('thali')) return false;
+      if (stationFilter === 'Station2' && !tn.includes('curry') && !tn.includes('dal') && !tn.includes('jain') && !tn.includes('kathiyawadi')) return false;
+      if (stationFilter === 'Station3' && !tn.includes('bowl') && !tn.includes('combo') && !tn.includes('khichdi') && !tn.includes('health')) return false;
     }
 
     if (quickChipFilter === 'URGENT' && o.secondsLeft > 180) return false;
     if (quickChipFilter === 'BULK' && o.quantity < 5) return false;
-    if (quickChipFilter === 'JAIN' && !o.tiffinCategory.toLowerCase().includes('jain') && !o.tiffinName.toLowerCase().includes('jain')) return false;
+    if (quickChipFilter === 'JAIN') {
+      const tc = (o.tiffinCategory || '').toLowerCase();
+      const tn = (o.tiffinName || '').toLowerCase();
+      if (!tc.includes('jain') && !tn.includes('jain')) return false;
+    }
 
     return true;
   }).sort((a, b) => {
@@ -359,6 +574,20 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  useEffect(() => {
+    if (filteredOrders && filteredOrders.length > 0) {
+      setSelectedOrder(prev => {
+        if (!prev) return filteredOrders[0];
+        const isCurrentInFiltered = filteredOrders.some(o => 
+          (o.id && prev.id && String(o.id) === String(prev.id)) ||
+          (o.orderId && prev.orderId && String(o.orderId) === String(prev.orderId)) ||
+          (o._id && prev._id && String(o._id) === String(prev._id))
+        );
+        return isCurrentInFiltered ? prev : filteredOrders[0];
+      });
+    }
+  }, [activeStatusTab]);
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto w-full font-body-md text-on-surface">
@@ -1331,11 +1560,15 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                 </thead>
                 <tbody className="divide-y divide-sand-neutral/40 text-xs font-body-md">
                   {paginatedOrders.map((ord) => {
-                    const isSelected = selectedOrder && (selectedOrder.id === ord.id || selectedOrder.orderId === ord.orderId);
+                    const isSelected = selectedOrder && (
+                      (selectedOrder.id && ord.id && String(selectedOrder.id) === String(ord.id)) ||
+                      (selectedOrder.orderId && ord.orderId && String(selectedOrder.orderId) === String(ord.orderId)) ||
+                      (selectedOrder._id && ord._id && String(selectedOrder._id) === String(ord._id))
+                    );
 
                     return (
                       <tr
-                        key={ord.id}
+                        key={ord.id || ord._id || ord.orderId}
                         onClick={() => { setSelectedOrder(ord); setIsDrawerOpen(true); }}
                         className={`cursor-pointer transition-colors ${
                           isSelected ? 'bg-amber-50/40 border-l-4 border-l-onyx-black font-semibold' : 'hover:bg-surface-container-low/60'
@@ -1356,19 +1589,33 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                               <div className="text-[10px] font-mono text-secondary">{ord.driverPhone}</div>
                             </td>
                             <td className="py-3.5 px-4">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-label-caps bg-onyx-black text-bone-white font-bold uppercase">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                {ord.deliveryStatus || 'In Transit'}
-                              </span>
+                              {isDriverAcceptedForOrder(ord) ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-label-caps bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold uppercase">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                  {ord.deliveryStatus === 'Searching' || ord.deliveryStatus === 'SEARCHING' ? 'Assigned' : (ord.deliveryStatus || 'In Transit')}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-label-caps bg-amber-100 text-amber-900 border border-amber-300 font-bold uppercase">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                                  Searching
+                                </span>
+                              )}
                             </td>
                             <td className="py-3.5 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateOrderStatus(ord.orderId, 'Completed')}
-                                className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors cursor-pointer font-bold mr-1"
-                              >
-                                Mark Delivered
-                              </button>
+                              {isDriverAcceptedForOrder(ord) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateOrderStatus(ord.orderId, 'Completed')}
+                                  className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors cursor-pointer font-bold mr-1"
+                                >
+                                  Mark Delivered
+                                </button>
+                              ) : (
+                                <span className="px-2.5 py-1.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 text-xs font-mono font-bold inline-flex items-center gap-1.5 mr-1">
+                                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                                  Searching Courier
+                                </span>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => { setSelectedOrder(ord); setIsDrawerOpen(true); }}
@@ -1502,7 +1749,23 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
                             {/* Quick Action */}
                             <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              {isReadyTab ? (
+                              {ord.status === 'Completed' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  ✓ Completed
+                                </span>
+                              ) : ord.status === 'Cancelled' || ord.status === 'Rejected' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                  ✕ Cancelled
+                                </span>
+                              ) : ord.status === 'Delivery' || ord.status === 'Out for Delivery' || ord.status === 'In Transit' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateOrderStatus(ord.orderId, 'Completed')}
+                                  className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
+                                >
+                                  Mark Delivered
+                                </button>
+                              ) : ord.status === 'Ready' || isReadyTab ? (
                                 ord.deliveryMode.toLowerCase().includes('pickup') ? (
                                   <button
                                     type="button"
@@ -1520,32 +1783,43 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                                     Courier
                                   </button>
                                 )
-                              ) : isPreparingTab ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateOrderStatus(ord.orderId, 'Ready')}
-                                  className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
-                                >
-                                  Ready
-                                </button>
+                              ) : ord.status === 'Preparing' || ord.status === 'In Prep' || isPreparingTab ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateOrderStatus(ord.orderId, 'Ready')}
+                                    className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold mr-1"
+                                  >
+                                    Ready
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRejectingOrder(ord)}
+                                    className="px-2.5 py-1.5 border border-sand-neutral/60 text-secondary hover:text-error hover:border-error rounded-lg text-xs transition-colors cursor-pointer"
+                                    title="Cancel Order"
+                                  >
+                                    ✕
+                                  </button>
+                                </>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateOrderStatus(ord.orderId, 'Preparing')}
-                                  className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
-                                >
-                                  Accept
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateOrderStatus(ord.orderId, 'Preparing')}
+                                    className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold mr-1"
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRejectingOrder(ord)}
+                                    className="px-2.5 py-1.5 border border-sand-neutral/60 text-secondary hover:text-error hover:border-error rounded-lg text-xs transition-colors cursor-pointer"
+                                    title="Cancel Order"
+                                  >
+                                    ✕
+                                  </button>
+                                </>
                               )}
-
-                              <button
-                                type="button"
-                                onClick={() => setRejectingOrder(ord)}
-                                className="px-2.5 py-1.5 border border-sand-neutral/60 text-secondary hover:text-error hover:border-error rounded-lg text-xs transition-colors cursor-pointer"
-                                title="Cancel Order"
-                              >
-                                ✕
-                              </button>
                             </td>
                           </>
                         )}
@@ -1619,7 +1893,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                   </span>
                   <button
                     type="button"
-                    onClick={() => showToast(`🖨️ KOT Ticket printed for Order ${selectedOrder.orderId}`)}
+                    onClick={() => handlePrintKOT(selectedOrder)}
                     className="p-1.5 rounded-lg hover:bg-surface-container text-secondary cursor-pointer"
                     title="Print KOT Ticket"
                   >
@@ -1628,9 +1902,15 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                 </div>
               </div>
               <p className="text-xs text-secondary mt-1 font-medium">
-                {isReadyTab
+                {selectedOrder.status === 'Completed' || selectedOrder.status === 'Delivered'
+                  ? 'Order fulfilled and completed.'
+                  : selectedOrder.status === 'Cancelled' || selectedOrder.status === 'Rejected'
+                  ? 'Order cancelled and archived.'
+                  : selectedOrder.status === 'Delivery' || selectedOrder.status === 'Out for Delivery' || selectedOrder.status === 'In Transit'
+                  ? 'Dispatched with delivery partner for customer dropoff.'
+                  : selectedOrder.status === 'Ready'
                   ? 'Staged in Bay 1 / Bay 2. Heat-sealed and ready for courier pickup or customer takeaway.'
-                  : isPreparingTab
+                  : selectedOrder.status === 'Preparing' || selectedOrder.status === 'In Prep'
                   ? 'Active in kitchen prep. Mark ready once all compartments are sealed.'
                   : 'Auto-reject fallback if no confirmation within window to avoid kitchen bottleneck.'
                 }
@@ -1755,7 +2035,30 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
             {/* Action Footer */}
             <div className="p-4 bg-surface-container-low border-t border-sand-neutral/40 space-y-2.5">
-              {selectedOrder.status === 'Ready' || isReadyTab ? (
+              {selectedOrder.status === 'Completed' ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-center rounded-lg">
+                  <span className="font-bold text-emerald-800 text-xs flex items-center justify-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px]">task_alt</span>
+                    Order Fulfilled & Completed
+                  </span>
+                </div>
+              ) : selectedOrder.status === 'Cancelled' || selectedOrder.status === 'Rejected' ? (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-center rounded-lg">
+                  <span className="font-bold text-rose-800 text-xs flex items-center justify-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px]">cancel</span>
+                    Order Cancelled
+                  </span>
+                </div>
+              ) : selectedOrder.status === 'Delivery' || selectedOrder.status === 'Out for Delivery' || selectedOrder.status === 'In Transit' ? (
+                <button
+                  type="button"
+                  onClick={() => handleUpdateOrderStatus(selectedOrder.orderId, 'Completed')}
+                  className="w-full py-3 px-4 bg-onyx-black hover:bg-stone-800 text-bone-white font-button-text text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer font-bold"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-emerald-400">task_alt</span>
+                  <span>Mark as Delivered</span>
+                </button>
+              ) : selectedOrder.status === 'Ready' ? (
                 selectedOrder.deliveryMode.toLowerCase().includes('pickup') ? (
                   <div className="grid grid-cols-3 gap-2">
                     <button
@@ -1797,7 +2100,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                     </button>
                   </div>
                 )
-              ) : selectedOrder.status === 'Preparing' || isPreparingTab ? (
+              ) : selectedOrder.status === 'Preparing' || selectedOrder.status === 'In Prep' ? (
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
@@ -1836,399 +2139,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                     <span className="material-symbols-outlined text-[16px]">cancel</span>
                     <span>Decline</span>
                   </button>
-                </div>
-              )}
-            </div>
-
-          </div>
-        )}
-
-      </div>
-
-      {/* Main Workspace (7-Column Table + 5-Column Side Inspector Drawer) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* Table View */}
-        <div className={`${selectedOrder ? 'lg:col-span-7' : 'lg:col-span-12'} rounded-2xl bg-surface-container-lowest border border-sand-neutral/40 shadow-xs overflow-hidden transition-all`}>
-          
-          <div className="px-5 py-3.5 bg-surface-container-low/70 border-b border-sand-neutral/40 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-onyx-black text-[18px]">receipt_long</span>
-              <span className="font-label-caps text-xs font-bold text-onyx-black uppercase tracking-wider">
-                Queue: {filteredOrders.length} {isPreparingTab ? 'Preparing Orders' : isNewOrdersTab ? 'New Orders' : `${activeStatusTab} Orders`}
-              </span>
-            </div>
-            <span className="text-[11px] font-mono text-secondary font-semibold">Click row to inspect docket</span>
-          </div>
-
-          {loading ? (
-            <div className="p-12 text-center space-y-3">
-              <span className="material-symbols-outlined text-[32px] text-onyx-black animate-spin">refresh</span>
-              <h3 className="font-headline-md text-lg text-on-surface">Connecting to MongoDB Orders Queue...</h3>
-              <p className="font-body-md text-xs text-secondary">Fetching real customer orders scoped to authenticated kitchen.</p>
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="p-12 text-center space-y-3">
-              <span className="material-symbols-outlined text-[36px] text-secondary">check_circle</span>
-              <h3 className="font-headline-md text-xl text-on-surface font-normal">
-                {isPreparingTab ? 'No Orders Being Prepared' : isNewOrdersTab ? 'No New Orders' : 'No Orders Found'}
-              </h3>
-              <p className="font-body-md text-xs text-secondary">
-                {isPreparingTab
-                  ? 'Accepted customer orders will appear here automatically while your kitchen prepares them.'
-                  : 'New customer orders will appear here automatically via Socket.IO.'
-                }
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-sand-neutral/40 text-[11px] font-label-caps uppercase tracking-wider text-secondary bg-surface-container-low/30 font-bold">
-                    <th className="py-3.5 px-4">Order ID & Timer</th>
-                    <th className="py-3.5 px-4">Customer</th>
-                    <th className="py-3.5 px-4">Tiffin Item</th>
-                    <th className="py-3.5 px-4">Total</th>
-                    <th className="py-3.5 px-4">Payment</th>
-                    <th className="py-3.5 px-4 text-right">Quick Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-sand-neutral/40 text-xs font-body-md">
-                  {paginatedOrders.map((ord) => {
-                    const isSelected = selectedOrder && (selectedOrder.id === ord.id || selectedOrder.orderId === ord.orderId);
-
-                    return (
-                      <tr
-                        key={ord.id}
-                        onClick={() => { setSelectedOrder(ord); setIsDrawerOpen(true); }}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? 'bg-amber-50/40 border-l-4 border-l-onyx-black font-semibold' : 'hover:bg-surface-container-low/60'
-                        }`}
-                      >
-                        {/* Order ID & Timer */}
-                        <td className="py-3.5 px-4 font-mono">
-                          <div className="flex items-center gap-1.5 font-bold text-onyx-black">
-                            <span>{ord.orderId}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); copyToClipboard(ord.orderId); }}
-                              className="text-secondary hover:text-onyx-black"
-                              title="Copy ID"
-                            >
-                              <span className="material-symbols-outlined text-[13px]">content_copy</span>
-                            </button>
-                          </div>
-                          <div className="inline-flex items-center gap-1 text-[10px] text-amber-800 font-bold mt-0.5">
-                            <span className="material-symbols-outlined text-[12px] text-amber-700">timer</span>
-                            <span>{formatTimer(ord.secondsLeft)} left</span>
-                          </div>
-                        </td>
-
-                        {/* Customer */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-onyx-black text-xs">{ord.customerName}</div>
-                          <div className="text-[11px] text-secondary font-mono font-medium">{ord.customerPhone}</div>
-                          <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] font-label-caps bg-surface-container text-clay-earth font-bold">
-                            {ord.customerTier}
-                          </span>
-                        </td>
-
-                        {/* Tiffin Item */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-onyx-black line-clamp-1">{ord.tiffinName}</div>
-                          <div className="text-[11px] text-emerald-800 font-medium flex items-center gap-1 mt-0.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                            <span>Pure Veg • {ord.quantity} Meal{ord.quantity > 1 ? 's' : ''}</span>
-                          </div>
-                        </td>
-
-                        {/* Total */}
-                        <td className="py-3.5 px-4 font-mono">
-                          <div className="font-bold text-onyx-black">₹{ord.grossAmount}.00</div>
-                          <div className="text-[10px] text-secondary font-semibold">Net: ₹{ord.netPayout}.00</div>
-                        </td>
-
-                        {/* Payment */}
-                        <td className="py-3.5 px-4">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-label-caps bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                            {ord.paymentStatus}
-                          </span>
-                          <div className="text-[10px] text-secondary mt-1 font-medium">Just now</div>
-                        </td>
-
-                        {/* Quick Action */}
-                        <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                          {isPreparingTab ? (
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateOrderStatus(ord.orderId, 'Ready')}
-                              className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
-                            >
-                              Ready
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateOrderStatus(ord.orderId, 'Preparing')}
-                              className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
-                            >
-                              Accept
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => setRejectingOrder(ord)}
-                            className="px-2.5 py-1.5 border border-sand-neutral/60 text-secondary hover:text-error hover:border-error rounded-lg text-xs transition-colors cursor-pointer"
-                            title="Cancel Order"
-                          >
-                            ✕
-                          </button>
-                        </td>
-
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Pagination Footer */}
-          <div className="p-4 bg-surface-container-low border-t border-sand-neutral/30 flex flex-col sm:flex-row items-center justify-between font-label-caps text-[11px] text-secondary gap-3 font-semibold">
-            <div>Page {currentPage} of {totalPages} • {filteredOrders.length} orders indexed</div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                className="px-3 py-1 rounded-lg bg-surface-container text-on-surface disabled:opacity-40 cursor-pointer font-bold"
-              >
-                Previous
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setCurrentPage(p)}
-                  className={`px-3 py-1 rounded-lg font-bold cursor-pointer ${
-                    currentPage === p ? 'bg-onyx-black text-bone-white' : 'bg-surface-container text-on-surface hover:bg-surface-container-highest'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-              <button
-                type="button"
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                className="px-3 py-1 rounded-lg bg-surface-container text-on-surface disabled:opacity-40 cursor-pointer font-bold"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Real-Time Order Details Docket (lg:col-span-5) */}
-        {selectedOrder && isDrawerOpen && (
-          <div className="lg:col-span-5 bg-surface-container-lowest rounded-2xl border border-sand-neutral/50 shadow-sm overflow-hidden flex flex-col animate-scale-in">
-            
-            {/* Docket Header */}
-            <div className="p-5 bg-surface-container-low border-b border-sand-neutral/40">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-secondary">ORDER INSPECTION</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-label-caps bg-amber-100 text-amber-900 font-bold border border-amber-300">
-                      {selectedOrder.status.toUpperCase()}
-                    </span>
-                  </div>
-                  <h2 className="font-headline-md text-2xl text-onyx-black font-normal mt-1">{selectedOrder.orderId}</h2>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 text-xs font-mono font-bold">
-                    <span className="material-symbols-outlined text-[14px] text-amber-700">alarm</span>
-                    <span>{formatTimer(selectedOrder.secondsLeft)}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => showToast(`🖨️ KOT Ticket printed for Order ${selectedOrder.orderId}`)}
-                    className="p-1.5 rounded-lg hover:bg-surface-container text-secondary cursor-pointer"
-                    title="Print KOT Ticket"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">print</span>
-                  </button>
-                </div>
-              </div>
-              <p className="text-xs text-secondary mt-1 font-medium">
-                {isPreparingTab
-                  ? 'Active in kitchen prep. Mark ready once all compartments are sealed.'
-                  : 'Auto-reject fallback if no confirmation within window to avoid kitchen bottleneck.'
-                }
-              </p>
-            </div>
-
-            <div className="p-5 space-y-6 flex-1 overflow-y-auto max-h-[720px]">
-              
-              {/* Customer Identity Card */}
-              <div className="bg-surface-container-low p-4 rounded-xl border border-sand-neutral/30 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-label-caps text-clay-earth uppercase tracking-wider font-bold">Customer Dossier</span>
-                  <span className="text-[10px] font-mono text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-bold">
-                    {selectedOrder.customerTier}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-onyx-black text-sm">{selectedOrder.customerName}</div>
-                    <div className="text-xs font-mono text-secondary font-bold">{selectedOrder.customerPhone}</div>
-                  </div>
-                  <a
-                    href={`tel:${selectedOrder.customerPhone}`}
-                    className="p-2 rounded-lg bg-surface-container hover:bg-surface-container-highest text-onyx-black cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">call</span>
-                  </a>
-                </div>
-                <div className="pt-2 border-t border-sand-neutral/40 text-xs space-y-1 font-medium">
-                  <div className="flex items-start gap-1.5 text-secondary">
-                    <span className="material-symbols-outlined text-[16px] text-onyx-black shrink-0 mt-0.5">location_on</span>
-                    <span className="text-on-surface">{selectedOrder.customerAddress} ({selectedOrder.deliveryDistance} away)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-secondary pl-5 text-[11px]">
-                    <span className="material-symbols-outlined text-[14px]">moped</span>
-                    <span>Mode: <strong className="text-onyx-black">{selectedOrder.deliveryMode}</strong> • Pickup: <strong>{selectedOrder.deliveryTarget}</strong></span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tiffin Manifest */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-label-caps text-clay-earth uppercase tracking-wider font-bold">Tiffin Manifest</span>
-                  <span className="text-xs font-mono text-secondary font-bold">Station: #ST-NORTH-2</span>
-                </div>
-                <div className="p-4 rounded-xl border border-sand-neutral/40 space-y-3 bg-surface-container-lowest">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 border border-emerald-700 p-0.5 flex items-center justify-center">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-700"></span>
-                        </span>
-                        <h3 className="font-bold text-sm text-onyx-black">{selectedOrder.quantity} × {selectedOrder.tiffinName}</h3>
-                      </div>
-                      <p className="text-xs text-secondary mt-0.5 font-medium">{selectedOrder.tiffinNotes}</p>
-                    </div>
-                    <span className="font-mono text-xs font-bold text-onyx-black">₹{selectedOrder.subtotal}.00</span>
-                  </div>
-
-                  {/* Item Breakdown */}
-                  <div className="bg-surface-container-low p-3 rounded-lg text-[11px] text-secondary space-y-1 font-medium border border-sand-neutral/30">
-                    <div className="font-bold text-onyx-black">Tiffin Compartments & Sides:</div>
-                    <ul className="list-disc list-inside space-y-0.5 ml-1">
-                      {selectedOrder.itemsBreakdown.map((item, i) => (
-                        <li key={i}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Special Instructions */}
-                  {selectedOrder.specialInstructions && (
-                    <div className="p-3 rounded-lg bg-amber-50/80 border border-amber-200/70 text-xs">
-                      <div className="flex items-center gap-1 text-amber-900 font-bold mb-0.5">
-                        <span className="material-symbols-outlined text-[14px]">edit_note</span>
-                        <span>Customer Dietary & Delivery Notes:</span>
-                      </div>
-                      <p className="text-amber-950 text-[11px] leading-relaxed font-medium">
-                        "{selectedOrder.specialInstructions}"
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Financial Ledger */}
-              <div className="space-y-2">
-                <span className="text-[11px] font-label-caps text-clay-earth uppercase tracking-wider font-bold">Ledger & Payout Audit</span>
-                <div className="p-4 bg-surface-container-low rounded-xl border border-sand-neutral/30 text-xs space-y-1.5 font-mono">
-                  <div className="flex justify-between text-secondary font-medium">
-                    <span>Items Subtotal ({selectedOrder.quantity} units)</span>
-                    <span>₹{selectedOrder.subtotal}.00</span>
-                  </div>
-                  <div className="flex justify-between text-secondary font-medium">
-                    <span>Eco-Packaging Surcharge</span>
-                    <span>+ ₹{selectedOrder.packagingFee}.00</span>
-                  </div>
-                  <div className="flex justify-between text-secondary font-medium">
-                    <span>Standard Delivery Logistics</span>
-                    <span>+ ₹{selectedOrder.deliveryFee}.00</span>
-                  </div>
-                  <div className="flex justify-between border-t border-sand-neutral/40 pt-2 font-bold text-onyx-black text-sm">
-                    <span>Customer Paid Total</span>
-                    <span>₹{selectedOrder.grossAmount}.00</span>
-                  </div>
-
-                  <div className="pt-2 mt-1 border-t border-dashed border-sand-neutral/50 flex justify-between items-center text-xs">
-                    <div>
-                      <span className="text-emerald-900 font-bold block">Net Kitchen Payout</span>
-                      <span className="text-[10px] text-secondary font-sans font-medium">Platform fee cut (12.5%) applied</span>
-                    </div>
-                    <span className="text-sm font-bold text-emerald-800 font-mono">₹{selectedOrder.netPayout}.00</span>
-                  </div>
-                  <div className="pt-1 text-[10px] text-secondary flex items-center gap-1 font-sans font-semibold">
-                    <span className="material-symbols-outlined text-[12px] text-emerald-700">lock</span>
-                    <span>Settlement UTR: <strong>{selectedOrder.utr}</strong> (Escrow Locked)</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Action Footer */}
-            <div className="p-4 bg-surface-container-low border-t border-sand-neutral/40 space-y-2.5">
-              {selectedOrder.status === 'Preparing' || isPreparingTab ? (
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateOrderStatus(selectedOrder.orderId, 'Ready')}
-                    className="col-span-2 py-3 px-4 bg-onyx-black hover:bg-stone-800 text-bone-white font-button-text text-button-text text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span>
-                    <span>Mark as Ready (Advance)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRejectingOrder(selectedOrder)}
-                    className="col-span-1 py-3 px-3 border border-sand-neutral/60 bg-surface-container-lowest hover:bg-error-container hover:text-on-error-container hover:border-error rounded-lg text-xs font-button-text transition-colors flex items-center justify-center gap-1 text-secondary cursor-pointer font-bold"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">cancel</span>
-                    <span>Cancel</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleUpdateOrderStatus(selectedOrder.orderId, 'Preparing')}
-                    className="col-span-2 py-3 px-4 bg-onyx-black hover:bg-stone-800 text-bone-white font-button-text text-button-text text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span>
-                    <span>Accept Order (Start Prep)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRejectingOrder(selectedOrder)}
-                    className="col-span-1 py-3 px-3 border border-sand-neutral/60 bg-surface-container-lowest hover:bg-error-container hover:text-on-error-container hover:border-error rounded-lg text-xs font-button-text transition-colors flex items-center justify-center gap-1 text-secondary cursor-pointer font-bold"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">cancel</span>
-                    <span>Decline</span>
-                  </button>
+       {/* Rejection Modal */}
                 </div>
               )}
             </div>

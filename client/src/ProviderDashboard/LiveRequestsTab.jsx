@@ -67,11 +67,20 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
 
       if (json && json.success && Array.isArray(json.data)) {
         const now = Date.now();
+        // Deduplicate incoming raw data from server
+        const seenReqIds = new Set();
+        const uniqueRawData = json.data.filter(r => {
+          const key = String(r._id || r.id || r.requestId || r.orderId || '').trim();
+          if (key && seenReqIds.has(key)) return false;
+          if (key) seenReqIds.add(key);
+          return true;
+        });
+
         setRequests(prev => {
           const previousIds = new Set(prev.map(p => p.dbId || p.id));
           let hasNewItem = false;
 
-          const updatedList = json.data.map((r, i) => {
+          const updatedList = uniqueRawData.map((r, i) => {
             const existing = prev.find(p => (p.dbId === r._id || p.id === r.id));
             if (!previousIds.has(r._id) && !previousIds.has(r.id) && !isInitial) {
               hasNewItem = true;

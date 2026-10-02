@@ -87,7 +87,6 @@ export default function SubscriptionsTab() {
     try {
       setLoading(true);
       const queryParams = new URLSearchParams({
-        providerId: 'prov_1',
         search: searchQuery,
         status: statusFilter,
         plan: planFilter,

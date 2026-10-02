@@ -37,6 +37,8 @@ const providerSchema = new mongoose.Schema({
   },
   cuisines: { type: String, default: '' },
   maxMeals: { type: String, default: '' },
+  maxCapacity: { type: Number, default: 30 },
+  avgPrepTime: { type: String, default: '15 min' },
   opens: { type: String, default: '' },
   closes: { type: String, default: '' },
   sameDayDelivery: { type: Boolean, default: false },

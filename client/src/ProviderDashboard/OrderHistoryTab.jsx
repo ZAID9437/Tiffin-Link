@@ -30,12 +30,20 @@ export default function OrderHistoryTab() {
   const fetchHistoryOrders = async () => {
     try {
       setLoading(true);
-      const json = await apiRequest('/orders/provider');
-      if (json.success && Array.isArray(json.orders)) {
-        setOrders(json.orders);
-      } else if (json.success && Array.isArray(json.data)) {
-        setOrders(json.data);
-      }
+      const json = await apiRequest('/orders');
+      const rawList = Array.isArray(json?.orders) ? json.orders : Array.isArray(json?.data) ? json.data : [];
+      const seenIds = new Set();
+      const seenOrderIds = new Set();
+      const unique = rawList.filter(o => {
+        const idStr = String(o._id || o.id || '').trim();
+        const ordIdStr = String(o.orderId || '').trim();
+        if (idStr && seenIds.has(idStr)) return false;
+        if (ordIdStr && seenOrderIds.has(ordIdStr)) return false;
+        if (idStr) seenIds.add(idStr);
+        if (ordIdStr) seenOrderIds.add(ordIdStr);
+        return true;
+      });
+      setOrders(unique);
     } catch (err) {
       console.error('Error fetching order history from MongoDB:', err);
     } finally {

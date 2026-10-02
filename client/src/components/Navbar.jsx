@@ -69,7 +69,8 @@ export default function Navbar({
       return [
         { label: 'For Diners', href: '#', id: 'home' },
         { label: 'For Providers', href: '#provider', id: 'provider' },
-        { label: 'For Deliverers', href: '#delivery', id: 'delivery' }
+        { label: 'For Deliverers', href: '#delivery', id: 'delivery' },
+        { label: 'Super Admin', href: '#/admin', id: 'admin' }
       ];
     }
 
@@ -81,7 +82,8 @@ export default function Navbar({
         { label: 'Explore Tiffins', href: '#explore', id: 'explore' },
         { label: 'My Orders', href: '#orders', id: 'orders' },
         { label: 'Favorites', href: '#favorites', id: 'favorites' },
-        { label: 'Cart', href: '#cart', id: 'cart' }
+        { label: 'Cart', href: '#cart', id: 'cart' },
+        { label: 'Super Admin', href: '#/admin', id: 'admin' }
       ];
     }
 
@@ -90,7 +92,8 @@ export default function Navbar({
         { label: 'Dashboard', href: '#provider', id: 'provider' },
         { label: 'My Tiffins', href: '#my-tiffins', id: 'my-tiffins' },
         { label: 'Orders', href: '#provider-orders', id: 'provider-orders' },
-        { label: 'Earnings', href: '#provider-earnings', id: 'provider-earnings' }
+        { label: 'Earnings', href: '#provider-earnings', id: 'provider-earnings' },
+        { label: 'Super Admin', href: '#/admin', id: 'admin' }
       ];
     }
 
@@ -98,18 +101,18 @@ export default function Navbar({
       return [
         { label: 'Dashboard', href: '#delivery', id: 'delivery' },
         { label: 'My Deliveries', href: '#my-deliveries', id: 'my-deliveries' },
-        { label: 'Earnings', href: '#delivery-earnings', id: 'delivery-earnings' }
+        { label: 'Earnings', href: '#delivery-earnings', id: 'delivery-earnings' },
+        { label: 'Super Admin', href: '#/admin', id: 'admin' }
       ];
     }
 
     if (role === 'admin') {
       return [
-        { label: 'Dashboard', href: '#admin', id: 'admin' },
-        { label: 'Users', href: '#admin-users', id: 'admin-users' },
-        { label: 'Providers', href: '#admin-providers', id: 'admin-providers' },
-        { label: 'Tiffins', href: '#admin-tiffins', id: 'admin-tiffins' },
-        { label: 'Orders', href: '#admin-orders', id: 'admin-orders' },
-        { label: 'Reports', href: '#admin-reports', id: 'admin-reports' }
+        { label: 'Super Admin', href: '#/admin', id: 'admin' },
+        { label: 'Diner Portal', href: '#', id: 'home' },
+        { label: 'Providers', href: '#/admin/providers/all', id: 'admin-providers' },
+        { label: 'Customers', href: '#/admin/customers/all', id: 'admin-customers' },
+        { label: 'Orders', href: '#/admin/orders/all', id: 'admin-orders' }
       ];
     }
 
@@ -118,7 +121,8 @@ export default function Navbar({
       { label: 'Explore Tiffins', href: '#explore', id: 'explore' },
       { label: 'My Orders', href: '#orders', id: 'orders' },
       { label: 'Favorites', href: '#favorites', id: 'favorites' },
-      { label: 'Cart', href: '#cart', id: 'cart' }
+      { label: 'Cart', href: '#cart', id: 'cart' },
+      { label: 'Super Admin', href: '#/admin', id: 'admin' }
     ];
   };
 
@@ -205,6 +209,17 @@ export default function Navbar({
                     </span>
                   </div>
                   <div className="space-y-1 text-xs">
+                    <a 
+                      href="#/admin" 
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-black/5 font-semibold transition-colors flex items-center justify-between text-onyx-black"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>🛡️</span>
+                        <span>Super Admin Portal</span>
+                      </span>
+                      <span>➔</span>
+                    </a>
                     <button 
                       onClick={() => { setIsUserMenuOpen(false); if (onLogout) onLogout(); }}
                       className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 font-bold transition-colors flex items-center justify-between"

@@ -33,7 +33,7 @@ const driverSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['AVAILABLE', 'BUSY', 'OFFLINE'],
+    enum: ['AVAILABLE', 'BUSY', 'OFFLINE', 'PAUSED'],
     default: 'AVAILABLE'
   },
   activeDeliveries: {

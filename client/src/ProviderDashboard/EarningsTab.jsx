@@ -1,627 +1,1655 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  DollarSign, 
-  TrendingUp, 
-  Clock, 
-  ArrowUpRight, 
-  CheckCircle, 
-  X, 
-  Download, 
-  RotateCw, 
-  Calendar, 
-  ShoppingBag, 
-  FileSpreadsheet, 
-  ChevronLeft, 
-  ChevronRight,
-  Filter,
-  PieChart
-} from 'lucide-react';
-
 import { apiRequest } from '../services/api';
 
-export default function EarningsTab({ currentUser }) {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  
-  // Period & Date Filter States
-  const [periodFilter, setPeriodFilter] = useState('All Time');
-  const [paymentMethodFilter, setPaymentMethodFilter] = useState('All');
-  const [tiffinFilter, setTiffinFilter] = useState('All');
-  const [chartRange, setChartRange] = useState('ALL'); // '7D' | '30D' | 'ALL'
-  const [customFromDate, setCustomFromDate] = useState('');
-  const [customToDate, setCustomToDate] = useState('');
+export default function EarningsTab({ currentUser, initialSubTab = 'earnings' }) {
+  // Active Sub-Tab state ('earnings' | 'transactions' | 'incentives' | 'wallet' | 'bank-payout')
+  const [activeSubTab, setActiveSubTab] = useState(initialSubTab || 'earnings');
 
-  // Hover Tooltip State for Chart
-  const [hoveredDay, setHoveredDay] = useState(null);
-
-  // Pagination State for Recent Transactions
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
-
+  // Update when prop changes from sidebar navigation
   useEffect(() => {
-    if (currentUser) {
-      fetchOrdersFromDb();
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
     }
-  }, [currentUser]);
+  }, [initialSubTab]);
 
-  const showToast = (msg) => {
+  // Global Toast & Notification
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('success');
+
+  const showToast = (msg, type = 'success') => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 3000);
+    setToastType(type);
+    setTimeout(() => setToastMessage(''), 4000);
   };
 
-  const fetchOrdersFromDb = async () => {
+  // ==========================================
+  // STATE 1: EARNINGS OVERVIEW
+  // ==========================================
+  const [earningsData, setEarningsData] = useState(null);
+  const [earningsLoading, setEarningsLoading] = useState(false);
+  const [earningsError, setEarningsError] = useState(null);
+  const [earningsPeriod, setEarningsPeriod] = useState('This Month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+
+  const fetchEarningsOverview = async () => {
     try {
-      setLoading(true);
-      const res = await apiRequest('/orders');
+      setEarningsLoading(true);
+      setEarningsError(null);
+      let url = `/provider/earnings/overview?period=${encodeURIComponent(earningsPeriod)}`;
+      if (earningsPeriod === 'Custom Range' && customFrom && customTo) {
+        url += `&startDate=${customFrom}&endDate=${customTo}`;
+      }
+      const res = await apiRequest(url);
       const json = typeof res?.json === 'function' ? await res.json() : res;
-      if (json && json.success && Array.isArray(json.data)) {
-        setOrders(json.data.map(o => ({
-          ...o,
-          id: o._id || o.id
-        })));
+      if (json && json.success) {
+        const raw = json.data || {};
+        const chartData = (raw.chartData || []).map(c => ({
+          ...c,
+          amount: c.amount ?? c.revenue ?? 0,
+          label: c.label ?? c.day ?? c.date ?? ''
+        }));
+        setEarningsData({
+          ...raw,
+          summary: {
+            today: raw.summary?.today ?? raw.todayEarnings ?? 0,
+            thisWeek: raw.summary?.thisWeek ?? raw.weekEarnings ?? 0,
+            thisMonth: raw.summary?.thisMonth ?? raw.monthEarnings ?? 0,
+            availableBalance: raw.summary?.availableBalance ?? raw.availableBalance ?? 0,
+            grossPeriod: raw.summary?.grossPeriod ?? raw.grossPeriodEarnings ?? 0,
+          },
+          chartData
+        });
+      } else {
+        setEarningsError(json?.message || 'Unable to load earnings overview from server. Please retry.');
       }
     } catch (err) {
-      console.error('Error fetching orders for earnings calculation:', err);
+      console.error('Error fetching earnings overview:', err);
+      setEarningsError('Unable to load earnings overview from server. Please retry.');
     } finally {
-      setLoading(false);
+      setEarningsLoading(false);
     }
   };
 
-  // Sync handlers for Period Filter dropdown and Chart Range buttons
-  const handlePeriodChange = (newPeriod) => {
-    setPeriodFilter(newPeriod);
-    setCurrentPage(1);
-    if (newPeriod === 'This Week') setChartRange('7D');
-    else if (newPeriod === 'This Month') setChartRange('30D');
-    else if (newPeriod === 'Last 3 Months') setChartRange('90D');
-    else if (newPeriod === 'This Year') setChartRange('1Y');
+  useEffect(() => {
+    if (activeSubTab === 'earnings' || activeSubTab === 'earnings-overview') {
+      fetchEarningsOverview();
+    }
+  }, [activeSubTab, earningsPeriod, customFrom, customTo]);
+
+  // ==========================================
+  // STATE 2: TRANSACTIONS
+  // ==========================================
+  const [txns, setTxns] = useState([]);
+  const [txnSummary, setTxnSummary] = useState({ totalVolume: 0, count: 0, completedCount: 0, pendingCount: 0, withdrawnVolume: 0 });
+  const [txnLoading, setTxnLoading] = useState(false);
+  const [txnError, setTxnError] = useState(null);
+  const [txnSearch, setTxnSearch] = useState('');
+  const [txnTypeFilter, setTxnTypeFilter] = useState('ALL');
+  const [txnStatusFilter, setTxnStatusFilter] = useState('ALL');
+  const [txnSort, setTxnSort] = useState('newest');
+  const [txnPage, setTxnPage] = useState(1);
+  const [txnTotalPages, setTxnTotalPages] = useState(1);
+  const [selectedTxn, setSelectedTxn] = useState(null);
+
+  const fetchTransactions = async () => {
+    try {
+      setTxnLoading(true);
+      setTxnError(null);
+      const query = new URLSearchParams({
+        page: txnPage,
+        limit: 8,
+        search: txnSearch,
+        type: txnTypeFilter,
+        status: txnStatusFilter,
+        sort: txnSort
+      }).toString();
+
+      const res = await apiRequest(`/provider/earnings/transactions?${query}`);
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+      if (json && json.success) {
+        setTxns(json.data || []);
+        if (json.summary) setTxnSummary(json.summary);
+        if (json.pagination) setTxnTotalPages(json.pagination.pages || 1);
+      } else {
+        setTxnError(json?.message || 'Unable to load transaction records.');
+      }
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+      setTxnError('Failed to connect to transaction service.');
+    } finally {
+      setTxnLoading(false);
+    }
   };
 
-  const handleRangeChange = (newRange) => {
-    setChartRange(newRange);
-    setCurrentPage(1);
-    if (newRange === '7D') setPeriodFilter('This Week');
-    else if (newRange === '30D') setPeriodFilter('This Month');
-    else if (newRange === '90D') setPeriodFilter('Last 3 Months');
-    else if (newRange === '1Y') setPeriodFilter('This Year');
+  useEffect(() => {
+    if (activeSubTab === 'transactions') {
+      fetchTransactions();
+    }
+  }, [activeSubTab, txnPage, txnTypeFilter, txnStatusFilter, txnSort]);
+
+  const handleTxnSearchSubmit = (e) => {
+    e.preventDefault();
+    setTxnPage(1);
+    fetchTransactions();
   };
 
-  // Filter Orders based on selected Period Filter
-  const filterOrdersByPeriod = (orderList) => {
-    const now = new Date();
-    return orderList.filter(ord => {
-      const orderDate = new Date(ord.createdAt);
-      if (periodFilter === 'This Week') {
-        const oneWeekAgo = new Date(now.valueOf() - 7 * 24 * 60 * 60 * 1000);
-        return orderDate >= oneWeekAgo;
+  // ==========================================
+  // STATE 3: INCENTIVES
+  // ==========================================
+  const [incentivesData, setIncentivesData] = useState(null);
+  const [incentivesLoading, setIncentivesLoading] = useState(false);
+  const [incentivesError, setIncentivesError] = useState(null);
+
+  const fetchIncentives = async () => {
+    try {
+      setIncentivesLoading(true);
+      setIncentivesError(null);
+      const res = await apiRequest('/provider/incentives');
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+      if (json && json.success) {
+        setIncentivesData(json.data);
+      } else {
+        setIncentivesError(json?.message || 'Unable to load incentives.');
       }
-      if (periodFilter === 'This Month') {
-        return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
-      }
-      if (periodFilter === 'Last Month') {
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        return orderDate.getMonth() === lastMonth.getMonth() && orderDate.getFullYear() === lastMonth.getFullYear();
-      }
-      if (periodFilter === 'Last 3 Months') {
-        const threeMonthsAgo = new Date(now.valueOf() - 90 * 24 * 60 * 60 * 1000);
-        return orderDate >= threeMonthsAgo;
-      }
-      if (periodFilter === 'This Year') {
-        return orderDate.getFullYear() === now.getFullYear();
-      }
-      if (periodFilter === 'Custom Range') {
-        if (!customFromDate || !customToDate) return true;
-        const from = new Date(customFromDate);
-        const to = new Date(customToDate);
-        to.setHours(23, 59, 59);
-        return orderDate >= from && orderDate <= to;
-      }
-      return true;
-    });
+    } catch (err) {
+      console.error('Error fetching incentives:', err);
+      setIncentivesError('Failed to fetch incentive programs.');
+    } finally {
+      setIncentivesLoading(false);
+    }
   };
 
-  const filteredOrders = filterOrdersByPeriod(orders);
-
-  // Financial Metric Calculations
-  const completedOrders = filteredOrders.filter(o => o.status === 'Completed' || o.status === 'Ready' || o.status === 'Preparing');
-  const cancelledOrders = filteredOrders.filter(o => o.status === 'Cancelled');
-
-  const grossRevenue = completedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-  const refundsAmount = cancelledOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-  const deliveryPlatformFees = completedOrders.reduce((sum, o) => sum + (o.deliveryFee || 45) + (o.packagingFee || 15), 0);
-  const netEarnings = Math.max(0, grossRevenue - deliveryPlatformFees);
-
-  const completedOrdersCount = completedOrders.length;
-  const avgOrderValue = completedOrdersCount > 0 ? Math.round(grossRevenue / completedOrdersCount) : 0;
-
-  // Dynamic Day Breakdown for Chart Graphic based on chartRange ('7D', '30D', '90D', '1Y')
-  const getChartData = () => {
-    const now = new Date();
-
-    if (chartRange === '7D') {
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return days.map((day, idx) => {
-        const dayOrders = completedOrders.filter(o => new Date(o.createdAt).getDay() === (idx + 1) % 7);
-        const dayRev = dayOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-        return {
-          day,
-          revenue: dayRev || (idx + 1) * 350 + 250,
-          ordersCount: dayOrders.length || idx + 1
-        };
-      });
+  useEffect(() => {
+    if (activeSubTab === 'incentives' || activeSubTab === 'incentives-and-bonuses') {
+      fetchIncentives();
     }
+  }, [activeSubTab]);
 
-    if (chartRange === '30D') {
-      const weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
-      return weeks.map((wLabel, idx) => {
-        const weekOrders = completedOrders.filter(o => {
-          const od = new Date(o.createdAt);
-          const dayOfMonth = od.getDate();
-          return dayOfMonth >= idx * 7 + 1 && dayOfMonth < (idx + 1) * 7 + 1;
-        });
-        const weekRev = weekOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-        return {
-          day: wLabel,
-          revenue: weekRev || (idx + 1) * 1400 + 800,
-          ordersCount: weekOrders.length || (idx + 1) * 3
-        };
-      });
-    }
+  // ==========================================
+  // STATE 4: WALLET & WITHDRAWALS
+  // ==========================================
+  const [walletData, setWalletData] = useState(null);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletError, setWalletError] = useState(null);
 
-    if (chartRange === '90D') {
-      const months = [];
-      for (let i = 2; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const mLabel = d.toLocaleDateString('en-US', { month: 'short' });
-        const monthOrders = completedOrders.filter(o => {
-          const od = new Date(o.createdAt);
-          return od.getMonth() === d.getMonth() && od.getFullYear() === d.getFullYear();
-        });
-        const monthRev = monthOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-        months.push({
-          day: mLabel,
-          revenue: monthRev || (3 - i) * 3200 + 1500,
-          ordersCount: monthOrders.length || (3 - i) * 8
-        });
+  // Withdrawal Request Modal Form State
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawDestination, setWithdrawDestination] = useState('bank');
+  const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
+  const [withdrawFormError, setWithdrawFormError] = useState('');
+
+  const fetchWalletAndWithdrawals = async () => {
+    try {
+      setWalletLoading(true);
+      setWalletError(null);
+      const [walletRes, withdrawRes] = await Promise.all([
+        apiRequest('/provider/wallet'),
+        apiRequest('/provider/withdrawals')
+      ]);
+
+      const walletJson = typeof walletRes?.json === 'function' ? await walletRes.json() : walletRes;
+      const withdrawJson = typeof withdrawRes?.json === 'function' ? await withdrawRes.json() : withdrawRes;
+
+      if (walletJson && walletJson.success) {
+        setWalletData(walletJson.data);
       }
-      return months;
+      if (withdrawJson && withdrawJson.success) {
+        setWithdrawals(withdrawJson.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching wallet/withdrawals:', err);
+      setWalletError('Unable to load wallet and payout data.');
+    } finally {
+      setWalletLoading(false);
     }
-
-    if (chartRange === '1Y') {
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return monthNames.map((mLabel, idx) => {
-        const monthOrders = completedOrders.filter(o => {
-          const od = new Date(o.createdAt);
-          return od.getMonth() === idx;
-        });
-        const monthRev = monthOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-        return {
-          day: mLabel,
-          revenue: monthRev || ((idx % 4) + 1) * 2800 + 1200,
-          ordersCount: monthOrders.length || ((idx % 4) + 1) * 6
-        };
-      });
-    }
-
-    return [];
   };
 
-  const chartDataDays = getChartData();
-  const maxChartRev = Math.max(...chartDataDays.map(d => d.revenue), 1000);
+  useEffect(() => {
+    if (activeSubTab === 'wallet' || activeSubTab === 'wallet-and-withdrawals') {
+      fetchWalletAndWithdrawals();
+    }
+  }, [activeSubTab]);
 
-  // CSV Export Handler
-  const handleExportCSV = () => {
-    if (filteredOrders.length === 0) {
-      showToast('⚠️ No financial transactions available to export');
+  const handleRequestWithdrawal = async (e) => {
+    e.preventDefault();
+    setWithdrawFormError('');
+    const amt = parseFloat(withdrawAmount);
+
+    if (!amt || isNaN(amt) || amt <= 0) {
+      setWithdrawFormError('Please enter a valid withdrawal amount greater than ₹0.');
       return;
     }
 
-    const headers = ['Order ID', 'Customer Name', 'Tiffin Name', 'Quantity', 'Amount (INR)', 'Payment Status', 'Order Status', 'Date'];
-    const rows = filteredOrders.map(o => [
-      o.orderId,
-      `"${o.customerName}"`,
-      `"${o.tiffinName}"`,
-      o.quantity,
-      o.totalAmount,
-      o.paymentStatus,
-      o.status,
-      new Date(o.createdAt).toLocaleDateString()
-    ]);
+    if (walletData && amt > walletData.availableBalance) {
+      setWithdrawFormError(`Insufficient available balance. Max available: ₹${walletData.availableBalance}`);
+      return;
+    }
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `TiffinLink_Earnings_${periodFilter.replace(/\s+/g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (amt < 500) {
+      setWithdrawFormError('Minimum withdrawal amount is ₹500.');
+      return;
+    }
 
-    showToast('✓ Exported Earnings CSV Report!');
+    try {
+      setWithdrawSubmitting(true);
+      const res = await apiRequest('/provider/withdrawals/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amt,
+          destinationType: withdrawDestination
+        })
+      });
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+
+      if (json && json.success) {
+        showToast('✓ Withdrawal request submitted successfully! Status: PENDING validation.', 'success');
+        setShowWithdrawModal(false);
+        setWithdrawAmount('');
+        fetchWalletAndWithdrawals();
+      } else {
+        setWithdrawFormError(json?.message || 'Withdrawal request failed. Please verify payout account details.');
+      }
+    } catch (err) {
+      console.error('Error requesting withdrawal:', err);
+      setWithdrawFormError('Failed to submit withdrawal request. Check backend connection.');
+    } finally {
+      setWithdrawSubmitting(false);
+    }
   };
 
-  // Pagination Logic for Transactions
-  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
-  const paginatedTransactions = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  // ==========================================
+  // STATE 5: BANK & PAYOUT DETAILS
+  // ==========================================
+  const [payoutDoc, setPayoutDoc] = useState(null);
+  const [payoutLoading, setPayoutLoading] = useState(false);
+  const [payoutError, setPayoutError] = useState(null);
+  const [showPayoutEditModal, setShowPayoutEditModal] = useState(false);
+  const [payoutForm, setPayoutForm] = useState({
+    accountHolderName: '',
+    bankName: '',
+    accountNumber: '',
+    confirmAccountNumber: '',
+    ifscCode: '',
+    upiId: ''
+  });
+  const [payoutFormError, setPayoutFormError] = useState('');
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
+
+  const fetchPayoutAccount = async () => {
+    try {
+      setPayoutLoading(true);
+      setPayoutError(null);
+      const res = await apiRequest('/provider/payout-account');
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+
+      if (json && json.success) {
+        setPayoutDoc(json.data);
+        if (json.data) {
+          setPayoutForm({
+            accountHolderName: json.data.accountHolderName || '',
+            bankName: json.data.bankName || '',
+            accountNumber: '',
+            confirmAccountNumber: '',
+            ifscCode: json.data.ifscCode || '',
+            upiId: json.data.upiId || ''
+          });
+        }
+      } else {
+        setPayoutError(json?.message || 'Unable to load payout account details.');
+      }
+    } catch (err) {
+      console.error('Error fetching payout account:', err);
+      setPayoutError('Failed to retrieve bank payout details.');
+    } finally {
+      setPayoutLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'bank-payout' || activeSubTab === 'bank-and-payout-details') {
+      fetchPayoutAccount();
+    }
+  }, [activeSubTab]);
+
+  const handleUpdatePayoutAccount = async (e) => {
+    e.preventDefault();
+    setPayoutFormError('');
+
+    if (!payoutForm.accountHolderName || !payoutForm.bankName) {
+      setPayoutFormError('Please fill in Account Holder Name and Bank Name.');
+      return;
+    }
+
+    if (payoutForm.accountNumber || payoutForm.confirmAccountNumber) {
+      if (payoutForm.accountNumber !== payoutForm.confirmAccountNumber) {
+        setPayoutFormError('Bank Account Numbers do not match. Please re-check.');
+        return;
+      }
+      if (!payoutForm.ifscCode || payoutForm.ifscCode.length < 4) {
+        setPayoutFormError('Please provide a valid 11-digit IFSC code.');
+        return;
+      }
+    }
+
+    try {
+      setPayoutSubmitting(true);
+      const res = await apiRequest('/provider/payout-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payoutForm)
+      });
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+
+      if (json && json.success) {
+        showToast('✓ Bank & payout account updated & verified successfully!', 'success');
+        setShowPayoutEditModal(false);
+        fetchPayoutAccount();
+      } else {
+        setPayoutFormError(json?.message || 'Failed to update payout account details.');
+      }
+    } catch (err) {
+      console.error('Error updating payout account:', err);
+      setPayoutFormError('Error saving payout account details.');
+    } finally {
+      setPayoutSubmitting(false);
+    }
+  };
+
+  // Helper renderer for normalized tab name
+  const isTab = (key) => {
+    if (key === 'earnings') return activeSubTab === 'earnings' || activeSubTab === 'earnings-overview';
+    if (key === 'transactions') return activeSubTab === 'transactions';
+    if (key === 'incentives') return activeSubTab === 'incentives' || activeSubTab === 'incentives-and-bonuses';
+    if (key === 'wallet') return activeSubTab === 'wallet' || activeSubTab === 'wallet-and-withdrawals';
+    if (key === 'bank-payout') return activeSubTab === 'bank-payout' || activeSubTab === 'bank-and-payout-details';
+    return false;
+  };
 
   return (
-    <div className="space-y-6 animate-slide-up relative text-xs font-bold text-[#111827]">
-      
-      {/* Toast Notification Banner */}
+    <div className="flex flex-col w-full space-y-8 min-h-screen selection:bg-sand-neutral selection:text-onyx-black">
+
+      {/* Global Toast Alert */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[9999] bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
-          <CheckCircle size={17} />
-          <span className="font-extrabold">{toastMessage}</span>
+        <div className={`fixed bottom-6 right-6 z-[9999] px-6 py-3.5 border shadow-2xl flex items-center gap-3 font-mono text-xs animate-slide-up ${
+          toastType === 'error' 
+            ? 'bg-error text-on-error border-error-container' 
+            : 'bg-onyx-black text-on-primary border-sand-neutral'
+        }`}>
+          <span className="material-symbols-outlined text-[18px]">
+            {toastType === 'error' ? 'error' : 'check_circle'}
+          </span>
+          <span className="font-semibold">{toastMessage}</span>
         </div>
       )}
 
-      {/* Page Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-xs border border-[#E5ECE8] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-[#6B7280] mb-1">
-            <span>Provider</span>
-            <span>/</span>
-            <span className="text-[#0A8B5F] font-extrabold">Earnings</span>
-          </div>
-          <h1 className="text-2xl font-black text-[#111827] tracking-tight">Financial Earnings & Payouts</h1>
-          <p className="text-xs text-[#6B7280] font-medium mt-1">Track your tiffin business revenue, net earnings, fees and payouts.</p>
-        </div>
-
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <button 
-            onClick={() => { fetchOrdersFromDb(); showToast('✓ Refreshed earnings data!'); }}
-            className="px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+      {/* Top Navigation Bar for 5 Financial Views */}
+      <div className="bg-bone-white border border-sand-neutral p-2 flex items-center justify-between overflow-x-auto gap-2">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('earnings')}
+            className={`px-4 py-2 font-button-text text-xs uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
+              isTab('earnings')
+                ? 'bg-onyx-black text-on-primary font-semibold'
+                : 'text-secondary hover:text-onyx-black hover:bg-surface-container-high'
+            }`}
           >
-            <RotateCw size={14} className="text-[#0A8B5F]" />
-            <span>Refresh</span>
+            <span className="material-symbols-outlined text-[18px]">query_stats</span>
+            <span>Earnings Overview</span>
           </button>
 
-          <button 
-            onClick={handleExportCSV}
-            className="px-4 py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('transactions')}
+            className={`px-4 py-2 font-button-text text-xs uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
+              isTab('transactions')
+                ? 'bg-onyx-black text-on-primary font-semibold'
+                : 'text-secondary hover:text-onyx-black hover:bg-surface-container-high'
+            }`}
           >
-            <Download size={15} />
-            <span>Export CSV</span>
+            <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+            <span>Transactions</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('incentives')}
+            className={`px-4 py-2 font-button-text text-xs uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
+              isTab('incentives')
+                ? 'bg-onyx-black text-on-primary font-semibold'
+                : 'text-secondary hover:text-onyx-black hover:bg-surface-container-high'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">military_tech</span>
+            <span>Incentives & Bonuses</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('wallet')}
+            className={`px-4 py-2 font-button-text text-xs uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
+              isTab('wallet')
+                ? 'bg-onyx-black text-on-primary font-semibold'
+                : 'text-secondary hover:text-onyx-black hover:bg-surface-container-high'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
+            <span>Wallet & Withdrawals</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('bank-payout')}
+            className={`px-4 py-2 font-button-text text-xs uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
+              isTab('bank-payout')
+                ? 'bg-onyx-black text-on-primary font-semibold'
+                : 'text-secondary hover:text-onyx-black hover:bg-surface-container-high'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">account_balance</span>
+            <span>Bank & Payout</span>
           </button>
         </div>
+
+        <div className="hidden md:flex items-center gap-2 pr-2 font-mono text-[11px] text-secondary">
+          <span className="w-2 h-2 rounded-full bg-onyx-black animate-pulse"></span>
+          <span>LIVE MONGO LEDGER</span>
+        </div>
       </div>
 
-      {/* Period Filter Selector Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-[#E5ECE8] shadow-xs flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Filter size={15} className="text-[#0A8B5F]" />
-          <span className="text-xs font-black text-[#111827] uppercase tracking-wider">Period Filter:</span>
-          
-          <select 
-            value={periodFilter}
-            onChange={e => handlePeriodChange(e.target.value)}
-            className="px-3.5 py-2 bg-[#F9FBF9] border border-[#E5ECE8] text-xs font-extrabold text-[#111827] rounded-xl focus:outline-none cursor-pointer"
-          >
-            <option value="This Week">This Week</option>
-            <option value="This Month">This Month</option>
-            <option value="Last Month">Last Month</option>
-            <option value="Last 3 Months">Last 3 Months</option>
-            <option value="This Year">This Year</option>
-            <option value="Custom Range">Custom Range</option>
-          </select>
-        </div>
-
-        {/* Custom Range Picker */}
-        {periodFilter === 'Custom Range' && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <input 
-              type="date" 
-              value={customFromDate}
-              onChange={e => setCustomFromDate(e.target.value)}
-              className="px-3 py-1.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none"
-            />
-            <span className="text-[#6B7280]">to</span>
-            <input 
-              type="date" 
-              value={customToDate}
-              onChange={e => setCustomToDate(e.target.value)}
-              className="px-3 py-1.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* 4 Summary Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Card 1: Total Revenue */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider">TOTAL REVENUE</span>
-            <DollarSign size={17} className="text-[#0A8B5F]" />
-          </div>
-          <div className="text-3xl font-black text-[#111827]">₹{grossRevenue.toLocaleString()}</div>
-          <p className="text-[11px] text-[#0A8B5F] font-semibold mt-1">Gross sales from orders</p>
-        </div>
-
-        {/* Card 2: Net Earnings */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider">NET EARNINGS</span>
-            <TrendingUp size={17} className="text-emerald-600" />
-          </div>
-          <div className="text-3xl font-black text-emerald-700">₹{netEarnings.toLocaleString()}</div>
-          <p className="text-[11px] text-emerald-700 font-semibold mt-1">● Actual profit after fees</p>
-        </div>
-
-        {/* Card 3: Orders Count */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider">FULFILLED ORDERS</span>
-            <ShoppingBag size={17} className="text-indigo-600" />
-          </div>
-          <div className="text-3xl font-black text-[#111827]">{completedOrdersCount}</div>
-          <p className="text-[11px] text-indigo-700 font-semibold mt-1">Completed orders</p>
-        </div>
-
-        {/* Card 4: Avg Order Value */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider">AVG ORDER VALUE</span>
-            <PieChart size={17} className="text-amber-600" />
-          </div>
-          <div className="text-3xl font-black text-[#111827]">₹{avgOrderValue}</div>
-          <p className="text-[11px] text-amber-700 font-semibold mt-1">Average per customer</p>
-        </div>
-
-      </div>
-
-      {/* Main Content Grid: Revenue Overview Chart & Earnings Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left Column: Revenue Overview SVG Graphic (8 Cols) */}
-        <div className="lg:col-span-8 bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5ECE8] pb-3">
-            <div>
-              <h3 className="text-base font-black text-[#111827]">Revenue Overview</h3>
-              <p className="text-[11px] text-[#6B7280] font-medium">Daily income trend for your tiffin kitchen.</p>
+      {/* ========================================================================= */}
+      {/* PART 1 — EARNINGS OVERVIEW VIEW                                          */}
+      {/* ========================================================================= */}
+      {isTab('earnings') && (
+        <div className="space-y-8 animate-slide-up">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-secondary font-label-caps text-label-caps uppercase tracking-widest">
+                <span>Provider</span>
+                <span>/</span>
+                <span>Earnings & Payments</span>
+                <span>/</span>
+                <span className="text-onyx-black font-semibold">Earnings Overview</span>
+              </div>
+              <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-none">
+                Earnings Overview
+              </h1>
+              <p className="font-body-md text-body-md text-clay-earth max-w-2xl">
+                Real-time financial summary calculated strictly from verified MongoDB kitchen transactions.
+              </p>
             </div>
 
-            <div className="flex items-center gap-1 bg-[#F9FBF9] p-1 rounded-xl border border-[#E5ECE8]">
-              {['7D', '30D', '90D', '1Y'].map((rng) => (
-                <button 
-                  key={rng}
-                  onClick={() => handleRangeChange(rng)}
-                  className={`px-3 py-1 rounded-lg text-xs font-extrabold cursor-pointer transition-all ${
-                    chartRange === rng ? 'bg-[#0A8B5F] text-white shadow-xs' : 'text-[#6B7280] hover:bg-white'
-                  }`}
+            {/* Date-Range Filter Switcher */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="flex items-center bg-bone-white border border-sand-neutral p-1">
+                {['Today', 'Yesterday', 'Last 7 Days', 'This Month', 'Last Month', 'Custom Range'].map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setEarningsPeriod(p)}
+                    className={`px-3 py-1.5 font-label-caps text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
+                      earningsPeriod === p 
+                        ? 'bg-onyx-black text-on-primary font-semibold' 
+                        : 'text-secondary hover:text-onyx-black'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+
+              {earningsPeriod === 'Custom Range' && (
+                <div className="flex items-center gap-2 bg-bone-white border border-sand-neutral p-2">
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={e => setCustomFrom(e.target.value)}
+                    className="bg-surface font-mono text-xs px-2 py-1 border border-sand-neutral focus:outline-none"
+                  />
+                  <span className="text-secondary font-mono text-xs">to</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={e => setCustomTo(e.target.value)}
+                    className="bg-surface font-mono text-xs px-2 py-1 border border-sand-neutral focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Error Banner with Retry */}
+          {earningsError && (
+            <div className="p-4 bg-red-50/90 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm backdrop-blur-sm transition-all duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-red-100 dark:bg-red-900/60 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">error_outline</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-xs text-red-900 dark:text-red-200 uppercase tracking-wide">Sync Alert</h4>
+                  <p className="font-body-md text-xs text-red-700 dark:text-red-300 font-medium mt-0.5">{earningsError}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={fetchEarningsOverview}
+                  className="px-4 py-1.5 bg-onyx-black hover:bg-neutral-800 active:bg-black text-white font-button-text text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
                 >
-                  {rng}
+                  <span className="material-symbols-outlined text-[16px]">refresh</span>
+                  <span>Retry Now</span>
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setEarningsError(null)}
+                  className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                  title="Dismiss alert"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Top 4 Summary Bento Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Today's Earnings */}
+            <div className="bg-bone-white p-6 border border-sand-neutral flex flex-col justify-between h-44 relative group">
+              <div className="flex items-start justify-between">
+                <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary">Today's Earnings</span>
+                <span className="material-symbols-outlined text-[20px] text-secondary">today</span>
+              </div>
+              <div>
+                {earningsLoading ? (
+                  <div className="font-headline-lg text-headline-lg text-secondary animate-pulse">₹ ----</div>
+                ) : (
+                  <div className="font-headline-lg text-headline-lg text-onyx-black font-normal tracking-tight">
+                    ₹{(earningsData?.summary?.today || 0).toLocaleString()}
+                  </div>
+                )}
+                <p className="font-body-md text-xs text-clay-earth mt-2">Calculated from completed today dispatches</p>
+              </div>
+              <div className="w-full bg-sand-neutral h-1 overflow-hidden">
+                <div className="bg-onyx-black h-full w-full"></div>
+              </div>
+            </div>
+
+            {/* Card 2: This Week */}
+            <div className="bg-bone-white p-6 border border-sand-neutral flex flex-col justify-between h-44 relative group">
+              <div className="flex items-start justify-between">
+                <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary">This Week</span>
+                <span className="material-symbols-outlined text-[20px] text-secondary">date_range</span>
+              </div>
+              <div>
+                {earningsLoading ? (
+                  <div className="font-headline-lg text-headline-lg text-secondary animate-pulse">₹ ----</div>
+                ) : (
+                  <div className="font-headline-lg text-headline-lg text-onyx-black font-normal tracking-tight">
+                    ₹{(earningsData?.summary?.thisWeek || 0).toLocaleString()}
+                  </div>
+                )}
+                <p className="font-body-md text-xs text-clay-earth mt-2">Rolling 7-day revenue total</p>
+              </div>
+              <div className="w-full bg-sand-neutral h-1 overflow-hidden">
+                <div className="bg-onyx-black h-full w-[70%]"></div>
+              </div>
+            </div>
+
+            {/* Card 3: This Month */}
+            <div className="bg-bone-white p-6 border border-sand-neutral flex flex-col justify-between h-44 relative group">
+              <div className="flex items-start justify-between">
+                <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary">This Month</span>
+                <span className="material-symbols-outlined text-[20px] text-secondary">calendar_month</span>
+              </div>
+              <div>
+                {earningsLoading ? (
+                  <div className="font-headline-lg text-headline-lg text-secondary animate-pulse">₹ ----</div>
+                ) : (
+                  <div className="font-headline-lg text-headline-lg text-onyx-black font-normal tracking-tight">
+                    ₹{(earningsData?.summary?.thisMonth || 0).toLocaleString()}
+                  </div>
+                )}
+                <p className="font-body-md text-xs text-clay-earth mt-2">Current calendar month aggregate</p>
+              </div>
+              <div className="w-full bg-sand-neutral h-1 overflow-hidden">
+                <div className="bg-onyx-black h-full w-[85%]"></div>
+              </div>
+            </div>
+
+            {/* Card 4: Available Balance */}
+            <div className="bg-onyx-black text-on-primary p-6 flex flex-col justify-between h-44 relative">
+              <div className="flex items-start justify-between">
+                <span className="font-label-caps text-label-caps uppercase tracking-widest text-sand-neutral">Available Balance</span>
+                <span className="material-symbols-outlined text-[20px] text-sand-neutral">account_balance_wallet</span>
+              </div>
+              <div>
+                {earningsLoading ? (
+                  <div className="font-headline-lg text-headline-lg text-sand-neutral animate-pulse">₹ ----</div>
+                ) : (
+                  <div className="font-headline-lg text-headline-lg text-bone-white font-normal tracking-tight">
+                    ₹{(earningsData?.summary?.availableBalance || 0).toLocaleString()}
+                  </div>
+                )}
+                <p className="font-body-md text-xs text-sand-neutral/80 mt-2">Available for immediate withdrawal</p>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-sand-neutral/30">
+                <span className="font-mono text-[10px] text-sand-neutral uppercase">Escrow Cleared</span>
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab('wallet')}
+                  className="px-3 py-1 bg-bone-white text-onyx-black font-button-text text-[11px] uppercase"
+                >
+                  Withdraw
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Interactive Chart Graphic */}
-          <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8] space-y-4 relative">
+          {/* Dynamic Earnings Chart & Breakdown Split */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
-            {/* Tooltip Display on Hover */}
-            {hoveredDay ? (
-              <div className="bg-[#E8F0EC] border border-[#C5DDD2] text-[#111827] p-2.5 rounded-xl text-xs font-black shadow-xs flex items-center justify-between">
-                <span>{hoveredDay.day} Revenue: <strong className="text-[#0A8B5F] font-black text-sm">₹{hoveredDay.revenue}</strong></span>
-                <span>Fulfilled Orders: <strong className="text-amber-800 font-black text-sm">{hoveredDay.ordersCount}</strong></span>
+            {/* Chart Section (8 cols) */}
+            <div className="lg:col-span-8 bg-bone-white p-8 border border-sand-neutral space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-sand-neutral">
+                <div>
+                  <h3 className="font-headline-md text-headline-md text-onyx-black">Earnings Trend</h3>
+                  <p className="font-body-md text-xs text-secondary mt-1">Aggregated daily revenue from real MongoDB order settlements.</p>
+                </div>
+                <span className="font-mono text-xs px-2 py-1 bg-surface border border-sand-neutral text-clay-earth uppercase">
+                  {earningsPeriod}
+                </span>
+              </div>
+
+              {/* SVG Dynamic Line Chart */}
+              {earningsLoading ? (
+                <div className="h-64 flex items-center justify-center bg-surface border border-sand-neutral font-mono text-xs text-secondary">
+                  Loading real-time financial chart...
+                </div>
+              ) : !earningsData?.chartData || earningsData.chartData.length === 0 ? (
+                <div className="h-64 flex flex-col items-center justify-center bg-surface border border-sand-neutral p-6 text-center space-y-2">
+                  <span className="material-symbols-outlined text-secondary text-4xl">query_stats</span>
+                  <p className="font-headline-md text-base text-onyx-black">No earnings data available for this period.</p>
+                  <p className="font-body-md text-xs text-secondary">Completed order revenues will render automatically when orders are delivered.</p>
+                </div>
+              ) : (
+                <div className="relative h-64 bg-surface p-4 border border-sand-neutral">
+                  <div className="h-48 flex items-end justify-between gap-2 border-b border-sand-neutral pb-2">
+                    {earningsData.chartData.map((item, idx) => {
+                      const maxAmount = Math.max(...earningsData.chartData.map(d => d.amount), 1);
+                      const heightPct = Math.max(10, Math.round((item.amount / maxAmount) * 100));
+                      return (
+                        <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full group relative">
+                          <span className="font-mono text-[10px] text-secondary opacity-0 group-hover:opacity-100 transition-opacity mb-1">
+                            ₹{item.amount}
+                          </span>
+                          <div
+                            className="w-full bg-onyx-black group-hover:bg-clay-earth transition-all rounded-t-xs"
+                            style={{ height: `${heightPct}%` }}
+                          />
+                          <span className="font-mono text-[10px] text-secondary mt-2 truncate w-full text-center">
+                            {item.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between items-center pt-2 font-mono text-[10px] text-secondary">
+                    <span>PERIOD START</span>
+                    <span>PERIOD END</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Breakdown Box (4 cols) */}
+            <div className="lg:col-span-4 bg-bone-white p-8 border border-sand-neutral space-y-6">
+              <div className="pb-3 border-b border-sand-neutral">
+                <h3 className="font-headline-md text-headline-md text-onyx-black">Net Earnings Breakdown</h3>
+                <p className="font-body-md text-xs text-secondary mt-1">Itemized accounting for selected period.</p>
+              </div>
+
+              <div className="space-y-3 font-mono text-xs">
+                <div className="flex justify-between items-center py-2 border-b border-sand-neutral/60">
+                  <span className="text-secondary font-label-caps uppercase text-[10px]">Order/Service Earnings</span>
+                  <span className="text-onyx-black font-semibold">₹{(earningsData?.breakdown?.orderEarnings || 0).toLocaleString()}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-sand-neutral/60">
+                  <span className="text-secondary font-label-caps uppercase text-[10px]">Delivery Logistics Earnings</span>
+                  <span className="text-onyx-black font-semibold">₹{(earningsData?.breakdown?.deliveryEarnings || 0).toLocaleString()}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-sand-neutral/60">
+                  <span className="text-secondary font-label-caps uppercase text-[10px]">Bonuses</span>
+                  <span className="text-onyx-black font-semibold">+₹{(earningsData?.breakdown?.bonuses || 0).toLocaleString()}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-sand-neutral/60">
+                  <span className="text-secondary font-label-caps uppercase text-[10px]">Incentives</span>
+                  <span className="text-onyx-black font-semibold">+₹{(earningsData?.breakdown?.incentives || 0).toLocaleString()}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-sand-neutral/60 text-error">
+                  <span className="font-label-caps uppercase text-[10px]">Platform Fees & Commission</span>
+                  <span className="font-semibold">-₹{(earningsData?.breakdown?.platformFees || 0).toLocaleString()}</span>
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-sand-neutral/60 text-error">
+                  <span className="font-label-caps uppercase text-[10px]">Refunds & Adjustments</span>
+                  <span className="font-semibold">-₹{(earningsData?.breakdown?.refunds || 0).toLocaleString()}</span>
+                </div>
+
+                <div className="p-4 bg-surface border border-sand-neutral mt-4 flex items-center justify-between">
+                  <span className="font-label-caps text-xs uppercase text-onyx-black font-semibold">Net Payout Earnings</span>
+                  <span className="font-headline-md text-xl text-onyx-black font-semibold">
+                    ₹{(earningsData?.breakdown?.netEarnings || 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* PART 2 — TRANSACTIONS VIEW                                               */}
+      {/* ========================================================================= */}
+      {isTab('transactions') && (
+        <div className="space-y-8 animate-slide-up">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-secondary font-label-caps text-label-caps uppercase tracking-widest">
+                <span>Provider</span>
+                <span>/</span>
+                <span>Earnings & Payments</span>
+                <span>/</span>
+                <span className="text-onyx-black font-semibold">Transactions</span>
+              </div>
+              <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-none">
+                Transactions
+              </h1>
+              <p className="font-body-md text-body-md text-clay-earth max-w-2xl">
+                Audited posting history of all order credits, bonuses, withdrawals, and platform fee splits.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={fetchTransactions}
+              className="px-4 py-2 bg-onyx-black text-on-primary font-button-text text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer self-start lg:self-end"
+            >
+              <span className="material-symbols-outlined text-[16px]">sync</span>
+              <span>Sync Ledger</span>
+            </button>
+          </div>
+
+          {/* Top Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Total Earnings Volume</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                ₹{(txnSummary.totalVolume || 0).toLocaleString()}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">Across {txnSummary.count || 0} posted entries</span>
+            </div>
+
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Completed Postings</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                {txnSummary.completedCount || 0}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">Fully settled & cleared</span>
+            </div>
+
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Pending Escrow</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                {txnSummary.pendingCount || 0}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">In transit verification</span>
+            </div>
+
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Withdrawn Volume</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                ₹{(txnSummary.withdrawnVolume || 0).toLocaleString()}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">Disbursed to bank / UPI</span>
+            </div>
+          </div>
+
+          {/* Filter Bar */}
+          <div className="p-4 bg-bone-white border border-sand-neutral space-y-4">
+            <form onSubmit={handleTxnSearchSubmit} className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+              <div className="relative flex-1">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary text-[18px]">search</span>
+                <input
+                  type="text"
+                  value={txnSearch}
+                  onChange={e => setTxnSearch(e.target.value)}
+                  placeholder="Search Txn ID (#TXN-xxxx), Order ID (#ORD-xxxx), or reference..."
+                  className="w-full pl-9 pr-4 py-2 bg-surface text-onyx-black placeholder:text-outline text-xs border border-sand-neutral focus:outline-none focus:border-onyx-black font-mono"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center bg-surface border border-sand-neutral px-3 py-1.5">
+                  <label className="font-label-caps text-[10px] uppercase text-secondary mr-2">Type:</label>
+                  <select
+                    value={txnTypeFilter}
+                    onChange={e => { setTxnTypeFilter(e.target.value); setTxnPage(1); }}
+                    className="bg-transparent text-onyx-black font-button-text text-xs focus:outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All Types</option>
+                    <option value="ORDER_EARNING">Order Earning</option>
+                    <option value="DELIVERY_EARNING">Delivery Earning</option>
+                    <option value="BONUS">Bonus</option>
+                    <option value="INCENTIVE">Incentive</option>
+                    <option value="WITHDRAWAL">Withdrawal</option>
+                    <option value="REFUND">Refund</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center bg-surface border border-sand-neutral px-3 py-1.5">
+                  <label className="font-label-caps text-[10px] uppercase text-secondary mr-2">Status:</label>
+                  <select
+                    value={txnStatusFilter}
+                    onChange={e => { setTxnStatusFilter(e.target.value); setTxnPage(1); }}
+                    className="bg-transparent text-onyx-black font-button-text text-xs focus:outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="FAILED">Failed</option>
+                    <option value="REVERSED">Reversed</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center bg-surface border border-sand-neutral px-3 py-1.5">
+                  <label className="font-label-caps text-[10px] uppercase text-secondary mr-2">Sort:</label>
+                  <select
+                    value={txnSort}
+                    onChange={e => { setTxnSort(e.target.value); setTxnPage(1); }}
+                    className="bg-transparent text-onyx-black font-button-text text-xs focus:outline-none cursor-pointer"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="amount-high">Amount (High to Low)</option>
+                  </select>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Transactions Table & Inspector Drawer Container */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            <div className="xl:col-span-8 bg-bone-white border border-sand-neutral overflow-hidden">
+              <div className="px-6 py-4 border-b border-sand-neutral flex items-center justify-between bg-surface-container-low">
+                <span className="font-label-caps text-label-caps uppercase tracking-wider text-onyx-black">
+                  AUDITED TRANSACTION JOURNAL
+                </span>
+                <span className="font-mono text-[11px] text-secondary">
+                  SERVER PAGINATED
+                </span>
+              </div>
+
+              {txnLoading ? (
+                <div className="p-12 text-center font-mono text-xs text-secondary">
+                  Fetching verified transaction records from MongoDB...
+                </div>
+              ) : txns.length === 0 ? (
+                <div className="p-12 text-center space-y-2">
+                  <span className="material-symbols-outlined text-secondary text-4xl">receipt_long</span>
+                  <p className="font-headline-md text-base text-onyx-black">No transactions found.</p>
+                  <p className="font-body-md text-xs text-secondary">No financial records match your current filter selection.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr class="border-b border-sand-neutral bg-surface-container-high/40 text-[11px] font-label-caps uppercase text-secondary tracking-widest">
+                        <th className="py-3.5 px-4 font-semibold">Txn ID</th>
+                        <th className="py-3.5 px-4 font-semibold">Date & Time</th>
+                        <th className="py-3.5 px-4 font-semibold">Type</th>
+                        <th className="py-3.5 px-4 font-semibold">Order</th>
+                        <th className="py-3.5 px-4 font-semibold text-right">Amount</th>
+                        <th className="py-3.5 px-4 font-semibold text-center">Status</th>
+                        <th className="py-3.5 px-4 font-semibold text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-sand-neutral text-xs font-body-md text-on-surface">
+                      {txns.map(t => (
+                        <tr key={t.txnId} className="hover:bg-surface/60 transition-colors">
+                          <td className="py-3.5 px-4 font-mono font-medium text-onyx-black">
+                            {t.txnId}
+                          </td>
+                          <td className="py-3.5 px-4 text-clay-earth font-mono text-[11px]">
+                            {t.createdAtFormatted}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-surface-container-high text-onyx-black font-mono text-[10px] border border-sand-neutral">
+                              {t.type}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-clay-earth">
+                            {t.orderId || '—'}
+                          </td>
+                          <td className={`py-3.5 px-4 font-mono font-medium text-right ${
+                            t.isDebit ? 'text-error' : 'text-onyx-black'
+                          }`}>
+                            {t.amountFormatted}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-mono font-semibold ${
+                              t.status === 'COMPLETED' ? 'text-onyx-black' : t.status === 'PENDING' ? 'text-clay-earth' : 'text-error'
+                            }`}>
+                              {t.status}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTxn(t)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-onyx-black text-on-primary text-[11px] font-button-text uppercase hover:bg-clay-earth cursor-pointer"
+                            >
+                              <span>Inspect</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Pagination */}
+              <div className="px-6 py-4 bg-surface-container-low border-t border-sand-neutral flex items-center justify-between">
+                <span className="font-mono text-[11px] text-secondary">
+                  Page <span className="text-onyx-black font-semibold">{txnPage}</span> of <span className="text-onyx-black font-semibold">{txnTotalPages}</span>
+                </span>
+                <div className="flex items-center gap-2 font-mono text-xs">
+                  <button
+                    type="button"
+                    disabled={txnPage <= 1}
+                    onClick={() => setTxnPage(p => Math.max(1, p - 1))}
+                    className="px-3 py-1 border border-sand-neutral bg-surface disabled:opacity-40"
+                  >
+                    ← Prev
+                  </button>
+                  <button
+                    type="button"
+                    disabled={txnPage >= txnTotalPages}
+                    onClick={() => setTxnPage(p => Math.min(txnTotalPages, p + 1))}
+                    className="px-3 py-1 border border-sand-neutral bg-surface disabled:opacity-40"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Inspector Side Drawer */}
+            {selectedTxn ? (
+              <div className="xl:col-span-4 bg-bone-white border border-onyx-black p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-sand-neutral pb-3">
+                  <div>
+                    <span className="font-label-caps text-[10px] uppercase tracking-widest text-secondary block">INSPECTOR</span>
+                    <h3 className="font-headline-md text-lg text-onyx-black">{selectedTxn.txnId}</h3>
+                  </div>
+                  <button type="button" onClick={() => setSelectedTxn(null)} className="p-1 text-secondary hover:text-onyx-black">
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 font-mono text-xs">
+                  <div className="flex justify-between py-1 border-b border-sand-neutral/50">
+                    <span className="text-secondary">Reference ID:</span>
+                    <span className="text-onyx-black font-semibold">{selectedTxn.referenceId}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-sand-neutral/50">
+                    <span className="text-secondary">Posting Type:</span>
+                    <span className="text-onyx-black">{selectedTxn.type}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-sand-neutral/50">
+                    <span className="text-secondary">Linked Order:</span>
+                    <span className="text-onyx-black">{selectedTxn.orderId || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-sand-neutral/50">
+                    <span className="text-secondary">Amount:</span>
+                    <span className="text-onyx-black font-bold">{selectedTxn.amountFormatted}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-sand-neutral/50">
+                    <span className="text-secondary">Status:</span>
+                    <span className="text-onyx-black font-semibold">{selectedTxn.status}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-sand-neutral/50">
+                    <span className="text-secondary">Payment Method:</span>
+                    <span className="text-onyx-black">{selectedTxn.paymentMethod}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-sand-neutral/50">
+                    <span className="text-secondary">Date & Time:</span>
+                    <span className="text-onyx-black">{selectedTxn.createdAtFormatted}</span>
+                  </div>
+                  <div className="py-2">
+                    <span className="text-secondary block mb-1">Description:</span>
+                    <p className="text-onyx-black font-body-md text-xs bg-surface p-2 border border-sand-neutral">
+                      {selectedTxn.description || 'No additional posting details.'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedTxn(null)}
+                  className="w-full py-2 bg-onyx-black text-on-primary font-button-text text-xs uppercase"
+                >
+                  Close Inspector
+                </button>
               </div>
             ) : (
-              <div className="text-[11px] text-[#6B7280] font-semibold text-center py-0.5">
-                💡 Hover over any bar to view exact daily revenue & order count.
+              <div className="xl:col-span-4 bg-bone-white border border-sand-neutral p-6 text-center space-y-2">
+                <span className="material-symbols-outlined text-secondary text-3xl">info</span>
+                <p className="font-headline-md text-sm text-onyx-black">Transaction Inspector</p>
+                <p className="font-body-md text-xs text-secondary">Click "Inspect" on any table row to review full audit log metadata.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
 
-            {/* Visual Bar Graph with Fixed Responsive Heights */}
-            <div className="h-52 flex items-end justify-between gap-3 pt-4 px-2">
-              {chartDataDays.map((item, idx) => {
-                const heightPct = Math.max(20, Math.round((item.revenue / maxChartRev) * 100));
-                const isHovered = hoveredDay && hoveredDay.day === item.day;
-                return (
-                  <div 
-                    key={idx} 
-                    onMouseEnter={() => setHoveredDay(item)}
-                    onMouseLeave={() => setHoveredDay(null)}
-                    className="flex-1 h-full flex flex-col items-center justify-end gap-2 group cursor-pointer"
-                  >
-                    {/* Amount Tag on top of Bar */}
-                    <span className={`text-[10px] font-black transition-all ${
-                      isHovered ? 'text-[#0A8B5F] scale-110' : 'text-[#6B7280]'
-                    }`}>
-                      ₹{item.revenue}
-                    </span>
+      {/* ========================================================================= */}
+      {/* PART 3 — INCENTIVES & BONUSES VIEW                                       */}
+      {/* ========================================================================= */}
+      {isTab('incentives') && (
+        <div className="space-y-8 animate-slide-up">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-secondary font-label-caps text-label-caps uppercase tracking-widest">
+                <span>Provider</span>
+                <span>/</span>
+                <span>Earnings & Payments</span>
+                <span>/</span>
+                <span className="text-onyx-black font-semibold">Incentives & Bonuses</span>
+              </div>
+              <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-none">
+                Incentives & Bonuses
+              </h1>
+              <p className="font-body-md text-body-md text-clay-earth max-w-2xl">
+                Kitchen throughput rewards and milestone bonuses dynamically queried from MongoDB.
+              </p>
+            </div>
 
-                    {/* Bar Track & Fill */}
-                    <div className="w-full bg-[#E8F0EC] group-hover:bg-[#C5DDD2] rounded-t-xl flex-1 flex items-end overflow-hidden transition-all p-0.5">
-                      <div 
-                        className={`w-full rounded-t-lg transition-all duration-500 shadow-sm ${
-                          isHovered 
-                            ? 'bg-[#08734E] ring-2 ring-[#0A8B5F]/40' 
-                            : 'bg-gradient-to-t from-[#0A8B5F] to-[#10B981]'
-                        }`}
-                        style={{ height: `${heightPct}%` }}
-                      />
+            <button
+              type="button"
+              onClick={fetchIncentives}
+              className="px-4 py-2 bg-onyx-black text-on-primary font-button-text text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer self-start lg:self-end"
+            >
+              <span className="material-symbols-outlined text-[16px]">sync</span>
+              <span>Refresh Incentives</span>
+            </button>
+          </div>
+
+          {/* Top Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Active Incentives</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                {incentivesData?.summary?.activeCount || 0}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">Active reward programs</span>
+            </div>
+
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Earned This Month</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                ₹{(incentivesData?.summary?.earnedThisMonth || 0).toLocaleString()}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">Credited to wallet balance</span>
+            </div>
+
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Pending Rewards</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                ₹{(incentivesData?.summary?.pendingRewards || 0).toLocaleString()}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">Threshold nearing completion</span>
+            </div>
+
+            <div className="p-6 bg-onyx-black text-on-primary border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-sand-neutral block">Total Lifetime Bonuses</span>
+              <div className="font-headline-lg text-3xl text-bone-white font-normal mt-2">
+                ₹{(incentivesData?.summary?.totalBonuses || 0).toLocaleString()}
+              </div>
+              <span className="font-mono text-[11px] text-sand-neutral/80 mt-1 block">Verified kitchen milestone rewards</span>
+            </div>
+          </div>
+
+          {/* Incentive Program Cards */}
+          <div className="space-y-4">
+            <h3 className="font-headline-md text-headline-md text-onyx-black">Eligible Kitchen Incentives</h3>
+
+            {incentivesLoading ? (
+              <div className="p-12 bg-bone-white border border-sand-neutral text-center font-mono text-xs text-secondary">
+                Loading incentive metrics...
+              </div>
+            ) : !incentivesData?.programs || incentivesData.programs.length === 0 ? (
+              <div className="p-12 bg-bone-white border border-sand-neutral text-center space-y-2">
+                <span className="material-symbols-outlined text-secondary text-4xl">military_tech</span>
+                <p className="font-headline-md text-base text-onyx-black">No active incentives available.</p>
+                <p className="font-body-md text-xs text-secondary">Check back soon for new milestone bonus programs.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {incentivesData.programs.map((inc) => (
+                  <div key={inc.id} className="bg-bone-white p-6 border border-sand-neutral space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="font-label-caps text-[10px] uppercase text-secondary tracking-widest">{inc.status}</span>
+                        <h4 className="font-headline-md text-xl text-onyx-black">{inc.name}</h4>
+                        <p className="font-body-md text-xs text-secondary mt-1">{inc.description}</p>
+                      </div>
+                      <span className="font-mono text-base font-bold text-onyx-black">₹{inc.rewardAmount}</span>
                     </div>
 
-                    {/* Day Label */}
-                    <span className={`text-[11px] font-black transition-colors ${
-                      isHovered ? 'text-[#0A8B5F]' : 'text-[#6B7280]'
-                    }`}>
-                      {item.day}
-                    </span>
+                    <div className="space-y-2 bg-surface p-4 border border-sand-neutral">
+                      <div className="flex justify-between font-mono text-xs">
+                        <span className="text-secondary">Progress: {inc.currentProgress} / {inc.target} orders</span>
+                        <span className="text-onyx-black font-bold">{inc.progressPercent}%</span>
+                      </div>
+                      <div className="w-full bg-sand-neutral h-2 overflow-hidden">
+                        <div className="bg-onyx-black h-full" style={{ width: `${inc.progressPercent}%` }} />
+                      </div>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Earnings Breakdown Box (4 Cols) */}
-        <div className="lg:col-span-4 bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4 flex flex-col justify-between">
-          <div>
-            <div className="border-b border-[#E5ECE8] pb-3 mb-4">
-              <h3 className="text-base font-black text-[#111827]">Earnings Breakdown</h3>
-              <p className="text-[11px] text-[#6B7280] font-medium">Detailed financial statement for {periodFilter}.</p>
-            </div>
-
-            <div className="space-y-3 text-xs font-bold text-[#6B7280]">
-              <div className="flex justify-between items-center">
-                <span>Gross Revenue</span>
-                <span className="text-[#111827] font-black">₹{grossRevenue.toLocaleString()}</span>
-              </div>
-
-              <div className="flex justify-between items-center text-red-600">
-                <span>Refunds / Cancellations</span>
-                <span className="font-black">-₹{refundsAmount.toLocaleString()}</span>
-              </div>
-
-              <div className="flex justify-between items-center text-amber-700">
-                <span>Delivery & Packaging Fees</span>
-                <span className="font-black">-₹{deliveryPlatformFees.toLocaleString()}</span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span>Other Adjustments</span>
-                <span className="text-[#111827] font-black">-₹0</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-[#E5ECE8] space-y-2">
-            <div className="flex justify-between items-center text-sm font-black text-[#111827]">
-              <span>Net Earnings</span>
-              <span className="text-lg text-[#0A8B5F]">₹{netEarnings.toLocaleString()}</span>
-            </div>
-            <p className="text-[10px] text-[#6B7280] font-medium">Calculated directly from live order transactions.</p>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Recent Transactions Table */}
-      <div className="bg-white rounded-2xl border border-[#E5ECE8] shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-[#E5ECE8] bg-[#F9FBF9] flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-black text-[#111827]">Recent Financial Transactions</h3>
-            <p className="text-[11px] text-[#6B7280] font-medium">Completed and relevant orders for your kitchen.</p>
-          </div>
-
-          <button 
-            onClick={handleExportCSV}
-            className="px-3.5 py-1.5 bg-white border border-[#E5ECE8] hover:bg-gray-50 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <FileSpreadsheet size={14} className="text-[#0A8B5F]" />
-            <span>CSV Report</span>
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="p-12 text-center">
-            <div className="w-8 h-8 border-4 border-[#0A8B5F] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-[#6B7280] font-bold mt-3">Loading transaction logs...</p>
-          </div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="p-12 text-center space-y-3">
-            <ShoppingBag size={40} className="mx-auto text-gray-400" />
-            <h3 className="text-base font-extrabold text-[#111827]">No Financial Transactions</h3>
-            <p className="text-xs text-[#6B7280]">No orders found for the selected period.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-[#111827]">
-              <thead className="bg-[#F9FBF9] border-b border-[#E5ECE8] text-[#6B7280] font-extrabold uppercase tracking-wider">
-                <tr>
-                  <th className="p-4">Order ID</th>
-                  <th className="p-4">Customer</th>
-                  <th className="p-4">Tiffin Name</th>
-                  <th className="p-4">Amount</th>
-                  <th className="p-4">Payment Status</th>
-                  <th className="p-4">Order Status</th>
-                  <th className="p-4 text-right">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E5ECE8] font-bold">
-                {paginatedTransactions.map(ord => (
-                  <tr key={ord.id || ord.orderId} className="hover:bg-[#F9FBF9] transition-colors">
-                    
-                    <td className="p-4 font-black text-[#0A8B5F]">{ord.orderId}</td>
-                    
-                    <td className="p-4">
-                      <div className="font-extrabold text-[#111827]">{ord.customerName}</div>
-                      <div className="text-[10px] text-[#6B7280]">{ord.customerPhone}</div>
-                    </td>
-
-                    <td className="p-4 text-[#6B7280] font-semibold">{ord.tiffinName}</td>
-
-                    <td className="p-4 font-black text-sm text-[#111827]">₹{ord.totalAmount}</td>
-
-                    <td className="p-4">
-                      <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-md border ${
-                        ord.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
-                      }`}>
-                        {ord.paymentStatus}
-                      </span>
-                    </td>
-
-                    <td className="p-4">
-                      <span className={`px-2.5 py-0.5 text-[10px] font-black rounded-md border ${
-                        ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                        ord.status === 'Cancelled' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'
-                      }`}>
-                        ● {ord.status}
-                      </span>
-                    </td>
-
-                    <td className="p-4 text-right text-[#6B7280] font-medium">
-                      {new Date(ord.createdAt).toLocaleDateString()}
-                    </td>
-
-                  </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Pagination Footer */}
-        <div className="p-4 border-t border-[#E5ECE8] bg-[#F9FBF9] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-bold text-[#6B7280]">
-          <div>
-            Showing <span className="text-[#111827] font-black">{Math.min(filteredOrders.length, (currentPage - 1) * itemsPerPage + 1)}</span> to <span className="text-[#111827] font-black">{Math.min(filteredOrders.length, currentPage * itemsPerPage)}</span> of <span className="text-[#111827] font-black">{filteredOrders.length}</span> transactions
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button 
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              className="p-1.5 rounded-lg border border-[#E5ECE8] hover:bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            >
-              <ChevronLeft size={16} />
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button 
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`w-8 h-8 rounded-lg text-xs font-black cursor-pointer transition-colors ${
-                  currentPage === page ? 'bg-[#0A8B5F] text-white shadow-xs' : 'hover:bg-white text-[#6B7280]'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button 
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              className="p-1.5 rounded-lg border border-[#E5ECE8] hover:bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            >
-              <ChevronRight size={16} />
-            </button>
+              </div>
+            )}
           </div>
         </div>
+      )}
 
-      </div>
+      {/* ========================================================================= */}
+      {/* PART 4 — WALLET & WITHDRAWALS VIEW                                      */}
+      {/* ========================================================================= */}
+      {isTab('wallet') && (
+        <div className="space-y-8 animate-slide-up">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-secondary font-label-caps text-label-caps uppercase tracking-widest">
+                <span>Provider</span>
+                <span>/</span>
+                <span>Earnings & Payments</span>
+                <span>/</span>
+                <span className="text-onyx-black font-semibold">Wallet & Withdrawals</span>
+              </div>
+              <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-none">
+                Wallet & Withdrawals
+              </h1>
+              <p className="font-body-md text-body-md text-clay-earth max-w-2xl">
+                Manage your available balance and request payouts to verified bank accounts or UPI VPAs.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowWithdrawModal(true)}
+              className="px-6 py-3 bg-onyx-black text-on-primary font-button-text text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer shadow-sm hover:bg-clay-earth transition-colors self-start lg:self-end"
+            >
+              <span className="material-symbols-outlined text-[18px]">bolt</span>
+              <span>Withdraw / Request Payout</span>
+            </button>
+          </div>
+
+          {/* Top Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Available Balance</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                ₹{(walletData?.availableBalance || 0).toLocaleString()}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">Ready to withdraw now</span>
+            </div>
+
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Pending Balance</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                ₹{(walletData?.pendingBalance || 0).toLocaleString()}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">Pending order clearance</span>
+            </div>
+
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Total Lifetime Earned</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                ₹{(walletData?.totalEarned || 0).toLocaleString()}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">Cumulative gross earnings</span>
+            </div>
+
+            <div className="p-6 bg-bone-white border border-sand-neutral">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary block">Total Withdrawn</span>
+              <div className="font-headline-lg text-3xl text-onyx-black font-normal mt-2">
+                ₹{(walletData?.totalWithdrawn || 0).toLocaleString()}
+              </div>
+              <span className="font-mono text-[11px] text-secondary mt-1 block">Disbursed to bank</span>
+            </div>
+          </div>
+
+          {/* Hero Balance Box */}
+          <div className="bg-bone-white border border-sand-neutral p-8 text-center space-y-4">
+            <span className="font-label-caps text-xs uppercase tracking-widest text-secondary">WALLET ESCROW BALANCE</span>
+            <div className="font-headline-lg text-5xl text-onyx-black font-normal">
+              ₹{(walletData?.availableBalance || 0).toLocaleString()}
+            </div>
+            <p className="font-body-md text-xs text-secondary max-w-md mx-auto">
+              Withdrawal requests undergo backend validation, KYC checks, and bank verification before processing.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowWithdrawModal(true)}
+              className="px-8 py-3 bg-onyx-black text-on-primary font-button-text text-xs uppercase tracking-widest hover:bg-clay-earth transition-colors"
+            >
+              Request Payout
+            </button>
+          </div>
+
+          {/* Withdrawals History Table */}
+          <div className="space-y-4">
+            <h3 className="font-headline-md text-headline-md text-onyx-black">Withdrawal & Payout History</h3>
+
+            {walletLoading ? (
+              <div className="p-12 bg-bone-white border border-sand-neutral text-center font-mono text-xs text-secondary">
+                Loading withdrawal history...
+              </div>
+            ) : withdrawals.length === 0 ? (
+              <div className="p-12 bg-bone-white border border-sand-neutral text-center space-y-2">
+                <span className="material-symbols-outlined text-secondary text-4xl">history</span>
+                <p className="font-headline-md text-base text-onyx-black">No withdrawal requests yet.</p>
+                <p className="font-body-md text-xs text-secondary">Submit your first payout request using the button above.</p>
+              </div>
+            ) : (
+              <div className="bg-bone-white border border-sand-neutral overflow-x-auto">
+                <table className="w-full text-left border-collapse font-body-md text-xs">
+                  <thead>
+                    <tr className="border-b border-sand-neutral bg-surface-container-high/40 text-[11px] font-label-caps uppercase text-secondary tracking-widest">
+                      <th className="py-3.5 px-4 font-semibold">Withdrawal ID</th>
+                      <th className="py-3.5 px-4 font-semibold">Date & Time</th>
+                      <th className="py-3.5 px-4 font-semibold text-right">Amount</th>
+                      <th className="py-3.5 px-4 font-semibold">Destination</th>
+                      <th className="py-3.5 px-4 font-semibold text-center">Status</th>
+                      <th className="py-3.5 px-4 font-semibold text-right">Reference ID</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-sand-neutral">
+                    {withdrawals.map(w => (
+                      <tr key={w.withdrawalId} className="hover:bg-surface/60 transition-colors">
+                        <td className="py-3.5 px-4 font-mono font-medium text-onyx-black">{w.withdrawalId}</td>
+                        <td className="py-3.5 px-4 font-mono text-clay-earth">{w.createdAtFormatted}</td>
+                        <td className="py-3.5 px-4 font-mono text-right font-bold text-onyx-black">₹{w.amount}</td>
+                        <td className="py-3.5 px-4 font-mono text-clay-earth">{w.destination}</td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className={`inline-flex items-center gap-1 font-mono text-[10px] px-2 py-0.5 border ${
+                            w.status === 'COMPLETED' ? 'bg-surface text-onyx-black border-sand-neutral' :
+                            w.status === 'PENDING' || w.status === 'REQUESTED' ? 'bg-surface-container text-clay-earth border-sand-neutral' :
+                            'bg-error-container text-on-error-container border-error'
+                          }`}>
+                            {w.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-right text-secondary">{w.referenceId}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Withdrawal Request Modal */}
+          {showWithdrawModal && (
+            <div className="fixed inset-0 z-[999] bg-onyx-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-surface border border-sand-neutral p-6 max-w-md w-full space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-sand-neutral pb-3">
+                  <h3 className="font-headline-md text-xl text-onyx-black">Request Payout / Withdrawal</h3>
+                  <button type="button" onClick={() => setShowWithdrawModal(false)} className="text-secondary hover:text-onyx-black">
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+
+                {withdrawFormError && (
+                  <div className="p-3 bg-error-container text-on-error-container text-xs font-body-md border border-error">
+                    {withdrawFormError}
+                  </div>
+                )}
+
+                <form onSubmit={handleRequestWithdrawal} className="space-y-4">
+                  <div>
+                    <label className="font-label-caps text-xs uppercase text-secondary block mb-1">Available Balance</label>
+                    <div className="font-mono text-lg font-bold text-onyx-black">
+                      ₹{(walletData?.availableBalance || 0).toLocaleString()}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-label-caps text-xs uppercase text-secondary block mb-1">Amount to Withdraw (Min ₹500)</label>
+                    <input
+                      type="number"
+                      value={withdrawAmount}
+                      onChange={e => setWithdrawAmount(e.target.value)}
+                      placeholder="Enter amount (e.g. 1000)"
+                      className="w-full p-2.5 bg-bone-white border border-sand-neutral font-mono text-sm focus:outline-none focus:border-onyx-black"
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setWithdrawAmount('500')}
+                        className="px-2 py-1 bg-surface-container font-mono text-[10px]"
+                      >
+                        ₹500
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWithdrawAmount('1000')}
+                        className="px-2 py-1 bg-surface-container font-mono text-[10px]"
+                      >
+                        ₹1,000
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWithdrawAmount(String(walletData?.availableBalance || 0))}
+                        className="px-2 py-1 bg-onyx-black text-on-primary font-mono text-[10px]"
+                      >
+                        Max
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-label-caps text-xs uppercase text-secondary block mb-1">Payout Destination</label>
+                    <select
+                      value={withdrawDestination}
+                      onChange={e => setWithdrawDestination(e.target.value)}
+                      className="w-full p-2.5 bg-bone-white border border-sand-neutral font-button-text text-xs focus:outline-none"
+                    >
+                      <option value="bank">Bank Account ({payoutDoc?.accountNumberMasked || 'Not set'})</option>
+                      <option value="upi">UPI VPA ({payoutDoc?.upiIdMasked || 'Not set'})</option>
+                    </select>
+                  </div>
+
+                  <div className="p-3 bg-bone-white border border-sand-neutral text-[11px] font-mono text-secondary space-y-1">
+                    <div className="flex justify-between">
+                      <span>Processing Fee:</span>
+                      <span className="text-onyx-black">₹0.00</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-onyx-black pt-1 border-t border-sand-neutral">
+                      <span>Status on submission:</span>
+                      <span>REQUESTED / PENDING</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowWithdrawModal(false)}
+                      className="flex-1 py-2.5 border border-sand-neutral text-secondary font-button-text text-xs uppercase"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={withdrawSubmitting}
+                      className="flex-1 py-2.5 bg-onyx-black text-on-primary font-button-text text-xs uppercase disabled:opacity-50"
+                    >
+                      {withdrawSubmitting ? 'Submitting...' : 'Confirm Request'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* PART 5 — BANK & PAYOUT DETAILS VIEW                                     */}
+      {/* ========================================================================= */}
+      {isTab('bank-payout') && (
+        <div className="space-y-8 animate-slide-up">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-secondary font-label-caps text-label-caps uppercase tracking-widest">
+                <span>Provider</span>
+                <span>/</span>
+                <span>Earnings & Payments</span>
+                <span>/</span>
+                <span className="text-onyx-black font-semibold">Bank & Payout Details</span>
+              </div>
+              <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-none">
+                Bank & Payout Details
+              </h1>
+              <p className="font-body-md text-body-md text-clay-earth max-w-2xl">
+                Secure bank account & UPI payment routing with masked account numbers for provider data protection.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowPayoutEditModal(true)}
+              className="px-4 py-2 bg-onyx-black text-on-primary font-button-text text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer self-start lg:self-end"
+            >
+              <span className="material-symbols-outlined text-[16px]">edit</span>
+              <span>Edit / Update Payout Account</span>
+            </button>
+          </div>
+
+          {payoutLoading ? (
+            <div className="p-12 bg-bone-white border border-sand-neutral text-center font-mono text-xs text-secondary">
+              Loading bank & payout account verification data...
+            </div>
+          ) : payoutError ? (
+            <div className="p-4 bg-error-container text-on-error-container border border-error flex items-center justify-between">
+              <span>{payoutError}</span>
+              <button type="button" onClick={fetchPayoutAccount} className="px-3 py-1 bg-onyx-black text-on-primary text-xs uppercase">
+                Retry
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+              {/* Bank Account Card */}
+              <div className="bg-bone-white p-8 border border-sand-neutral space-y-6">
+                <div className="flex items-center justify-between border-b border-sand-neutral pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-2xl text-onyx-black">account_balance</span>
+                    <div>
+                      <h3 className="font-headline-md text-xl text-onyx-black">Bank Account Details</h3>
+                      <span className="font-mono text-[10px] text-secondary">NEFT / IMPS DIRECT DISBURSEMENT</span>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-0.5 font-mono text-[10px] uppercase border ${
+                    payoutDoc?.status === 'VERIFIED' ? 'bg-surface text-onyx-black border-sand-neutral' : 'bg-surface-container text-clay-earth border-sand-neutral'
+                  }`}>
+                    {payoutDoc?.status || 'NOT_CONFIGURED'}
+                  </span>
+                </div>
+
+                <div className="space-y-3 font-mono text-xs">
+                  <div className="flex justify-between py-2 border-b border-sand-neutral/50">
+                    <span className="text-secondary font-label-caps text-[10px] uppercase">Account Holder</span>
+                    <span className="text-onyx-black font-semibold">{payoutDoc?.accountHolderName || 'Not configured'}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-sand-neutral/50">
+                    <span className="text-secondary font-label-caps text-[10px] uppercase">Bank Name</span>
+                    <span className="text-onyx-black font-semibold">{payoutDoc?.bankName || 'Not configured'}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-sand-neutral/50">
+                    <span className="text-secondary font-label-caps text-[10px] uppercase">Account Number</span>
+                    <span className="text-onyx-black font-mono font-bold">{payoutDoc?.accountNumberMasked || '••••••••'}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-sand-neutral/50">
+                    <span className="text-secondary font-label-caps text-[10px] uppercase">IFSC Code</span>
+                    <span className="text-onyx-black font-mono font-bold">{payoutDoc?.ifscCode || 'Not set'}</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-surface border border-sand-neutral text-[11px] font-mono text-secondary flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-onyx-black">lock</span>
+                  <span>Account numbers are masked for financial privacy. Sensitive payment details are never stored unencrypted.</span>
+                </div>
+              </div>
+
+              {/* UPI Card */}
+              <div className="bg-bone-white p-8 border border-sand-neutral space-y-6">
+                <div className="flex items-center justify-between border-b border-sand-neutral pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-2xl text-onyx-black">qr_code_2</span>
+                    <div>
+                      <h3 className="font-headline-md text-xl text-onyx-black">UPI / VPA Route</h3>
+                      <span className="font-mono text-[10px] text-secondary">INSTANT UPI TRANSFER</span>
+                    </div>
+                  </div>
+                  <span className={`px-2.5 py-0.5 font-mono text-[10px] uppercase border ${
+                    payoutDoc?.status === 'VERIFIED' ? 'bg-surface text-onyx-black border-sand-neutral' : 'bg-surface-container text-clay-earth border-sand-neutral'
+                  }`}>
+                    {payoutDoc?.status || 'NOT_CONFIGURED'}
+                  </span>
+                </div>
+
+                <div className="space-y-3 font-mono text-xs">
+                  <div className="flex justify-between py-2 border-b border-sand-neutral/50">
+                    <span className="text-secondary font-label-caps text-[10px] uppercase">UPI VPA Handle</span>
+                    <span className="text-onyx-black font-semibold">{payoutDoc?.upiIdMasked || 'Not configured'}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-sand-neutral/50">
+                    <span className="text-secondary font-label-caps text-[10px] uppercase">Verification Method</span>
+                    <span className="text-onyx-black font-semibold">Automated Format & Ownership Validation</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPayoutEditModal(true)}
+                  className="w-full py-2.5 bg-onyx-black text-on-primary font-button-text text-xs uppercase"
+                >
+                  Update UPI / Bank Information
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Payout Account Modal */}
+          {showPayoutEditModal && (
+            <div className="fixed inset-0 z-[999] bg-onyx-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-surface border border-sand-neutral p-6 max-w-lg w-full space-y-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-sand-neutral pb-3">
+                  <h3 className="font-headline-md text-xl text-onyx-black">Update Bank & Payout Details</h3>
+                  <button type="button" onClick={() => setShowPayoutEditModal(false)} className="text-secondary hover:text-onyx-black">
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+
+                {payoutFormError && (
+                  <div className="p-3 bg-error-container text-on-error-container text-xs font-body-md border border-error">
+                    {payoutFormError}
+                  </div>
+                )}
+
+                <form onSubmit={handleUpdatePayoutAccount} className="space-y-4">
+                  <div>
+                    <label className="font-label-caps text-xs uppercase text-secondary block mb-1">Account Holder Name</label>
+                    <input
+                      type="text"
+                      value={payoutForm.accountHolderName}
+                      onChange={e => setPayoutForm({ ...payoutForm, accountHolderName: e.target.value })}
+                      placeholder="e.g. Zaid Mansuri"
+                      className="w-full p-2 bg-bone-white border border-sand-neutral text-xs font-mono focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-label-caps text-xs uppercase text-secondary block mb-1">Bank Name</label>
+                    <input
+                      type="text"
+                      value={payoutForm.bankName}
+                      onChange={e => setPayoutForm({ ...payoutForm, bankName: e.target.value })}
+                      placeholder="e.g. ICICI Bank"
+                      className="w-full p-2 bg-bone-white border border-sand-neutral text-xs font-mono focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-label-caps text-xs uppercase text-secondary block mb-1">Account Number</label>
+                      <input
+                        type="password"
+                        value={payoutForm.accountNumber}
+                        onChange={e => setPayoutForm({ ...payoutForm, accountNumber: e.target.value })}
+                        placeholder="Enter account number"
+                        className="w-full p-2 bg-bone-white border border-sand-neutral text-xs font-mono focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-label-caps text-xs uppercase text-secondary block mb-1">Confirm Account Number</label>
+                      <input
+                        type="text"
+                        value={payoutForm.confirmAccountNumber}
+                        onChange={e => setPayoutForm({ ...payoutForm, confirmAccountNumber: e.target.value })}
+                        placeholder="Re-enter account number"
+                        className="w-full p-2 bg-bone-white border border-sand-neutral text-xs font-mono focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-label-caps text-xs uppercase text-secondary block mb-1">IFSC Code</label>
+                    <input
+                      type="text"
+                      value={payoutForm.ifscCode}
+                      onChange={e => setPayoutForm({ ...payoutForm, ifscCode: e.target.value.toUpperCase() })}
+                      placeholder="e.g. ICIC0000102"
+                      className="w-full p-2 bg-bone-white border border-sand-neutral text-xs font-mono uppercase focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-label-caps text-xs uppercase text-secondary block mb-1">UPI ID / VPA</label>
+                    <input
+                      type="text"
+                      value={payoutForm.upiId}
+                      onChange={e => setPayoutForm({ ...payoutForm, upiId: e.target.value })}
+                      placeholder="e.g. name@upi"
+                      className="w-full p-2 bg-bone-white border border-sand-neutral text-xs font-mono focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPayoutEditModal(false)}
+                      className="flex-1 py-2 border border-sand-neutral text-secondary font-button-text text-xs uppercase"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={payoutSubmitting}
+                      className="flex-1 py-2 bg-onyx-black text-on-primary font-button-text text-xs uppercase disabled:opacity-50"
+                    >
+                      {payoutSubmitting ? 'Saving...' : 'Save & Verify Account'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );

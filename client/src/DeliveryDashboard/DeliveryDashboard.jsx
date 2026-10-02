@@ -42,8 +42,101 @@ const formatOrderRef = (ref) => {
   return `#${clean}`;
 };
 
+const getDriverTabFromHash = (rawHash) => {
+  const hash = (rawHash || (typeof window !== 'undefined' ? window.location.hash : '') || '').toLowerCase().trim();
+  if (hash.includes('/my-deliveries/upcoming')) return 'upcoming';
+  if (hash.includes('/my-deliveries/completed')) return 'completed';
+  if (hash.includes('/my-deliveries/active') || hash.includes('/my-deliveries')) return 'active-delivery';
+  if (hash.includes('/requests')) return 'requests';
+  if (hash.includes('/history')) return 'history';
+  if (hash.includes('/map')) return 'live-map';
+  if (hash.includes('/navigation')) return 'route-navigation';
+
+  if (hash.includes('/earnings/transactions')) return 'transactions';
+  if (hash.includes('/earnings/incentives')) return 'incentives-bonuses';
+  if (hash.includes('/earnings/wallet')) return 'wallet-withdrawals';
+  if (hash.includes('/earnings/payout') || hash.includes('/earnings/bank')) return 'bank-payout';
+  if (hash.includes('/earnings')) return 'earnings-overview';
+
+  if (hash.includes('/performance')) return 'performance';
+  if (hash.includes('/reviews')) return 'ratings-reviews';
+  if (hash.includes('/duty-status')) return 'duty-status';
+  if (hash.includes('/schedule')) return 'working-schedule';
+  if (hash.includes('/preferences')) return 'delivery-preferences';
+  if (hash.includes('/emergency')) return 'safety-emergency';
+  if (hash.includes('/guidelines')) return 'safety-guidelines';
+  if (hash.includes('/report-issue')) return 'report-issue';
+  if (hash.includes('/notifications')) return 'notifications';
+  if (hash.includes('/help')) return 'help-support';
+
+  if (hash.includes('/settings/notifications')) return 'notification-preferences';
+  if (hash.includes('/settings/security')) return 'privacy-security';
+  if (hash.includes('/settings/app')) return 'app-preferences';
+  if (hash.includes('/settings')) return 'account-settings';
+
+  return 'dashboard';
+};
+
+const getHashFromDriverTab = (tab) => {
+  switch (tab) {
+    case 'dashboard': return '#/delivery/dashboard';
+    case 'requests': return '#/delivery/requests';
+    case 'active-delivery': return '#/delivery/my-deliveries/active';
+    case 'upcoming': return '#/delivery/my-deliveries/upcoming';
+    case 'completed': return '#/delivery/my-deliveries/completed';
+    case 'history': return '#/delivery/history';
+    case 'live-map': return '#/delivery/map';
+    case 'route-navigation': return '#/delivery/navigation';
+    case 'earnings-overview': return '#/delivery/earnings';
+    case 'transactions': return '#/delivery/earnings/transactions';
+    case 'incentives-bonuses': return '#/delivery/earnings/incentives';
+    case 'wallet-withdrawals': return '#/delivery/earnings/wallet';
+    case 'bank-payout': return '#/delivery/earnings/bank';
+    case 'performance': return '#/delivery/performance';
+    case 'ratings-reviews': return '#/delivery/reviews';
+    case 'duty-status': return '#/delivery/duty-status';
+    case 'working-schedule': return '#/delivery/schedule';
+    case 'delivery-preferences': return '#/delivery/preferences';
+    case 'safety-emergency': return '#/delivery/emergency';
+    case 'safety-guidelines': return '#/delivery/guidelines';
+    case 'report-issue': return '#/delivery/report-issue';
+    case 'notifications': return '#/delivery/notifications';
+    case 'help-support': return '#/delivery/help';
+    case 'account-settings': return '#/delivery/settings';
+    case 'notification-preferences': return '#/delivery/settings/notifications';
+    case 'privacy-security': return '#/delivery/settings/security';
+    case 'app-preferences': return '#/delivery/settings/app';
+    default: return '#/delivery/dashboard';
+  }
+};
+
 export default function DeliveryDashboard({ currentUser, onLogout }) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTabState] = useState(() => {
+    return getDriverTabFromHash(typeof window !== 'undefined' ? window.location.hash : '');
+  });
+
+  const setActiveTab = (newTab, updateHash = true) => {
+    setActiveTabState(newTab);
+    if (updateHash && typeof window !== 'undefined') {
+      const targetHash = getHashFromDriverTab(newTab);
+      if (window.location.hash !== targetHash) {
+        window.history.pushState(null, '', targetHash);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const tabFromHash = getDriverTabFromHash(window.location.hash);
+      setActiveTabState(tabFromHash);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handleHashChange);
+    };
+  }, []);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);

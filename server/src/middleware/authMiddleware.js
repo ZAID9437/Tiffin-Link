@@ -58,105 +58,7 @@ const protect = async (req, res, next) => {
       }
 
       // If user is a Driver / Delivery partner, bind their authenticated Driver record & driverId
-      let driver = await Driver.findOne({
-        $or: [
-          { userId: user._id },
-          { email: user.email },
-          { phone: user.phone }
-        ]
-      });
-
-      if (driver) {
-        req.driver = driver;
-        req.driverId = driver.driverId || driver._id.toString();
-      } else {
-        req.driverId = user.driverId || user._id.toString();
-      }
-
-      return next();
-    } catch (error) {
-      if (error.name !== 'TokenExpiredError') {
-        console.error('JWT Authentication Error:', error.message);
-      }
-      // Fallback auth for driver routes if token is invalid or expired
-      try {
-        const email = req.query?.email || req.body?.email || '';
-        const phone = req.query?.phone || req.body?.phone || '';
-        const driverId = req.query?.driverId || req.body?.driverId || '';
-
-        const queryOr = [
-          ...(email ? [{ email: email.toLowerCase() }] : []),
-          ...(phone ? [{ phone }] : []),
-          ...(driverId ? [{ driverId }, { _id: mongoose.Types.ObjectId.isValid(driverId) ? driverId : null }] : []).filter(Boolean)
-        ];
-
-        let user = null;
-        if (queryOr.length > 0) {
-          user = await User.findOne({ $or: queryOr });
-        }
-        if (!user) {
-          user = await User.findOne({ role: { $in: ['delivery', 'driver', 'delivery_partner'] } });
-        }
-
-        if (user) {
-          req.user = user;
-          let driver = await Driver.findOne({
-            $or: [
-              { userId: user._id },
-              { email: user.email },
-              { phone: user.phone }
-            ]
-          });
-          if (driver) {
-            req.driver = driver;
-            req.driverId = driver.driverId || driver._id.toString();
-          } else {
-            req.driverId = user._id.toString();
-          }
-          return next();
-        } else {
-          const defaultDriverRecord = await Driver.findOne();
-          req.user = {
-            _id: defaultDriverRecord?._id || '66a1a1a1a1a1a1a1a1a1a1a1',
-            name: defaultDriverRecord?.name || 'Ziyan Mansuri',
-            email: defaultDriverRecord?.email || 'ziyan.mansuri@tiffinlink.com',
-            phone: defaultDriverRecord?.phone || '+91 98765 43210',
-            role: 'driver'
-          };
-          req.driver = defaultDriverRecord || null;
-          req.driverId = defaultDriverRecord?.driverId || 'DP-4409';
-          return next();
-        }
-      } catch (fbErr) {}
-
-      return res.status(401).json({ success: false, message: 'Not authorized, token invalid or expired' });
-    }
-  }
-
-  if (!token) {
-    // Graceful fallback for driver requests if token is not present in dev/testing mode
-    try {
-      const email = req.query?.email || req.body?.email || '';
-      const phone = req.query?.phone || req.body?.phone || '';
-      const driverId = req.query?.driverId || req.body?.driverId || '';
-
-      const queryOr = [
-        ...(email ? [{ email: email.toLowerCase() }] : []),
-        ...(phone ? [{ phone }] : []),
-        ...(driverId ? [{ driverId }, { _id: mongoose.Types.ObjectId.isValid(driverId) ? driverId : null }] : []).filter(Boolean)
-      ];
-
-      let user = null;
-      if (queryOr.length > 0) {
-        user = await User.findOne({ $or: queryOr });
-      }
-
-      if (!user) {
-        user = await User.findOne({ role: { $in: ['delivery', 'driver', 'delivery_partner'] } });
-      }
-
-      if (user) {
-        req.user = user;
+      if (user.role === 'delivery' || user.role === 'driver' || user.role === 'delivery_partner') {
         let driver = await Driver.findOne({
           $or: [
             { userId: user._id },
@@ -164,32 +66,61 @@ const protect = async (req, res, next) => {
             { phone: user.phone }
           ]
         });
+
         if (driver) {
           req.driver = driver;
           req.driverId = driver.driverId || driver._id.toString();
         } else {
-          req.driverId = user._id.toString();
+          req.driverId = user.driverId || user._id.toString();
+        }
+      }
+
+      return next();
+    } catch (error) {
+      if (error.name !== 'TokenExpiredError') {
+        console.error('JWT Authentication Error:', error.message);
+      }
+      return res.status(401).json({ success: false, message: 'Not authorized, token invalid or expired' });
+    }
+  }
+
+  // If token is missing, check if specific identity email/phone query parameter was explicitly provided
+  const email = req.query?.email || req.body?.email || '';
+  const phone = req.query?.phone || req.body?.phone || '';
+
+  if (email || phone) {
+    try {
+      const queryOr = [
+        ...(email ? [{ email: email.toLowerCase() }] : []),
+        ...(phone ? [{ phone }] : [])
+      ];
+
+      const user = await User.findOne({ $or: queryOr }).select('-password');
+      if (user && user.isActive !== false) {
+        req.user = user;
+        if (user.role === 'provider') {
+          const provider = await Provider.findOne({ $or: [{ userId: user._id }, { email: user.email }] });
+          if (provider) {
+            req.provider = provider;
+            req.providerId = provider._id.toString();
+          }
+        } else if (user.role === 'delivery' || user.role === 'driver' || user.role === 'delivery_partner') {
+          const driver = await Driver.findOne({ $or: [{ userId: user._id }, { email: user.email }] });
+          if (driver) {
+            req.driver = driver;
+            req.driverId = driver.driverId || driver._id.toString();
+          } else {
+            req.driverId = user._id.toString();
+          }
         }
         return next();
-      } else {
-        const defaultDriverRecord = await Driver.findOne();
-        req.user = {
-          _id: defaultDriverRecord?._id || '66a1a1a1a1a1a1a1a1a1a1a1',
-          name: defaultDriverRecord?.name || 'Ziyan Mansuri',
-          email: defaultDriverRecord?.email || 'ziyan.mansuri@tiffinlink.com',
-          phone: defaultDriverRecord?.phone || '+91 98765 43210',
-          role: 'driver'
-        };
-        req.driver = defaultDriverRecord || null;
-        req.driverId = defaultDriverRecord?.driverId || 'DP-4409';
-        return next();
       }
-    } catch (fallbackErr) {
-      console.error('Fallback Auth Error:', fallbackErr);
+    } catch (err) {
+      console.error('Explicit query auth error:', err);
     }
-
-    return res.status(401).json({ success: false, message: 'Not authorized, no access token provided' });
   }
+
+  return res.status(401).json({ success: false, message: 'Not authorized, no access token provided' });
 };
 
 const requireProvider = (req, res, next) => {
@@ -207,13 +138,13 @@ const requireDriver = (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Authentication required' });
   }
   
-  const validRoles = ['delivery', 'driver', 'delivery_partner', 'courier', 'admin', 'user', 'customer'];
+  const validRoles = ['delivery', 'driver', 'delivery_partner', 'courier', 'admin'];
   if (!validRoles.includes(req.user.role) && !req.driverId && !req.driver) {
     return res.status(403).json({ success: false, message: 'Forbidden: Driver access required' });
   }
 
-  if (!req.driverId) {
-    req.driverId = req.driver?.driverId || req.user?.driverId || req.user?._id?.toString() || 'DP-4409';
+  if (!req.driverId && req.user) {
+    req.driverId = req.driver?.driverId || req.user?.driverId || req.user?._id?.toString();
   }
 
   next();

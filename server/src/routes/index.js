@@ -21,9 +21,12 @@ const capacityRoutes = require('./capacityRoutes');
 const serviceAreaRoutes = require('./serviceAreaRoutes');
 const scheduleRoutes = require('./scheduleRoutes');
 const safetyRoutes = require('./safetyRoutes');
+const adminRoutes = require('./adminRoutes');
 
 router.use('/auth', authRoutes);
+router.use('/admin', adminRoutes);
 router.use('/providers', providerRoutes);
+router.use('/provider', providerRoutes);
 router.use('/tiffins', tiffinRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/orders', orderRoutes);

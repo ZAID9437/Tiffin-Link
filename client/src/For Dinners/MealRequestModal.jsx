@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Search, MapPin, Navigation, IndianRupee, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -17,7 +17,7 @@ export default function MealRequestModal({ isOpen, onClose, onSubmitSuccess }) {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     try {
       const saved = localStorage.getItem('tiffinlink_user');
       if (saved) {
@@ -31,7 +31,7 @@ export default function MealRequestModal({ isOpen, onClose, onSubmitSuccess }) {
     } catch (e) {}
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       return () => {

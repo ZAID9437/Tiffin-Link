@@ -330,6 +330,9 @@ export default function ProviderSidebar({
 
             {openSections.performance && (
               <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
+                <div onClick={() => handleNavClick('performance')} className={childClass('performance')}>
+                  <span>Performance</span>
+                </div>
                 <div onClick={() => handleNavClick('reviews')} className={childClass('reviews')}>
                   <span>Ratings & Reviews</span>
                 </div>

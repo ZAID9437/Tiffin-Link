@@ -44,6 +44,35 @@ textarea,
   background: #0A8B5F;
 }
 
+/* Visible Custom Scrollbar for Admin Sidebar Nav */
+.admin-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #b0aba2 #eae8e4;
+}
+
+.admin-sidebar-scroll::-webkit-scrollbar {
+  width: 7px !important;
+  height: 7px !important;
+  display: block !important;
+}
+
+.admin-sidebar-scroll::-webkit-scrollbar-track {
+  background: #eae8e4 !important;
+  border-radius: 4px !important;
+  margin: 4px 0 !important;
+}
+
+.admin-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #b0aba2 !important;
+  border-radius: 4px !important;
+  border: 1px solid #eae8e4 !important;
+}
+
+.admin-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #1b1c1a !important;
+}
+
+
 /* Parallax GPU Acceleration */
 .parallax-img {
   will-change: transform;

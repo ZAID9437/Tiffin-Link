@@ -79,8 +79,40 @@ const subscriptionSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['ACTIVE', 'PAUSED', 'CANCELLED'],
+    enum: ['ACTIVE', 'PAUSED', 'CANCELLED', 'PENDING', 'EXPIRED'],
     default: 'ACTIVE'
+  },
+  totalMeals: {
+    type: Number,
+    default: 26
+  },
+  deliveredMeals: {
+    type: Number,
+    default: 0
+  },
+  remainingMeals: {
+    type: Number,
+    default: 26
+  },
+  slotTime: {
+    type: String,
+    default: 'Lunch: 12:30 PM'
+  },
+  canisterId: {
+    type: String,
+    default: '#TK-104'
+  },
+  mandateStatus: {
+    type: String,
+    default: 'ICICI UPI AutoPay'
+  },
+  escrowHeld: {
+    type: Number,
+    default: 0
+  },
+  escrowReleased: {
+    type: Number,
+    default: 0
   },
   pausedAt: {
     type: Date

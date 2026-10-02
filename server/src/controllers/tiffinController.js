@@ -100,8 +100,8 @@ const getTiffins = async (req, res) => {
         }
         return {
           ...t,
-          rating: t.rating || 4.8,
-          reviewCount: t.reviewCount || 5
+          rating: t.rating || 0,
+          reviewCount: t.reviewCount || 0
         };
       });
 

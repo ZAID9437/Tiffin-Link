@@ -26,6 +26,9 @@ import DeliveryLanding from './For Delivers/DeliveryLanding';
 import BecomeDeliveryPartnerModal from './For Delivers/BecomeDeliveryPartnerModal';
 import DeliveryDashboard from './DeliveryDashboard/DeliveryDashboard';
 
+// Super Admin Operating System Component
+import AdminDashboard from './AdminDashboard/AdminDashboard';
+
 // Shared Animations & Modals
 import Preloader from './components/Preloader';
 import ParticleBackground from './components/ParticleBackground';
@@ -36,46 +39,18 @@ import DemoModal from './components/DemoModal';
 import CookieConsentModal from './components/CookieConsentModal';
 import CustomerDeliveryTrackingModal from './components/CustomerDeliveryTrackingModal';
 
+import { useAuth } from './context/AuthContext';
 import { clearAuthTokens, getCookie, setCookie, saveUserSession } from './services/api';
 import { CheckCircle2 } from 'lucide-react';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('tiffinlink_user');
-      const cookieUser = getCookie('tiffinlink_user');
-      const activeRole = localStorage.getItem('tiffinlink_user_role') || getCookie('tiffinlink_role');
-
-      let user = saved ? JSON.parse(saved) : (cookieUser ? (typeof cookieUser === 'object' ? cookieUser : JSON.parse(cookieUser)) : null);
-      if (user && activeRole) {
-        user = { ...user, role: activeRole };
-      }
-      return user;
-    } catch {
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    if (currentUser?.email) {
-      fetch(`http://localhost:5000/api/auth/me?email=${encodeURIComponent(currentUser.email)}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && data.user) {
-            const activeRole = localStorage.getItem('tiffinlink_user_role') || getCookie('tiffinlink_role') || currentUser.role;
-            const updatedUser = { ...data.user, role: activeRole || data.user.role };
-            setCurrentUser(updatedUser);
-            saveUserSession(updatedUser);
-          }
-        })
-        .catch(err => console.error('Failed to sync profile from MongoDB:', err));
-    }
-  }, []);
+  const { currentUser, loading: authLoading, loginUser, logoutUser, updateUser } = useAuth();
 
   const handleLoginSuccess = (userObj) => {
-    setCurrentUser(userObj);
-    saveUserSession(userObj);
-    if (userObj.role === 'delivery') {
+    loginUser(userObj);
+    if (userObj.role === 'admin') {
+      window.location.hash = '#admin';
+    } else if (userObj.role === 'delivery' || userObj.role === 'driver') {
       window.location.hash = '#delivery';
     } else if (userObj.role === 'provider') {
       window.location.hash = '#provider';
@@ -84,9 +59,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    setCurrentUser(null);
-    clearAuthTokens();
-    window.location.hash = '';
+    logoutUser();
     showToastNotification('You have been signed out.');
   };
 
@@ -103,26 +76,26 @@ export default function App() {
 
   // State-based router with session & cookies persistence
   const [view, setView] = useState(() => {
-    const hash = window.location.hash;
-    const activeRole = localStorage.getItem('tiffinlink_user_role') || getCookie('tiffinlink_role');
-    if (hash === '#delivery' || activeRole === 'delivery' || currentUser?.role === 'delivery') return 'delivery';
-    if (hash === '#provider' || activeRole === 'provider' || currentUser?.role === 'provider') return 'provider';
+    const hash = window.location.hash || '';
+    if (hash.startsWith('#/admin') || hash.startsWith('#admin') || currentUser?.role === 'admin') return 'admin';
+    if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || currentUser?.role === 'delivery' || currentUser?.role === 'driver') return 'delivery';
+    if (hash.startsWith('#/provider') || hash.startsWith('#provider') || currentUser?.role === 'provider') return 'provider';
     return 'home';
   });
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash;
-      const activeRole = localStorage.getItem('tiffinlink_user_role') || getCookie('tiffinlink_role');
+      const hash = window.location.hash || '';
+      const activeRole = localStorage.getItem('tiffinlink_user_role') || getCookie('tiffinlink_role') || currentUser?.role;
       let currentView = 'home';
-      if (hash === '#delivery' || activeRole === 'delivery') currentView = 'delivery';
-      else if (hash === '#provider' || activeRole === 'provider') currentView = 'provider';
+      if (hash.startsWith('#/admin') || hash.startsWith('#admin') || activeRole === 'admin') currentView = 'admin';
+      else if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || activeRole === 'delivery' || activeRole === 'driver') currentView = 'delivery';
+      else if (hash.startsWith('#/provider') || hash.startsWith('#provider') || activeRole === 'provider') currentView = 'provider';
       setView(currentView);
-      window.scrollTo({ top: 0, behavior: 'instant' });
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, [currentUser]);
 
   // Sync active order for logged-in Diner/Customer from MongoDB
   useEffect(() => {
@@ -444,6 +417,24 @@ export default function App() {
     };
   }, [view]);
 
+  // While authentication session is restoring from MongoDB /auth/me on page refresh, show preloader
+  if (authLoading) {
+    return (
+      <div className="app-layout">
+        <Preloader key="auth_loading" onComplete={() => {}} />
+      </div>
+    );
+  }
+
+  // If user is authenticated as Super Admin or hash is #admin, render Admin Dashboard Control Center
+  if (currentUser?.role === 'admin' || view === 'admin') {
+    return (
+      <div className="app-layout">
+        <AdminDashboard currentUser={currentUser} onLogout={handleLogout} />
+      </div>
+    );
+  }
+
   // If user is authenticated as a Provider, render the Provider Kitchen Portal Dashboard directly
   if (currentUser?.role === 'provider') {
     return (
@@ -451,17 +442,14 @@ export default function App() {
         <ProviderDashboard 
           currentUser={currentUser} 
           onLogout={handleLogout} 
-          onUpdateUser={(updatedUser) => {
-            setCurrentUser(updatedUser);
-            localStorage.setItem('tiffinlink_user', JSON.stringify(updatedUser));
-          }}
+          onUpdateUser={(updatedUser) => updateUser(updatedUser)}
         />
       </div>
     );
   }
 
   // If user is authenticated as a Delivery Partner, render the Delivery Dashboard directly
-  if (currentUser?.role === 'delivery') {
+  if (currentUser?.role === 'delivery' || currentUser?.role === 'driver') {
     return (
       <div className="app-layout">
         <DeliveryDashboard currentUser={currentUser} onLogout={handleLogout} />

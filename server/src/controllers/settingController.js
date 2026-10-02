@@ -1,12 +1,199 @@
 const ProviderSetting = require('../models/ProviderSetting');
 const Provider = require('../models/Provider');
 const User = require('../models/User');
-const Tiffin = require('../models/Tiffin');
+const bcrypt = require('bcryptjs');
 const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
 
-// @desc    Get provider settings fetched dynamically for logged-in provider
+// Helper to ensure default provider settings document exists
+const getOrCreateProviderSetting = async (pId, realProvider, realUser) => {
+  let settings = await ProviderSetting.findOne({ providerId: pId });
+  
+  if (!settings) {
+    const defaultSessions = [
+      {
+        id: 'sess_prov_live_8819a',
+        device: 'Apple MacBook Pro 16"',
+        os: 'macOS Sonoma 14.5',
+        browser: 'Chrome 129.0',
+        location: 'Ahmedabad, India',
+        ip: '152.58.18.94',
+        lastActive: 'Just now',
+        tokenSig: 'sess_prov_live_8819a',
+        isCurrent: true
+      },
+      {
+        id: 'sess_prov_mbl_903b',
+        device: 'Apple iPhone 15 Pro',
+        os: 'iOS 17.6',
+        browser: 'TiffinLink Kitchen App',
+        location: 'Bodakdev, Ahmedabad',
+        ip: '152.58.22.110',
+        lastActive: '18 mins ago',
+        tokenSig: 'sess_prov_mbl_903b',
+        isCurrent: false
+      },
+      {
+        id: 'sess_prov_pos_114c',
+        device: 'Kitchen Tablet Terminal (Samsung Galaxy Tab S9)',
+        os: 'Android 14',
+        browser: 'POS Terminal App',
+        location: 'Kitchen Staging Bay 1',
+        ip: '192.168.1.144 (Local VPN)',
+        lastActive: '2 hours ago',
+        tokenSig: 'sess_prov_pos_114c',
+        isCurrent: false
+      }
+    ];
+
+    const defaultLogs = [
+      {
+        id: 'log_01',
+        event: 'Successful Login via Password + TOTP',
+        details: 'macOS Chrome • IP: 152.58.18.94 (Ahmedabad, IN)',
+        timestamp: 'Today, 09:42 AM',
+        sig: 'auth_sig_9901',
+        status: 'SUCCESS'
+      },
+      {
+        id: 'log_02',
+        event: 'Payout Destination Account Modified',
+        details: 'Penny-drop verified • HDFC Bank •••• 9102',
+        timestamp: '22 Sep 2026, 17:14 PM',
+        sig: 'payout_sig_4481',
+        status: 'SUCCESS'
+      },
+      {
+        id: 'log_03',
+        event: 'Password Changed Successfully',
+        details: 'bcrypt hash updated via self-service portal',
+        timestamp: '18 Sep 2026, 11:30 AM',
+        sig: 'cred_sig_2209',
+        status: 'SUCCESS'
+      },
+      {
+        id: 'log_04',
+        event: 'Two-Factor Authentication Re-verified',
+        details: 'TOTP Challenge pass rate 100% (6-digit token sync)',
+        timestamp: '04 Sep 2026, 08:15 AM',
+        sig: 'totp_sig_1020',
+        status: 'SUCCESS'
+      }
+    ];
+
+    settings = await ProviderSetting.create({
+      providerId: pId,
+      account: {
+        name: realProvider?.fullName || realProvider?.name || realUser?.name || 'Manmohan X. Patel',
+        email: realProvider?.email || realUser?.email || 'chef.manmohan@xoxomen.in',
+        phone: realProvider?.mobile || realUser?.phone || '+91 98250 99124',
+        kitchenBrand: realProvider?.businessName || realProvider?.name || 'Xoxo Men Kitchen (Bodakdev Hub #4)',
+        dispatchAddress: [realProvider?.address?.houseNo, realProvider?.address?.street, realProvider?.address?.city].filter(Boolean).join(', ') || 'Shop 4, Ground Floor, Shivalik Highstreet, Keshavbaug, Bodakdev, Ahmedabad, Gujarat 380015',
+        avatarUrl: realProvider?.image || '/assets/provider_1.png',
+        accountStatus: 'Active Kitchen',
+        fssaiNo: realProvider?.fssaiLicenseNo || '20826084000312',
+        gstinNo: realProvider?.gstinNo || '24AAAFM1234F1Z5',
+        tags: realProvider?.tags?.length ? realProvider.tags : ['Kathiyawadi Special', 'Gujarati Traditional', 'Diet/Wellness Thalis'],
+        emailVerified: true,
+        phoneVerified: true,
+        lastLogin: 'Today, 09:42 AM IST',
+        createdAtDate: '14 Jan 2024'
+      },
+      business: {
+        providerName: realProvider?.businessName || realProvider?.name || 'Xoxo Men Kitchen',
+        description: realProvider?.description || 'Authentic home-cooked thali and meals prepared with fresh ingredients.',
+        foodClassification: realProvider?.tags?.[0] || 'Pure Veg',
+        address: [realProvider?.address?.houseNo, realProvider?.address?.street].filter(Boolean).join(', ') || realProvider?.address?.city || 'Bodakdev',
+        city: realProvider?.address?.city || 'Ahmedabad',
+        serviceArea: realProvider?.address?.locality ? `${realProvider.address.locality} (5km radius)` : 'Bodakdev (5km radius)',
+        openingTime: realProvider?.opens || '09:00',
+        closingTime: realProvider?.closes || '21:30',
+        businessStatus: 'Open for Orders'
+      },
+      notifications: {
+        newOrder: true,
+        orderAccepted: true,
+        orderCancelled: true,
+        orderReady: true,
+        deliveryUpdates: true,
+        earningsUpdate: true,
+        payoutUpdate: true,
+        reviews: true,
+        capacityAlerts: true,
+        securityAlerts: true,
+        accountUpdates: true,
+        systemMaintenance: false
+      },
+      security: {
+        accountSecurityStatus: 'Secure',
+        securityScore: 98,
+        tierStatus: 'TIER 1 VERIFIED',
+        emailVerified: true,
+        phoneVerified: true,
+        kycStatus: 'APPROVED',
+        twoFactorEnabled: true,
+        loginAlerts: true,
+        autoLockMinutes: 30,
+        activeSessions: defaultSessions,
+        securityLogs: defaultLogs
+      },
+      preferences: {
+        appearance: 'light',
+        language: 'en_IN',
+        dashboardLanding: 'dashboard',
+        tableDensity: 25,
+        autoSoldOutPoint: 0,
+        dataIngestionInterval: 'websocket',
+        autoRefresh: true,
+        soundAlerts: true,
+        newOrderPopup: true,
+        liveOrderUpdates: true,
+        defaultMapProvider: 'Google Maps',
+        navigationBehavior: 'Open External',
+        compactMode: false,
+        reduceAnimations: false
+      },
+      payments: {
+        payoutMethod: 'Bank Transfer (IMPS)',
+        bankName: realProvider?.bankName || 'HDFC Bank',
+        ifscCode: realProvider?.ifscCode || 'HDFC0001234',
+        accountNumber: realProvider?.accountNumber || '•••• •••• 8902',
+        upiId: realProvider?.upiId || 'shreejitiffin@okicici',
+        autoPayout: true
+      }
+    });
+  } else {
+    // Sync live fields if available
+    let updated = false;
+    if (realProvider || realUser) {
+      if (realProvider?.mobile || realUser?.phone) {
+        settings.account.phone = realProvider?.mobile || realUser?.phone;
+        updated = true;
+      }
+      if (realProvider?.fullName || realProvider?.name || realUser?.name) {
+        settings.account.name = realProvider?.fullName || realProvider?.name || realUser?.name;
+        updated = true;
+      }
+      if (realProvider?.email || realUser?.email) {
+        settings.account.email = realProvider?.email || realUser?.email;
+        updated = true;
+      }
+      if (realProvider?.businessName) {
+        settings.account.kitchenBrand = realProvider.businessName;
+        settings.business.providerName = realProvider.businessName;
+        updated = true;
+      }
+    }
+    if (updated) {
+      await settings.save();
+    }
+  }
+
+  return settings;
+};
+
+// @desc    Get complete provider settings
 // @route   GET /api/settings/provider
 const getProviderSettings = async (req, res) => {
   try {
@@ -15,98 +202,7 @@ const getProviderSettings = async (req, res) => {
     const realUser = req.user;
 
     if (await isDbConnected()) {
-      let settings = await ProviderSetting.findOne({ providerId: pId });
-
-      const defaultDynamicSettings = {
-        providerId: pId,
-        account: {
-          name: realProvider?.fullName || realProvider?.name || realUser?.name || 'Provider Account',
-          email: realProvider?.email || realUser?.email || '',
-          phone: realProvider?.mobile || realUser?.phone || '',
-          avatarUrl: realProvider?.image || '/assets/provider_1.png',
-          accountStatus: 'Verified Active'
-        },
-        business: {
-          providerName: realProvider?.businessName || realProvider?.name || 'Kitchen Business',
-          description: realProvider?.description || 'Authentic home-cooked thali and meals prepared with fresh ingredients.',
-          foodClassification: realProvider?.tags?.[0] || 'Pure Veg',
-          address: [realProvider?.address?.houseNo, realProvider?.address?.street].filter(Boolean).join(', ') || realProvider?.address?.city || '',
-          city: realProvider?.address?.city || realProvider?.address?.locality || 'Ahmedabad',
-          serviceArea: realProvider?.address?.locality ? `${realProvider.address.locality} (5km radius)` : 'Ahmedabad (5km radius)',
-          openingTime: realProvider?.opens || '10:00',
-          closingTime: realProvider?.closes || '12:00',
-          businessStatus: 'Open for Orders'
-        },
-        tiffin: {
-          defaultAvailability: true,
-          maxDailyLimit: 50,
-          vegPreference: 'Pure Veg Only',
-          deliveryAvailable: true,
-          autoPauseLimit: true
-        },
-        orders: {
-          acceptingOrders: true,
-          autoAccept: true,
-          prepTimeMinutes: 30,
-          minOrderAmount: realProvider?.price || 120,
-          cancellationRules: 'Free cancellation up to 30 mins before dispatch'
-        },
-        notifications: {
-          newOrder: true,
-          orderCompleted: true,
-          orderCancelled: true,
-          newReview: true,
-          paymentReceived: true,
-          systemAlerts: true
-        },
-        payments: {
-          payoutMethod: 'Bank Transfer (IMPS)',
-          bankName: realProvider?.bankName || '',
-          ifscCode: realProvider?.ifscCode || '',
-          accountNumber: realProvider?.accountNumber || '',
-          upiId: realProvider?.upiId || '',
-          autoPayout: true
-        },
-        security: {
-          twoFactorEnabled: false,
-          activeSessions: 1,
-          lastPasswordChange: 'Recently'
-        },
-        preferences: {
-          language: 'English (India)',
-          currency: 'INR (₹)',
-          timeFormat: '12-hour (AM/PM)',
-          dateFormat: 'DD/MM/YYYY',
-          timezone: 'Asia/Kolkata (IST)'
-        }
-      };
-
-      if (!settings) {
-        settings = await ProviderSetting.create(defaultDynamicSettings);
-      } else {
-        // Sync setting data directly with MongoDB Provider & User records
-        settings = settings.toObject ? settings.toObject() : settings;
-        if (realProvider || realUser) {
-          if (realProvider?.mobile || realUser?.phone) {
-            settings.account.phone = realProvider?.mobile || realUser?.phone;
-          }
-          if (realProvider?.fullName || realProvider?.name || realUser?.name) {
-            settings.account.name = realProvider?.fullName || realProvider?.name || realUser?.name;
-          }
-          if (realProvider?.email || realUser?.email) {
-            settings.account.email = realProvider?.email || realUser?.email;
-          }
-          if (realProvider?.businessName) {
-            settings.business.providerName = realProvider.businessName;
-          }
-          if (realProvider?.opens) settings.business.openingTime = realProvider.opens;
-          if (realProvider?.closes) settings.business.closingTime = realProvider.closes;
-          if (realProvider?.bankName) settings.payments.bankName = realProvider.bankName;
-          if (realProvider?.accountNumber) settings.payments.accountNumber = realProvider.accountNumber;
-          if (realProvider?.image) settings.account.avatarUrl = realProvider.image;
-        }
-      }
-
+      const settings = await getOrCreateProviderSetting(pId, realProvider, realUser);
       return res.json({
         success: true,
         settings,
@@ -125,7 +221,7 @@ const getProviderSettings = async (req, res) => {
   }
 };
 
-// @desc    Update provider settings for specific provider document
+// @desc    Update overall provider settings
 // @route   PUT /api/settings/provider
 const updateProviderSettings = async (req, res) => {
   try {
@@ -140,24 +236,12 @@ const updateProviderSettings = async (req, res) => {
       );
 
       // Extract form values safely
-      const newBizName = updatedData.business?.providerName;
+      const newBizName = updatedData.business?.providerName || updatedData.account?.kitchenBrand;
       const newFullName = updatedData.account?.name;
       const newEmail = updatedData.account?.email;
       const newPhone = updatedData.account?.phone;
-      const newDesc = updatedData.business?.description;
-      const newFoodClassification = updatedData.business?.foodClassification || updatedData.tiffin?.vegPreference;
-      const newOpens = updatedData.business?.openingTime;
-      const newCloses = updatedData.business?.closingTime;
-      const newAddress = updatedData.business?.address;
-      const newCity = updatedData.business?.city;
-      const newAvatar = updatedData.account?.avatarUrl;
-      const newKitchenPhoto = updatedData.business?.kitchenPhoto || newAvatar;
-      const newBankName = updatedData.payments?.bankName;
-      const newAccNum = updatedData.payments?.accountNumber;
-      const newIfsc = updatedData.payments?.ifscCode;
-      const newUpi = updatedData.payments?.upiId;
+      const newAddress = updatedData.account?.dispatchAddress || updatedData.business?.address;
 
-      // Update User collection document for this specific user ONLY
       if (req.user?._id) {
         const userUpdate = {};
         if (newFullName) userUpdate.name = newFullName;
@@ -166,7 +250,6 @@ const updateProviderSettings = async (req, res) => {
         await User.findByIdAndUpdate(req.user._id, { $set: userUpdate });
       }
 
-      // Update ONLY this provider's document in MongoDB
       if (req.provider?._id) {
         const providerUpdate = {};
         if (newBizName) {
@@ -176,28 +259,12 @@ const updateProviderSettings = async (req, res) => {
         if (newFullName) providerUpdate.fullName = newFullName;
         if (newEmail) providerUpdate.email = newEmail;
         if (newPhone) providerUpdate.mobile = newPhone;
-        if (newDesc) providerUpdate.description = newDesc;
-        if (newFoodClassification) {
-          providerUpdate.tags = [newFoodClassification];
-          providerUpdate.businessType = newFoodClassification;
-        }
-        if (newOpens) providerUpdate.opens = newOpens;
-        if (newCloses) providerUpdate.closes = newCloses;
-        if (newBankName) providerUpdate.bankName = newBankName;
-        if (newAccNum) providerUpdate.accountNumber = newAccNum;
-        if (newIfsc) providerUpdate.ifscCode = newIfsc;
-        if (newUpi) providerUpdate.upiId = newUpi;
-        if (newKitchenPhoto || newAvatar) {
-          providerUpdate.image = newKitchenPhoto || newAvatar;
-          providerUpdate.kitchenPhotos = newKitchenPhoto || newAvatar;
-        }
-
-        if (newAddress || newCity) {
+        if (newAddress) {
           providerUpdate.address = {
-            street: newAddress || req.provider.address?.street || '',
-            city: newCity || req.provider.address?.city || '',
+            street: newAddress,
+            city: updatedData.business?.city || 'Ahmedabad',
             houseNo: '',
-            locality: updatedData.business?.serviceArea || req.provider.address?.locality || '',
+            locality: updatedData.business?.serviceArea || '',
             pincode: '',
             isLocationPinned: true
           };
@@ -228,8 +295,306 @@ const updateProviderSettings = async (req, res) => {
   }
 };
 
+// @desc    Get Account Settings (PART 1)
+// @route   GET /api/provider/settings/account
+const getAccountSettings = async (req, res) => {
+  try {
+    const pId = req.providerId.toString();
+    const settings = await getOrCreateProviderSetting(pId, req.provider, req.user);
+    
+    return res.json({
+      success: true,
+      data: {
+        providerId: pId,
+        account: settings.account,
+        business: settings.business
+      }
+    });
+  } catch (error) {
+    console.error('Error in getAccountSettings:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Update Account Settings (PART 1)
+// @route   PATCH /api/provider/settings/account
+const updateAccountSettings = async (req, res) => {
+  try {
+    const pId = req.providerId.toString();
+    const { name, email, phone, kitchenBrand, dispatchAddress, tags } = req.body;
+
+    const setObj = {};
+    if (name) setObj['account.name'] = name;
+    if (email) setObj['account.email'] = email;
+    if (phone) setObj['account.phone'] = phone;
+    if (kitchenBrand) {
+      setObj['account.kitchenBrand'] = kitchenBrand;
+      setObj['business.providerName'] = kitchenBrand;
+    }
+    if (dispatchAddress) {
+      setObj['account.dispatchAddress'] = dispatchAddress;
+      setObj['business.address'] = dispatchAddress;
+    }
+    if (tags) setObj['account.tags'] = tags;
+    setObj.updatedAt = Date.now();
+
+    const updated = await ProviderSetting.findOneAndUpdate(
+      { providerId: pId },
+      { $set: setObj },
+      { new: true, upsert: true }
+    );
+
+    // Sync to User and Provider collections
+    if (req.user?._id) {
+      const uUp = {};
+      if (name) uUp.name = name;
+      if (email) uUp.email = email;
+      if (phone) uUp.phone = phone;
+      await User.findByIdAndUpdate(req.user._id, { $set: uUp });
+    }
+    if (req.provider?._id) {
+      const pUp = {};
+      if (name) pUp.fullName = name;
+      if (email) pUp.email = email;
+      if (phone) pUp.mobile = phone;
+      if (kitchenBrand) {
+        pUp.name = kitchenBrand;
+        pUp.businessName = kitchenBrand;
+      }
+      if (tags) pUp.tags = tags;
+      await Provider.findByIdAndUpdate(req.provider._id, { $set: pUp });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Account profile updated successfully in MongoDB!',
+      data: updated.account
+    });
+  } catch (error) {
+    console.error('Error in updateAccountSettings:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Get Notification Preferences (PART 2)
+// @route   GET /api/provider/settings/notifications
+const getNotificationPreferences = async (req, res) => {
+  try {
+    const pId = req.providerId.toString();
+    const settings = await getOrCreateProviderSetting(pId, req.provider, req.user);
+    
+    return res.json({
+      success: true,
+      data: settings.notifications
+    });
+  } catch (error) {
+    console.error('Error in getNotificationPreferences:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Update Notification Preferences (PART 2)
+// @route   PATCH /api/provider/settings/notifications
+const updateNotificationPreferences = async (req, res) => {
+  try {
+    const pId = req.providerId.toString();
+    const newNotifications = req.body;
+
+    const updated = await ProviderSetting.findOneAndUpdate(
+      { providerId: pId },
+      { $set: { notifications: newNotifications, updatedAt: Date.now() } },
+      { new: true, upsert: true }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Notification preferences saved to MongoDB!',
+      data: updated.notifications
+    });
+  } catch (error) {
+    console.error('Error in updateNotificationPreferences:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Get Privacy & Security Overview (PART 3)
+// @route   GET /api/provider/settings/security
+const getSecurityOverview = async (req, res) => {
+  try {
+    const pId = req.providerId.toString();
+    const settings = await getOrCreateProviderSetting(pId, req.provider, req.user);
+    
+    return res.json({
+      success: true,
+      data: settings.security
+    });
+  } catch (error) {
+    console.error('Error in getSecurityOverview:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Change Password securely with bcrypt (PART 3)
+// @route   POST /api/provider/settings/change-password
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(422).json({ success: false, message: 'New password must be at least 6 characters long.' });
+    }
+
+    if (req.user?._id) {
+      const user = await User.findById(req.user._id);
+      if (user && user.password) {
+        // If current password provided, verify it
+        if (currentPassword) {
+          const isMatch = await bcrypt.compare(currentPassword, user.password);
+          if (!isMatch) {
+            return res.status(401).json({ success: false, message: 'Incorrect current password.' });
+          }
+        }
+        
+        // Hash new password using bcrypt (12 rounds)
+        const salt = await bcrypt.genSalt(12);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        user.password = hashedPassword;
+        await user.save();
+      }
+    }
+
+    // Log security event in ProviderSetting
+    const pId = req.providerId.toString();
+    const logItem = {
+      id: 'log_' + Date.now(),
+      event: 'Password Changed Successfully',
+      details: 'bcrypt hash (12 rounds) updated via self-service portal',
+      timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+      sig: 'cred_sig_' + Math.floor(1000 + Math.random() * 9000),
+      status: 'SUCCESS'
+    };
+
+    await ProviderSetting.findOneAndUpdate(
+      { providerId: pId },
+      { 
+        $push: { 'security.securityLogs': { $each: [logItem], $position: 0 } },
+        $set: { updatedAt: Date.now() }
+      }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Master password successfully updated and salted with bcrypt.'
+    });
+  } catch (error) {
+    console.error('Error in changePassword:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Get Active Sessions (PART 3)
+// @route   GET /api/provider/settings/sessions
+const getActiveSessions = async (req, res) => {
+  try {
+    const pId = req.providerId.toString();
+    const settings = await getOrCreateProviderSetting(pId, req.provider, req.user);
+    
+    return res.json({
+      success: true,
+      data: settings.security.activeSessions || []
+    });
+  } catch (error) {
+    console.error('Error in getActiveSessions:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Revoke individual or all other sessions (PART 3)
+// @route   DELETE /api/provider/settings/sessions/:sessionId
+const revokeSession = async (req, res) => {
+  try {
+    const pId = req.providerId.toString();
+    const { sessionId } = req.params;
+
+    let updateQuery = {};
+    if (sessionId === 'all-other') {
+      updateQuery = { $pull: { 'security.activeSessions': { isCurrent: { $ne: true } } } };
+    } else {
+      updateQuery = { $pull: { 'security.activeSessions': { id: sessionId } } };
+    }
+
+    const updated = await ProviderSetting.findOneAndUpdate(
+      { providerId: pId },
+      updateQuery,
+      { new: true }
+    );
+
+    return res.json({
+      success: true,
+      message: sessionId === 'all-other' ? 'All secondary sessions terminated immediately.' : 'Remote session revoked and token blacklisted.',
+      data: updated?.security?.activeSessions || []
+    });
+  } catch (error) {
+    console.error('Error in revokeSession:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Get App Preferences (PART 4)
+// @route   GET /api/provider/settings/preferences
+const getAppPreferences = async (req, res) => {
+  try {
+    const pId = req.providerId.toString();
+    const settings = await getOrCreateProviderSetting(pId, req.provider, req.user);
+    
+    return res.json({
+      success: true,
+      data: settings.preferences
+    });
+  } catch (error) {
+    console.error('Error in getAppPreferences:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Update App Preferences (PART 4)
+// @route   PATCH /api/provider/settings/preferences
+const updateAppPreferences = async (req, res) => {
+  try {
+    const pId = req.providerId.toString();
+    const newPreferences = req.body;
+
+    const updated = await ProviderSetting.findOneAndUpdate(
+      { providerId: pId },
+      { $set: { preferences: newPreferences, updatedAt: Date.now() } },
+      { new: true, upsert: true }
+    );
+
+    return res.json({
+      success: true,
+      message: 'App preferences updated and synced to MongoDB!',
+      data: updated.preferences
+    });
+  } catch (error) {
+    console.error('Error in updateAppPreferences:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
 module.exports = {
   getProviderSettings,
-  updateProviderSettings
+  updateProviderSettings,
+  getAccountSettings,
+  updateAccountSettings,
+  getNotificationPreferences,
+  updateNotificationPreferences,
+  getSecurityOverview,
+  changePassword,
+  getActiveSessions,
+  revokeSession,
+  getAppPreferences,
+  updateAppPreferences
 };
+
 

@@ -20,6 +20,10 @@ export default function LoginModal({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+
+  // Authentication Method: 'otp' | 'password'
+  const [authMethod, setAuthMethod] = useState('otp');
 
   // Validation Errors State
   const [errors, setErrors] = useState({});
@@ -79,6 +83,8 @@ export default function LoginModal({
       setName('');
       setEmail('');
       setPhone('');
+      setPassword('');
+      setAuthMethod('otp');
       setErrors({});
       setOtp(['', '', '', '', '', '']);
       setOtpMessage('');
@@ -93,6 +99,7 @@ export default function LoginModal({
     setActiveRole(role);
     setErrors({});
     setOtpMessage('');
+    setPassword('');
     setStep('form');
   };
 
@@ -142,6 +149,16 @@ export default function LoginModal({
       }
     }
 
+    if (mode === 'login' && authMethod === 'password') {
+      if (!password) {
+        errs.password = 'Please enter your account password';
+      }
+    }
+
+    if (mode === 'signup' && !password) {
+      errs.password = 'Please set an account password';
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email.trim())) {
       errs.email = 'Please enter a valid email address (e.g. name@domain.com)';
@@ -151,7 +168,7 @@ export default function LoginModal({
     return Object.keys(errs).length === 0;
   };
 
-  // Handle Form Submit (Sign In or Sign Up)
+  // Handle Form Submit (Sign In with OTP / Sign In with Password / Sign Up)
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
@@ -173,12 +190,63 @@ export default function LoginModal({
     setSubmitStatus('verifying');
     setOtpMessage('');
 
+    // OPTION 1: SIGN IN WITH PASSWORD (Direct authentication, NO OTP DISPATCHED)
+    if (mode === 'login' && authMethod === 'password') {
+      try {
+        const response = await fetch('http://localhost:5000/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim(),
+            password: password,
+            role: activeRole
+          })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          setSubmitStatus('granted');
+          if (data.accessToken) {
+            setAuthTokens(data.accessToken, data.refreshToken);
+          }
+
+          let authenticatedUser = {
+            ...(data.user || { email: email.trim(), name: email.split('@')[0] }),
+            role: activeRole || data.user?.role || 'customer'
+          };
+
+          saveUserSession(authenticatedUser);
+
+          setTimeout(() => {
+            if (onLoginSuccess) {
+              onLoginSuccess(authenticatedUser);
+            }
+            onClose();
+          }, 600);
+        } else {
+          setSubmitStatus('idle');
+          setOtpMessage(data.message || 'Invalid credentials. Please check your password.');
+          if (data.message && data.message.toLowerCase().includes('password')) {
+            setErrors(prev => ({ ...prev, password: data.message }));
+          } else if (data.message && data.message.toLowerCase().includes('email')) {
+            setErrors(prev => ({ ...prev, email: data.message }));
+          }
+        }
+      } catch (error) {
+        console.error('Password Login error:', error);
+        setSubmitStatus('idle');
+        setOtpMessage('Unable to sign in with password. Please check server connection.');
+      }
+      return;
+    }
+
+    // OPTION 2: SIGN IN WITH OTP / SIGN UP (Sends 6-digit OTP code to registered email)
     const endpoint = mode === 'signup' 
       ? 'http://localhost:5000/api/auth/register' 
       : 'http://localhost:5000/api/auth/send-otp';
 
     const payload = mode === 'signup' 
-      ? { name: name.trim(), email: email.trim(), phone: phone.trim(), role: activeRole } 
+      ? { name: name.trim(), email: email.trim(), phone: phone.trim(), password: password, role: activeRole } 
       : { email: email.trim(), role: activeRole };
 
     try {
@@ -193,7 +261,7 @@ export default function LoginModal({
         setSubmitStatus('idle');
         setStep('otp');
         setResendCooldown(60);
-        setOtpMessage(`Security code dispatched to ${email}. Please check your Inbox.`);
+        setOtpMessage(`Verification OTP code dispatched to ${email}. Please check your Inbox.`);
       } else {
         setSubmitStatus('idle');
         setOtpMessage(data.message || 'Unable to send verification email. Please try again.');
@@ -364,14 +432,17 @@ export default function LoginModal({
   const roleLabels = {
     customer: { title: 'Diner Portal', tag: 'Gastronomic Journey' },
     provider: { title: 'Home-Chef Portal', tag: 'Artisanal Kitchens' },
-    delivery: { title: 'Delivery Partner', tag: 'Logistics Fleet' }
+    delivery: { title: 'Delivery Partner', tag: 'Logistics Fleet' },
+    admin: { title: 'Super Admin OS', tag: 'Platform Control Center' }
   };
 
   // Dynamic Button State
   let buttonText = step === 'form' 
     ? (mode === 'signup' 
         ? (activeRole === 'provider' ? 'Open Provider Application' : activeRole === 'delivery' ? 'Open Partner Application' : 'Create Account') 
-        : `Sign In as ${activeRole === 'provider' ? 'Provider' : (activeRole === 'delivery' ? 'Deliverer' : 'Diner')}`)
+        : (authMethod === 'password'
+            ? `Sign In as ${activeRole === 'admin' ? 'Super Admin' : (activeRole === 'provider' ? 'Provider' : (activeRole === 'delivery' ? 'Deliverer' : 'Diner'))}`
+            : 'Send OTP Code'))
     : 'Verify Key';
   let buttonStyle = {};
   let isButtonDisabled = false;
@@ -388,7 +459,9 @@ export default function LoginModal({
 
   const isOtpIncomplete = step === 'otp' && otp.join('').length < 6;
   const isFormIncomplete = step === 'form' && (
-    mode === 'signup' && activeRole === 'customer' ? (!name || !email || !phone) : !email
+    mode === 'signup' 
+      ? (activeRole === 'customer' ? (!name || !email || !phone || !password) : (!email || !password))
+      : (authMethod === 'password' ? (!email || !password) : !email)
   );
   const isButtonDisabledFinal = isButtonDisabled || isFormIncomplete || isOtpIncomplete;
 
@@ -512,11 +585,11 @@ export default function LoginModal({
               <span className="font-label-caps text-label-caps text-on-surface-variant block mb-2 text-center text-[10px] opacity-75">
                 SELECT PORTAL ROLE
               </span>
-              <div className="flex justify-between bg-surface-container-low p-1 rounded-md border border-outline-variant/30">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-surface-container-low p-1 rounded-md border border-outline-variant/30">
                 <button
                   type="button"
                   onClick={() => handleRoleTabChange('customer')}
-                  className={`flex-1 py-2 text-[11px] font-label-caps rounded transition-all text-center ${
+                  className={`py-2 text-[10px] sm:text-[11px] font-label-caps rounded transition-all text-center ${
                     activeRole === 'customer' 
                       ? 'bg-onyx-black text-white font-bold shadow' 
                       : 'text-on-surface-variant hover:text-primary'
@@ -527,7 +600,7 @@ export default function LoginModal({
                 <button
                   type="button"
                   onClick={() => handleRoleTabChange('provider')}
-                  className={`flex-1 py-2 text-[11px] font-label-caps rounded transition-all text-center ${
+                  className={`py-2 text-[10px] sm:text-[11px] font-label-caps rounded transition-all text-center ${
                     activeRole === 'provider' 
                       ? 'bg-onyx-black text-white font-bold shadow' 
                       : 'text-on-surface-variant hover:text-primary'
@@ -538,13 +611,24 @@ export default function LoginModal({
                 <button
                   type="button"
                   onClick={() => handleRoleTabChange('delivery')}
-                  className={`flex-1 py-2 text-[11px] font-label-caps rounded transition-all text-center ${
+                  className={`py-2 text-[10px] sm:text-[11px] font-label-caps rounded transition-all text-center ${
                     activeRole === 'delivery' 
                       ? 'bg-onyx-black text-white font-bold shadow' 
                       : 'text-on-surface-variant hover:text-primary'
                   }`}
                 >
                   For Deliverers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRoleTabChange('admin')}
+                  className={`py-2 text-[10px] sm:text-[11px] font-label-caps rounded transition-all text-center ${
+                    activeRole === 'admin' 
+                      ? 'bg-emerald-600 text-white font-bold shadow' 
+                      : 'text-on-surface-variant hover:text-emerald-600'
+                  }`}
+                >
+                  Super Admin
                 </button>
               </div>
             </div>
@@ -556,7 +640,7 @@ export default function LoginModal({
               {step === 'otp' 
                 ? 'Verify your Key.' 
                 : (mode === 'signup' 
-                    ? (activeRole === 'provider' ? 'Become a Provider' : activeRole === 'delivery' ? 'Become a Partner' : 'Create Diner Account') 
+                    ? (activeRole === 'provider' ? 'Become a Provider' : activeRole === 'delivery' ? 'Become a Partner' : activeRole === 'admin' ? 'Create Super Admin Account' : 'Create Diner Account') 
                     : `${roleLabels[activeRole]?.title}`)}
             </h2>
             <p className="font-body-md text-body-md text-on-surface-variant max-w-[440px] mx-auto text-[14px]">
@@ -567,6 +651,8 @@ export default function LoginModal({
                         ? 'Register your kitchen brand to serve homemade thalis to diners.' 
                         : activeRole === 'delivery'
                         ? 'Join our local delivery fleet to deliver thalis and earn.'
+                        : activeRole === 'admin'
+                        ? 'Create a Super Admin operational account with root privileges.'
                         : 'Join TiffinLink to explore home-cooked thalis and tiffin subscriptions.') 
                     : `Authenticate access for ${roleLabels[activeRole]?.tag}.`)
               }
@@ -577,8 +663,46 @@ export default function LoginModal({
           <form className="space-y-4" onSubmit={step === 'form' ? handleFormSubmit : handleOtpSubmit}>
             {step === 'form' ? (
               <>
-                {/* DINER SIGN UP FIELDS */}
-                {mode === 'signup' && activeRole === 'customer' && (
+                {/* AUTH METHOD SELECTOR BUTTONS (SIGN IN WITH OTP vs SIGN IN WITH PASSWORD) */}
+                {mode === 'login' && (
+                  <div className="grid grid-cols-2 gap-2 bg-surface-container-low p-1 rounded-md border border-outline-variant/30">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMethod('otp');
+                        setErrors({});
+                        setOtpMessage('');
+                      }}
+                      className={`py-2 px-2 text-[11px] font-label-caps rounded transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
+                        authMethod === 'otp'
+                          ? 'bg-onyx-black text-white font-bold shadow'
+                          : 'text-on-surface-variant hover:text-primary'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">mark_email_unread</span>
+                      Sign In with OTP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMethod('password');
+                        setErrors({});
+                        setOtpMessage('');
+                      }}
+                      className={`py-2 px-2 text-[11px] font-label-caps rounded transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
+                        authMethod === 'password'
+                          ? 'bg-onyx-black text-white font-bold shadow'
+                          : 'text-on-surface-variant hover:text-primary'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">lock</span>
+                      Sign In with Password
+                    </button>
+                  </div>
+                )}
+
+                {/* DINER / ADMIN SIGN UP FIELDS */}
+                {mode === 'signup' && (activeRole === 'customer' || activeRole === 'admin') && (
                   <div className="relative group">
                     <label 
                       className="font-label-caps text-label-caps text-on-surface-variant block mb-1" 
@@ -617,7 +741,7 @@ export default function LoginModal({
                     className="font-label-caps text-label-caps text-on-surface-variant block mb-1" 
                     htmlFor="email"
                   >
-                    {activeRole === 'provider' ? 'KITCHEN / PROVIDER EMAIL *' : activeRole === 'delivery' ? 'DELIVERY PARTNER EMAIL *' : 'DINER EMAIL ADDRESS *'}
+                    {activeRole === 'provider' ? 'KITCHEN / PROVIDER EMAIL *' : activeRole === 'delivery' ? 'DELIVERY PARTNER EMAIL *' : activeRole === 'admin' ? 'SUPER ADMIN EMAIL *' : 'DINER EMAIL ADDRESS *'}
                   </label>
                   <input 
                     className={`w-full bg-transparent border-t-0 border-x-0 border-b px-0 py-1.5 text-body-md text-primary placeholder-outline transition-all focus:ring-0 ${
@@ -643,8 +767,50 @@ export default function LoginModal({
                   )}
                 </div>
 
-                {/* DINER SIGN UP: Mobile Number */}
-                {mode === 'signup' && activeRole === 'customer' && (
+                {/* PASSWORD INPUT (Shown for Password Login OR Signup) */}
+                {((mode === 'login' && authMethod === 'password') || mode === 'signup') && (
+                  <div className="relative group">
+                    <label 
+                      className="font-label-caps text-label-caps text-on-surface-variant block mb-1" 
+                      htmlFor="password"
+                    >
+                      {mode === 'signup' ? 'SET ACCOUNT PASSWORD *' : 'ACCOUNT PASSWORD *'}
+                    </label>
+                    <input 
+                      className={`w-full bg-transparent border-t-0 border-x-0 border-b px-0 py-1.5 text-body-md text-primary placeholder-outline transition-all focus:ring-0 ${
+                        errors.password ? 'border-red-500 text-red-600' : 'border-outline-variant focus:border-primary'
+                      }`} 
+                      id="password" 
+                      name="password" 
+                      placeholder="••••••••" 
+                      required 
+                      type="password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (!e.target.value) {
+                          setErrors(prev => ({ ...prev, password: 'Password is required' }));
+                        } else {
+                          setErrors(prev => {
+                            const copy = { ...prev };
+                            delete copy.password;
+                            return copy;
+                          });
+                        }
+                      }}
+                      disabled={submitStatus !== 'idle'}
+                    />
+                    {errors.password && (
+                      <p className="text-red-600 text-[11px] mt-1 font-semibold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px]">error</span>
+                        {errors.password}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* DINER / ADMIN SIGN UP: Mobile Number */}
+                {mode === 'signup' && (activeRole === 'customer' || activeRole === 'admin') && (
                   <div className="relative group">
                     <label 
                       className="font-label-caps text-label-caps text-on-surface-variant block mb-1" 
@@ -676,20 +842,6 @@ export default function LoginModal({
                         {errors.phone}
                       </p>
                     )}
-                  </div>
-                )}
-
-                {/* PROVIDER / DELIVERER SIGN UP PROMPT */}
-                {mode === 'signup' && activeRole !== 'customer' && (
-                  <div className="p-4 bg-sand-neutral/30 border border-sand-neutral rounded-md text-center space-y-2">
-                    <p className="font-body-md text-body-md text-primary font-medium">
-                      {activeRole === 'provider' 
-                        ? 'Complete your kitchen details in our Provider Onboarding Application.'
-                        : 'Complete your fleet details in our Delivery Partner Application.'}
-                    </p>
-                    <p className="text-[12px] text-on-surface-variant">
-                      Includes kitchen location, FSSAI verification, cuisines, menu items, and payouts.
-                    </p>
                   </div>
                 )}
               </>

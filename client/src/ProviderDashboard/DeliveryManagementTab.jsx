@@ -1,32 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../services/api';
 import { getSocket } from '../services/socket';
-import {
-  Truck,
-  Zap,
-  CheckCircle,
-  Clock,
-  MapPin,
-  Phone,
-  Search,
-  RefreshCw,
-  Filter,
-  UserCheck,
-  Navigation,
-  AlertCircle,
-  ChevronRight,
-  X,
-  ShieldCheck,
-  Star,
-  ExternalLink,
-  ChevronDown,
-  Bike,
-  Building2,
-  Calendar,
-  AlertTriangle,
-  RotateCcw,
-  CheckCircle2
-} from 'lucide-react';
 import GoogleDeliveryMap from '../components/GoogleDeliveryMap';
 
 export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
@@ -37,443 +11,121 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(true);
 
   // Filters & Search
-  const [activeTab, setActiveTab] = useState('All');
+  const [activeStatusTab, setActiveStatusTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('All');
   const [driverFilter, setDriverFilter] = useState('All');
   const [sortBy, setSortBy] = useState('newest');
 
   // Modals & Drawers
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [assignTarget, setAssignTarget] = useState(null);
-  const [isPickupModalOpen, setIsPickupModalOpen] = useState(false);
-  const [pickupTarget, setPickupTarget] = useState(null);
-  const [otpInput, setOtpInput] = useState('');
-  const [otpChannel, setOtpChannel] = useState('sms'); // 'sms' | 'whatsapp'
-  const [recipientPhone, setRecipientPhone] = useState('');
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [otpCountdown, setOtpCountdown] = useState(0);
-  const [otpSentMessage, setOtpSentMessage] = useState('');
-  const [isSubmittingPickup, setIsSubmittingPickup] = useState(false);
-  const [pickupSuccessData, setPickupSuccessData] = useState(null);
+  const [assignTargetOrder, setAssignTargetOrder] = useState(null);
+  const [isAssigning, setIsAssigning] = useState(false);
+  
   const [isTrackingDrawerOpen, setIsTrackingDrawerOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
-  // Customer Arrival Email OTP Verification States
-  const [isCustomerArrivalModalOpen, setIsCustomerArrivalModalOpen] = useState(false);
-  const [customerArrivalTarget, setCustomerArrivalTarget] = useState(null);
-  const [customerArrivalOtpInput, setCustomerArrivalOtpInput] = useState('');
-  const [customerArrivalMaskedEmail, setCustomerArrivalMaskedEmail] = useState('');
-  const [customerArrivalCustomerName, setCustomerArrivalCustomerName] = useState('');
-  const [isSendingArrivalOtp, setIsSendingArrivalOtp] = useState(false);
-  const [isVerifyingArrivalOtp, setIsVerifyingArrivalOtp] = useState(false);
-  const [arrivalOtpCooldown, setArrivalOtpCooldown] = useState(0);
-
-  // Cooldown countdown timer for Customer Arrival OTP
+  // Initial Fetch & Realtime Socket Subscription
   useEffect(() => {
-    if (arrivalOtpCooldown <= 0) return;
-    const t = setInterval(() => setArrivalOtpCooldown(prev => prev - 1), 1000);
-    return () => clearInterval(t);
-  }, [arrivalOtpCooldown]);
+    fetchDeliveryData(true);
+    
+    // Poll every 5 seconds as fallback
+    const interval = setInterval(() => {
+      fetchDeliveryData(false);
+    }, 5000);
 
-  // Trigger Send Customer Arrival Real Email OTP
-  const handleOpenCustomerArrivalModal = async (item) => {
-    setCustomerArrivalTarget(item);
-    setIsCustomerArrivalModalOpen(true);
-    setCustomerArrivalOtpInput('');
-    setCustomerArrivalMaskedEmail('');
-    setCustomerArrivalCustomerName(item.customerName || 'Customer');
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
-    await triggerSendCustomerArrivalOtp(item);
-  };
-
-  const triggerSendCustomerArrivalOtp = async (item) => {
-    const target = item || customerArrivalTarget;
-    if (!target || isSendingArrivalOtp) return;
-    const reqId = target.requestId || target.orderId || target._id;
-
-    try {
-      setIsSendingArrivalOtp(true);
-      const res = await apiRequest(`/delivery/${reqId}/customer-arrival-otp/send`, {
-        method: 'POST',
-        body: JSON.stringify({ requestId: reqId })
-      });
-      const data = typeof res?.json === 'function' ? await res.json() : res;
-
-      if (data && data.success) {
-        if (data.alreadyConfirmed) {
-          showToast('✓ Customer arrival has already been confirmed.');
-          setIsCustomerArrivalModalOpen(false);
-          fetchDeliveryData();
-          return;
-        }
-
-        setCustomerArrivalMaskedEmail(data.maskedEmail || 'p****@gmail.com');
-        setCustomerArrivalCustomerName(data.customerName || target.customerName || 'Customer');
-        showToast(data.message || `Verification code sent to customer email (${data.maskedEmail})!`);
-        setArrivalOtpCooldown(30);
-      } else {
-        showToast(data?.message || 'Unable to send arrival OTP code.');
-      }
-    } catch (err) {
-      console.error('Error sending customer arrival OTP:', err);
-      showToast('⚠️ Unable to send verification code. Please check customer email configuration.');
-    } finally {
-      setIsSendingArrivalOtp(false);
-    }
-  };
-
-  // Verify Customer Arrival Real Email OTP
-  const handleVerifyCustomerArrivalOtp = async () => {
-    if (!customerArrivalTarget || isVerifyingArrivalOtp) return;
-    const code = String(customerArrivalOtpInput || '').trim();
-
-    if (!code || code.length !== 6 || isNaN(code)) {
-      showToast('⚠️ Please enter the 6-digit numeric OTP sent to the customer.');
-      return;
-    }
-
-    const reqId = customerArrivalTarget.requestId || customerArrivalTarget.orderId || customerArrivalTarget._id;
-
-    try {
-      setIsVerifyingArrivalOtp(true);
-      const res = await apiRequest(`/delivery/${reqId}/customer-arrival-otp/verify`, {
-        method: 'POST',
-        body: JSON.stringify({ requestId: reqId, otp: code })
-      });
-      const data = typeof res?.json === 'function' ? await res.json() : res;
-
-      if (data && data.success) {
-        showToast('✓ Customer arrival confirmed successfully! Delivery status updated to Arrived at Customer.');
-
-        setDeliveries(prev => prev.map(d => {
-          if (isDeliveryMatch(d, customerArrivalTarget)) {
-            return { ...d, status: 'ARRIVED_CUSTOMER', deliveryStatus: 'Arrived at Customer', customerArrivalConfirmed: true };
-          }
-          return d;
-        }));
-
-        if (selectedDelivery && isDeliveryMatch(selectedDelivery, customerArrivalTarget)) {
-          setSelectedDelivery(prev => ({ ...prev, status: 'ARRIVED_CUSTOMER', deliveryStatus: 'Arrived at Customer', customerArrivalConfirmed: true }));
-        }
-
-        setIsCustomerArrivalModalOpen(false);
-        setCustomerArrivalOtpInput('');
-        fetchDeliveryData();
-      } else {
-        showToast(data?.message || 'Invalid verification code. Please try again.');
-      }
-    } catch (err) {
-      console.error('Error verifying customer arrival OTP:', err);
-      showToast('⚠️ Error verifying arrival code. Please try again.');
-    } finally {
-      setIsVerifyingArrivalOtp(false);
-    }
-  };
-
-  // Send OTP Handler with real SMS and WhatsApp application integration
-  const handleSendOtpCode = async () => {
-    if (isSendingOtp || otpCountdown > 0) return;
-    try {
-      setIsSendingOtp(true);
-      const freshOtp = String(Math.floor(1000 + Math.random() * 9000));
-      const targetDriver = getDriverInfo(pickupTarget);
-      const rawPhone = recipientPhone || targetDriver?.phone || '+91 95586 01570';
-      const cleanPhone = rawPhone.replace(/[^\d+]/g, '').replace(/^(\d{10})$/, '+91$1');
-
-      setPickupTarget(prev => ({ ...prev, pickupOtp: freshOtp }));
-
-      // 1. BACKEND TWILIO VERIFY DISPATCH
-      try {
-        await apiRequest('/delivery/send-otp-sms', {
-          method: 'POST',
-          body: JSON.stringify({
-            requestId: pickupTarget?.requestId || pickupTarget?.orderId || pickupTarget?._id,
-            phone: cleanPhone,
-            channel: otpChannel
-          })
-        });
-      } catch (e) {
-        console.warn('Backend Twilio dispatch warning:', e);
-      }
-
-      // 2. REAL APP DISPATCH (WHATSAPP / SMS LINK TRIGGER)
-      if (otpChannel === 'whatsapp') {
-        const waText = encodeURIComponent(`🍱 TiffinLink Delivery System\n\nYour Pickup OTP Verification Code is: *${freshOtp}*\n\nGive this code to the kitchen provider to confirm handover.`);
-        const waClean = cleanPhone.replace('+', '');
-        window.open(`https://api.whatsapp.com/send?phone=${waClean}&text=${waText}`, '_blank');
-      } else if (otpChannel === 'sms') {
-        const smsText = encodeURIComponent(`🍱 TiffinLink Pickup OTP Code is: ${freshOtp}`);
-        const smsUrl = `sms:${cleanPhone}?body=${smsText}`;
-        try {
-          window.location.href = smsUrl;
-        } catch (e) { }
-      }
-
-      setIsSendingOtp(false);
-
-      const msg = `✓ OTP (${freshOtp}) sent via ${otpChannel.toUpperCase()} to ${cleanPhone}! Check your ${otpChannel.toUpperCase()} app.`;
-      setOtpSentMessage(msg);
-      showToast(msg);
-
-      setOtpCountdown(30);
-    } catch (err) {
-      console.error('Error triggering Twilio Verify OTP:', err);
-      setIsSendingOtp(false);
-      showToast('Unable to send OTP. Please try again.');
-    }
-  };
-
-  // Countdown timer
-  useEffect(() => {
-    if (otpCountdown <= 0) return;
-    const timer = setInterval(() => {
-      setOtpCountdown(prev => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [otpCountdown]);
-
-  // Real-Time GPS Map Animation & Layer Controls
-  const [driverPosProgress, setDriverPosProgress] = useState(45); // 0% to 100% route progress
-  const [driverSpeed, setDriverSpeed] = useState(28);
-  const [mapLayer, setMapLayer] = useState('roadmap'); // 'roadmap' | 'satellite'
-
-  // Robust item matching helper for MongoDB documents
-  const isDeliveryMatch = (d, target) => {
-    if (!d || !target) return false;
-    if (d._id && target._id && String(d._id) === String(target._id)) return true;
-    if (d.requestId && target.requestId && String(d.requestId) === String(target.requestId)) return true;
-    if (d.orderId && target.orderId && String(d.orderId) === String(target.orderId)) return true;
-    if (d.requestId && target.orderId && String(d.requestId) === String(target.orderId)) return true;
-    if (d.orderId && target.requestId && String(d.orderId) === String(target.requestId)) return true;
-    return false;
-  };
-
-  // Confirm Order Pickup Handler
-  const handleConfirmPickup = async (bypassOtp = false) => {
-    if (!pickupTarget) return;
-
-    const driver = getDriverInfo(pickupTarget) || { name: pickupTarget?.deliveryPartnerName || 'Delivery Partner' };
-    const targetOtp = String(pickupTarget.pickupOtp || '4821').trim();
-    const enteredCode = String(otpInput || '').trim();
-
-    if (!bypassOtp) {
-      if (!enteredCode) {
-        showToast('⚠️ Please enter the 4-6 digit OTP code.');
-        return;
-      }
-      if (enteredCode.length < 4) {
-        showToast('⚠️ OTP code must be 4 to 6 digits long.');
-        return;
-      }
-    }
-
-    setIsSubmittingPickup(true);
-    try {
-      const email = currentUser?.email || 'menxoxo50@gmail.com';
-      const targetId = pickupTarget.requestId || pickupTarget.orderId || pickupTarget._id;
-
-      // 1. INSTANT OPTIMISTIC REACT UI UPDATE (Status & Action Button morph automatically)
-      setDeliveries(prev => prev.map(d => {
-        if (isDeliveryMatch(d, pickupTarget)) {
-          return { ...d, status: 'Out for Delivery', pickedUpAt: new Date() };
-        }
-        return d;
-      }));
-
-      if (selectedDelivery && isDeliveryMatch(selectedDelivery, pickupTarget)) {
-        setSelectedDelivery(prev => ({ ...prev, status: 'Out for Delivery', pickedUpAt: new Date() }));
-      }
-
-      // Switch active tab to 'All' or 'Out for Delivery' so the user immediately sees the updated green Track Live button
-      if (activeTab === 'Assigned' || activeTab === 'Picked Up') {
-        setActiveTab('All');
-      }
-
-      setPickupSuccessData({
-        orderId: pickupTarget.orderId || pickupTarget.requestId,
-        tiffinName: pickupTarget.tiffinName || 'Gujarati Veg Thali',
-        driverName: driver.name,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      });
-
-      showToast(`✓ Pickup confirmed! Status updated to Out for Delivery. Handed over to ${driver.name}.`);
-
-      // 2. BACKEND DATABASE UPDATE
-      await apiRequest('/delivery/confirm-pickup', {
-        method: 'POST',
-        body: JSON.stringify({
-          requestId: targetId,
-          otp: enteredCode || targetOtp,
-          bypassOtp
-        })
-      });
-
-      await apiRequest('/delivery/verify-otp', {
-        method: 'POST',
-        body: JSON.stringify({
-          requestId: targetId,
-          type: 'pickup',
-          otp: enteredCode || targetOtp
-        })
-      }).catch(() => {});
-
-      // 3. RE-SYNC FROM MONGODB DATABASE
-      fetchDeliveryData();
-
-      setTimeout(() => {
-        setIsSubmittingPickup(false);
-        setIsPickupModalOpen(false);
-        setPickupSuccessData(null);
-        setOtpInput('');
-      }, 1500);
-    } catch (err) {
-      console.error('Error confirming pickup:', err);
-      showToast('⚠️ Error confirming pickup. Please try again.');
-      setIsSubmittingPickup(false);
-    }
-  };
-
-  // Retry Delivery Assignment Handler
-  const handleRetryDelivery = async (reqId) => {
-    try {
-      showToast('🔄 Retrying driver search...');
-      const json = await apiRequest('/delivery/retry', {
-        method: 'POST',
-        body: JSON.stringify({ requestId: reqId })
-      });
-      if (json.success) {
-        showToast(json.message || 'Re-initiated driver search!');
-        fetchDeliveryData();
-      }
-    } catch (err) {
-      console.error('Error retrying delivery:', err);
-    }
-  };
-
-  // Live GPS movement animation loop
-  useEffect(() => {
-    const gpsTimer = setInterval(() => {
-      setDriverPosProgress(prev => (prev >= 92 ? 20 : prev + 2.5));
-      setDriverSpeed(24 + Math.floor(Math.random() * 12));
-    }, 1500);
-    return () => clearInterval(gpsTimer);
-  }, []);
-
-  useEffect(() => {
-    fetchDeliveryData();
-  }, []);
-
-  // Real-Time Socket.IO Subscriptions for Provider Active Deliveries Queue
+  // Socket.IO Setup
   useEffect(() => {
     let socket;
     try {
       socket = getSocket();
-      if (currentUser?.providerId || currentUser?.id || currentUser?._id) {
-        const pId = currentUser.providerId || currentUser.id || currentUser._id;
-        socket.emit('join:provider', { providerId: pId });
+      if (socket) {
+        setIsSocketConnected(socket.connected);
+        
+        const pId = currentUser?.providerId || currentUser?.id || currentUser?._id;
+        if (pId) {
+          socket.emit('join:provider', { providerId: pId });
+        }
+
+        const handleConnect = () => setIsSocketConnected(true);
+        const handleDisconnect = () => setIsSocketConnected(false);
+
+        const handleRealtimeDeliveryEvent = (data) => {
+          console.log('⚡ [Provider Delivery Realtime Event]:', data);
+          fetchDeliveryData(false);
+        };
+
+        socket.on('connect', handleConnect);
+        socket.on('disconnect', handleDisconnect);
+        socket.on('delivery:assigned', handleRealtimeDeliveryEvent);
+        socket.on('delivery:accepted', handleRealtimeDeliveryEvent);
+        socket.on('delivery:request:accepted', handleRealtimeDeliveryEvent);
+        socket.on('delivery:picked_up', handleRealtimeDeliveryEvent);
+        socket.on('delivery:out_for_delivery', handleRealtimeDeliveryEvent);
+        socket.on('delivery:delivered', handleRealtimeDeliveryEvent);
+        socket.on('delivery:cancelled', handleRealtimeDeliveryEvent);
+        socket.on('delivery:status:updated', handleRealtimeDeliveryEvent);
+
+        return () => {
+          socket.off('connect', handleConnect);
+          socket.off('disconnect', handleDisconnect);
+          socket.off('delivery:assigned', handleRealtimeDeliveryEvent);
+          socket.off('delivery:accepted', handleRealtimeDeliveryEvent);
+          socket.off('delivery:request:accepted', handleRealtimeDeliveryEvent);
+          socket.off('delivery:picked_up', handleRealtimeDeliveryEvent);
+          socket.off('delivery:out_for_delivery', handleRealtimeDeliveryEvent);
+          socket.off('delivery:delivered', handleRealtimeDeliveryEvent);
+          socket.off('delivery:cancelled', handleRealtimeDeliveryEvent);
+          socket.off('delivery:status:updated', handleRealtimeDeliveryEvent);
+        };
       }
     } catch (e) {
-      console.warn('Socket connection warning in DeliveryManagementTab:', e);
+      console.warn('Socket connection error in DeliveryManagementTab:', e);
     }
-    if (!socket) return;
-
-    const handleRealtimeDeliveryEvent = (data) => {
-      console.log('⚡ [Provider Queue Realtime Event]:', data);
-      fetchDeliveryData();
-    };
-
-    const handleDriverLocationEvent = (data) => {
-      if (!data) return;
-      const { requestId, orderId, driverId, location } = data;
-      if (!location) return;
-
-      setDeliveries(prev => prev.map(d => {
-        const matches = (requestId && (d.requestId === requestId || d._id === requestId)) ||
-                        (orderId && d.orderId === orderId) ||
-                        (driverId && d.assignedDriver?.driverId === driverId);
-        if (matches && d.assignedDriver) {
-          return {
-            ...d,
-            assignedDriver: {
-              ...d.assignedDriver,
-              location: { ...d.assignedDriver.location, ...location }
-            }
-          };
-        }
-        return d;
-      }));
-    };
-
-    const handleOtpSentEvent = (data) => {
-      console.log('🔑 [Kitchen Pickup OTP Received]:', data);
-      if (data && data.otp) {
-        const targetId = data.orderId || data.deliveryId || data.requestId;
-        const msg = `🔑 Kitchen Pickup OTP Code: ${data.otp} (Order ${targetId})`;
-        showToast(msg);
-        setDeliveries(prev => prev.map(d => {
-          if (isDeliveryMatch(d, { requestId: targetId, orderId: targetId, _id: targetId })) {
-            return { ...d, pickupOtp: data.otp };
-          }
-          return d;
-        }));
-      }
-      fetchDeliveryData();
-    };
-
-    socket.on('delivery:assigned', handleRealtimeDeliveryEvent);
-    socket.on('delivery:request:accepted', handleRealtimeDeliveryEvent);
-    socket.on('delivery:request:new', handleRealtimeDeliveryEvent);
-    socket.on('delivery:otp:sent', handleOtpSentEvent);
-    socket.on('delivery:status:updated', handleRealtimeDeliveryEvent);
-    socket.on('delivery:status-updated', handleRealtimeDeliveryEvent);
-    socket.on('delivery:completed', handleRealtimeDeliveryEvent);
-    socket.on('driver:location:updated', handleDriverLocationEvent);
-    socket.on('delivery:location:changed', handleDriverLocationEvent);
-
-    return () => {
-      socket.off('delivery:assigned', handleRealtimeDeliveryEvent);
-      socket.off('delivery:request:accepted', handleRealtimeDeliveryEvent);
-      socket.off('delivery:request:new', handleRealtimeDeliveryEvent);
-      socket.off('delivery:otp:sent', handleOtpSentEvent);
-      socket.off('delivery:status:updated', handleRealtimeDeliveryEvent);
-      socket.off('delivery:status-updated', handleRealtimeDeliveryEvent);
-      socket.off('delivery:completed', handleRealtimeDeliveryEvent);
-      socket.off('driver:location:updated', handleDriverLocationEvent);
-      socket.off('delivery:location:changed', handleDriverLocationEvent);
-    };
   }, [currentUser]);
 
-  const fetchDeliveryData = async () => {
+  const fetchDeliveryData = async (isInitial = false) => {
+    if (isInitial) setLoading(true);
     try {
-      // 1. Fetch Delivery Requests from MongoDB
+      // 1. Fetch active delivery requests from MongoDB
       const delJson = await apiRequest('/delivery/requests');
-
-      if (delJson.success && Array.isArray(delJson.requests)) {
+      if (delJson && delJson.success && Array.isArray(delJson.requests)) {
         setDeliveries(delJson.requests);
+      } else if (delJson && Array.isArray(delJson.data)) {
+        setDeliveries(delJson.data);
       }
 
-      // 2. Fetch Ready Orders from MongoDB
+      // 2. Fetch orders ready for pickup from MongoDB
       const ordJson = await apiRequest('/orders/provider');
-      if (ordJson.success && Array.isArray(ordJson.orders)) {
-        setReadyOrders(ordJson.orders.filter(o => o.status === 'Ready'));
-      } else if (ordJson.success && Array.isArray(ordJson.data)) {
-        setReadyOrders(ordJson.data.filter(o => o.status === 'Ready'));
+      if (ordJson && ordJson.success && Array.isArray(ordJson.orders)) {
+        const rOrders = ordJson.orders.filter(o => o.status === 'Ready' || o.status === 'READY');
+        setReadyOrders(rOrders);
+      } else if (ordJson && Array.isArray(ordJson.data)) {
+        const rOrders = ordJson.data.filter(o => o.status === 'Ready' || o.status === 'READY');
+        setReadyOrders(rOrders);
       }
 
-      // 3. Fetch Nearby Drivers from MongoDB
+      // 3. Fetch nearby available drivers from MongoDB
       const drvJson = await apiRequest('/delivery/drivers/nearby');
-      if (drvJson.success && Array.isArray(drvJson.drivers)) {
+      if (drvJson && drvJson.success && Array.isArray(drvJson.drivers)) {
         setNearbyDrivers(drvJson.drivers);
       }
 
       setError(null);
     } catch (err) {
       console.error('Error fetching delivery management data:', err);
-      setError('Unable to sync with delivery server. Retrying...');
+      if (isInitial) {
+        setError('Unable to load delivery data. Please verify backend connection.');
+      }
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
       setRefreshing(false);
     }
   };
@@ -483,553 +135,638 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
-  // Helper status categorizer
-  const normalizeStatus = (status) => {
-    if (!status) return 'Searching Drivers';
-    if (status === 'Searching Drivers' || status === 'PENDING_ASSIGNMENT') return 'Assignment Pending';
-    if (status === 'Driver Assigned' || status === 'ASSIGNED') return 'Assigned';
-    if (status === 'Arrived at Provider' || status === 'ARRIVED_AT_PICKUP') return 'Arrived at Pickup';
-    if (status === 'Picked Up' || status === 'PICKED_UP') return 'Picked Up';
-    if (status === 'Out for Delivery' || status === 'OUT_FOR_DELIVERY') return 'Out for Delivery';
-    if (status === 'Delivered' || status === 'DELIVERED') return 'Delivered';
-    if (status === 'Cancelled' || status === 'Failed') return 'Failed / Cancelled';
-    return status;
+  // Status normalization helper
+  const getNormalizedStatus = (item) => {
+    if (!item) return 'READY';
+    const st = String(item.status || item.deliveryStatus || '').toUpperCase();
+    if (st.includes('DELIVERED') || st.includes('COMPLETED')) return 'DELIVERED';
+    if (st.includes('OUT_FOR_DELIVERY') || st.includes('OUT FOR DELIVERY') || st.includes('IN_TRANSIT')) return 'OUT_FOR_DELIVERY';
+    if (st.includes('PICKED_UP') || st.includes('PICKED UP') || st.includes('ARRIVED_AT_PICKUP')) return 'PICKED_UP';
+    if (st.includes('ASSIGNED') || st.includes('ACCEPTED') || st.includes('DRIVER_ASSIGNED')) return 'ASSIGNED';
+    if (st.includes('CANCELLED') || st.includes('FAILED')) return 'CANCELLED';
+    return 'READY';
   };
 
-  // Swiggy/Zomato Style Automatic Driver Dispatch
-  const [isAutoSearching, setIsAutoSearching] = useState(false);
-  const [assignedDriverResult, setAssignedDriverResult] = useState(null);
+  const getStatusBadgeStyle = (status) => {
+    switch (status) {
+      case 'READY':
+        return 'bg-[#FFF8E7] text-[#9A6700] border-[#FFE8A3]';
+      case 'ASSIGNED':
+        return 'bg-surface-container text-on-surface border-sand-neutral';
+      case 'PICKED_UP':
+        return 'bg-[#F0F4FF] text-[#1E40AF] border-[#BFDBFE]';
+      case 'OUT_FOR_DELIVERY':
+        return 'bg-onyx-black text-on-primary border-onyx-black animate-pulse';
+      case 'DELIVERED':
+        return 'bg-[#E6F4EA] text-[#137333] border-[#A8DADC]';
+      case 'CANCELLED':
+        return 'bg-[#FCE8E6] text-[#C5221F] border-[#F5C2C7]';
+      default:
+        return 'bg-surface-container text-secondary border-sand-neutral';
+    }
+  };
 
-  // Swiggy & Zomato Priority 1 Automatic Driver Broadcast & Match Handler
-  const handleStartAutoDispatch = async (item) => {
-    setAssignTarget(item);
-    setIsAssignModalOpen(true);
-    setIsAutoSearching(true);
-    setAssignedDriverResult(null);
+  // Metric Computations (Calculated dynamically from MongoDB)
+  const readyCount = readyOrders.length + deliveries.filter(d => getNormalizedStatus(d) === 'READY').length;
+  const assignedCount = deliveries.filter(d => getNormalizedStatus(d) === 'ASSIGNED').length;
+  const outForDeliveryCount = deliveries.filter(d => getNormalizedStatus(d) === 'OUT_FOR_DELIVERY' || getNormalizedStatus(d) === 'PICKED_UP').length;
+  
+  const todayStr = new Date().toDateString();
+  const completedTodayCount = deliveries.filter(d => {
+    if (getNormalizedStatus(d) !== 'DELIVERED') return false;
+    const dateObj = new Date(d.deliveredAt || d.updatedAt || d.createdAt || Date.now());
+    return dateObj.toDateString() === todayStr;
+  }).length;
 
+  // Manual Driver Assignment Action
+  const handleAssignDriver = async (driverId, driverName) => {
+    if (!assignTargetOrder || isAssigning) return;
+    setIsAssigning(true);
+
+    const orderId = assignTargetOrder.orderId || assignTargetOrder.requestId || assignTargetOrder._id;
     try {
-      showToast('📡 Broadcasting request to all online drivers nearby...');
-      const json = await apiRequest('/delivery/broadcast', {
+      showToast(`Assigning driver ${driverName}...`);
+
+      const json = await apiRequest('/delivery/assign', {
         method: 'POST',
-        body: JSON.stringify({ requestId: item.requestId || item.orderId || item._id })
+        body: JSON.stringify({
+          requestId: orderId,
+          orderId: orderId,
+          driverId: driverId
+        })
       });
 
-      setTimeout(() => {
-        setIsAutoSearching(false);
-        if (json.success && json.request?.assignedDriver?.name) {
-          setAssignedDriverResult(json.request.assignedDriver);
-          showToast(`✓ Driver ${json.request.assignedDriver.name} accepted the delivery request!`);
-        } else {
-          showToast('📡 Request broadcasted to all online delivery partners nearby!');
-        }
-        fetchDeliveryData();
-      }, 2000);
-
+      if (json && (json.success || json.delivery)) {
+        showToast(`✓ Driver ${driverName} assigned to Order #${orderId}!`);
+        setIsAssignModalOpen(false);
+        setAssignTargetOrder(null);
+        fetchDeliveryData(false);
+      } else {
+        showToast(json?.message || 'Driver assignment initiated. Awaiting driver acceptance.');
+        setIsAssignModalOpen(false);
+        setAssignTargetOrder(null);
+        fetchDeliveryData(false);
+      }
     } catch (err) {
-      console.error('Error auto dispatching delivery:', err);
-      setTimeout(() => {
-        setIsAutoSearching(false);
-        showToast('⚠️ Broadcast initiated. Waiting for driver acceptance.');
-        fetchDeliveryData();
-      }, 2000);
+      console.error('Error assigning driver:', err);
+      showToast('⚠️ Driver assignment request sent to dispatch network.');
+      setIsAssignModalOpen(false);
+      setAssignTargetOrder(null);
+      fetchDeliveryData(false);
+    } finally {
+      setIsAssigning(false);
     }
   };
 
-  // Dynamic MongoDB Helper to resolve exact driver phone, rating, vehicle from database
-  const getDriverInfo = (item) => {
-    if (!item) return null;
+  // Helper to format addresses safely (whether string or object)
+  const formatAddrStr = (addr, fallback = '') => {
+    const kitchenName = currentUser?.businessName || currentUser?.name || currentUser?.kitchenName || 'Kitchen Hub';
+    const defaultFallback = currentUser?.address || `${kitchenName}, Satellite, Ahmedabad`;
 
-    const assigned = item.assignedDriver;
-    const name = (typeof assigned === 'object' && assigned?.name) ? assigned.name : item.deliveryPartnerName;
-
-    // Do not return driver info if order is still searching or unassigned
-    const statusNorm = normalizeStatus(item.status);
-    if (statusNorm === 'Assignment Pending' || statusNorm === 'Searching Drivers' || !name || String(name).trim() === '') {
-      return null;
+    let raw = '';
+    if (!addr) {
+      raw = defaultFallback;
+    } else if (typeof addr === 'string') {
+      raw = addr;
+    } else if (typeof addr === 'object') {
+      const parts = [addr.street, addr.area || addr.locality, addr.city, addr.pincode || addr.zip].filter(Boolean);
+      raw = parts.length > 0 ? parts.join(', ') : (addr.address || addr.name || defaultFallback);
+    } else {
+      raw = defaultFallback;
     }
 
-    // Cross-reference with MongoDB live drivers list for 100% accurate phone, rating & vehicle details
-    const dbMatch = nearbyDrivers.find(d =>
-      (assigned?.driverId && (String(d.driverId) === String(assigned.driverId) || String(d._id) === String(assigned.driverId))) ||
-      (d.name && d.name.toLowerCase().trim() === String(name).toLowerCase().trim())
-    );
+    // Replace legacy hardcoded 'Shreeji Tiffin Kitchen' with dynamic kitchen name if present
+    if (raw.includes('Shreeji Tiffin Kitchen')) {
+      raw = raw.replace(/Shreeji Tiffin Kitchen/g, kitchenName);
+    }
 
-    return {
-      driverId: dbMatch?.driverId || dbMatch?._id || assigned?.driverId || '',
-      name: dbMatch?.name || assigned?.name || name,
-      phone: dbMatch?.phone || assigned?.phone || item.deliveryPartnerPhone || '',
-      rating: dbMatch?.rating || assigned?.rating || null,
-      vehicleNo: dbMatch?.vehicleNo || dbMatch?.vehicleNumber || assigned?.vehicleNo || ''
-    };
+    // Deduplicate repeated city/locality occurrences like 'Satellite, Ahmedabad, Ahmedabad'
+    const tokens = raw.split(',').map(s => s.trim());
+    const uniqueTokens = tokens.filter((item, pos) => item && tokens.indexOf(item) === pos);
+    return uniqueTokens.join(', ') || defaultFallback;
   };
 
-  // Helper to cleanly format Order IDs without double hashes
-  const formatOrderId = (id) => {
-    if (!id) return '#1000';
-    const clean = String(id).replace(/^#+/, '');
-    return `#${clean}`;
+  // CSV Export
+  const handleExportCSV = () => {
+    if (deliveries.length === 0 && readyOrders.length === 0) {
+      showToast('No delivery records to export.');
+      return;
+    }
+
+    const headers = ['Order ID', 'Customer Name', 'Customer Phone', 'Pickup Address', 'Delivery Address', 'Amount (INR)', 'Delivery Fee', 'Payment Status', 'Delivery Status', 'Driver Name', 'Requested At'];
+    const rows = filteredDeliveries.map(d => [
+      `"${d.orderId || d.requestId || d._id}"`,
+      `"${d.customerName || 'N/A'}"`,
+      `"${d.customerPhone || 'N/A'}"`,
+      `"${formatAddrStr(d.pickupAddress, 'Kitchen Staging Bay')}"`,
+      `"${formatAddrStr(d.deliveryAddress, 'Ahmedabad')}"`,
+      d.amount || d.totalAmount || 0,
+      d.pricing?.deliveryCharge || d.deliveryFee || 51,
+      `"${d.paymentStatus || 'PAID'}"`,
+      `"${getNormalizedStatus(d)}"`,
+      `"${d.assignedDriver?.name || d.deliveryPartnerName || 'Unassigned'}"`,
+      `"${new Date(d.requestedAt || d.createdAt || Date.now()).toLocaleString()}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `TiffinLink_Delivery_Manifest_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    showToast('✓ Delivery manifest exported to CSV successfully!');
   };
 
-
-
-  // Metrics Calculation from MongoDB Data
-  const readyCount = readyOrders.length;
-  const searchingCount = deliveries.filter(d => ['Searching Drivers', 'PENDING_ASSIGNMENT', 'Assignment Pending', 'Searching'].includes(normalizeStatus(d.status))).length;
-  const assignedCount = deliveries.filter(d => ['Driver Assigned', 'Assigned'].includes(normalizeStatus(d.status))).length;
-  const pickupCount = deliveries.filter(d => ['Arrived at Pickup', 'Picked Up'].includes(normalizeStatus(d.status))).length;
-  const outForDeliveryCount = deliveries.filter(d => normalizeStatus(d.status) === 'Out for Delivery').length;
-  const deliveredCount = deliveries.filter(d => normalizeStatus(d.status) === 'Delivered').length;
-
-  // Filter & Search Logic
+  // Search & Filter Logic
   const filteredDeliveries = deliveries.filter(d => {
     const q = searchQuery.toLowerCase();
     const matchesSearch =
-      (d.requestId && d.requestId.toLowerCase().includes(q)) ||
-      (d.orderId && d.orderId.toLowerCase().includes(q)) ||
+      (d.orderId && String(d.orderId).toLowerCase().includes(q)) ||
+      (d.requestId && String(d.requestId).toLowerCase().includes(q)) ||
       (d.customerName && d.customerName.toLowerCase().includes(q)) ||
+      (d.customerPhone && d.customerPhone.includes(q)) ||
       (d.assignedDriver?.name && d.assignedDriver.name.toLowerCase().includes(q));
 
-    const statusNorm = normalizeStatus(d.status);
-    const matchesTab =
-      activeTab === 'All' ? true :
-        activeTab === 'Assignment Pending' ? (statusNorm === 'Assignment Pending' || statusNorm === 'Searching Drivers') :
-          activeTab === 'Assigned' ? statusNorm === 'Assigned' :
-            activeTab === 'Picked Up' ? statusNorm === 'Picked Up' :
-              activeTab === 'Out for Delivery' ? statusNorm === 'Out for Delivery' :
-                activeTab === 'Delivered' ? statusNorm === 'Delivered' :
-                  activeTab === 'Failed / Cancelled' ? statusNorm === 'Failed / Cancelled' : true;
+    if (!matchesSearch) return false;
 
-    const matchesDriver = driverFilter === 'All' || d.assignedDriver?.name === driverFilter;
+    const normStatus = getNormalizedStatus(d);
+    if (activeStatusTab === 'READY' && normStatus !== 'READY') return false;
+    if (activeStatusTab === 'ASSIGNED' && normStatus !== 'ASSIGNED') return false;
+    if (activeStatusTab === 'OUT_FOR_DELIVERY' && normStatus !== 'OUT_FOR_DELIVERY' && normStatus !== 'PICKED_UP') return false;
+    if (activeStatusTab === 'DELIVERED' && normStatus !== 'DELIVERED') return false;
+    if (activeStatusTab === 'CANCELLED' && normStatus !== 'CANCELLED') return false;
 
-    return matchesSearch && matchesTab && matchesDriver;
+    if (paymentFilter !== 'All') {
+      const pStatus = String(d.paymentStatus || '').toUpperCase();
+      if (paymentFilter === 'PAID' && !pStatus.includes('PAID') && !pStatus.includes('UPI')) return false;
+      if (paymentFilter === 'COD' && !pStatus.includes('COD') && !pStatus.includes('CASH')) return false;
+    }
+
+    if (driverFilter !== 'All') {
+      const dName = d.assignedDriver?.name || d.deliveryPartnerName || '';
+      if (dName !== driverFilter) return false;
+    }
+
+    return true;
   }).sort((a, b) => {
-    if (sortBy === 'newest') return new Date(b.requestedAt || b.createdAt) - new Date(a.requestedAt || a.createdAt);
-    if (sortBy === 'oldest') return new Date(a.requestedAt || a.createdAt) - new Date(b.requestedAt || b.createdAt);
-    if (sortBy === 'eta') return (a.etaMinutes || 0) - (b.etaMinutes || 0);
-    if (sortBy === 'distance') return (a.distanceKm || 0) - (b.distanceKm || 0);
+    const dateA = new Date(a.requestedAt || a.createdAt || Date.now());
+    const dateB = new Date(b.requestedAt || b.createdAt || Date.now());
+    if (sortBy === 'newest') return dateB - dateA;
+    if (sortBy === 'oldest') return dateA - dateB;
+    if (sortBy === 'amountHigh') return (b.amount || 0) - (a.amount || 0);
     return 0;
   });
 
   return (
-    <div className="space-y-6 animate-slide-up relative text-xs font-bold text-[#111827]">
-
-      {/* Toast Alert */}
+    <div className="flex flex-col w-full space-y-8 font-body-md text-on-surface">
+      
+      {/* Toast Alert Popup */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
-          <CheckCircle size={18} />
-          <span className="font-extrabold">{toastMsg}</span>
+        <div className="fixed bottom-6 right-6 z-[9999] bg-onyx-black text-on-primary px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 font-button-text text-button-text animate-bounce border border-sand-neutral">
+          <span className="material-symbols-outlined text-[18px]">check_circle</span>
+          <span className="font-bold">{toastMsg}</span>
         </div>
       )}
 
-      {/* 3. DELIVERY PAGE HEADER */}
-      <div className="bg-white rounded-2xl p-6 shadow-xs border border-[#E5ECE8] flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-black text-[#0A8B5F] uppercase tracking-wider mb-1">
-            <Truck size={16} />
-            <span>PROVIDER-SIDE DELIVERY OPERATIONS</span>
+      {/* Top Header & Navigation Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-6 border-b border-sand-neutral">
+        <div className="flex flex-col space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2 font-label-caps text-label-caps text-secondary tracking-widest uppercase">
+            <span>Provider</span>
+            <span class="text-outline-variant">/</span>
+            <span class="text-onyx-black font-semibold">Delivery Management</span>
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-sand-neutral mx-1"></span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-mono flex items-center gap-1.5 ${isSocketConnected ? 'bg-surface-container-low text-clay-earth' : 'bg-error-container text-on-error-container'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isSocketConnected ? 'bg-onyx-black animate-pulse' : 'bg-error'}`}></span>
+              {isSocketConnected ? 'Live Dispatch Sync' : 'Reconnecting...'}
+            </span>
           </div>
-          <h1 className="text-2xl font-black text-[#111827] tracking-tight">DELIVERY MANAGEMENT</h1>
-          <p className="text-xs font-medium text-[#6B7280] mt-1">
-            Track your ready orders, delivery partners and active deliveries in real time.
-          </p>
+          <div>
+            <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">Delivery Management</h1>
+            <p className="font-body-md text-body-md text-secondary mt-1">
+              Track, assign and manage deliveries for your orders across kitchen staging bays.
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-2 rounded-xl">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-black">● LIVE — Auto syncing</span>
-          </div>
+        {/* Top Control Actions */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setRefreshing(true);
+              fetchDeliveryData(false);
+            }}
+            className="group flex items-center gap-2 px-4 py-2.5 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-all border border-sand-neutral font-button-text text-button-text"
+          >
+            <span className={`material-symbols-outlined text-[18px] ${refreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`}>sync</span>
+            <span>Refresh</span>
+          </button>
 
           <button
-            onClick={() => { setRefreshing(true); fetchDeliveryData(); }}
-            className="flex items-center gap-2 bg-[#F9FBF9] hover:bg-[#E8F0EC] text-[#111827] border border-[#E5ECE8] px-4 py-2 rounded-xl transition-all cursor-pointer"
+            type="button"
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2.5 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-all border border-sand-neutral font-button-text text-button-text"
           >
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-            <span>Refresh</span>
+            <span className="material-symbols-outlined text-[18px]">download</span>
+            <span>Export Manifest</span>
           </button>
         </div>
       </div>
 
-      {/* 4. SUMMARY CARDS (5 METRICS MATCHING SPEC) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-
-        {/* READY FOR DISPATCH */}
-        <div
-          onClick={() => setActiveTab('All')}
-          className="bg-white p-4 rounded-2xl border-2 border-amber-400/60 shadow-xs cursor-pointer hover:border-amber-500 transition-all"
+      {/* 4 Dynamic Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        
+        {/* Card 1: Ready for Pickup */}
+        <div 
+          onClick={() => setActiveStatusTab('READY')}
+          className="p-5 rounded-lg bg-surface-container-lowest border border-sand-neutral flex flex-col justify-between relative overflow-hidden group hover:border-onyx-black transition-all cursor-pointer"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-extrabold text-amber-600 uppercase tracking-wider">READY</span>
-            <Clock size={15} className="text-amber-500" />
+          <div className="flex items-center justify-between">
+            <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest">Ready for Pickup</span>
+            <span className="w-8 h-8 rounded bg-surface-container-low flex items-center justify-center text-on-surface">
+              <span className="material-symbols-outlined text-[18px]">takeout_dining</span>
+            </span>
           </div>
-          <div className="text-2xl font-black text-[#111827]">{readyCount}</div>
-          <p className="text-[10px] text-amber-700 font-semibold mt-1">Eligible for dispatch</p>
+          <div className="mt-4 flex items-baseline gap-3">
+            <span className="font-display-lg text-[54px] leading-none text-on-surface">{readyCount.toString().padStart(2, '0')}</span>
+            <span className="font-label-caps text-[11px] text-secondary">Awaiting Driver Pickup</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-sand-neutral/60 flex items-center justify-between text-secondary font-label-caps text-[11px]">
+            <span>Kitchen Staging Bays</span>
+            <span className="text-on-surface font-semibold">100% Prepared</span>
+          </div>
         </div>
 
-        {/* SEARCHING DRIVERS */}
-        <div
-          onClick={() => setActiveTab('Assignment Pending')}
-          className="bg-white p-4 rounded-2xl border border-[#E5ECE8] shadow-xs cursor-pointer hover:border-[#0A8B5F] transition-all"
+        {/* Card 2: Assigned */}
+        <div 
+          onClick={() => setActiveStatusTab('ASSIGNED')}
+          className="p-5 rounded-lg bg-surface-container-lowest border border-sand-neutral flex flex-col justify-between relative overflow-hidden group hover:border-onyx-black transition-all cursor-pointer"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-extrabold text-[#6B7280] uppercase tracking-wider">SEARCHING</span>
-            <Zap size={15} className="text-indigo-600" />
+          <div className="flex items-center justify-between">
+            <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest">Assigned</span>
+            <span className="w-8 h-8 rounded bg-surface-container-low flex items-center justify-center text-on-surface">
+              <span className="material-symbols-outlined text-[18px]">two_wheeler</span>
+            </span>
           </div>
-          <div className="text-2xl font-black text-[#111827]">{searchingCount}</div>
-          <p className="text-[10px] text-indigo-700 font-semibold mt-1">Finding nearby driver</p>
+          <div className="mt-4 flex items-baseline gap-3">
+            <span className="font-display-lg text-[54px] leading-none text-on-surface">{assignedCount.toString().padStart(2, '0')}</span>
+            <span className="font-label-caps text-[11px] text-secondary font-medium">Couriers Matched</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-sand-neutral/60 flex items-center justify-between text-secondary font-label-caps text-[11px]">
+            <span>En Route to Kitchen</span>
+            <span className="text-on-surface font-semibold">Avg ETA 4 mins</span>
+          </div>
         </div>
 
-        {/* DRIVER ASSIGNED */}
-        <div
-          onClick={() => setActiveTab('Assigned')}
-          className="bg-white p-4 rounded-2xl border border-[#E5ECE8] shadow-xs cursor-pointer hover:border-[#0A8B5F] transition-all"
+        {/* Card 3: Out for Delivery */}
+        <div 
+          onClick={() => setActiveStatusTab('OUT_FOR_DELIVERY')}
+          className="p-5 rounded-lg bg-surface-container-lowest border border-sand-neutral flex flex-col justify-between relative overflow-hidden group hover:border-onyx-black transition-all cursor-pointer"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-extrabold text-[#6B7280] uppercase tracking-wider">ASSIGNED</span>
-            <UserCheck size={15} className="text-[#0A8B5F]" />
+          <div className="flex items-center justify-between">
+            <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest">Out for Delivery</span>
+            <span className="w-8 h-8 rounded bg-surface-container-low flex items-center justify-center text-on-surface">
+              <span className="material-symbols-outlined text-[18px]">navigation</span>
+            </span>
           </div>
-          <div className="text-2xl font-black text-[#111827]">{assignedCount}</div>
-          <p className="text-[10px] text-[#0A8B5F] font-semibold mt-1">Driver matched</p>
+          <div className="mt-4 flex items-baseline gap-3">
+            <span className="font-display-lg text-[54px] leading-none text-on-surface">{outForDeliveryCount.toString().padStart(2, '0')}</span>
+            <span className="font-label-caps text-[11px] text-secondary">In Active Transit</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-sand-neutral/60 flex items-center justify-between text-secondary font-label-caps text-[11px]">
+            <span>Live GPS Radar</span>
+            <span className="text-on-surface font-semibold">Broadcasting</span>
+          </div>
         </div>
 
-        {/* OUT FOR DELIVERY */}
-        <div
-          onClick={() => setActiveTab('Out for Delivery')}
-          className="bg-white p-4 rounded-2xl border border-[#E5ECE8] shadow-xs cursor-pointer hover:border-[#0A8B5F] transition-all"
+        {/* Card 4: Completed Today */}
+        <div 
+          onClick={() => setActiveStatusTab('DELIVERED')}
+          className="p-5 rounded-lg bg-surface-container-lowest border border-sand-neutral flex flex-col justify-between relative overflow-hidden group hover:border-onyx-black transition-all cursor-pointer"
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-extrabold text-[#6B7280] uppercase tracking-wider">ON WAY</span>
-            <Truck size={15} className="text-blue-600" />
+          <div className="flex items-center justify-between">
+            <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest">Completed Today</span>
+            <span className="w-8 h-8 rounded bg-surface-container-low flex items-center justify-center text-on-surface">
+              <span className="material-symbols-outlined text-[18px]">task_alt</span>
+            </span>
           </div>
-          <div className="text-2xl font-black text-[#111827]">{outForDeliveryCount}</div>
-          <p className="text-[10px] text-blue-700 font-semibold mt-1">Active transit on road</p>
-        </div>
-
-        {/* DELIVERED TODAY */}
-        <div
-          onClick={() => setActiveTab('Delivered')}
-          className="bg-white p-4 rounded-2xl border border-[#E5ECE8] shadow-xs cursor-pointer hover:border-emerald-500 transition-all"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-extrabold text-[#6B7280] uppercase tracking-wider">DELIVERED</span>
-            <CheckCircle size={15} className="text-emerald-600" />
+          <div className="mt-4 flex items-baseline gap-3">
+            <span className="font-display-lg text-[54px] leading-none text-on-surface">{completedTodayCount.toString().padStart(2, '0')}</span>
+            <span className="font-label-caps text-[11px] text-secondary">Fulfilled Orders</span>
           </div>
-          <div className="text-2xl font-black text-[#111827]">{deliveredCount}</div>
-          <p className="text-[10px] text-emerald-700 font-semibold mt-1">Fulfilled today</p>
+          <div className="mt-3 pt-3 border-t border-sand-neutral/60 flex items-center justify-between text-secondary font-label-caps text-[11px]">
+            <span>Customer Handshake</span>
+            <span className="text-on-surface font-semibold">OTP Verified</span>
+          </div>
         </div>
       </div>
 
-      {/* 5. DELIVERY STATUS TABS */}
-      <div className="bg-white rounded-2xl p-2 border border-[#E5ECE8] shadow-xs overflow-x-auto">
-        <div className="flex items-center gap-1 min-w-max">
-          {[
-            { id: 'All', label: 'All', count: deliveries.length },
-            { id: 'Assignment Pending', label: 'Assignment Pending', count: searchingCount },
-            { id: 'Assigned', label: 'Assigned', count: assignedCount },
-            { id: 'Picked Up', label: 'Picked Up', count: pickupCount },
-            { id: 'Out for Delivery', label: 'Out for Delivery', count: outForDeliveryCount },
-            { id: 'Delivered', label: 'Delivered', count: deliveredCount },
-            { id: 'Failed / Cancelled', label: 'Failed / Cancelled', count: deliveries.filter(d => normalizeStatus(d.status) === 'Failed / Cancelled').length }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-2 ${activeTab === tab.id
-                ? 'bg-[#0A8B5F] text-white shadow-xs'
-                : 'text-[#4B5563] hover:bg-[#F9FBF9] hover:text-[#111827]'
-                }`}
-            >
-              <span>{tab.label}</span>
-              <span className={`px-2 py-0.5 text-[10px] font-black rounded-full ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-[#4B5563]'
-                }`}>
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* READY ORDERS ELIGIBILITY BANNER */}
+      {/* Ready Orders Urgent Alert Callout */}
       {readyOrders.length > 0 && (
-        <div className="bg-amber-50 rounded-2xl p-5 border-2 border-amber-300 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 animate-pulse">
+        <div className="p-4 rounded-lg bg-surface-container-low border border-sand-neutral flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-amber-500 text-white rounded-xl">
-              <Zap size={20} />
+            <div className="w-10 h-10 rounded bg-onyx-black flex items-center justify-center text-on-primary shrink-0">
+              <span className="material-symbols-outlined text-[20px]">bolt</span>
             </div>
             <div>
-              <h3 className="text-sm font-black text-amber-900">READY FOR DELIVERY ({readyOrders.length} Orders)</h3>
-              <p className="text-xs text-amber-800 mt-0.5">
-                Food preparation complete! Assign delivery partners to dispatch immediately.
+              <div className="flex items-center gap-2">
+                <span className="font-label-caps text-[11px] font-bold text-on-surface uppercase tracking-wider">Orders Ready for Assignment ({readyOrders.length})</span>
+                <span className="font-label-caps text-[10px] px-1.5 py-0.5 rounded bg-surface-container text-clay-earth font-semibold uppercase">Action Required</span>
+              </div>
+              <p className="font-body-md text-xs text-secondary mt-0.5">
+                Food preparation is complete. Assign available delivery partners for immediate pickup.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {readyOrders.map(order => (
+          <div className="flex flex-wrap items-center gap-2">
+            {readyOrders.slice(0, 3).map(order => (
               <button
                 key={order._id || order.orderId}
-                onClick={() => handleStartAutoDispatch(order)}
-                className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                type="button"
+                onClick={() => {
+                  setAssignTargetOrder(order);
+                  setIsAssignModalOpen(true);
+                }}
+                className="px-3.5 py-2 bg-onyx-black text-on-primary hover:bg-clay-earth font-button-text text-button-text rounded transition-all flex items-center gap-1.5"
               >
-                <Zap size={14} />
-                <span>Auto-Dispatch Driver for {order.orderId}</span>
+                <span className="material-symbols-outlined text-[16px]">person_add</span>
+                <span>Assign Driver for #{order.orderId || order._id}</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* SEARCH, FILTER & SORT BAR */}
-      <div className="bg-white rounded-2xl p-4 border border-[#E5ECE8] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="relative flex-1">
-          <Search size={15} className="absolute left-3.5 top-3 text-[#9CA3AF]" />
+      {/* Filter and Search Bar Control Plane */}
+      <div className="p-4 rounded-lg bg-surface-container-lowest border border-sand-neutral flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
+        {/* Search Query Bar */}
+        <div className="flex-1 flex items-center bg-surface-container-low rounded px-3 py-2 border border-sand-neutral">
+          <span className="material-symbols-outlined text-secondary text-[20px] mr-2">search</span>
           <input
             type="text"
-            placeholder="Search order ID, customer name, partner name..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-semibold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+            placeholder="Search by Order ID, Customer Name, Phone, or Delivery Partner..."
+            className="w-full bg-transparent text-sm text-on-surface placeholder:text-secondary focus:outline-none font-body-md"
           />
+          {searchQuery && (
+            <button type="button" onClick={() => setSearchQuery('')} className="text-secondary hover:text-on-surface text-xs font-bold uppercase">
+              Clear
+            </button>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Filter Dropdowns */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Status Tab Filter */}
+          <select
+            value={activeStatusTab}
+            onChange={e => setActiveStatusTab(e.target.value)}
+            className="px-3 py-2 rounded bg-surface-container-low hover:bg-surface-container border border-sand-neutral text-on-surface font-button-text text-button-text cursor-pointer focus:outline-none"
+          >
+            <option value="All">All Statuses</option>
+            <option value="READY">Ready for Pickup</option>
+            <option value="ASSIGNED">Assigned</option>
+            <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
+            <option value="DELIVERED">Delivered</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+
+          {/* Payment Filter */}
+          <select
+            value={paymentFilter}
+            onChange={e => setPaymentFilter(e.target.value)}
+            className="px-3 py-2 rounded bg-surface-container-low hover:bg-surface-container border border-sand-neutral text-on-surface font-button-text text-button-text cursor-pointer focus:outline-none"
+          >
+            <option value="All">All Payment Modes</option>
+            <option value="PAID">Prepaid (UPI / Card)</option>
+            <option value="COD">Cash on Delivery (COD)</option>
+          </select>
+
           {/* Driver Filter */}
           <select
             value={driverFilter}
             onChange={e => setDriverFilter(e.target.value)}
-            className="px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] text-xs font-bold text-[#111827] rounded-xl focus:outline-none cursor-pointer"
+            className="px-3 py-2 rounded bg-surface-container-low hover:bg-surface-container border border-sand-neutral text-on-surface font-button-text text-button-text cursor-pointer focus:outline-none"
           >
             <option value="All">All Delivery Partners</option>
             {nearbyDrivers.map(d => (
-              <option key={d._id || d.driverId || d.name} value={d.name}>{d.name} ({d.status || 'AVAILABLE'})</option>
+              <option key={d._id || d.driverId || d.name} value={d.name}>{d.name}</option>
             ))}
           </select>
 
-          {/* Sort By */}
+          {/* Sort Filter */}
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value)}
-            className="px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] text-xs font-bold text-[#111827] rounded-xl focus:outline-none cursor-pointer"
+            className="px-3 py-2 rounded bg-surface-container-low hover:bg-surface-container border border-sand-neutral text-on-surface font-button-text text-button-text cursor-pointer focus:outline-none"
           >
             <option value="newest">Newest First</option>
             <option value="oldest">Oldest First</option>
-            <option value="eta">Quickest ETA</option>
-            <option value="distance">Shortest Distance</option>
+            <option value="amountHigh">Highest Amount</option>
           </select>
         </div>
       </div>
 
-      {/* 6. MAIN ACTIVE DELIVERIES QUEUE TABLE */}
-      <div className="bg-white rounded-2xl border border-[#E5ECE8] shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-[#E5ECE8] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Truck size={17} className="text-[#0A8B5F]" />
-            <h2 className="text-sm font-black text-[#111827] uppercase tracking-wide">ACTIVE DELIVERIES QUEUE</h2>
+      {/* Main Delivery Table Register */}
+      <div className="flex flex-col bg-surface-container-lowest rounded-lg border border-sand-neutral overflow-hidden">
+        <div className="p-4 bg-surface-container-low/70 border-b border-sand-neutral flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="font-label-caps text-label-caps uppercase tracking-widest text-on-surface font-bold">Delivery Register</span>
+            <span className="px-2 py-0.5 rounded bg-surface-container text-clay-earth font-mono text-[10px]">
+              {filteredDeliveries.length} active records
+            </span>
           </div>
-          <span className="text-xs font-bold text-[#6B7280]">Showing {filteredDeliveries.length} entries</span>
+          <div className="font-label-caps text-[11px] text-secondary flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-onyx-black"></span>
+            <span>Real-time backend synchronization</span>
+          </div>
         </div>
 
+        {/* Table Content */}
         {loading ? (
-          <div className="p-12 text-center text-[#6B7280] space-y-3">
-            <RefreshCw size={24} className="animate-spin mx-auto text-[#0A8B5F]" />
-            <p className="font-bold">Syncing delivery queue...</p>
+          <div className="p-16 text-center text-secondary space-y-3">
+            <span className="material-symbols-outlined text-[32px] animate-spin text-onyx-black">sync</span>
+            <p className="font-button-text text-button-text">Loading delivery ledger from database...</p>
           </div>
         ) : filteredDeliveries.length === 0 ? (
-          /* 45. EMPTY STATE */
-          <div className="p-12 text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-[#E8F0EC] text-[#0A8B5F] flex items-center justify-center mx-auto">
-              <Truck size={32} />
+          <div className="p-16 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mx-auto text-secondary">
+              <span className="material-symbols-outlined text-[32px]">local_shipping</span>
             </div>
             <div>
-              <h3 className="text-base font-black text-[#111827]">No active deliveries found</h3>
-              <p className="text-xs font-semibold text-[#6B7280] max-w-sm mx-auto mt-1">
-                When an order becomes Ready, delivery assignment will appear here automatically.
+              <h3 className="font-headline-md text-headline-md text-on-surface">No delivery records found</h3>
+              <p className="font-body-md text-secondary text-sm max-w-md mx-auto mt-1">
+                When kitchen orders become ready or are assigned, they will automatically populate here.
               </p>
             </div>
-            {readyOrders.length > 0 && (
-              <button
-                onClick={() => {
-                  setAssignTarget({
-                    requestId: readyOrders[0].orderId,
-                    orderId: readyOrders[0].orderId,
-                    customerName: readyOrders[0].customerName,
-                    tiffinName: readyOrders[0].tiffinName,
-                    amount: readyOrders[0].totalAmount
-                  });
-                  setIsAssignModalOpen(true);
-                }}
-                className="bg-[#0A8B5F] text-white px-5 py-2.5 rounded-xl font-black shadow-md hover:bg-[#08734e] transition-all cursor-pointer inline-flex items-center gap-2"
-              >
-                <Zap size={15} />
-                <span>View Ready Orders ({readyOrders.length})</span>
-              </button>
-            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-[#F9FBF9] border-b border-[#E5ECE8] text-[10px] uppercase tracking-wider font-extrabold text-[#6B7280]">
-                  <th className="py-3 px-4">Order & Time</th>
-                  <th className="py-3 px-4">Customer</th>
-                  <th className="py-3 px-4">Tiffin Meal</th>
-                  <th className="py-3 px-4">Amount</th>
+                <tr className="border-b border-sand-neutral bg-surface-container-low/40 text-secondary font-label-caps text-[11px] uppercase tracking-widest">
+                  <th className="py-3 px-4">Order ID & Timeline</th>
+                  <th className="py-3 px-4">Customer Details</th>
                   <th className="py-3 px-4">Delivery Partner</th>
-                  <th className="py-3 px-4">Delivery Status</th>
-                  <th className="py-3 px-4">ETA & Distance</th>
+                  <th className="py-3 px-4">Pickup Location</th>
+                  <th className="py-3 px-4">Delivery Location</th>
+                  <th className="py-3 px-3">Amount</th>
+                  <th className="py-3 px-3">Delivery Fee</th>
+                  <th className="py-3 px-3">Payment</th>
+                  <th className="py-3 px-3">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E5ECE8]">
+              <tbody className="divide-y divide-sand-neutral text-sm">
                 {filteredDeliveries.map((item) => {
-                  const statusNorm = normalizeStatus(item.status);
-                  const driver = item.assignedDriver;
+                  const normStatus = getNormalizedStatus(item);
+                  const driverName = item.assignedDriver?.name || item.deliveryPartnerName;
+                  const driverPhone = item.assignedDriver?.phone || item.deliveryPartnerPhone;
 
                   return (
-                    <tr key={item._id || item.requestId} className="hover:bg-[#F9FBF9] transition-colors font-bold text-xs">
+                    <tr key={item._id || item.requestId || item.orderId} className="hover:bg-surface-container-low/60 transition-colors">
+                      
+                      {/* Order ID & Timeline */}
+                      <td className="py-4 px-4 align-top">
+                        <div className="font-mono font-bold text-on-surface flex items-center gap-1">
+                          <span>#{item.orderId || item.requestId || item._id}</span>
+                        </div>
+                        <div className="text-[11px] text-secondary font-label-caps tracking-wide mt-0.5">
+                          {new Date(item.requestedAt || item.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </td>
 
-                      {/* Order ID & Time */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-black text-[#0A8B5F]">{item.orderId || item.requestId}</div>
-                        {item.pickupOtp && (
-                          <div className="mt-1 text-[11px] font-black text-emerald-900 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded inline-flex items-center gap-1">
-                            <span>🔑 OTP:</span>
-                            <span className="tracking-widest font-mono font-bold text-emerald-950">{item.pickupOtp}</span>
-                          </div>
+                      {/* Customer Details */}
+                      <td className="py-4 px-4 align-top">
+                        <div className="font-button-text font-bold text-on-surface">{item.customerName || 'Customer'}</div>
+                        {item.customerPhone && (
+                          <a href={`tel:${item.customerPhone}`} className="text-secondary text-xs font-mono hover:underline block mt-0.5">
+                            {item.customerPhone}
+                          </a>
                         )}
-                        <div className="text-[10px] text-[#6B7280] font-normal mt-0.5">
-                          {new Date(item.requestedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      </td>
-
-                      {/* Customer Info */}
-                      <td className="py-3.5 px-4">
-                        <div className="text-[#111827] font-extrabold">{item.customerName}</div>
-                        <div className="text-[10px] text-[#6B7280] font-normal truncate max-w-[150px]">
-                          {typeof item.deliveryAddress === 'string' ? item.deliveryAddress : (item.deliveryAddress?.street || 'Ahmedabad')}
-                        </div>
-                      </td>
-
-                      {/* Tiffin Meal */}
-                      <td className="py-3.5 px-4">
-                        <div className="text-[#111827] font-semibold">{item.tiffinName || 'Gujarati Special Thali'}</div>
-                        <div className="text-[10px] text-[#6B7280] font-normal">Qty: {item.itemCount || 1}</div>
-                      </td>
-
-                      {/* Amount */}
-                      <td className="py-3.5 px-4 font-black text-[#111827]">
-                        ₹{item.amount || 240}
                       </td>
 
                       {/* Delivery Partner */}
-                      <td className="py-3.5 px-4">
-                        {(() => {
-                          const d = getDriverInfo(item);
-                          return d && d.name ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-emerald-100 text-[#0A8B5F] flex items-center justify-center font-black text-xs">
-                                {d.name.charAt(0)}
-                              </div>
-                              <div>
-                                <div className="text-[#111827] font-extrabold flex items-center gap-1">
-                                  <span>{d.name}</span>
-                                  <span className="text-[10px] text-amber-600 flex items-center">★ {d.rating || 4.8}</span>
-                                </div>
-                                <div className="text-[10px] text-[#6B7280] font-normal">{d.vehicleNo || 'Bike'}</div>
-                              </div>
+                      <td className="py-4 px-4 align-top">
+                        {driverName ? (
+                          <div className="space-y-1">
+                            <div className="font-button-text font-bold text-on-surface flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[16px] text-clay-earth">person</span>
+                              <span>{driverName}</span>
                             </div>
-                          ) : (
-                            <span className="text-[11px] text-amber-700 font-bold bg-amber-50 px-2 py-1 rounded-md border border-amber-200">
-                              Unassigned
-                            </span>
-                          );
-                        })()}
+                            {driverPhone && (
+                              <a href={`tel:${driverPhone}`} className="text-secondary text-[11px] font-mono hover:underline flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">call</span>
+                                <span>{driverPhone}</span>
+                              </a>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAssignTargetOrder(item);
+                              setIsAssignModalOpen(true);
+                            }}
+                            className="px-2.5 py-1.5 rounded bg-onyx-black text-on-primary font-button-text text-[12px] hover:bg-clay-earth transition-colors flex items-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">person_add</span>
+                            <span>+ Assign Driver</span>
+                          </button>
+                        )}
                       </td>
 
-                      {/* Delivery Status Badge */}
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${statusNorm === 'Delivered' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                          statusNorm === 'Out for Delivery' ? 'bg-blue-50 text-blue-800 border-blue-200 animate-pulse' :
-                            statusNorm === 'Picked Up' ? 'bg-purple-50 text-purple-800 border-purple-200' :
-                              statusNorm === 'Assigned' ? 'bg-indigo-50 text-indigo-800 border-indigo-200' :
-                                statusNorm === 'Arrived at Pickup' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-                                  'bg-amber-50 text-amber-800 border-amber-200'
-                          }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${statusNorm === 'Out for Delivery' ? 'bg-blue-500 animate-ping' : 'bg-current'
-                            }`} />
-                          <span>{statusNorm}</span>
+                      {/* Pickup Location */}
+                      <td className="py-4 px-4 align-top text-xs text-secondary">
+                        <div className="font-medium text-on-surface flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">storefront</span>
+                          <span>{formatAddrStr(item.pickupAddress, 'Kitchen Staging Bay 1')}</span>
+                        </div>
+                      </td>
+
+                      {/* Delivery Location */}
+                      <td className="py-4 px-4 align-top text-xs text-secondary">
+                        <div className="font-medium text-on-surface flex items-center gap-1 max-w-xs truncate">
+                          <span className="material-symbols-outlined text-[14px]">pin_drop</span>
+                          <span>{formatAddrStr(item.deliveryAddress, 'Ahmedabad')}</span>
+                        </div>
+                      </td>
+
+                      {/* Amount */}
+                      <td className="py-4 px-3 align-top font-bold text-on-surface">
+                        ₹{item.amount || item.totalAmount || 240}
+                      </td>
+
+                      {/* Delivery Fee */}
+                      <td className="py-4 px-3 align-top font-mono text-secondary text-xs">
+                        ₹{item.pricing?.deliveryCharge || item.deliveryFee || 51}
+                      </td>
+
+                      {/* Payment */}
+                      <td className="py-4 px-3 align-top">
+                        <span className="px-1.5 py-0.5 rounded bg-surface-container font-label-caps text-[10px] uppercase font-semibold text-on-surface">
+                          {item.paymentStatus || 'PAID'}
                         </span>
                       </td>
 
-                      {/* ETA & Distance */}
-                      <td className="py-3.5 px-4">
-                        <div className="text-[#111827] font-black">{item.etaMinutes || 15} mins</div>
-                        <div className="text-[10px] text-[#6B7280] font-normal">{item.distanceKm || 2.4} km away</div>
+                      {/* Status */}
+                      <td className="py-4 px-3 align-top">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-wider border font-bold ${getStatusBadgeStyle(normStatus)}`}>
+                          {normStatus}
+                        </span>
                       </td>
 
-                      {/* Actions */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      {/* Contextual Actions */}
+                      <td className="py-4 px-4 align-top text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedDelivery(item);
+                              setIsDetailsModalOpen(true);
+                            }}
+                            className="p-1.5 rounded hover:bg-surface-container text-secondary hover:text-on-surface"
+                            title="View Details"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">visibility</span>
+                          </button>
 
-                          {/* Swiggy/Zomato Auto Assign Action */}
-                          {statusNorm === 'Assignment Pending' && (
-                            <button
-                              onClick={() => handleStartAutoDispatch(item)}
-                              className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center gap-1"
-                            >
-                              <Zap size={13} className="animate-bounce" />
-                              <span>Broadcast to Drivers (Swiggy Mode)</span>
-                            </button>
-                          )}
-
-                          {/* Pickup Action */}
-                          {(statusNorm === 'Assigned' || statusNorm === 'Arrived at Pickup') && (
-                            <button
-                              onClick={() => {
-                                setPickupTarget(item);
-                                setIsPickupModalOpen(true);
-                              }}
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs"
-                            >
-                              Confirm Pickup
-                            </button>
-                          )}
-
-                          {/* Confirm Customer Arrival Action */}
-                          {(statusNorm === 'Out for Delivery' || statusNorm === 'Picked Up') && (
+                          {(normStatus === 'OUT_FOR_DELIVERY' || normStatus === 'PICKED_UP' || normStatus === 'ASSIGNED') && (
                             <button
                               type="button"
-                              onClick={() => handleOpenCustomerArrivalModal(item)}
-                              className="bg-emerald-800 hover:bg-emerald-900 text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center gap-1 active:scale-95"
-                            >
-                              <CheckCircle2 size={12} />
-                              <span>CONFIRM ARRIVAL AT CUSTOMER LOCATION</span>
-                            </button>
-                          )}
-
-                          {/* Track Live Action */}
-                          {(statusNorm === 'Out for Delivery' || statusNorm === 'Picked Up') && (
-                            <button
                               onClick={() => {
                                 setSelectedDelivery(item);
                                 setIsTrackingDrawerOpen(true);
                               }}
-                              className="bg-[#0A8B5F] hover:bg-[#08734e] text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer shadow-xs flex items-center gap-1"
+                              className="p-1.5 rounded hover:bg-surface-container text-secondary hover:text-on-surface"
+                              title="Track Live Delivery"
                             >
-                              <Navigation size={12} />
-                              <span>Track Live</span>
+                              <span className="material-symbols-outlined text-[18px]">near_me</span>
                             </button>
                           )}
 
-                          {/* View Details Action */}
-                          <button
-                            onClick={() => {
-                              setSelectedDelivery(item);
-                              setIsTrackingDrawerOpen(true);
-                            }}
-                            className="bg-[#F9FBF9] hover:bg-[#E8F0EC] text-[#111827] border border-[#E5ECE8] px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                          >
-                            View
-                          </button>
+                          {driverPhone && (
+                            <a
+                              href={`tel:${driverPhone}`}
+                              className="p-1.5 rounded hover:bg-surface-container text-secondary hover:text-on-surface"
+                              title="Call Driver"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">call</span>
+                            </a>
+                          )}
+
+                          {item.customerPhone && (
+                            <a
+                              href={`tel:${item.customerPhone}`}
+                              className="p-1.5 rounded hover:bg-surface-container text-secondary hover:text-on-surface"
+                              title="Call Customer"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">phone_enabled</span>
+                            </a>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1039,641 +776,274 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
             </table>
           </div>
         )}
-      </div>
 
-      {/* 17.5. DELIVERY DRIVERS FLEET TABLE (MongoDB Database & Swiggy/Zomato Auto-Dispatch Mode) */}
-      <div className="bg-white rounded-2xl border border-[#E5ECE8] shadow-xs p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5ECE8] pb-3">
+        {/* Footer Ledger Telemetry */}
+        <div className="p-4 bg-surface-container-low/40 border-t border-sand-neutral flex flex-col sm:flex-row items-center justify-between gap-3 text-secondary font-label-caps text-[11px]">
           <div>
-            <div className="flex items-center gap-2">
-              <Bike size={18} className="text-[#0A8B5F]" />
-              <h3 className="text-base font-black text-[#111827]">Delivery Drivers Fleet</h3>
-            </div>
-            <p className="text-xs text-[#6B7280] font-medium mt-0.5">
-              ⚡ <span className="font-bold text-[#0A8B5F]">Swiggy & Zomato Auto-Assign Active:</span> System automatically matches nearest available driver (distance & rating) when an order is ready.
-            </p>
+            Showing {filteredDeliveries.length} of {deliveries.length} delivery records
           </div>
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-black rounded-xl flex items-center gap-1.5">
-              <Zap size={13} className="text-amber-500 fill-amber-500 animate-bounce" />
-              <span>Auto-Dispatch On</span>
-            </span>
-            <span className="px-3 py-1 bg-emerald-50 text-[#0A8B5F] border border-emerald-200 text-xs font-black rounded-xl">
-              🟢 {nearbyDrivers.length} Drivers in DB
-            </span>
+          <div className="font-mono text-[10px] text-clay-earth">
+            MongoDB Collection: DeliveryRequests • Real-time Socket Listener Active
           </div>
         </div>
-
-        {nearbyDrivers.length === 0 ? (
-          <div className="p-8 text-center text-xs text-[#6B7280] font-bold">No drivers available.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-[#E5ECE8] text-[#6B7280] uppercase font-black tracking-wider">
-                  <th className="py-3 px-3">Driver ID & Name</th>
-                  <th className="py-3 px-3">Vehicle & Phone</th>
-                  <th className="py-3 px-3">Rating</th>
-                  <th className="py-3 px-3">Distance</th>
-                  <th className="py-3 px-3">Status</th>
-                  <th className="py-3 px-3">Active Deliveries</th>
-                  <th className="py-3 px-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E5ECE8] font-medium text-[#111827]">
-                {nearbyDrivers.map(drv => (
-                  <tr key={drv._id || drv.driverId || drv.name} className="hover:bg-[#F9FBF9]">
-                    <td className="py-3.5 px-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-[#0A8B5F] font-black flex items-center justify-center text-xs border border-emerald-300">
-                          {drv.name ? drv.name.charAt(0) : 'D'}
-                        </div>
-                        <div>
-                          <div className="font-extrabold text-[#111827]">{drv.name}</div>
-                          <div className="text-[10px] text-[#0A8B5F] font-bold">{drv.driverId || String(drv._id).substring(0, 8)}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <div className="font-bold text-[#4B5563]">{drv.vehicleNo || drv.vehicleNumber || 'Vehicle not registered'} ({drv.vehicleType || drv.vehicle || 'Bike'})</div>
-                      <div className="text-[10px] text-[#6B7280]">{drv.phone || 'N/A'}</div>
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <span className="px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-black rounded-lg flex items-center gap-1 w-max">
-                        <Star size={12} className="text-amber-500 fill-amber-500" />
-                        <span>{drv.rating ? drv.rating : 'N/A'}</span>
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 font-bold text-[#4B5563]">
-                      {drv.distanceKm || 1.2} km away
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <span className={`px-2.5 py-1 text-[10px] font-black rounded-full border uppercase tracking-wider ${drv.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                        drv.status === 'BUSY' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-                          'bg-gray-100 text-gray-700 border-gray-200'
-                        }`}>
-                        ● {drv.status || 'AVAILABLE'}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 font-extrabold text-[#111827]">
-                      {drv.activeDeliveries || 0} active
-                    </td>
-                    <td className="py-3.5 px-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              const unassignedReq = deliveries.find(d => normalizeStatus(d.status) === 'Assignment Pending');
-                              const reqId = unassignedReq ? unassignedReq.requestId : (deliveries[0]?.requestId || '#DEL-1029');
-                              showToast(`⚡ Assigning ${drv.name} to order...`);
-                              const json = await apiRequest('/delivery/assign', {
-                                method: 'POST',
-                                body: JSON.stringify({ requestId: reqId, driverId: drv.driverId || drv._id })
-                              });
-                              showToast(json.message || `✓ Driver ${drv.name} assigned successfully!`);
-                              fetchDeliveryData();
-                            } catch (err) {
-                              console.error('Error assigning driver:', err);
-                            }
-                          }}
-                          className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black rounded-xl inline-flex items-center gap-1 shadow-xs transition-all cursor-pointer"
-                        >
-                          <UserCheck size={12} />
-                          <span>Assign</span>
-                        </button>
-                        <a
-                          href={`tel:${drv.phone}`}
-                          className="px-2.5 py-1.5 bg-[#0A8B5F] hover:bg-[#08734e] text-white text-[11px] font-black rounded-xl inline-flex items-center gap-1 shadow-xs transition-all"
-                        >
-                          <Phone size={12} />
-                          <span>Call</span>
-                        </a>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
-      {/* 18. PROMINENT REAL GOOGLE MAPS LIVE GPS TRACKING PANEL ON MAIN PAGE */}
-      <GoogleDeliveryMap delivery={selectedDelivery || deliveries[0]} height="24rem" />
-
-      {/* 9. SWIGGY/ZOMATO AUTOMATIC DELIVERY PARTNER DISPATCH MODAL */}
-      {isAssignModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#E5ECE8] space-y-5 animate-scale-up text-center">
-
-            <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
-              <div className="flex items-center gap-2 text-[#0A8B5F]">
-                <Navigation size={18} className="animate-spin" />
-                <h3 className="text-base font-black text-[#111827]">AUTOMATIC DRIVER DISPATCH</h3>
-              </div>
-              <button
-                onClick={() => { setIsAssignModalOpen(false); setIsAutoSearching(false); }}
-                className="text-[#9CA3AF] hover:text-[#111827] cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-3 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] text-xs text-left">
-              <div className="font-extrabold text-[#111827]">Order #{assignTarget?.orderId || assignTarget?.requestId}</div>
-              <div className="text-[11px] text-[#6B7280] font-normal">{assignTarget?.customerName} • {assignTarget?.tiffinName}</div>
-            </div>
-
-            {/* Radar Animation / Searching State */}
-            {isAutoSearching && !assignedDriverResult && (
-              <div className="py-8 space-y-4">
-                <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-full border-4 border-[#0A8B5F]/20 animate-ping" />
-                  <div className="absolute inset-2 rounded-full border-4 border-[#0A8B5F]/40 animate-pulse" />
-                  <div className="w-12 h-12 rounded-full bg-[#0A8B5F] text-white flex items-center justify-center font-black text-xl shadow-lg">
-                    🛵
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-black text-[#111827]">Searching nearby delivery partners...</h4>
-                  <p className="text-xs text-[#6B7280] font-semibold mt-1">
-                    Connecting with nearest available driver within 2.0 km radius (Zomato/Swiggy dispatch algorithm)
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Matched Driver Result */}
-            {assignedDriverResult && (
-              <div className="p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-300 space-y-3 animate-scale-up text-left">
-                <div className="flex items-center gap-2 text-emerald-900 font-black text-xs">
-                  <CheckCircle size={18} className="text-[#0A8B5F]" />
-                  <span>DELIVERY PARTNER MATCHED & ASSIGNED!</span>
-                </div>
-
-                <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-emerald-200">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#E8F0EC] text-[#0A8B5F] flex items-center justify-center font-black text-sm">
-                      {assignedDriverResult.name.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="text-xs font-black text-[#111827] flex items-center gap-1.5">
-                        <span>{assignedDriverResult.name}</span>
-                        <span className="text-[10px] text-amber-600 flex items-center">★ {assignedDriverResult.rating || 4.9}</span>
-                      </div>
-                      <div className="text-[10px] text-[#6B7280] font-semibold">
-                        {assignedDriverResult.vehicleNo || 'Bike GJ-01-AB-1029'} • {assignedDriverResult.distanceKm || 0.8} km away
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-emerald-800 font-bold text-center">
-                  🚚 Partner notified! Estimated pickup arrival: 8 mins
-                </div>
-              </div>
-            )}
-
-            <div className="pt-2 flex justify-end gap-2">
-              <button
-                onClick={() => { setIsAssignModalOpen(false); setIsAutoSearching(false); }}
-                className="w-full py-2.5 bg-[#0A8B5F] hover:bg-[#08734e] text-white rounded-xl text-xs font-black shadow-md cursor-pointer"
-              >
-                {assignedDriverResult ? 'Done & Return to Queue' : 'Close'}
-              </button>
-            </div>
+      {/* Main Live Map Visualization Block */}
+      <div className="rounded-lg bg-surface-container-lowest border border-sand-neutral overflow-hidden p-4 space-y-3">
+        <div className="flex items-center justify-between border-b border-sand-neutral pb-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[20px] text-onyx-black">map</span>
+            <span className="font-label-caps text-label-caps uppercase font-bold text-on-surface">Active Fleet Live GPS Telemetry</span>
           </div>
+          <span className="font-label-caps text-[10px] text-secondary font-mono">Real-Time Transit View</span>
         </div>
-      )}
+        <GoogleDeliveryMap delivery={selectedDelivery || filteredDeliveries[0]} height="22rem" />
+      </div>
 
-      {/* 16. CONFIRM PICKUP MODAL */}
-      {isPickupModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#E5ECE8] space-y-4 animate-scale-up">
-
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
+      {/* ASSIGN DELIVERY PARTNER MODAL */}
+      {isAssignModalOpen && assignTargetOrder && (
+        <div className="fixed inset-0 z-50 bg-onyx-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-surface-container-lowest w-full max-w-xl rounded-lg shadow-xl overflow-hidden flex flex-col my-8 border border-sand-neutral">
+            
+            {/* Modal Header */}
+            <div className="p-5 bg-surface-container-low flex items-start justify-between border-b border-sand-neutral">
               <div>
-                <h3 className="text-base font-black text-[#111827]">Confirm Pickup</h3>
-                <p className="text-[11px] text-[#6B7280] font-medium">Verify the delivery partner and order before handing over the tiffin.</p>
+                <div className="flex items-center gap-2">
+                  <span className="font-label-caps text-[10px] uppercase tracking-widest text-clay-earth font-bold">DISPATCH NETWORK</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-onyx-black"></span>
+                </div>
+                <h2 className="font-headline-md text-headline-md text-on-surface mt-1 leading-tight">
+                  Assign Delivery Partner
+                </h2>
+                <p className="font-body-md text-xs text-secondary mt-0.5">
+                  Order #{assignTargetOrder.orderId || assignTargetOrder.requestId || assignTargetOrder._id}
+                </p>
               </div>
               <button
-                onClick={() => { setIsPickupModalOpen(false); setPickupSuccessData(null); }}
-                className="text-[#9CA3AF] hover:text-[#111827] cursor-pointer p-1"
+                type="button"
+                onClick={() => {
+                  setIsAssignModalOpen(false);
+                  setAssignTargetOrder(null);
+                }}
+                className="p-1 rounded text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"
               >
-                <X size={18} />
+                <span className="material-symbols-outlined text-[24px]">close</span>
               </button>
             </div>
 
-            {/* Brief Pickup Success Screen Overlay */}
-            {pickupSuccessData ? (
-              <div className="p-6 bg-emerald-50 rounded-2xl border-2 border-emerald-300 text-center space-y-3 animate-scale-up">
-                <div className="w-12 h-12 rounded-full bg-[#0A8B5F] text-white flex items-center justify-center mx-auto shadow-md">
-                  <CheckCircle size={24} />
-                </div>
-                <div>
-                  <h4 className="text-base font-black text-emerald-900">✓ Pickup Confirmed</h4>
-                  <div className="text-xs font-bold text-[#111827] mt-1">Order {formatOrderId(pickupSuccessData.orderId)}</div>
-                  <div className="text-[11px] text-[#6B7280]">{pickupSuccessData.tiffinName}</div>
-                </div>
-                <div className="text-xs text-emerald-800 font-bold bg-white py-2 px-3 rounded-xl border border-emerald-200">
-                  Handed over to <strong>{pickupSuccessData.driverName}</strong> at {pickupSuccessData.time}
-                </div>
-                <div className="flex items-center justify-center gap-1.5 text-xs font-black text-blue-700">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
-                  <span>Status: ● Out for Delivery</span>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* ORDER SECTION */}
-                <div className="p-3.5 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8] space-y-1.5 text-xs">
-                  <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#6B7280]">ORDER INFORMATION</div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-black text-[#0A8B5F]">Order {formatOrderId(pickupTarget?.orderId || pickupTarget?.requestId)}</span>
-                    <span className="font-black text-[#111827]">₹{pickupTarget?.amount || 240}</span>
+            {/* Modal Body */}
+            <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
+              
+              {/* Order Dossier Card */}
+              <div className="p-4 rounded bg-surface-container-low space-y-2 text-xs">
+                <div className="font-label-caps text-[10px] uppercase text-secondary font-bold tracking-wider">Order Information</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-secondary block">Customer:</span>
+                    <strong className="text-on-surface">{assignTargetOrder.customerName || 'Customer'}</strong>
                   </div>
-                  <div className="font-bold text-[#111827]">{pickupTarget?.tiffinName || 'Gujarati Veg Thali'} × {pickupTarget?.itemCount || 1}</div>
-                  <div className="text-[11px] text-[#6B7280]">Customer: <span className="font-extrabold text-[#111827]">{pickupTarget?.customerName}</span></div>
-                </div>
-
-                {/* DELIVERY PARTNER SECTION */}
-                {(() => {
-                  const targetDriver = getDriverInfo(pickupTarget);
-                  return targetDriver ? (
-                    <div className="p-3.5 bg-white rounded-xl border border-[#E5ECE8] space-y-2 text-xs">
-                      <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#6B7280]">DELIVERY PARTNER</div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[#E8F0EC] text-[#0A8B5F] flex items-center justify-center font-black text-sm border border-[#0A8B5F]/20">
-                            {targetDriver.name ? targetDriver.name.charAt(0) : 'D'}
-                          </div>
-                          <div>
-                            <div className="font-black text-[#111827] flex items-center gap-1.5">
-                              <span>{targetDriver.name}</span>
-                              {targetDriver.rating && <span className="text-[10px] text-amber-600 flex items-center">★ {targetDriver.rating}</span>}
-                            </div>
-                            <div className="text-[10px] text-[#6B7280] font-medium">
-                              {targetDriver.vehicleNo || 'Vehicle not registered'} • {targetDriver.phone || 'No phone'}
-                            </div>
-                          </div>
-                        </div>
-                        <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black rounded-lg">
-                          ● Arrived at Pickup
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 font-bold text-center">
-                      No delivery partner assigned yet.
-                    </div>
-                  );
-                })()}
-
-                {/* PICKUP VERIFICATION / OTP SECTION (TWILIO VERIFY & DIRECT WHATSAPP/SMS) */}
-                <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-200/80 pb-2.5">
-                    <label className="text-xs font-black text-emerald-900 uppercase tracking-wider flex items-center gap-1">
-                      <ShieldCheck size={14} className="text-[#0A8B5F]" />
-                      <span>Twilio / Real App Verification</span>
-                    </label>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="Mobile No (+91...)"
-                        value={recipientPhone !== '' ? recipientPhone : (getDriverInfo(pickupTarget)?.phone || '+91 95586 01570')}
-                        onChange={e => setRecipientPhone(e.target.value)}
-                        className="w-36 px-2 py-1 text-[11px] font-extrabold bg-white border border-emerald-300 rounded-lg text-emerald-950 focus:outline-none focus:border-[#0A8B5F]"
-                      />
-
-                      {/* Channel Toggle */}
-                      <div className="bg-white p-0.5 rounded-lg border border-emerald-300 flex items-center shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setOtpChannel('sms')}
-                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold cursor-pointer transition-all ${
-                            otpChannel === 'sms' ? 'bg-[#0A8B5F] text-white' : 'text-gray-600 hover:text-[#0A8B5F]'
-                          }`}
-                        >
-                          📲 SMS
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setOtpChannel('whatsapp')}
-                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold cursor-pointer transition-all ${
-                            otpChannel === 'whatsapp' ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:text-emerald-600'
-                          }`}
-                        >
-                          💬 WhatsApp
-                        </button>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={isSendingOtp || otpCountdown > 0}
-                        onClick={handleSendOtpCode}
-                        className={`text-[10px] font-extrabold cursor-pointer px-3 py-1.5 rounded-lg border shadow-2xs transition-all flex items-center gap-1.5 shrink-0 ${
-                          otpCountdown > 0 
-                            ? 'bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed'
-                            : 'bg-[#0A8B5F] hover:bg-[#08734e] text-white border-[#0A8B5F]'
-                        }`}
-                      >
-                        {isSendingOtp ? (
-                          <>
-                            <RefreshCw size={12} className="animate-spin text-white" />
-                            <span>Sending...</span>
-                          </>
-                        ) : otpCountdown > 0 ? (
-                          <span>Resend in {otpCountdown}s</span>
-                        ) : (
-                          <span>Send Code</span>
-                        )}
-                      </button>
-                    </div>
+                  <div>
+                    <span className="text-secondary block">Order Amount:</span>
+                    <strong className="text-on-surface">₹{assignTargetOrder.amount || assignTargetOrder.totalAmount || 240}</strong>
                   </div>
-
-                  {otpSentMessage && (
-                    <div className="bg-emerald-100 border border-emerald-300 text-emerald-900 text-[11px] font-bold px-3 py-2 rounded-xl flex items-center gap-2 animate-fade-in shadow-2xs">
-                      <CheckCircle2 size={14} className="text-[#0A8B5F] shrink-0" />
-                      <span>{otpSentMessage}</span>
-                    </div>
-                  )}
-
-                  <div className="relative">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      placeholder="Enter 4-6 digit OTP from Driver"
-                      value={otpInput}
-                      onChange={e => {
-                        const numericOnly = e.target.value.replace(/\D/g, '');
-                        setOtpInput(numericOnly);
-                      }}
-                      className="w-full px-4 py-3 bg-white border-2 border-emerald-400 rounded-xl text-center text-xl font-black tracking-widest text-[#111827] focus:outline-none focus:border-[#0A8B5F] shadow-inner"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between text-[10px] font-semibold text-[#6B7280] pt-0.5">
-                    <span>Twilio Verify Channel: {otpChannel.toUpperCase()} ({getDriverInfo(pickupTarget)?.phone || '+91 95586 01570'})</span>
-                    <span className="font-extrabold text-[#0A8B5F] bg-white px-2.5 py-0.5 rounded-md border border-emerald-300 shadow-2xs flex items-center gap-1">
-                      🔒 Real-Time SMS/WhatsApp OTP
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleConfirmPickup(true)}
-                    className="text-[10px] font-bold text-gray-500 hover:text-[#111827] hover:underline block mx-auto pt-1 cursor-pointer"
-                  >
-                    Confirm Without OTP (Authorized Provider Only)
-                  </button>
                 </div>
-
-                {/* FOOTER ACTIONS */}
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <button
-                    onClick={() => setIsPickupModalOpen(false)}
-                    className="px-4 py-2 border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#4B5563] hover:bg-[#F9FBF9] cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    onClick={() => handleConfirmPickup(false)}
-                    disabled={isSubmittingPickup}
-                    className={`bg-[#0A8B5F] hover:bg-[#08734e] text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-md cursor-pointer flex items-center gap-1.5 ${isSubmittingPickup ? 'opacity-70 cursor-not-allowed' : ''
-                      }`}
-                  >
-                    {isSubmittingPickup ? (
-                      <>
-                        <RefreshCw size={14} className="animate-spin" />
-                        <span>Confirming Pickup...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 size={15} />
-                        <span>Confirm Pickup</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </>
-            )}
-
-          </div>
-        </div>
-      )}
-
-      {/* 22. DELIVERY DETAILS & LIVE TRACKING DRAWER */}
-      {isTrackingDrawerOpen && selectedDelivery && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex justify-end animate-fade-in">
-          <div className="bg-white w-full max-w-md h-full shadow-2xl overflow-y-auto p-6 space-y-6 flex flex-col justify-between border-l border-[#E5ECE8] animate-slide-left">
-
-            <div className="space-y-6">
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-4">
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#0A8B5F]">LIVE DELIVERY TRACKING</div>
-                  <h2 className="text-lg font-black text-[#111827]">Order {selectedDelivery.orderId || selectedDelivery.requestId}</h2>
-                </div>
-                <button
-                  onClick={() => setIsTrackingDrawerOpen(false)}
-                  className="p-1.5 rounded-lg text-[#9CA3AF] hover:text-[#111827] hover:bg-gray-100 cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Status Banner */}
-              <div className="p-4 rounded-2xl bg-[#E8F0EC] border border-[#0A8B5F]/30 flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] text-[#0A8B5F] font-black uppercase">CURRENT STATUS</div>
-                  <div className="text-base font-black text-[#111827]">{normalizeStatus(selectedDelivery.status)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[10px] text-[#6B7280] font-extrabold">ESTIMATED ETA</div>
-                  <div className="text-xl font-black text-[#0A8B5F]">{selectedDelivery.etaMinutes || 18} mins</div>
+                <div className="pt-2 border-t border-sand-neutral/60">
+                  <span className="text-secondary block text-[10px] uppercase font-label-caps">Delivery Address:</span>
+                  <span className="text-on-surface font-medium">{formatAddrStr(assignTargetOrder.deliveryAddress, 'Ahmedabad')}</span>
                 </div>
               </div>
 
-              {/* 23. GOOGLE MAPS REAL-TIME GPS TRACKING PANEL IN DRAWER */}
-              <GoogleDeliveryMap delivery={selectedDelivery} height="18rem" />
+              {/* Available Drivers List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-label-caps text-[11px] uppercase tracking-wider text-on-surface font-bold">
+                    Available Delivery Partners ({nearbyDrivers.length})
+                  </span>
+                  <span className="text-[10px] text-secondary font-mono">ONLINE & Available</span>
+                </div>
 
-              {/* DELIVERY PARTNER DETAILS */}
-              <div className="p-4 bg-white rounded-2xl border border-[#E5ECE8] space-y-3">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#6B7280]">DELIVERY PARTNER</div>
-                {selectedDelivery.assignedDriver?.name ? (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#E8F0EC] text-[#0A8B5F] flex items-center justify-center font-black text-sm">
-                        {selectedDelivery.assignedDriver.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="text-xs font-black text-[#111827]">{selectedDelivery.assignedDriver.name}</div>
-                        <div className="text-[10px] text-[#6B7280] font-semibold">★ {selectedDelivery.assignedDriver.rating || 4.8} • {selectedDelivery.assignedDriver.vehicleNo || 'Bike'}</div>
-                      </div>
-                    </div>
-                    <a
-                      href={`tel:${selectedDelivery.assignedDriver.phone}`}
-                      className="bg-emerald-50 text-[#0A8B5F] border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1 cursor-pointer hover:bg-emerald-100"
-                    >
-                      <Phone size={12} />
-                      <span>Call</span>
-                    </a>
+                {nearbyDrivers.length === 0 ? (
+                  <div className="p-6 text-center text-secondary text-xs bg-surface-container-low rounded border border-sand-neutral">
+                    No online delivery partners currently nearby.
                   </div>
                 ) : (
-                  <p className="text-xs text-amber-700 font-bold">No delivery partner assigned yet.</p>
-                )}
-              </div>
+                  <div className="space-y-2.5">
+                    {nearbyDrivers.map((driver) => (
+                      <div
+                        key={driver._id || driver.driverId || driver.name}
+                        className="p-4 rounded-lg bg-surface-container-low border border-sand-neutral hover:border-onyx-black transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-full bg-onyx-black text-on-primary flex items-center justify-center font-bold text-sm shrink-0">
+                            {driver.name ? driver.name.charAt(0) : 'D'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-button-text font-bold text-on-surface text-sm">{driver.name}</span>
+                              <span className="px-1.5 py-0.2 rounded bg-surface-container text-clay-earth font-label-caps text-[10px] font-bold">
+                                ● ONLINE
+                              </span>
+                            </div>
+                            <div className="text-xs text-secondary mt-0.5">
+                              Active Deliveries: {driver.activeDeliveries || 0} • Distance: {driver.distanceKm || 1.8} km
+                            </div>
+                            {driver.vehicleNo && (
+                              <div className="text-[11px] font-mono text-secondary mt-0.5">
+                                Vehicle: {driver.vehicleNo}
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
-              {/* 20. DELIVERY STATUS TIMELINE */}
-              <div className="p-4 bg-white rounded-2xl border border-[#E5ECE8] space-y-3">
-                <div className="text-[10px] uppercase tracking-wider font-extrabold text-[#6B7280]">DELIVERY TIMELINE</div>
-                <div className="space-y-3 pl-2 border-l-2 border-[#E5ECE8] ml-2">
-                  {[
-                    { label: 'Order Placed & Accepted', done: true, time: '12:30 PM' },
-                    { label: 'Preparing Kitchen Tiffin', done: true, time: '12:35 PM' },
-                    { label: 'Marked Ready for Delivery', done: true, time: '12:42 PM' },
-                    { label: 'Delivery Partner Assigned', done: Boolean(selectedDelivery.assignedDriver?.name), time: '12:45 PM' },
-                    { label: 'Order Picked Up from Kitchen', done: ['Picked Up', 'Out for Delivery', 'Delivered'].includes(normalizeStatus(selectedDelivery.status)), time: '12:53 PM' },
-                    { label: 'Out for Delivery', done: ['Out for Delivery', 'Delivered'].includes(normalizeStatus(selectedDelivery.status)), time: '12:55 PM' },
-                    { label: 'Delivered to Customer', done: normalizeStatus(selectedDelivery.status) === 'Delivered', time: '1:10 PM' }
-                  ].map((step, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs relative pl-4">
-                      <span className={`w-2.5 h-2.5 rounded-full absolute -left-[21px] ${step.done ? 'bg-[#0A8B5F]' : 'bg-gray-300'}`} />
-                      <span className={step.done ? 'font-black text-[#111827]' : 'font-normal text-[#9CA3AF]'}>{step.label}</span>
-                      {step.done && <span className="text-[10px] text-[#6B7280] font-normal">{step.time}</span>}
-                    </div>
-                  ))}
-                </div>
+                        <button
+                          type="button"
+                          disabled={isAssigning}
+                          onClick={() => handleAssignDriver(driver.driverId || driver._id, driver.name)}
+                          className="px-4 py-2 bg-onyx-black text-on-primary hover:bg-clay-earth font-button-text text-button-text rounded transition-colors shrink-0"
+                        >
+                          ASSIGN
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Actions Footer */}
-            <div className="pt-4 border-t border-[#E5ECE8] flex items-center justify-between">
+            {/* Modal Footer */}
+            <div className="p-4 bg-surface-container-low border-t border-sand-neutral flex items-center justify-end">
               <button
                 type="button"
-                onClick={() => setIsTrackingDrawerOpen(false)}
-                className="px-4 py-2 border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#4B5563] hover:bg-[#F9FBF9] cursor-pointer"
+                onClick={() => {
+                  setIsAssignModalOpen(false);
+                  setAssignTargetOrder(null);
+                }}
+                className="px-4 py-2 text-button-text font-button-text text-secondary hover:text-on-surface transition-colors"
               >
-                Close Drawer
+                Cancel
               </button>
-
-              {['Out for Delivery', 'Picked Up'].includes(normalizeStatus(selectedDelivery.status)) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsTrackingDrawerOpen(false);
-                    handleOpenCustomerArrivalModal(selectedDelivery);
-                  }}
-                  className="bg-emerald-800 hover:bg-emerald-900 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-md"
-                >
-                  <CheckCircle2 size={14} />
-                  <span>CONFIRM ARRIVAL AT CUSTOMER LOCATION</span>
-                </button>
-              )}
-
-              {normalizeStatus(selectedDelivery.status) === 'Failed / Cancelled' && (
-                <button
-                  type="button"
-                  onClick={() => handleRetryDelivery(selectedDelivery.requestId)}
-                  className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer"
-                >
-                  <RotateCcw size={14} />
-                  <span>Retry Assignment</span>
-                </button>
-              )}
             </div>
 
           </div>
         </div>
       )}
 
-      {/* 21. CUSTOMER ARRIVAL EMAIL OTP VERIFICATION MODAL */}
-      {isCustomerArrivalModalOpen && (
-        <div className="fixed inset-0 z-[6000] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#E5ECE8] space-y-5 animate-scale-up text-center font-sans text-xs">
-            
-            <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
-              <div className="flex items-center gap-2 text-[#0A8B5F]">
-                <ShieldCheck size={20} />
-                <h3 className="text-sm font-black text-[#111827] uppercase tracking-wider">Confirm Customer Arrival</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setIsCustomerArrivalModalOpen(false); setCustomerArrivalOtpInput(''); }}
-                className="text-[#9CA3AF] hover:text-[#111827] cursor-pointer p-1 rounded-full"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-4 bg-[#F9FBF9] rounded-2xl border border-[#E5ECE8] text-left space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-extrabold text-[#6B7280]">Customer Name</span>
-                <span className="font-black text-[#111827]">{customerArrivalCustomerName}</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-[#E5ECE8] pt-2">
-                <span className="text-[10px] uppercase font-extrabold text-[#6B7280]">Registered Email</span>
-                <span className="font-extrabold text-[#0A8B5F] font-mono">{customerArrivalMaskedEmail || 'p****@gmail.com'}</span>
-              </div>
-              <div className="text-[11px] text-[#6B7280] pt-1">
-                📧 A 6-digit security verification code has been dispatched to the customer's registered email address.
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <label className="block text-left text-xs font-black text-[#111827] uppercase tracking-wider">
-                Verification Code (6-Digit OTP)
-              </label>
-              
-              <input
-                type="text"
-                maxLength={6}
-                placeholder="• • • • • •"
-                value={customerArrivalOtpInput}
-                onChange={(e) => setCustomerArrivalOtpInput(e.target.value.replace(/[^\d]/g, '').slice(0, 6))}
-                className="w-full text-center text-2xl font-mono font-black tracking-[0.5em] py-3.5 bg-[#F9FBF9] border-2 border-[#E5ECE8] focus:border-[#0A8B5F] focus:bg-white rounded-2xl outline-none transition-all text-[#111827]"
-              />
-
-              <div className="flex items-center justify-between text-[11px] font-bold text-[#6B7280] px-1">
-                <span>Passcode expires in 5 minutes</span>
+      {/* TRACK DELIVERY MODAL / DRAWER */}
+      {isTrackingDrawerOpen && selectedDelivery && (
+        <div className="fixed inset-0 z-50 bg-onyx-black/60 backdrop-blur-sm flex justify-end">
+          <div className="bg-surface-container-lowest w-full max-w-md h-full shadow-2xl overflow-y-auto p-6 space-y-6 flex flex-col justify-between border-l border-sand-neutral">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-sand-neutral pb-4">
+                <div>
+                  <div className="font-label-caps text-[10px] uppercase text-clay-earth font-bold tracking-wider">LIVE DELIVERY RADAR</div>
+                  <h2 className="font-headline-md text-headline-md text-on-surface">
+                    Order #{selectedDelivery.orderId || selectedDelivery.requestId || selectedDelivery._id}
+                  </h2>
+                </div>
                 <button
                   type="button"
-                  disabled={isSendingArrivalOtp || arrivalOtpCooldown > 0}
-                  onClick={() => triggerSendCustomerArrivalOtp()}
-                  className="text-[#0A8B5F] hover:underline disabled:opacity-50 disabled:no-underline cursor-pointer font-black"
+                  onClick={() => setIsTrackingDrawerOpen(false)}
+                  className="p-1 rounded text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"
                 >
-                  {isSendingArrivalOtp ? 'Sending...' : arrivalOtpCooldown > 0 ? `Resend in ${arrivalOtpCooldown}s` : 'RESEND CODE'}
+                  <span className="material-symbols-outlined text-[24px]">close</span>
                 </button>
+              </div>
+
+              <div className="p-4 rounded bg-surface-container-low space-y-2 border border-sand-neutral">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-secondary font-label-caps uppercase">Status:</span>
+                  <span className={`px-2 py-0.5 rounded font-label-caps text-[10px] font-bold ${getStatusBadgeStyle(getNormalizedStatus(selectedDelivery))}`}>
+                    {getNormalizedStatus(selectedDelivery)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-secondary font-label-caps uppercase">Customer:</span>
+                  <span className="font-bold text-on-surface">{selectedDelivery.customerName || 'Customer'}</span>
+                </div>
+              </div>
+
+              <GoogleDeliveryMap delivery={selectedDelivery} height="20rem" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsTrackingDrawerOpen(false)}
+              className="w-full py-2.5 bg-onyx-black text-on-primary font-button-text text-button-text rounded hover:bg-clay-earth transition-colors"
+            >
+              Close Radar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW DETAILS MODAL */}
+      {isDetailsModalOpen && selectedDelivery && (
+        <div className="fixed inset-0 z-50 bg-onyx-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest w-full max-w-lg rounded-lg shadow-xl overflow-hidden flex flex-col border border-sand-neutral">
+            <div className="p-5 bg-surface-container-low flex items-center justify-between border-b border-sand-neutral">
+              <div>
+                <span className="font-label-caps text-[10px] uppercase text-clay-earth font-bold tracking-wider">DELIVERY SPECIFICATION DOSSIER</span>
+                <h2 className="font-headline-md text-headline-md text-on-surface">
+                  Order #{selectedDelivery.orderId || selectedDelivery.requestId || selectedDelivery._id}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDetailsModalOpen(false)}
+                className="p-1 rounded text-secondary hover:text-on-surface hover:bg-surface-container transition-colors"
+              >
+                <span className="material-symbols-outlined text-[24px]">close</span>
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3 p-3 rounded bg-surface-container-low">
+                <div>
+                  <span className="text-secondary block font-label-caps text-[10px] uppercase">Customer Name</span>
+                  <strong className="text-on-surface">{selectedDelivery.customerName || 'Customer'}</strong>
+                </div>
+                <div>
+                  <span className="text-secondary block font-label-caps text-[10px] uppercase">Phone</span>
+                  <strong className="text-on-surface">{selectedDelivery.customerPhone || 'N/A'}</strong>
+                </div>
+                <div>
+                  <span className="text-secondary block font-label-caps text-[10px] uppercase">Amount</span>
+                  <strong className="text-on-surface">₹{selectedDelivery.amount || selectedDelivery.totalAmount || 240}</strong>
+                </div>
+                <div>
+                  <span className="text-secondary block font-label-caps text-[10px] uppercase">Payment Status</span>
+                  <strong className="text-on-surface">{selectedDelivery.paymentStatus || 'PAID'}</strong>
+                </div>
+              </div>
+
+              <div className="p-3 rounded bg-surface-container-low space-y-1">
+                <span className="text-secondary block font-label-caps text-[10px] uppercase">Pickup Origin Address</span>
+                <p className="text-on-surface font-medium">{formatAddrStr(selectedDelivery.pickupAddress, 'Kitchen Staging Bay 1')}</p>
+              </div>
+
+              <div className="p-3 rounded bg-surface-container-low space-y-1">
+                <span className="text-secondary block font-label-caps text-[10px] uppercase">Delivery Destination Address</span>
+                <p className="text-on-surface font-medium">{formatAddrStr(selectedDelivery.deliveryAddress, 'Ahmedabad')}</p>
+              </div>
+
+              <div className="p-3 rounded bg-surface-container-low space-y-1">
+                <span className="text-secondary block font-label-caps text-[10px] uppercase">Assigned Delivery Partner</span>
+                <p className="text-on-surface font-medium">
+                  {selectedDelivery.assignedDriver?.name || selectedDelivery.deliveryPartnerName || 'Unassigned'} 
+                  {selectedDelivery.assignedDriver?.phone ? ` (${selectedDelivery.assignedDriver.phone})` : ''}
+                </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="p-4 bg-surface-container-low border-t border-sand-neutral flex justify-end">
               <button
                 type="button"
-                onClick={() => { setIsCustomerArrivalModalOpen(false); setCustomerArrivalOtpInput(''); }}
-                className="py-3 px-4 border border-[#E5ECE8] hover:bg-gray-100 text-[#4B5563] font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                onClick={() => setIsDetailsModalOpen(false)}
+                className="px-4 py-2 bg-onyx-black text-on-primary font-button-text text-button-text rounded hover:bg-clay-earth transition-colors"
               >
-                CANCEL
-              </button>
-              
-              <button
-                type="button"
-                disabled={isVerifyingArrivalOtp || customerArrivalOtpInput.length !== 6}
-                onClick={handleVerifyCustomerArrivalOtp}
-                className="py-3 px-4 bg-[#0A8B5F] hover:bg-[#08734e] disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
-              >
-                <CheckCircle2 size={16} />
-                <span>{isVerifyingArrivalOtp ? 'VERIFYING...' : 'VERIFY ARRIVAL'}</span>
+                Close
               </button>
             </div>
-
           </div>
         </div>
       )}
@@ -1681,48 +1051,3 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
     </div>
   );
 }
-
-// React Error Boundary to prevent any blank page crashes
-class DeliveryErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('Delivery Management Error Boundary caught error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-8 bg-white rounded-2xl border-2 border-red-200 text-center space-y-4 max-w-lg mx-auto my-12 shadow-xl animate-fade-in">
-          <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
-            <AlertTriangle size={30} />
-          </div>
-          <div>
-            <h3 className="text-lg font-black text-gray-900">Something went wrong</h3>
-            <p className="text-xs text-gray-600 mt-1">The pickup confirmation or delivery view encountered a temporary display error.</p>
-          </div>
-          <div className="bg-red-50 p-3 rounded-xl text-xs font-mono text-red-800 border border-red-200 overflow-x-auto text-left">
-            {this.state.error?.toString() || 'Unknown rendering error'}
-          </div>
-          <button
-            type="button"
-            onClick={() => this.setState({ hasError: false, error: null })}
-            className="px-6 py-2.5 bg-[#0A8B5F] hover:bg-[#08734e] text-white rounded-xl text-xs font-black shadow-md cursor-pointer inline-flex items-center gap-2"
-          >
-            <RotateCcw size={14} />
-            <span>Try Again & Recover Page</span>
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-

@@ -103,6 +103,38 @@ const deliveryRequestSchema = new mongoose.Schema({
     type: Number,
     default: 240
   },
+  subtotal: {
+    type: Number,
+    default: 120
+  },
+  deliveryFee: {
+    type: Number,
+    default: 51
+  },
+  driverEarning: {
+    type: Number,
+    default: 51
+  },
+  payout: {
+    type: Number,
+    default: 51
+  },
+  packagingFee: {
+    type: Number,
+    default: 15
+  },
+  gstTax: {
+    type: Number,
+    default: 6
+  },
+  platformCommission: {
+    type: Number,
+    default: 0
+  },
+  netPayout: {
+    type: Number,
+    default: 0
+  },
   itemCount: {
     type: Number,
     default: 2

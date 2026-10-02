@@ -50,12 +50,16 @@ const orderSchema = new mongoose.Schema({
     required: true
   },
 
-  // Item Subtotal & Pricing Breakdown
+  // Item Subtotal & Pricing Breakdown Snapshot
   subtotal: {
     type: Number,
     default: 0
   },
   deliveryFee: {
+    type: Number,
+    default: 45
+  },
+  driverEarning: {
     type: Number,
     default: 45
   },
@@ -71,9 +75,25 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     default: 15
   },
+  serviceCharge: {
+    type: Number,
+    default: 0
+  },
+  additionalCharges: {
+    type: Number,
+    default: 0
+  },
   gstTax: {
     type: Number,
     default: 12
+  },
+  platformCommission: {
+    type: Number,
+    default: 0
+  },
+  netPayout: {
+    type: Number,
+    default: 0
   },
   totalAmount: {
     type: Number,

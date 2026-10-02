@@ -53,11 +53,112 @@ import NotificationsTab from './NotificationsTab';
 import SettingsTab from './SettingsTab';
 import DeliveryManagementTab from './DeliveryManagementTab';
 import HelpSupportTab from './HelpSupportTab';
+import PerformanceTab from './PerformanceTab';
 
-import { apiRequest } from '../services/api';
+const getProviderTabFromHash = (rawHash) => {
+  const hash = (rawHash || (typeof window !== 'undefined' ? window.location.hash : '') || '').toLowerCase().trim();
+  if (hash.includes('/orders/new')) return 'orders-new';
+  if (hash.includes('/orders/preparing')) return 'orders-preparing';
+  if (hash.includes('/orders/ready')) return 'orders-ready';
+  if (hash.includes('/orders/delivery')) return 'orders-delivery';
+  if (hash.includes('/orders/completed')) return 'orders-completed';
+  if (hash.includes('/orders/cancelled')) return 'orders-cancelled';
+  if (hash.includes('/orders')) return 'orders-all';
+
+  if (hash.includes('/tiffins/add')) return 'add-tiffin';
+  if (hash.includes('/tiffins/availability')) return 'availability';
+  if (hash.includes('/tiffins/categories')) return 'categories';
+  if (hash.includes('/tiffins')) return 'tiffins';
+
+  if (hash.includes('/delivery-management')) return 'delivery-management';
+  if (hash.includes('/customers')) return 'customers';
+  if (hash.includes('/subscriptions')) return 'subscriptions';
+
+  if (hash.includes('/earnings/transactions')) return 'transactions';
+  if (hash.includes('/earnings/incentives')) return 'incentives';
+  if (hash.includes('/earnings/wallet')) return 'wallet';
+  if (hash.includes('/earnings/bank') || hash.includes('/earnings/payout')) return 'bank-payout';
+  if (hash.includes('/earnings')) return 'earnings';
+
+  if (hash.includes('/reviews')) return 'reviews';
+  if (hash.includes('/analytics')) return 'analytics';
+  if (hash.includes('/capacity')) return 'capacity';
+  if (hash.includes('/service-area')) return 'service-area';
+  if (hash.includes('/schedule')) return 'schedule';
+  if (hash.includes('/performance')) return 'performance';
+  if (hash.includes('/notifications')) return 'notifications';
+  if (hash.includes('/settings')) return 'settings';
+  if (hash.includes('/requests') || hash.includes('/live-requests')) return 'live-requests';
+  if (hash.includes('/help')) return 'help';
+
+  return 'dashboard';
+};
+
+const getHashFromProviderTab = (tab) => {
+  switch (tab) {
+    case 'dashboard': return '#/provider/dashboard';
+    case 'requests':
+    case 'live-requests': return '#/provider/requests';
+    case 'tiffins': return '#/provider/tiffins';
+    case 'add-tiffin': return '#/provider/tiffins/add';
+    case 'availability': return '#/provider/tiffins/availability';
+    case 'categories': return '#/provider/tiffins/categories';
+    case 'orders':
+    case 'orders-all': return '#/provider/orders';
+    case 'orders-new': return '#/provider/orders/new';
+    case 'orders-preparing': return '#/provider/orders/preparing';
+    case 'orders-ready': return '#/provider/orders/ready';
+    case 'orders-delivery': return '#/provider/orders/delivery';
+    case 'orders-completed': return '#/provider/orders/completed';
+    case 'orders-cancelled': return '#/provider/orders/cancelled';
+    case 'delivery-management': return '#/provider/delivery-management';
+    case 'customers': return '#/provider/customers';
+    case 'subscriptions': return '#/provider/subscriptions';
+    case 'earnings': return '#/provider/earnings';
+    case 'transactions': return '#/provider/earnings/transactions';
+    case 'incentives': return '#/provider/earnings/incentives';
+    case 'wallet': return '#/provider/earnings/wallet';
+    case 'bank-payout': return '#/provider/earnings/bank';
+    case 'reviews': return '#/provider/reviews';
+    case 'analytics': return '#/provider/analytics';
+    case 'capacity': return '#/provider/capacity';
+    case 'service-area': return '#/provider/service-area';
+    case 'schedule': return '#/provider/schedule';
+    case 'performance': return '#/provider/performance';
+    case 'notifications': return '#/provider/notifications';
+    case 'settings': return '#/provider/settings';
+    case 'help': return '#/provider/help';
+    default: return '#/provider/dashboard';
+  }
+};
 
 export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser }) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTabState] = useState(() => {
+    return getProviderTabFromHash(typeof window !== 'undefined' ? window.location.hash : '');
+  });
+
+  const setActiveTab = (newTab, updateHash = true) => {
+    setActiveTabState(newTab);
+    if (updateHash && typeof window !== 'undefined') {
+      const targetHash = getHashFromProviderTab(newTab);
+      if (window.location.hash !== targetHash) {
+        window.history.pushState(null, '', targetHash);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const tabFromHash = getProviderTabFromHash(window.location.hash);
+      setActiveTabState(tabFromHash);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handleHashChange);
+    };
+  }, []);
   const [expandedMenus, setExpandedMenus] = useState({
     tiffins: true,
     orders: true
@@ -162,7 +263,9 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         case 'subscriptions':
           return <SubscriptionsTab currentUser={currentUser} />;
         case 'performance':
+          return <PerformanceTab currentUser={currentUser} />;
         case 'reviews':
+        case 'ratings-reviews':
           return <ReviewsTab currentUser={currentUser} />;
         case 'earnings':
         case 'transactions':
@@ -187,7 +290,9 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         case 'settings-preferences':
           return <SettingsTab currentUser={currentUser} onUpdateUser={onUpdateUser} initialSubTab={activeTab} />;
         case 'help':
+        case 'help-support':
           return <HelpSupportTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
+
         default:
           return <DashboardOverviewTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
       }
@@ -349,7 +454,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         </header>
 
         {/* MAIN BODY AREA */}
-        <main className="w-full pt-16 bg-surface min-h-screen p-4 sm:p-6 lg:p-8">
+        <main className="w-full pt-20 pb-12 px-4 sm:px-6 lg:px-8 bg-surface min-h-screen">
           <div className="max-w-7xl mx-auto">
             {renderActiveTabContent()}
           </div>

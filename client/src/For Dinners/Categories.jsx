@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import use3DTilt from '../components/use3DTilt';
 
 const REGIONS = [
@@ -76,6 +76,21 @@ const REGIONS = [
 
 export default function Categories() {
   const [activeTab, setActiveTab] = useState('malabar');
+
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = (window.location.hash || '').toLowerCase();
+      if (hash.includes('malabar')) setActiveTab('malabar');
+      else if (hash.includes('awadh')) setActiveTab('awadh');
+      else if (hash.includes('kathiawar')) setActiveTab('kathiawar');
+      else if (hash.includes('bengal')) setActiveTab('bengal');
+      else if (hash.includes('punjab')) setActiveTab('punjab');
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
   const activeRegion = REGIONS.find(r => r.id === activeTab) || REGIONS[0];
   const tiltRef = use3DTilt(10, 1.02);
 

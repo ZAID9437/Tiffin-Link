@@ -154,7 +154,14 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
           }
 
           if (Array.isArray(d.todaysOrders)) {
-            const formatted = d.todaysOrders.map(o => ({
+            const seenIds = new Set();
+            const uniqueRaw = d.todaysOrders.filter(o => {
+              const key = String(o.id || o.orderId || o._id || '').trim();
+              if (key && seenIds.has(key)) return false;
+              if (key) seenIds.add(key);
+              return true;
+            });
+            const formatted = uniqueRaw.map(o => ({
               id: o.id || '#1027',
               customer: o.customer || 'Customer',
               items: o.qtyText || 'Tiffin Meal',
@@ -627,91 +634,13 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
                   </div>
                 ))
               ) : (
-                <>
-                  {/* Default Dynamic Display Order 1 */}
-                  <div className="p-5 hover:bg-surface-container-low/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-surface-container flex-shrink-0 flex items-center justify-center text-clay-earth">
-                        <span className="material-symbols-outlined text-[24px]">bento</span>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-label-caps text-[12px] font-bold text-on-surface">#9559</span>
-                          <button onClick={() => navigator.clipboard.writeText('#9559')} className="text-secondary hover:text-on-surface cursor-pointer" title="Copy Order ID">
-                            <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                          </button>
-                          <span className="px-2 py-0.5 rounded-full bg-surface-container text-secondary font-label-caps text-[10px] font-semibold">Standard Lunch</span>
-                        </div>
-                        <div className="flex items-center gap-2 font-body-md text-[14px] text-on-surface font-medium">
-                          <span>Zaid Mansuri</span>
-                          <span className="text-secondary text-xs">•</span>
-                          <span className="font-body-md text-[13px] text-secondary flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px]">phone</span> +91 98201 ••••
-                          </span>
-                        </div>
-                        <p className="font-body-md text-[13px] text-secondary">
-                          1 × Gujarati Special Kathiyawadi Thali · Today (Lunch)
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between md:flex-col md:items-end gap-2 md:text-right">
-                      <div>
-                        <span className="font-label-caps text-[14px] font-bold text-on-surface block">₹280</span>
-                        <span className="font-label-caps text-[10px] text-secondary">Paid Online</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-caps text-[11px] font-bold">
-                          Completed
-                        </span>
-                        <button onClick={() => onNavigateTab && onNavigateTab('orders')} className="px-3 py-1 rounded bg-onyx-black text-bone-white hover:bg-stone-800 transition-colors font-button-text text-[12px] cursor-pointer">
-                          View Details
-                        </button>
-                      </div>
-                    </div>
+                <div className="p-12 text-center flex flex-col items-center justify-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-secondary mb-1">
+                    <span className="material-symbols-outlined text-[24px]">inbox</span>
                   </div>
-
-                  {/* Default Dynamic Display Order 2 */}
-                  <div className="p-5 hover:bg-surface-container-low/50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-surface-container flex-shrink-0 flex items-center justify-center text-clay-earth">
-                        <span className="material-symbols-outlined text-[24px]">corporate_fare</span>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-label-caps text-[12px] font-bold text-on-surface">#ORD-2773</span>
-                          <button onClick={() => navigator.clipboard.writeText('#ORD-2773')} className="text-secondary hover:text-on-surface cursor-pointer" title="Copy Order ID">
-                            <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                          </button>
-                          <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-caps text-[10px] font-bold">Corporate Bulk</span>
-                        </div>
-                        <div className="flex items-center gap-2 font-body-md text-[14px] text-on-surface font-medium">
-                          <span>Bhavin Shah</span>
-                          <span className="text-secondary text-xs">•</span>
-                          <span className="font-body-md text-[13px] text-secondary flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[13px]">phone</span> +91 98920 ••••
-                          </span>
-                        </div>
-                        <p className="font-body-md text-[13px] text-secondary">
-                          15 × Gujarati Special Kathiyawadi Thali · Today (Bulk Corporate)
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between md:flex-col md:items-end gap-2 md:text-right">
-                      <div>
-                        <span className="font-label-caps text-[14px] font-bold text-on-surface block">₹1,870</span>
-                        <span className="font-label-caps text-[10px] text-secondary">Paid Online (Escrow Released)</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-caps text-[11px] font-bold">
-                          Completed
-                        </span>
-                        <button onClick={() => onNavigateTab && onNavigateTab('orders')} className="px-3 py-1 rounded bg-onyx-black text-bone-white hover:bg-stone-800 transition-colors font-button-text text-[12px] cursor-pointer">
-                          View Details
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </>
+                  <p className="font-headline-md text-sm text-on-surface font-semibold">No active orders today</p>
+                  <p className="font-body-md text-xs text-secondary max-w-sm">New orders assigned to your kitchen batch will appear here in real-time when placed by customers.</p>
+                </div>
               )}
             </div>
 

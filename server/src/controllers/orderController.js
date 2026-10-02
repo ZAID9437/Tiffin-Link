@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const { ensureConnected } = require('../config/db');
 
@@ -9,9 +10,28 @@ const calculateBillBreakdown = (qty, price, distanceKm = 3.2) => {
   const subtotal = quantity * unitPrice;
   const km = Number(distanceKm) || 3.2;
   const deliveryFee = Math.round(25 + (km * 8)); // Base ₹25 + ₹8 per km
+  const driverEarning = deliveryFee; // Single source of truth
   const packagingFee = 15;
   const gstTax = Math.round(subtotal * 0.05); // 5% GST
-  const totalAmount = subtotal + deliveryFee + packagingFee + gstTax;
+  const serviceCharge = 0;
+  const additionalCharges = 0;
+  const totalAmount = subtotal + deliveryFee + packagingFee + gstTax + serviceCharge + additionalCharges;
+  const platformCommission = Math.round(totalAmount * 0.125);
+  const netPayout = totalAmount - platformCommission;
+
+  const pricing = {
+    itemsSubtotal: subtotal,
+    packagingCharge: packagingFee,
+    deliveryCharge: deliveryFee,
+    serviceCharge,
+    tax: gstTax,
+    discount: 0,
+    additionalCharges,
+    customerPaidTotal: totalAmount,
+    driverEarning,
+    platformFee: platformCommission,
+    providerPayout: netPayout
+  };
 
   return {
     quantity,
@@ -19,10 +39,63 @@ const calculateBillBreakdown = (qty, price, distanceKm = 3.2) => {
     subtotal,
     deliveryKm: km,
     deliveryFee,
+    driverEarning,
     packagingFee,
+    serviceCharge,
+    additionalCharges,
     gstTax,
-    totalAmount
+    totalAmount,
+    platformCommission,
+    netPayout,
+    pricing
   };
+};
+
+const enrichOrderFinancials = (o) => {
+  if (!o) return o;
+  const obj = typeof o.toObject === 'function' ? o.toObject() : { ...o };
+  const subtotal = Number(obj.subtotal) || ((Number(obj.quantity) || 1) * (Number(obj.unitPrice) || 120)) || 120;
+  const deliveryFee = Number(obj.deliveryFee) || 51;
+  const driverEarning = Number(obj.driverEarning) || deliveryFee;
+  const packagingFee = Number(obj.packagingFee) || 15;
+  const gstTax = Number(obj.gstTax) || Math.round(subtotal * 0.05);
+  const serviceCharge = Number(obj.serviceCharge) || 0;
+  const additionalCharges = Number(obj.additionalCharges) || 0;
+  const totalAmount = Number(obj.totalAmount) || (subtotal + deliveryFee + packagingFee + gstTax + serviceCharge + additionalCharges);
+  const platformCommission = Number(obj.platformCommission) || Math.round(totalAmount * 0.125);
+  const netPayout = Number(obj.netPayout) || (totalAmount - platformCommission);
+
+  const createdAtTime = obj.createdAt ? new Date(obj.createdAt).getTime() : Date.now();
+  const elapsedSecs = Math.floor((Date.now() - createdAtTime) / 1000);
+  const secondsLeft = Math.max(0, 300 - elapsedSecs);
+
+  obj.subtotal = subtotal;
+  obj.deliveryFee = deliveryFee;
+  obj.driverEarning = driverEarning;
+  obj.packagingFee = packagingFee;
+  obj.gstTax = gstTax;
+  obj.serviceCharge = serviceCharge;
+  obj.additionalCharges = additionalCharges;
+  obj.totalAmount = totalAmount;
+  obj.platformCommission = platformCommission;
+  obj.netPayout = netPayout;
+  obj.secondsLeft = secondsLeft;
+
+  obj.pricing = {
+    itemsSubtotal: subtotal,
+    packagingCharge: packagingFee,
+    deliveryCharge: deliveryFee,
+    serviceCharge,
+    tax: gstTax,
+    discount: 0,
+    additionalCharges,
+    customerPaidTotal: totalAmount,
+    driverEarning,
+    platformFee: platformCommission,
+    providerPayout: netPayout
+  };
+
+  return obj;
 };
 
 const defaultInitialOrders = [
@@ -154,10 +227,10 @@ const getOrders = async (req, res) => {
     } = req.query;
 
     if (await isDbConnected()) {
-      // Non-blocking background reconciliation if needed
+      // Reconcile delivery requests before querying orders
       try {
         const { reconcileMissingDeliveryRequests } = require('./deliveryDispatchController');
-        reconcileMissingDeliveryRequests().catch(rErr => console.warn('Background reconciliation error:', rErr.message));
+        await reconcileMissingDeliveryRequests();
       } catch (rErr) {}
 
       // Build MongoDB query
@@ -180,6 +253,23 @@ const getOrders = async (req, res) => {
         ];
       }
 
+      // Helper to deduplicate order documents strictly by Mongo _id and orderId
+      const deduplicateOrders = (orderDocs) => {
+        const seenIds = new Set();
+        const seenOrderIds = new Set();
+        const result = [];
+        for (const o of orderDocs) {
+          const idStr = String(o._id || o.id || '').trim();
+          const ordIdStr = String(o.orderId || '').trim();
+          if (idStr && seenIds.has(idStr)) continue;
+          if (ordIdStr && seenOrderIds.has(ordIdStr)) continue;
+          if (idStr) seenIds.add(idStr);
+          if (ordIdStr) seenOrderIds.add(ordIdStr);
+          result.push(enrichOrderFinancials({ ...o, id: idStr || o.id }));
+        }
+        return result;
+      };
+
       // If pagination is requested
       if (page || limit) {
         const pageNum = parseInt(page, 10) || 1;
@@ -199,7 +289,7 @@ const getOrders = async (req, res) => {
           ])
         ]);
 
-        const formattedOrders = orders.map(o => ({ ...o, id: o._id.toString() }));
+        const formattedOrders = deduplicateOrders(orders);
 
         const statusCounts = { All: 0, New: 0, Preparing: 0, Ready: 0, Completed: 0, Cancelled: 0 };
         statusCountsAgg.forEach(item => {
@@ -213,7 +303,7 @@ const getOrders = async (req, res) => {
           success: true,
           data: formattedOrders,
           pagination: {
-            total,
+            total: formattedOrders.length,
             page: pageNum,
             limit: limitNum,
             totalPages: Math.ceil(total / limitNum) || 1
@@ -226,7 +316,7 @@ const getOrders = async (req, res) => {
 
       // Default: lightweight projected query if no pagination explicitly requested
       const orders = await Order.find(query).sort({ createdAt: -1 }).lean();
-      const formattedOrders = orders.map(o => ({ ...o, id: o._id.toString() }));
+      const formattedOrders = deduplicateOrders(orders);
 
       return res.json({ success: true, data: formattedOrders, source: 'database', databaseName: 'tiffinlink' });
     } else {
@@ -366,6 +456,27 @@ const createOrder = async (req, res) => {
   }
 };
 
+// Helper to build flexible order lookup query matching _id or orderId formats
+const buildOrderLookupQuery = (id, providerId = null) => {
+  const queryList = [];
+  if (id && mongoose.Types.ObjectId.isValid(id)) {
+    queryList.push({ _id: id });
+  }
+  if (id) {
+    const cleanId = String(id).replace(/^#/, '').trim();
+    queryList.push({ orderId: id });
+    queryList.push({ orderId: `#${cleanId}` });
+    queryList.push({ orderId: `#ORD-${cleanId}` });
+    queryList.push({ orderId: cleanId });
+  }
+
+  const findFilter = queryList.length > 0 ? { $or: queryList } : {};
+  if (providerId) {
+    return { providerId, ...findFilter };
+  }
+  return findFilter;
+};
+
 // @desc    Update order status or details
 // @route   PUT /api/orders/:id
 const updateOrder = async (req, res) => {
@@ -379,7 +490,8 @@ const updateOrder = async (req, res) => {
     }
 
     if (await isDbConnected()) {
-      const updated = await Order.findOneAndUpdate({ _id: id, providerId }, updateData, { new: true });
+      const query = buildOrderLookupQuery(id, providerId);
+      const updated = await Order.findOneAndUpdate(query, updateData, { new: true });
       if (!updated) {
         return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
       }
@@ -389,13 +501,13 @@ const updateOrder = async (req, res) => {
       } catch (rErr) {
         console.warn('Reconciliation error in updateOrder:', rErr.message);
       }
-      const refreshed = await Order.findById(id);
+      const refreshed = await Order.findById(updated._id);
       return res.json({ success: true, message: 'Order updated successfully', data: refreshed || updated });
     }
     return res.json({ success: true, message: 'Order updated (in-memory)', data: req.body });
   } catch (error) {
     console.error('Error updating order:', error);
-    res.status(500).json({ success: false, message: 'Failed to update order' });
+    res.status(500).json({ success: false, message: 'Failed to update order: ' + error.message });
   }
 };
 
@@ -411,10 +523,10 @@ const acceptDelivery = async (req, res) => {
     const deliveryPartnerPhone = partnerPhone || '+91 98765 11223';
 
     if (await isDbConnected()) {
+      const query = buildOrderLookupQuery(id, providerId);
       const updatedOrder = await Order.findOneAndUpdate(
         { 
-          _id: id, 
-          providerId,
+          ...query,
           status: 'Ready',
           deliveryStatus: { $in: ['Unassigned', 'Searching'] }
         },
@@ -471,7 +583,8 @@ const updateDeliveryStatus = async (req, res) => {
     }
 
     if (await isDbConnected()) {
-      const updated = await Order.findOneAndUpdate({ _id: id, providerId }, updateFields, { new: true });
+      const query = buildOrderLookupQuery(id, providerId);
+      const updated = await Order.findOneAndUpdate(query, updateFields, { new: true });
       if (!updated) {
         return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
       }
@@ -492,7 +605,8 @@ const deleteOrder = async (req, res) => {
     const { id } = req.params;
     const providerId = req.providerId;
     if (await isDbConnected()) {
-      const deleted = await Order.findOneAndDelete({ _id: id, providerId });
+      const query = buildOrderLookupQuery(id, providerId);
+      const deleted = await Order.findOneAndDelete(query);
       if (!deleted) {
         return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
       }
@@ -505,10 +619,211 @@ const deleteOrder = async (req, res) => {
   }
 };
 
+// @desc    Get single order by ID with authoritative financial snapshot
+// @route   GET /api/orders/:id
+const getOrderById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const providerId = req.providerId;
+    if (await isDbConnected()) {
+      const query = buildOrderLookupQuery(id, providerId);
+      const ord = await Order.findOne(query).lean();
+      if (!ord) {
+        return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+      }
+      return res.json({ success: true, data: enrichOrderFinancials(ord) });
+    }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
+  } catch (error) {
+    console.error('Error fetching order by ID:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch order: ' + error.message });
+  }
+};
+
+// @desc    Atomic Provider Order Acceptance
+// @route   POST /api/orders/:id/accept or PUT /api/orders/:id/accept
+const acceptOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const providerId = req.providerId;
+    if (!providerId) {
+      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+    }
+
+    if (await isDbConnected()) {
+      const lookupQuery = buildOrderLookupQuery(id, providerId);
+      const existing = await Order.findOne(lookupQuery);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+      }
+
+      const currentStatus = String(existing.status || '').toUpperCase();
+      
+      // If already accepted/preparing, return success gracefully
+      if (currentStatus === 'PREPARING' || currentStatus === 'ACCEPTED' || currentStatus === 'IN_PREP') {
+        return res.json({
+          success: true,
+          message: `Order ${existing.orderId} is already accepted and in kitchen preparation.`,
+          data: enrichOrderFinancials(existing)
+        });
+      }
+
+      // If cancelled, cannot accept
+      if (currentStatus === 'CANCELLED' || currentStatus === 'REJECTED') {
+        return res.status(409).json({
+          success: false,
+          message: 'Order was cancelled and cannot be accepted.'
+        });
+      }
+
+      // Update order to Preparing atomically
+      const updatedOrder = await Order.findOneAndUpdate(
+        {
+          _id: existing._id,
+          providerId
+        },
+        {
+          $set: {
+            status: 'Preparing',
+            acceptedAt: new Date(),
+            acceptedBy: req.user?._id
+          }
+        },
+        { new: true }
+      );
+
+      if (!updatedOrder) {
+        return res.status(409).json({
+          success: false,
+          message: 'Order is no longer available.'
+        });
+      }
+
+      // Audit Log & Socket Notification
+      try {
+        const AuditLog = require('../models/AuditLog');
+        await AuditLog.create({
+          action: 'ORDER_ACCEPTED',
+          entityType: 'Order',
+          entityId: String(updatedOrder._id),
+          performedBy: req.user?.name || 'Provider',
+          details: `Order ${updatedOrder.orderId} accepted by provider`
+        });
+      } catch (aErr) {}
+
+      try {
+        const { emitToProvider, getIO } = require('../services/socketService');
+        emitToProvider(providerId, 'order:status:updated', { orderId: updatedOrder.orderId, status: 'Preparing' });
+        const io = getIO();
+        if (io) io.emit('order:status:updated', { orderId: updatedOrder.orderId, status: 'Preparing', providerId });
+      } catch (sErr) {}
+
+      return res.json({
+        success: true,
+        message: `Order ${updatedOrder.orderId} Accepted! Moved to Kitchen Prep Queue.`,
+        data: enrichOrderFinancials(updatedOrder)
+      });
+    }
+
+    return res.json({ success: true, message: 'Order accepted' });
+  } catch (error) {
+    console.error('Error accepting order:', error);
+    res.status(500).json({ success: false, message: 'Failed to accept order: ' + error.message });
+  }
+};
+
+// @desc    Provider Order Rejection/Decline
+// @route   POST /api/orders/:id/reject or PUT /api/orders/:id/reject
+const rejectOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const providerId = req.providerId;
+    const { reason, notes } = req.body;
+    if (!providerId) {
+      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+    }
+
+    if (await isDbConnected()) {
+      const lookupQuery = buildOrderLookupQuery(id, providerId);
+      const existing = await Order.findOne(lookupQuery);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+      }
+
+      const currentStatus = String(existing.status || '').toUpperCase();
+      if (currentStatus === 'CANCELLED' || currentStatus === 'REJECTED') {
+        return res.json({
+          success: true,
+          message: `Order ${existing.orderId} is already cancelled.`,
+          data: enrichOrderFinancials(existing)
+        });
+      }
+
+      const rejectionReason = reason || notes || 'Declined by kitchen provider';
+
+      const updatedOrder = await Order.findOneAndUpdate(
+        {
+          _id: existing._id,
+          providerId
+        },
+        {
+          $set: {
+            status: 'Cancelled',
+            cancelledBy: 'Provider',
+            cancellationReason: rejectionReason,
+            cancelledAt: new Date()
+          }
+        },
+        { new: true }
+      );
+
+      if (!updatedOrder) {
+        return res.status(409).json({
+          success: false,
+          message: 'Order is no longer available for rejection.'
+        });
+      }
+
+      // Audit Log & Socket Notification
+      try {
+        const AuditLog = require('../models/AuditLog');
+        await AuditLog.create({
+          action: 'ORDER_REJECTED',
+          entityType: 'Order',
+          entityId: String(updatedOrder._id),
+          performedBy: req.user?.name || 'Provider',
+          details: `Order ${updatedOrder.orderId} declined by provider. Reason: ${rejectionReason}`
+        });
+      } catch (aErr) {}
+
+      try {
+        const { emitToProvider, getIO } = require('../services/socketService');
+        emitToProvider(providerId, 'order:status:updated', { orderId: updatedOrder.orderId, status: 'Cancelled' });
+        const io = getIO();
+        if (io) io.emit('order:status:updated', { orderId: updatedOrder.orderId, status: 'Cancelled', providerId });
+      } catch (sErr) {}
+
+      return res.json({
+        success: true,
+        message: `Order ${updatedOrder.orderId} declined. Reason logged.`,
+        data: enrichOrderFinancials(updatedOrder)
+      });
+    }
+
+    return res.json({ success: true, message: 'Order declined' });
+  } catch (error) {
+    console.error('Error rejecting order:', error);
+    res.status(500).json({ success: false, message: 'Failed to decline order: ' + error.message });
+  }
+};
+
 module.exports = {
   getOrders,
+  getOrderById,
   createOrder,
   updateOrder,
+  acceptOrder,
+  rejectOrder,
   acceptDelivery,
   updateDeliveryStatus,
   deleteOrder

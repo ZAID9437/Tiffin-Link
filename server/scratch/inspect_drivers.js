@@ -1,29 +1,28 @@
 const mongoose = require('mongoose');
-const db = require('../src/config/db');
-const Driver = require('../src/models/Driver');
-const User = require('../src/models/User');
+require('dotenv').config();
 
-async function run() {
-  await db.ensureConnected();
-  
-  console.log('=== DRIVERS COLLECTION ===');
-  const drivers = await Driver.find({});
-  console.log(`Total Drivers in MongoDB: ${drivers.length}`);
-  drivers.forEach((d, idx) => {
-    console.log(`[${idx+1}] ID: ${d._id} | DriverId: ${d.driverId} | Name: ${d.name} | Phone: ${d.phone} | Vehicle: ${d.vehicleNo} | Status: ${d.status}`);
-  });
+async function inspect() {
+  const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/tiffinlink';
+  await mongoose.connect(uri);
+  const db = mongoose.connection.db;
 
-  console.log('\n=== USERS COLLECTION ===');
-  const users = await User.find({});
-  console.log(`Total Users in MongoDB: ${users.length}`);
-  users.forEach((u, idx) => {
-    console.log(`[${idx+1}] ID: ${u._id} | Name: ${u.name} | Email: ${u.email} | Role: ${u.role}`);
-  });
+  const drivers = await db.collection('drivers').find().toArray();
+  console.log('=== DRIVERS IN DB (' + drivers.length + ') ===');
+  drivers.forEach(d => console.log(d._id, d.name, d.phone, d.driverId, d.status));
 
-  process.exit(0);
+  const kyc = await db.collection('driverkycs').find().toArray();
+  console.log('=== DRIVER KYCS IN DB (' + kyc.length + ') ===');
+  kyc.forEach(k => console.log(k._id, k.name, k.id, k.status));
+
+  const tel = await db.collection('drivertelemetries').find().toArray();
+  console.log('=== DRIVER TELEMETRIES IN DB (' + tel.length + ') ===');
+  tel.forEach(t => console.log(t._id, t.name, t.id, t.status));
+
+  const users = await db.collection('users').find({ role: 'driver' }).toArray();
+  console.log('=== USERS WITH ROLE DRIVER (' + users.length + ') ===');
+  users.forEach(u => console.log(u._id, u.name, u.phone, u.role));
+
+  await mongoose.disconnect();
 }
 
-run().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+inspect();

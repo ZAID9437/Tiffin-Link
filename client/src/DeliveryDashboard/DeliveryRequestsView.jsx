@@ -219,20 +219,17 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
   }, []);
 
   // Fetch real delivery requests from MongoDB
-  const fetchRequests = async () => {
+  const fetchRequests = async (showLoading = false) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const driverId = currentUser?.id || currentUser?._id || 'TL-8041';
       const lat = userCoords?.lat || 23.0280;
       const lng = userCoords?.lng || 72.5670;
 
-      const res = await fetch(
-        `http://localhost:5000/api/delivery/driver-requests?driverId=${encodeURIComponent(driverId)}&lat=${lat}&lng=${lng}&filter=${activeFilter}`,
-        { headers: getAuthHeaders() }
-      );
-      const json = await res.json();
+      const res = await apiRequest(`/delivery/driver-requests?driverId=${encodeURIComponent(driverId)}&lat=${lat}&lng=${lng}&filter=${activeFilter}`);
+      const json = typeof res?.json === 'function' ? await res.json() : res;
 
-      if (json.success && json.data) {
+      if (json && json.success && json.data) {
         const rawList = json.data.requests || [];
         const fetchedList = rawList.filter(r => {
           if (r.status === 'Driver Assigned' || r.status === 'Picked Up' || r.status === 'Delivered' || r.status === 'Cancelled') {
@@ -257,7 +254,7 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
             isUrgent,
             surgeBonus,
             driverEarning,
-            secondsLeft: r.secondsLeft !== undefined ? r.secondsLeft : (60 + idx * 30)
+            secondsLeft: r.secondsLeft !== undefined ? r.secondsLeft : 5
           };
         });
 
@@ -272,7 +269,11 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
   };
 
   useEffect(() => {
-    fetchRequests();
+    fetchRequests(true);
+    const interval = setInterval(() => {
+      fetchRequests(false);
+    }, 3000);
+    return () => clearInterval(interval);
   }, [activeFilter, userCoords]);
 
   // Real-time Socket.IO subscriptions for broadcast & atomic winner assignment
@@ -313,6 +314,7 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
     };
 
     socket.on('delivery:request:new', handleNewRequest);
+    socket.on('delivery:driver:live_request', handleNewRequest);
     socket.on('delivery:request:accepted', handleAccepted);
     socket.on('delivery:request:unavailable', handleUnavailable);
     socket.on('delivery:request:expired', handleUnavailable);
@@ -320,6 +322,7 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
 
     return () => {
       socket.off('delivery:request:new', handleNewRequest);
+      socket.off('delivery:driver:live_request', handleNewRequest);
       socket.off('delivery:request:accepted', handleAccepted);
       socket.off('delivery:request:unavailable', handleUnavailable);
       socket.off('delivery:request:expired', handleUnavailable);

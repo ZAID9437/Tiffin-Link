@@ -295,14 +295,28 @@ const getMe = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    const freshUser = await User.findById(req.user._id || req.user.id);
+    const freshUser = await User.findById(req.user._id || req.user.id).select('-password');
     if (!freshUser) {
       return res.status(404).json({ success: false, message: 'User record not found' });
     }
 
+    const userPayload = formatUserPayload(freshUser);
+    if (freshUser.role === 'provider' && req.providerId) {
+      userPayload.providerId = req.providerId;
+      if (req.provider) {
+        userPayload.providerName = req.provider.name || req.provider.businessName;
+      }
+    }
+    if ((freshUser.role === 'delivery' || freshUser.role === 'driver') && req.driverId) {
+      userPayload.driverId = req.driverId;
+      if (req.driver) {
+        userPayload.driverName = req.driver.name;
+      }
+    }
+
     return res.json({
       success: true,
-      user: formatUserPayload(freshUser),
+      user: userPayload,
       source: 'database'
     });
   } catch (error) {

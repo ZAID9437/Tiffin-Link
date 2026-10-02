@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 /**
  * DriverSidebar Component
@@ -26,6 +26,20 @@ export default function DriverSidebar({
     safety: true,
     settings: true
   });
+
+  useEffect(() => {
+    if (['active-delivery', 'upcoming', 'completed'].includes(activeTab)) {
+      setExpandedGroups(prev => ({ ...prev, myDeliveries: true }));
+    } else if (['earnings-overview', 'transactions', 'incentives-bonuses', 'wallet-withdrawals', 'bank-payout'].includes(activeTab)) {
+      setExpandedGroups(prev => ({ ...prev, profile: true }));
+    } else if (['duty-status', 'working-schedule', 'delivery-preferences'].includes(activeTab)) {
+      setExpandedGroups(prev => ({ ...prev, availability: true }));
+    } else if (['safety-emergency', 'safety-guidelines', 'report-issue'].includes(activeTab)) {
+      setExpandedGroups(prev => ({ ...prev, safety: true }));
+    } else if (['account-settings', 'notification-preferences', 'privacy-security', 'app-preferences'].includes(activeTab)) {
+      setExpandedGroups(prev => ({ ...prev, settings: true }));
+    }
+  }, [activeTab]);
 
   const toggleGroup = (groupKey) => {
     setExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));

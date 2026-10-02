@@ -129,9 +129,9 @@ const reconcileMissingDeliveryRequests = async () => {
   try {
     if (!(await isDbConnected())) return;
 
-    // Find orders that are ready/preparing/new for delivery but do not have an assigned driver yet
+    // Find orders that are ready/preparing/new/delivery but need reconciliation
     const unassignedOrders = await Order.find({
-      status: { $in: ['New', 'Preparing', 'Ready'] },
+      status: { $in: ['New', 'Preparing', 'Ready', 'Delivery', 'Out for Delivery'] },
       $or: [
         { deliveryStatus: { $in: ['Searching', 'Unassigned', 'Pending', null, ''] } },
         { deliveryPartnerName: { $in: [null, ''] } },
@@ -152,8 +152,8 @@ const reconcileMissingDeliveryRequests = async () => {
         ]
       });
 
-      let providerName = 'Shreeji Tiffin Kitchen';
-      let providerEmail = 'menxoxo50@gmail.com';
+      let providerName = 'Artisanal Home Kitchen';
+      let providerEmail = 'kitchen@tiffinlink.com';
       if (ord.providerId && isValidObjectId(ord.providerId)) {
         const prov = await Provider.findById(ord.providerId);
         if (prov) {
@@ -162,11 +162,17 @@ const reconcileMissingDeliveryRequests = async () => {
         }
       }
 
+      const hasAssignedDriverOnOrd = Boolean(
+        ord.deliveryPartnerName &&
+        ord.deliveryPartnerName !== 'Unassigned' &&
+        !ord.deliveryPartnerName.toLowerCase().includes('searching')
+      );
+
       if (!existingReq) {
         const newReq = await DeliveryRequest.create({
           requestId: `#DEL-${Math.floor(1000 + Math.random() * 9000)}`,
           orderId: ord.orderId || hashedOrdId,
-          providerId: String(ord.providerId || '6a7f3051d4b48741d8722416'),
+          providerId: String(ord.providerId || ''),
           providerEmail,
           providerName,
           customerName: ord.customerName || 'Customer',
@@ -180,20 +186,20 @@ const reconcileMissingDeliveryRequests = async () => {
             lng: 72.5714
           },
           pickupAddress: {
-            street: 'Shreeji Tiffin Kitchen, Satellite',
+            street: `${providerName}, Satellite`,
             city: 'Ahmedabad',
             lat: 23.0300,
             lng: 72.5650
           },
           assignedDriver: {
             driverId: '',
-            name: '',
-            phone: '',
+            name: hasAssignedDriverOnOrd ? (ord.deliveryPartnerName || ord.driverName) : '',
+            phone: hasAssignedDriverOnOrd ? (ord.deliveryPartnerPhone || ord.driverPhone) : '',
             rating: 4.8,
             vehicleNo: '',
             location: { lat: 23.0280, lng: 72.5670 }
           },
-          status: 'Searching Drivers',
+          status: hasAssignedDriverOnOrd ? 'Driver Assigned' : 'Searching Drivers',
           distanceKm: ord.deliveryKm || 2.4,
           etaMinutes: Math.round((ord.deliveryKm || 2.4) * 4 + 5),
           amount: ord.totalAmount || 220,
@@ -202,21 +208,88 @@ const reconcileMissingDeliveryRequests = async () => {
           requestedAt: ord.createdAt ? new Date(ord.createdAt) : new Date()
         });
 
-        // Emit Socket.IO live notification to all online drivers
-        try {
-          const { getIO } = require('../services/socketService');
-          const io = getIO();
-          if (io) {
-            io.emit('delivery:request:new', { request: newReq });
+        // Emit Socket.IO live notification to all online drivers if searching
+        if (!hasAssignedDriverOnOrd) {
+          try {
+            const { getIO } = require('../services/socketService');
+            const io = getIO();
+            if (io) {
+              io.emit('delivery:request:new', { request: newReq });
+              io.emit('delivery:driver:live_request', { request: newReq });
+            }
+          } catch (sErr) {
+            console.warn('Socket broadcast warning in reconciliation:', sErr.message);
           }
-        } catch (sErr) {
-          console.warn('Socket broadcast warning in reconciliation:', sErr.message);
         }
 
         await Order.updateOne(
           { _id: ord._id },
-          { $set: { deliveryStatus: 'Searching' } }
+          { $set: { deliveryStatus: hasAssignedDriverOnOrd ? 'Assigned' : 'Searching' } }
         );
+      } else {
+        // Sync Order with existing DeliveryRequest status & assigned driver
+        if (hasAssignedDriverOnOrd && (!existingReq.assignedDriver?.name || existingReq.status === 'Searching Drivers')) {
+          const assignedName = ord.deliveryPartnerName || ord.driverName;
+          const assignedPhone = ord.deliveryPartnerPhone || ord.driverPhone || '+91 9558601570';
+          await DeliveryRequest.updateOne(
+            { _id: existingReq._id },
+            {
+              $set: {
+                status: 'Driver Assigned',
+                'assignedDriver.name': assignedName,
+                'assignedDriver.phone': assignedPhone,
+                acceptedAt: new Date()
+              }
+            }
+          );
+          existingReq.status = 'Driver Assigned';
+          if (!existingReq.assignedDriver) existingReq.assignedDriver = {};
+          existingReq.assignedDriver.name = assignedName;
+          existingReq.assignedDriver.phone = assignedPhone;
+        }
+
+        const reqStatus = existingReq.status;
+        const driverName = existingReq.assignedDriver?.name || ord.deliveryPartnerName || '';
+        const driverPhone = existingReq.assignedDriver?.phone || ord.deliveryPartnerPhone || '';
+
+        const isDelivered = reqStatus === 'Delivered' || reqStatus === 'DELIVERED' || reqStatus === 'Completed' || reqStatus === 'COMPLETED';
+
+        const ordStatusMap = {
+          'Driver Assigned': 'Delivery',
+          'Arrived at Provider': 'Delivery',
+          'ARRIVED_PROVIDER': 'Delivery',
+          'Picked Up': 'Delivery',
+          'PICKED_UP': 'Delivery',
+          'Out for Delivery': 'Delivery',
+          'OUT_FOR_DELIVERY': 'Delivery',
+          'Delivered': 'Completed',
+          'DELIVERED': 'Completed',
+          'Completed': 'Completed',
+          'COMPLETED': 'Completed'
+        };
+
+        const syncStatus = ordStatusMap[reqStatus] || (isDelivered ? 'Completed' : ord.status);
+        const syncDelStatus = isDelivered ? 'Delivered' : (driverName ? 'Assigned' : 'Searching');
+
+        const updateFields = {
+          status: syncStatus,
+          deliveryStatus: syncDelStatus
+        };
+
+        if (driverName) {
+          updateFields.deliveryPartnerName = driverName;
+          updateFields.driverName = driverName;
+        }
+        if (driverPhone) {
+          updateFields.deliveryPartnerPhone = driverPhone;
+          updateFields.driverPhone = driverPhone;
+        }
+        if (isDelivered) {
+          updateFields.deliveredAt = existingReq.deliveredAt || new Date();
+          updateFields.completedAt = existingReq.deliveredAt || new Date();
+        }
+
+        await Order.updateOne({ _id: ord._id }, { $set: updateFields });
       }
     }
   } catch (err) {
@@ -304,59 +377,89 @@ const findBestNearbyDriverFromDb = async () => {
 
 // @desc    Create new delivery dispatch request with Dynamic Driver Matching
 // @route   POST /api/delivery/dispatch
+// @desc    Create new delivery dispatch request with Dynamic Driver Broadcast
+// @route   POST /api/delivery/dispatch
 const createDeliveryRequest = async (req, res) => {
   try {
     const providerId = req.providerId;
     const { orderId, customerName, customerPhone, deliveryAddress, amount, itemCount, tiffinName } = req.body;
-    const providerEmail = req.provider?.email || req.body.email || '';
-    const providerName = req.provider?.name || req.provider?.businessName || '';
+    const providerEmail = req.provider?.email || req.user?.email || req.body.email || '';
+    const providerName = req.provider?.businessName || req.provider?.name || 'Kitchen Provider';
     const requestId = `#DEL-${Math.floor(1000 + Math.random() * 9000)}`;
     const pickupOtp = String(Math.floor(1000 + Math.random() * 9000));
 
-    const selectedDriver = await findBestNearbyDriverFromDb();
-
     const newRequestData = {
       requestId,
-      providerId,
+      providerId: String(providerId || ''),
       orderId: orderId || `ORD-${Math.floor(1000 + Math.random() * 9000)}`,
       providerEmail,
       providerName,
-      customerName: customerName || 'Raj Patel',
+      customerName: customerName || 'Customer',
       customerPhone: customerPhone || '+91 98765 12345',
       tiffinName: tiffinName || 'Gujarati Special Thali × 1',
       deliveryAddress: typeof deliveryAddress === 'object' ? deliveryAddress : { street: deliveryAddress || 'Ahmedabad', city: 'Ahmedabad', lat: 23.0225, lng: 72.5714 },
-      pickupAddress: { street: 'Shreeji Tiffin Kitchen, Satellite', city: 'Ahmedabad', lat: 23.0300, lng: 72.5650 },
+      pickupAddress: { street: `${providerName}, Satellite`, city: 'Ahmedabad', lat: 23.0300, lng: 72.5650 },
       assignedDriver: {
-        driverId: selectedDriver.driverId,
-        name: selectedDriver.name,
-        phone: selectedDriver.phone,
-        rating: selectedDriver.rating,
-        vehicleNo: selectedDriver.vehicleNo,
-        location: selectedDriver.location || { lat: 23.0280, lng: 72.5670 }
+        driverId: '',
+        name: '',
+        phone: '',
+        rating: 4.8,
+        vehicleNo: ''
       },
-      status: 'Driver Assigned',
-      distanceKm: selectedDriver.distanceKm || 1.2,
-      etaMinutes: Math.round((selectedDriver.distanceKm || 1.2) * 5 + 6),
+      status: 'Searching Drivers',
+      distanceKm: 2.4,
+      etaMinutes: 15,
       amount: amount || 240,
       itemCount: itemCount || 1,
       pickupOtp,
-      requestedAt: new Date(),
-      acceptedAt: new Date()
+      requestedAt: new Date()
     };
 
     if (await isDbConnected()) {
-      const request = await DeliveryRequest.create(newRequestData);
-      
-      if (orderId) {
-        await Order.findOneAndUpdate(
-          { $or: [{ orderId }, { _id: orderId }], providerId },
-          { $set: { status: 'Ready', deliveryStatus: 'Assigned', deliveryPartnerName: selectedDriver.name, deliveryPartnerPhone: selectedDriver.phone } }
+      let request = await DeliveryRequest.findOne({
+        $or: [
+          { orderId },
+          { orderId: `#${String(orderId).replace(/^#+/, '')}` },
+          { requestId: orderId }
+        ]
+      });
+
+      if (!request) {
+        request = await DeliveryRequest.create(newRequestData);
+      } else {
+        await DeliveryRequest.updateOne(
+          { _id: request._id },
+          { $set: { status: 'Searching Drivers', 'assignedDriver.name': '', 'assignedDriver.driverId': '' } }
         );
+        request.status = 'Searching Drivers';
+        request.assignedDriver = { driverId: '', name: '', phone: '', rating: 4.8, vehicleNo: '' };
+      }
+
+      if (orderId) {
+        const ordFilter = isValidObjectId(orderId) ? { $or: [{ orderId }, { _id: orderId }] } : { orderId };
+        if (providerId) ordFilter.providerId = providerId;
+        await Order.findOneAndUpdate(
+          ordFilter,
+          { $set: { status: 'Ready', deliveryStatus: 'Searching', deliveryPartnerName: '' } }
+        );
+      }
+
+      // Emit Socket.IO live notifications to online drivers
+      try {
+        const { getIO } = require('../services/socketService');
+        const io = getIO();
+        if (io) {
+          io.emit('delivery:request:new', { request });
+          io.emit('delivery:new-request', { request });
+          io.emit('delivery:driver:live_request', { request });
+        }
+      } catch (sErr) {
+        console.warn('Socket broadcast error in createDeliveryRequest:', sErr.message);
       }
 
       return res.status(201).json({
         success: true,
-        message: `Delivery dispatched! Driver ${selectedDriver.name} (${selectedDriver.vehicleNo}) assigned.`,
+        message: `Delivery dispatch initiated! Request broadcast to nearby delivery partners.`,
         request
       });
     }
@@ -805,12 +908,36 @@ const updateDeliveryStatus = async (req, res) => {
             'Picked Up': 'Out for Delivery',
             'ARRIVED_CUSTOMER': 'Arrived at Customer',
             'DELIVERED': 'Completed',
-            'Delivered': 'Completed'
+            'Delivered': 'Completed',
+            'COMPLETED': 'Completed',
+            'Completed': 'Completed'
           };
           const nextOrdStatus = ordStatusMap[status] || status;
+          const isDel = (status === 'Delivered' || status === 'DELIVERED' || status === 'Completed' || status === 'COMPLETED');
+          const finalDelStatus = isDel ? 'Delivered' : status;
+
+          const setPayload = {
+            status: nextOrdStatus,
+            deliveryStatus: finalDelStatus
+          };
+
+          if (isDel) {
+            setPayload.deliveredAt = new Date();
+            setPayload.completedAt = new Date();
+          }
+
+          if (request.assignedDriver && request.assignedDriver.name) {
+            setPayload.deliveryPartnerName = request.assignedDriver.name;
+            setPayload.driverName = request.assignedDriver.name;
+          }
+          if (request.assignedDriver && request.assignedDriver.phone) {
+            setPayload.deliveryPartnerPhone = request.assignedDriver.phone;
+            setPayload.driverPhone = request.assignedDriver.phone;
+          }
+
           await Order.updateMany(
             ordQuery,
-            { $set: { status: nextOrdStatus, deliveryStatus: status } }
+            { $set: setPayload }
           );
         }
 
@@ -1137,7 +1264,9 @@ const getDriverDashboardData = async (req, res) => {
         ...(driverInfo.driverId ? [{ 'assignedDriver.driverId': String(driverInfo.driverId) }] : []),
         ...(driverRecord?._id ? [{ 'assignedDriver.driverId': String(driverRecord._id) }] : []),
         ...(driverEmail ? [{ 'assignedDriver.email': driverEmail }] : []),
-        ...(driverPhone ? [{ 'assignedDriver.phone': driverPhone }] : [])
+        ...(driverPhone ? [{ 'assignedDriver.phone': driverPhone }, { 'assignedDriver.phone': `+91 ${driverPhone.replace(/\D/g, '')}` }, { 'assignedDriver.phone': driverPhone.replace(/\D/g, '') }] : []),
+        ...(driverInfo.name ? [{ 'assignedDriver.name': driverInfo.name }] : []),
+        ...(driverRecord?.name ? [{ 'assignedDriver.name': driverRecord.name }] : [])
       ];
 
       let activeReq = null;
@@ -1148,10 +1277,46 @@ const getDriverDashboardData = async (req, res) => {
         }).sort({ requestedAt: -1 });
       }
 
+      // Fallback matching directly via Order if DeliveryRequest is unlinked
+      if (!activeReq && (driverInfo.name || driverPhone)) {
+        const ordMatch = await Order.findOne({
+          status: { $in: ['Ready', 'Delivery', 'Out for Delivery', 'Dispatched', 'In Transit'] },
+          $or: [
+            ...(driverInfo.name ? [{ deliveryPartnerName: driverInfo.name }, { driverName: driverInfo.name }] : []),
+            ...(driverRecord?.name ? [{ deliveryPartnerName: driverRecord.name }, { driverName: driverRecord.name }] : []),
+            ...(driverPhone ? [{ deliveryPartnerPhone: driverPhone }, { driverPhone: driverPhone }] : [])
+          ]
+        }).sort({ createdAt: -1 });
+
+        if (ordMatch) {
+          activeReq = await DeliveryRequest.findOne(buildIdQuery(ordMatch.orderId));
+          if (!activeReq) {
+            activeReq = await DeliveryRequest.create({
+              requestId: `#DEL-${Math.floor(1000 + Math.random() * 9000)}`,
+              orderId: ordMatch.orderId,
+              providerName: 'Xoxo Men Kitchen',
+              customerName: ordMatch.customerName || 'Zaid Mansuri',
+              customerPhone: ordMatch.customerPhone || '9558601570',
+              deliveryAddress: { street: ordMatch.customerAddress || 'A-402, Titanium City Center, Anand Nagar, Ahmedabad' },
+              pickupAddress: { street: 'Shreeji Tiffin Kitchen, Satellite' },
+              assignedDriver: {
+                driverId: driverInfo.driverId || String(driverRecord?._id || ''),
+                name: driverInfo.name,
+                phone: driverPhone || '+91 9558601570'
+              },
+              status: 'Driver Assigned',
+              amount: ordMatch.totalAmount || 192,
+              itemCount: ordMatch.quantity || 1,
+              tiffinName: ordMatch.tiffinName || 'Gujarati Special Kathiyawadi Thali'
+            });
+          }
+        }
+      }
+
       if (activeReq) {
         const obj = activeReq.toObject ? activeReq.toObject() : { ...activeReq };
-        const totalTiffinAmount = obj.amount || 220;
-        const calculatedDriverEarning = Math.round(35 + (obj.distanceKm || 2.4) * 18);
+        const totalTiffinAmount = obj.amount || obj.totalAmount || 192;
+        const calculatedDriverEarning = obj.driverEarning || obj.deliveryFee || 51;
         obj.tiffinPayment = totalTiffinAmount;
         obj.driverEarning = calculatedDriverEarning;
         obj.payout = calculatedDriverEarning;
@@ -1172,7 +1337,7 @@ const getDriverDashboardData = async (req, res) => {
       });
 
       completedToday = completedReqs.length;
-      totalEarningsToday = completedReqs.reduce((sum, r) => sum + (r.amount || 150), 0);
+      totalEarningsToday = completedReqs.reduce((sum, r) => sum + (r.driverEarning || r.deliveryFee || 51), 0);
 
       recentDeliveries = await DeliveryRequest.find({
         $or: [
@@ -1618,12 +1783,14 @@ const getEligibleRequestsForDriver = async (req, res) => {
     let requests = [];
 
     if (await isDbConnected()) {
+      reconcileMissingDeliveryRequests().catch(rErr => console.warn('Background reconciliation warning:', rErr.message));
+
       const queryFilter = {
-        status: { $in: ['Searching Drivers', 'Pending'] }
+        status: { $in: ['Searching Drivers', 'Searching', 'Pending', 'SEARCHING_DRIVERS', 'SEARCHING'] }
       };
 
       if (driverId) {
-        queryFilter['candidateDrivers.driverId'] = { $ne: driverId };
+        queryFilter.declinedDrivers = { $ne: String(driverId) };
       }
 
       let rawRequests = await DeliveryRequest.find(queryFilter)
@@ -1816,10 +1983,24 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
 
       // Socket.IO Broadcast: Notify all connected clients that this request is accepted and unavailable for others
       try {
-        const { getIO } = require('../services/socketService');
+        const { getIO, emitToProvider } = require('../services/socketService');
         const io = getIO();
         if (io) {
           const targetId = acceptedReq.requestId || acceptedReq.orderId || String(acceptedReq._id);
+          if (acceptedReq.providerId) {
+            emitToProvider(acceptedReq.providerId, 'delivery:assigned', {
+              orderId: acceptedReq.orderId,
+              driverId,
+              driverName,
+              driverPhone,
+              deliveryStatus: 'Assigned'
+            });
+            emitToProvider(acceptedReq.providerId, 'order:updated', {
+              orderId: acceptedReq.orderId,
+              deliveryStatus: 'Assigned',
+              deliveryPartnerName: driverName
+            });
+          }
           io.emit('delivery:request:accepted', {
             requestId: targetId,
             orderId: acceptedReq.orderId,
@@ -1830,6 +2011,11 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
             requestId: targetId,
             orderId: acceptedReq.orderId,
             reason: 'accepted_by_another'
+          });
+          io.emit('order:status:updated', {
+            orderId: acceptedReq.orderId,
+            deliveryStatus: 'Assigned',
+            deliveryPartnerName: driverName
           });
         }
       } catch (sErr) {
@@ -1904,8 +2090,8 @@ const getActiveDelivery = async (req, res) => {
 
       if (activeReq) {
         const obj = activeReq.toObject ? activeReq.toObject() : { ...activeReq };
-        const totalTiffinAmount = obj.amount || 220;
-        const calculatedDriverEarning = Math.round(35 + (obj.distanceKm || 2.4) * 18);
+        const totalTiffinAmount = obj.amount || obj.totalAmount || 192;
+        const calculatedDriverEarning = obj.driverEarning || obj.deliveryFee || 51;
         obj.tiffinPayment = totalTiffinAmount;
         obj.driverEarning = calculatedDriverEarning;
         return res.json({ success: true, activeDelivery: obj });
@@ -2180,7 +2366,7 @@ const getUpcomingDeliveries = async (req, res) => {
         status: activeDelivery.status,
         tiffinName: activeDelivery.tiffinName,
         amount: activeDelivery.amount,
-        driverEarning: activeDelivery.driverEarning || Math.round(35 + (activeDelivery.distanceKm || 2.4) * 18)
+        driverEarning: activeDelivery.driverEarning || activeDelivery.deliveryFee || 51
       } : null,
       counts: {
         all: countAll,
@@ -2344,7 +2530,7 @@ const getCompletedDeliveries = async (req, res) => {
     completedRequests.forEach(reqDoc => {
       const key = String(reqDoc.orderId || reqDoc.requestId || reqDoc._id);
       const totalTiffinAmount = reqDoc.amount || 224;
-      const driverEarning = reqDoc.driverEarning || reqDoc.payout || Math.round(35 + (reqDoc.distanceKm || 2.4) * 18);
+      const driverEarning = reqDoc.driverEarning || reqDoc.deliveryFee || reqDoc.payout || 51;
       const completionTime = reqDoc.deliveredAt || reqDoc.completedAt || reqDoc.updatedAt || reqDoc.requestedAt;
 
       recordMap.set(key, {
@@ -2390,7 +2576,7 @@ const getCompletedDeliveries = async (req, res) => {
       const key = String(ordDoc.orderId || ordDoc._id);
       if (!recordMap.has(key)) {
         const totalTiffinAmount = ordDoc.totalAmount || ordDoc.subtotal || 224;
-        const driverEarning = ordDoc.driverEarning || ordDoc.payout || Math.round(35 + (ordDoc.deliveryKm || 2.4) * 18);
+        const driverEarning = ordDoc.driverEarning || ordDoc.deliveryFee || ordDoc.payout || 51;
         const completionTime = ordDoc.deliveredAt || ordDoc.updatedAt || ordDoc.createdAt;
 
         recordMap.set(key, {
@@ -3690,7 +3876,7 @@ const getDriverEarningsOverview = async (req, res) => {
       const key = String(reqDoc.orderId || reqDoc.requestId || reqDoc._id);
       const isDelivered = deliveredStatuses.includes(reqDoc.status);
       const distance = reqDoc.distanceKm || 2.4;
-      const driverEarning = isDelivered ? (reqDoc.driverEarning || reqDoc.payout || Math.round(35 + distance * 18)) : 0;
+      const driverEarning = isDelivered ? (reqDoc.driverEarning || reqDoc.deliveryFee || reqDoc.payout || 51) : 0;
       const completionTime = new Date(reqDoc.deliveredAt || reqDoc.completedAt || reqDoc.requestedAt || reqDoc.createdAt || Date.now());
 
       recordMap.set(key, {
@@ -3713,7 +3899,7 @@ const getDriverEarningsOverview = async (req, res) => {
         const ordStatus = ordDoc.status || ordDoc.deliveryStatus;
         const isDelivered = deliveredStatuses.includes(ordStatus);
         const distance = ordDoc.deliveryKm || 2.4;
-        const driverEarning = isDelivered ? (ordDoc.driverEarning || ordDoc.payout || Math.round(35 + distance * 18)) : 0;
+        const driverEarning = isDelivered ? (ordDoc.driverEarning || ordDoc.deliveryFee || ordDoc.payout || 51) : 0;
         const completionTime = new Date(ordDoc.deliveredAt || ordDoc.completedAt || ordDoc.createdAt || Date.now());
 
         recordMap.set(key, {

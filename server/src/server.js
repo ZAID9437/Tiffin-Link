@@ -2,7 +2,6 @@ const http = require('http');
 const app = require('./app');
 const connectDB = require('./config/db');
 const { initSocket } = require('./services/socketService');
-
 // Connect to MongoDB
 connectDB();
 
