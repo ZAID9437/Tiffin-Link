@@ -30,6 +30,8 @@ import DeliveryDashboard from './DeliveryDashboard/DeliveryDashboard';
 // Super Admin Operating System Component
 import AdminDashboard from './AdminDashboard/AdminDashboard';
 import NearbyTiffinServices from './CustomerExperience/NearbyTiffinServices';
+import MyOrdersView from './CustomerExperience/MyOrdersView';
+import UserProfileModal from './components/UserProfileModal';
 
 // Shared Animations & Modals
 import Preloader from './components/Preloader';
@@ -72,6 +74,8 @@ export default function App() {
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const [isCookieConsentModalOpen, setIsCookieConsentModalOpen] = useState(false);
   const [isCustomerTrackingModalOpen, setIsCustomerTrackingModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalTab, setProfileModalTab] = useState('profile');
   const [hasActiveOrder, setHasActiveOrder] = useState(false);
   const [activeCustomerOrderId, setActiveCustomerOrderId] = useState('');
   const [preloaderFinished, setPreloaderFinished] = useState(true);
@@ -84,6 +88,7 @@ export default function App() {
     if (hash.startsWith('#/admin') || hash.startsWith('#admin') || currentUser?.role === 'admin') return 'admin';
     if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || currentUser?.role === 'delivery' || currentUser?.role === 'driver') return 'delivery';
     if (hash.startsWith('#/provider') || hash.startsWith('#provider') || currentUser?.role === 'provider') return 'provider';
+    if (hash.startsWith('#orders') || hash.startsWith('#my-orders')) return 'orders';
     if (hash.startsWith('#find-tiffin') || hash.startsWith('#order-tiffin')) return 'find-tiffin';
     return 'home';
   });
@@ -96,6 +101,7 @@ export default function App() {
       if (hash.startsWith('#/admin') || hash.startsWith('#admin') || activeRole === 'admin') currentView = 'admin';
       else if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || activeRole === 'delivery' || activeRole === 'driver') currentView = 'delivery';
       else if (hash.startsWith('#/provider') || hash.startsWith('#provider') || activeRole === 'provider') currentView = 'provider';
+      else if (hash.startsWith('#orders') || hash.startsWith('#my-orders')) currentView = 'orders';
       else if (hash.startsWith('#find-tiffin') || hash.startsWith('#order-tiffin')) currentView = 'find-tiffin';
       setView(currentView);
     };
@@ -501,6 +507,10 @@ export default function App() {
         onOpenBecomeDeliveryPartnerModal={() => setIsBecomeDeliveryPartnerModalOpen(true)}
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onOpenTrackingModal={() => setIsCustomerTrackingModalOpen(true)}
+        onOpenProfileModal={(tab) => {
+          setProfileModalTab(tab || 'profile');
+          setIsProfileModalOpen(true);
+        }}
         hasActiveOrder={hasActiveOrder}
         currentView={view}
         currentUser={currentUser}
@@ -519,9 +529,18 @@ export default function App() {
             onOpenBecomeDeliveryPartnerModal={() => setIsBecomeDeliveryPartnerModalOpen(true)}
             onOpenDemoModal={() => setIsDemoModalOpen(true)}
           />
+        ) : view === 'orders' ? (
+          <MyOrdersView 
+            currentUser={currentUser} 
+            onNavigate={(hash) => { setView(hash.replace(/^#/, '')); window.location.hash = hash; }} 
+            onOpenTracking={(orderId) => {
+              setActiveCustomerOrderId(orderId);
+              setIsCustomerTrackingModalOpen(true);
+            }}
+          />
         ) : view === 'find-tiffin' ? (
           <NearbyTiffinServices 
-            onNavigate={(hash) => { window.location.hash = hash; }} 
+            onNavigate={(hash) => { setView(hash.replace(/^#/, '')); window.location.hash = hash; }} 
             initialFilters={searchFilters} 
           />
         ) : (
@@ -612,6 +631,15 @@ export default function App() {
         isOpen={isCustomerTrackingModalOpen}
         onClose={() => setIsCustomerTrackingModalOpen(false)}
         initialOrderId={activeCustomerOrderId}
+      />
+
+      <UserProfileModal 
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        initialTab={profileModalTab}
+        currentUser={currentUser}
+        onUpdateUser={updateUser}
+        onLogout={handleLogout}
       />
 
       {/* Toast Alerts */}
