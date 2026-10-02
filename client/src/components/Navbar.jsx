@@ -119,26 +119,44 @@ export default function Navbar({
     setIsMobileMenuOpen(false);
   }, [currentView]);
 
+  const isLightPage = currentView !== 'home' && currentView !== 'provider' && currentView !== 'delivery';
+  const isHashLight = typeof window !== 'undefined' && (
+    window.location.hash.includes('find-tiffin') || 
+    window.location.hash.includes('order-tiffin') || 
+    window.location.hash.includes('orders')
+  );
+  const showSolidNav = isScrolled || forceSolid || isMobileMenuOpen || isLightPage || isHashLight;
+
   return (
     <>
       <nav 
-        className={`fixed top-0 w-full z-50 px-4 sm:px-6 md:px-margin-desktop py-4 md:py-6 flex justify-between items-center transition-all duration-500 ${
+        className={`fixed top-0 w-full z-50 px-4 sm:px-6 md:px-margin-desktop py-4 md:py-5 flex justify-between items-center transition-all duration-500 ${
           isVisible ? 'translate-y-0' : '-translate-y-full'
         } ${
-          isScrolled || forceSolid || isMobileMenuOpen
-            ? 'bg-bone-white/95 backdrop-blur-md text-onyx-black shadow-sm border-b border-sand-neutral/20' 
+          showSolidNav
+            ? 'bg-[#fbf9f5]/95 backdrop-blur-md text-[#1a1a1a] shadow-sm border-b border-[#ded9d1]' 
             : 'bg-transparent text-bone-white'
         }`}
       >
-        <a className="font-headline-md text-2xl md:text-headline-md tracking-tighter" href="#" onClick={isFormOpen ? onCloseForm : () => setIsMobileMenuOpen(false)}>TiffinLink</a>
+        <a 
+          className={`font-headline-md text-2xl md:text-headline-md tracking-tighter ${
+            showSolidNav ? 'text-[#1a1a1a]' : 'text-bone-white'
+          }`} 
+          href="#" 
+          onClick={isFormOpen ? onCloseForm : () => setIsMobileMenuOpen(false)}
+        >
+          TiffinLink
+        </a>
         <div className="hidden md:flex space-x-12">
           {navLinks.map((link) => {
             const isActive = (currentView === link.id) || (link.id === 'home' && currentView === 'home') || (window.location.hash === link.href);
             return (
               <a 
                 key={link.label}
-                className={`font-label-caps text-label-caps relative ${
-                  isActive && !isFormOpen ? 'border-b border-current pb-1 font-bold pointer-events-none' : 'nav-underline'
+                className={`font-label-caps text-label-caps relative transition-colors ${
+                  showSolidNav 
+                    ? (isActive ? 'text-[#1a1a1a] font-bold border-b-2 border-[#a0522d] pb-1' : 'text-[#4a4238] hover:text-[#1a1a1a]') 
+                    : (isActive ? 'text-white font-bold border-b-2 border-white pb-1' : 'text-bone-white/80 hover:text-white')
                 }`} 
                 href={link.href}
                 onClick={isFormOpen ? onCloseForm : undefined}
@@ -154,7 +172,7 @@ export default function Navbar({
             <button 
               onClick={onOpenTrackingModal}
               className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black transition-all cursor-pointer shadow-xs active:scale-95 ${
-                isScrolled || forceSolid 
+                showSolidNav 
                   ? 'bg-[#0A8B5F] text-white hover:bg-[#08734e]' 
                   : 'bg-[#0A8B5F] hover:bg-[#08734e] text-white border border-emerald-400/40'
               }`}
@@ -168,8 +186,8 @@ export default function Navbar({
               <button 
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2 rounded-full border transition-all duration-300 ${
-                  isScrolled || forceSolid || isMobileMenuOpen
-                    ? 'border-onyx-black/30 bg-black/5 hover:bg-black/10 text-onyx-black' 
+                  showSolidNav
+                    ? 'border-[#1a1a1a]/30 bg-black/5 hover:bg-black/10 text-[#1a1a1a]' 
                     : 'border-white/30 bg-white/10 hover:bg-white/20 text-bone-white'
                 }`}
               >
@@ -177,10 +195,14 @@ export default function Navbar({
                   {userInitial}
                 </div>
                 <div className="text-left hidden sm:block">
-                  <p className="text-xs font-bold leading-none">{currentUser.name || currentUser.email.split('@')[0]}</p>
-                  <p className="text-[10px] opacity-75 leading-none mt-1 uppercase tracking-wider">{roleLabel}</p>
+                  <p className={`text-xs font-bold leading-none ${showSolidNav ? 'text-[#1a1a1a]' : 'text-bone-white'}`}>
+                    {currentUser.name || currentUser.email.split('@')[0]}
+                  </p>
+                  <p className={`text-[10px] leading-none mt-1 uppercase tracking-wider ${showSolidNav ? 'text-[#665d52]' : 'opacity-75'}`}>
+                    {roleLabel}
+                  </p>
                 </div>
-                <span className="text-xs opacity-60">▼</span>
+                <span className={`text-xs ${showSolidNav ? 'text-[#1a1a1a]/60' : 'opacity-60'}`}>▼</span>
               </button>
 
               {isUserMenuOpen && (
@@ -222,13 +244,17 @@ export default function Navbar({
             <div className="hidden md:flex items-center gap-6">
               <button 
                 onClick={isFormOpen ? onCloseForm : onOpenLogin}
-                className="font-label-caps text-label-caps relative nav-underline cursor-pointer"
+                className={`font-label-caps text-label-caps relative nav-underline cursor-pointer ${
+                  showSolidNav ? 'text-[#1a1a1a]' : 'text-bone-white'
+                }`}
               >
                 Log in
               </button>
               <button 
                 onClick={isFormOpen ? onCloseForm : onOpenLogin}
-                className="font-label-caps text-label-caps relative nav-underline cursor-pointer"
+                className={`font-label-caps text-label-caps relative nav-underline cursor-pointer ${
+                  showSolidNav ? 'text-[#1a1a1a]' : 'text-bone-white'
+                }`}
               >
                 Sign up
               </button>
@@ -237,7 +263,7 @@ export default function Navbar({
           <button 
             onClick={isFormOpen ? onCloseForm : (currentView === 'delivery' ? onOpenBecomeDeliveryPartnerModal : onOpenBecomeProviderModal)}
             className={`hidden sm:inline-block px-5 md:px-8 py-2.5 md:py-3 text-xs md:text-sm font-button-text transition-all duration-500 scale-100 active:scale-95 hover:tracking-widest magnetic ${
-              isScrolled || forceSolid || isMobileMenuOpen
+              showSolidNav
                 ? 'bg-onyx-black text-bone-white hover:bg-clay-earth' 
                 : 'bg-bone-white text-onyx-black hover:bg-clay-earth hover:text-bone-white'
             }`}
@@ -249,8 +275,8 @@ export default function Navbar({
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className={`md:hidden p-2 rounded-lg transition-colors cursor-pointer ${
-              isScrolled || forceSolid || isMobileMenuOpen 
-                ? 'text-onyx-black hover:bg-black/5' 
+              showSolidNav 
+                ? 'text-[#1a1a1a] hover:bg-black/5' 
                 : 'text-bone-white hover:bg-white/10'
             }`}
             aria-label="Toggle Navigation Menu"

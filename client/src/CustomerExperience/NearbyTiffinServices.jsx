@@ -242,7 +242,7 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
   };
 
   return (
-    <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a]">
+    <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a] pt-24 sm:pt-28">
       {/* Hyperlocal Context Header & Geospatial Status */}
       <section className="w-full bg-[#fbf9f5] py-8 sm:py-10 border-b border-[#ded9d1]/40">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 md:px-margin-desktop space-y-8">
