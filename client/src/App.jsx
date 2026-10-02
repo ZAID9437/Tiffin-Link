@@ -73,7 +73,7 @@ export default function App() {
   const [isCustomerTrackingModalOpen, setIsCustomerTrackingModalOpen] = useState(false);
   const [hasActiveOrder, setHasActiveOrder] = useState(false);
   const [activeCustomerOrderId, setActiveCustomerOrderId] = useState('');
-  const [preloaderFinished, setPreloaderFinished] = useState(false);
+  const [preloaderFinished, setPreloaderFinished] = useState(true);
 
   // State-based router with session & cookies persistence
   const [view, setView] = useState(() => {
@@ -366,7 +366,13 @@ export default function App() {
     });
 
     const scrollElements = document.querySelectorAll('.reveal-on-scroll, .line-draw');
-    scrollElements.forEach(el => observer.observe(el));
+    scrollElements.forEach(el => {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight + 150) {
+        el.classList.add('active');
+      }
+      observer.observe(el);
+    });
 
     // 5. Parallax scroll elements (optimized with requestAnimationFrame and GPU acceleration)
     let ticking = false;
@@ -418,14 +424,7 @@ export default function App() {
     };
   }, [view]);
 
-  // While authentication session is restoring from MongoDB /auth/me on page refresh, show preloader
-  if (authLoading) {
-    return (
-      <div className="app-layout">
-        <Preloader key="auth_loading" onComplete={() => {}} />
-      </div>
-    );
-  }
+
 
   // If user is authenticated as Super Admin or hash is #admin, render Admin Dashboard Control Center
   if (currentUser?.role === 'admin' || view === 'admin') {
@@ -472,8 +471,7 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      {/* Premium Entrance Preloader */}
-      <Preloader key={view} onComplete={handlePreloaderComplete} />
+
 
       {/* Floating Spice Canvas Background */}
       <ParticleBackground />
