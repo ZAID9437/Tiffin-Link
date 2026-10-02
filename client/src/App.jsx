@@ -26,11 +26,6 @@ import DeliveryLanding from './For Delivers/DeliveryLanding';
 import BecomeDeliveryPartnerModal from './For Delivers/BecomeDeliveryPartnerModal';
 import DeliveryDashboard from './DeliveryDashboard/DeliveryDashboard';
 
-// Customer Experience Pages
-import CustomerHome from './CustomerExperience/CustomerHome';
-import NearbyTiffinServices from './CustomerExperience/NearbyTiffinServices';
-import ProviderShowcase from './CustomerExperience/ProviderShowcase';
-import LiveOrderTracking from './CustomerExperience/LiveOrderTracking';
 
 // Super Admin Operating System Component
 import AdminDashboard from './AdminDashboard/AdminDashboard';
@@ -67,14 +62,6 @@ export default function App() {
   const handleLogout = () => {
     logoutUser();
     showToastNotification('You have been signed out.');
-  };
-
-  // Customer Experience sub-navigation (embedded on home page)
-  const [customerView, setCustomerView] = useState('customer-home');
-
-  const handleCustomerNavigate = (page) => {
-    setCustomerView(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Modal states
@@ -520,57 +507,43 @@ export default function App() {
           />
         ) : (
           <>
-            {/* Customer Experience Sub-Pages — embedded in home flow */}
-            {customerView === 'nearby-tiffin-services' ? (
-              <NearbyTiffinServices onNavigate={handleCustomerNavigate} />
-            ) : customerView === 'provider-showcase' ? (
-              <ProviderShowcase onNavigate={handleCustomerNavigate} />
-            ) : customerView === 'live-order-tracking' ? (
-              <LiveOrderTracking onNavigate={handleCustomerNavigate} />
-            ) : (
-              <>
-                {/* Hero Section */}
-                <Hero />
+            {/* Hero Section */}
+            <Hero />
 
-                {/* Hanging Ropes Animation */}
-                <HangingRopes />
+            {/* Hanging Ropes Animation */}
+            <HangingRopes />
 
-                {/* Meal Request Form */}
-                <MealRequestForm 
-                  onSubmitRequestSuccess={handleRequestSubmitSuccess}
-                />
+            {/* Meal Request Form */}
+            <MealRequestForm 
+              onSubmitRequestSuccess={handleRequestSubmitSuccess}
+            />
 
-                {/* Stats Section */}
-                <StatsBar />
+            {/* Stats Section */}
+            <StatsBar />
 
-                {/* Scroll responsive horizontal brand marquee */}
-                <ScrollMarquee />
+            {/* Scroll responsive horizontal brand marquee */}
+            <ScrollMarquee />
 
-                {/* Customer Home — Find Tiffin Section */}
-                <CustomerHome onNavigate={handleCustomerNavigate} />
+            {/* Top Providers */}
+            <TopProviders />
 
-                {/* Top Providers */}
-                <TopProviders />
+            {/* Popular Meal Categories */}
+            <Categories />
 
-                {/* Popular Meal Categories */}
-                <Categories />
+            {/* Value Propositions (Why Choose) */}
+            <WhyChoose />
 
-                {/* Value Propositions (Why Choose) */}
-                <WhyChoose />
+            {/* Verification Steps (Food Safety) */}
+            <FoodSafety />
 
-                {/* Verification Steps (Food Safety) */}
-                <FoodSafety />
+            {/* Story Section */}
+            <Story />
 
-                {/* Story Section */}
-                <Story />
+            {/* Hanging Spices Animation */}
+            <HangingSpices />
 
-                {/* Hanging Spices Animation */}
-                <HangingSpices />
-
-                {/* Contact Section */}
-                <ContactSection />
-              </>
-            )}
+            {/* Contact Section */}
+            <ContactSection />
           </>
         )}
       </main>
