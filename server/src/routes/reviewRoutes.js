@@ -8,7 +8,7 @@ const {
 } = require('../controllers/reviewController');
 
 router.get('/', protect, requireProvider, getReviews);
-router.post('/', protect, requireProvider, createReview);
+router.post('/', protect, createReview);
 router.put('/:id/reply', protect, requireProvider, replyToReview);
 
 module.exports = router;

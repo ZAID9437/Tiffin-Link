@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext'
+import { CartProvider } from './context/CartContext'
 import "maplibre-gl/dist/maplibre-gl.css"
 
 // Initialize theme from localStorage on startup
@@ -123,7 +124,9 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <RootErrorBoundary>
       <AuthProvider>
-        <App />
+        <CartProvider>
+          <App />
+        </CartProvider>
       </AuthProvider>
     </RootErrorBoundary>
   </StrictMode>,

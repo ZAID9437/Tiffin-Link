@@ -45,7 +45,23 @@ const userSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
       default: Date.now
-    }
+    },
+    savedAddresses: [
+      {
+        label: { type: String, default: 'Home' },
+        fullName: { type: String, default: '' },
+        phone: { type: String, default: '' },
+        street: { type: String, default: '' },
+        area: { type: String, default: '' },
+        city: { type: String, default: 'Ahmedabad' },
+        state: { type: String, default: 'Gujarat' },
+        pincode: { type: String, default: '' },
+        lat: { type: Number, default: 23.0300 },
+        lng: { type: Number, default: 72.5178 },
+        landmark: { type: String, default: '' },
+        isDefault: { type: Boolean, default: false }
+      }
+    ]
   },
   {
     timestamps: true

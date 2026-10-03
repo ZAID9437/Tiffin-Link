@@ -1,5 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { apiRequest } from '../services/api';
+import CategoriesItemsTab from './CategoriesItemsTab';
+import MealBuilderTab from './MealBuilderTab';
+
+const DAYS_CONFIG = [
+  { key: 'Mon', full: 'Monday', label: 'MON' },
+  { key: 'Tue', full: 'Tuesday', label: 'TUE' },
+  { key: 'Wed', full: 'Wednesday', label: 'WED' },
+  { key: 'Thu', full: 'Thursday', label: 'THU' },
+  { key: 'Fri', full: 'Friday', label: 'FRI' },
+  { key: 'Sat', full: 'Saturday', label: 'SAT' },
+  { key: 'Sun', full: 'Sunday', label: 'SUN' }
+];
+
+const PRESET_CATALOG_ITEMS = [
+  { name: '4 Bajra Rotla', category: 'Breads' },
+  { name: '3 Phulka Roti', category: 'Breads' },
+  { name: '2 Butter Paratha', category: 'Breads' },
+  { name: '4 Bhakri', category: 'Breads' },
+  { name: 'Ringan No Olo', category: 'Vegetable Curries' },
+  { name: 'Sev Tameta Shaak', category: 'Vegetable Curries' },
+  { name: 'Lasaniya Bataka', category: 'Vegetable Curries' },
+  { name: 'Paneer Butter Masala', category: 'Vegetable Curries' },
+  { name: 'Gujarati Kadhi', category: 'Dal & Kadhi' },
+  { name: 'Dal Tadka', category: 'Dal & Kadhi' },
+  { name: 'Vaghareli Khichdi', category: 'Rice & Khichdi' },
+  { name: 'Jeera Rice', category: 'Rice & Khichdi' },
+  { name: 'Gir Cow Chaas', category: 'Accompaniments' },
+  { name: 'Garlic Chutney & Jaggery', category: 'Accompaniments' },
+  { name: 'Kachumber Salad', category: 'Accompaniments' },
+  { name: 'Fried Papad', category: 'Accompaniments' },
+  { name: 'Gulab Jamun (2 pcs)', category: 'Sweets' },
+  { name: 'Shrikhand Cup', category: 'Sweets' }
+];
 
 export default function MyTiffinsTab({ 
   initialSubView = 'all', 
@@ -11,7 +44,8 @@ export default function MyTiffinsTab({
     initialOpenModal || defaultOpenAdd ? 'add' : 
     initialSubView === 'add' ? 'add' : 
     initialSubView === 'availability' ? 'availability' : 
-    initialSubView === 'categories' ? 'categories' : 'all'
+    initialSubView === 'categories' ? 'categories' : 
+    initialSubView === 'meal-builder' ? 'meal-builder' : 'all'
   );
 
   // Filter & Search states for All Tiffins
@@ -30,34 +64,63 @@ export default function MyTiffinsTab({
   const [toastMessage, setToastMessage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draftStatus, setDraftStatus] = useState('Auto-draft saved');
+  const [showImagePicker, setShowImagePicker] = useState(false);
 
   // Data Collections
   const [tiffins, setTiffins] = useState([]);
   const [categories, setCategories] = useState([]);
 
-  // Form State for Add / Edit Tiffin
+  // Add Category Modal & Form State
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [newCatForm, setNewCatForm] = useState({ name: '', description: '', status: 'Active' });
+  const [isSubmittingCat, setIsSubmittingCat] = useState(false);
+
+  // Available Menu Items from DB / Catalog
+  const [availableMenuItems, setAvailableMenuItems] = useState([]);
+  const [loadingMenuItems, setLoadingMenuItems] = useState(false);
+  const [selectedItemCategoryFilter, setSelectedItemCategoryFilter] = useState('All');
+  const [customInclusionInput, setCustomInclusionInput] = useState('');
+
+  // Form State for Configure / Add / Edit Tiffin
   const [formState, setFormState] = useState({
-    name: '',
-    category: 'Gujarati',
+    name: 'Kathiyawadi Deluxe Homestyle Thali',
+    category: 'Kathiyawadi',
     foodType: 'Pure Veg',
-    description: '',
-    price: '220',
-    discount: '10',
-    capacity: '25',
-    noticeTime: '2 Hours Notice',
-    prepStation: 'Station 2 (Slow Curries)',
-    days: { Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true, Saturday: true, Sunday: false },
-    area: 'Navrangpura, Satellite, Vastrapur',
-    ingredients: 'Fresh vegetables, Whole wheat flour, Pure A2 Ghee',
-    items: ['4x Phulka Rotis (A2 Ghee)', '1x Sev Tameta Gravy 250ml', '1x Ringan Olo (Baingan Bharta) 200g', '1x Handcrafted Dryfruit Ladoo', '1x Masala Buttermilk 200ml'],
+    capacity: '40',
+    days: { Mon: true, Tue: true, Wed: true, Thu: true, Fri: true, Sat: true, Sun: false, Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true, Saturday: true, Sunday: false },
+    mealType: 'Lunch',
+    startTime: '12:00 PM',
+    endTime: '02:00 PM',
+    orderCutoff: '10:00 AM',
+    isAvailable: true,
     status: 'Active',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAgVbGgvOlqEPwBhHCO0mfTLEfVaodryI5Y-OTN8CXcfAHNIZH_kIdBNi64elpWcbnfv99KLJ-C6fXTTMseFJiZNgrZ1xWRlvnK3Ozg9qQk_oEAGawxyLchVvSwK7aEPuNgLl_gKPbV2WioOVbUZyE1kR0Ycg-qRHtv59KPm0tjW393jmrHiDyIEX3qxzCHTO_qphuMzbM_FmS9_8ViNHwKQAL0dQ7tp5yH_InNUEbHmYKkZu1sc_dy'
+    price: '140',
+    monthlySubPrice: '3640',
+    weeklyPrice: '899',
+    discount: '0',
+    description: 'Prepared with cold-pressed peanut oil and slow-simmered spices. Includes 4 hand-rolled Bajra Rotlas, Ringan No Olo (charred eggplant), Sev Tameta Shaak, authentic Kadhi, steamed rice, and pure churned Gir cow Chaas.',
+    noticeTime: '2 Hours Notice',
+    prepStation: 'Station 1',
+    area: 'All Localities',
+    ingredients: 'Cold-pressed peanut oil, slow-simmered spices',
+    items: ['4 Rotlas', '2 Sabzis', 'Kadhi-Khichdi', 'Chaas'],
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAoCpsKFtBQ7Y0PkpVHBLhBG0mf0yNeKZ3xpD2Mf9ygH1gzqxHtJshyX53UEIfiCHfxroI2IgNooZWl7FqBrAIeMh_eUK1KRYAGrGr2twEdq1wf6xVjKrm7fXHUxmR6aAzBpFi-ae0Lk_qbfbNvdLX69eafIpARsneiz0HcrbrKmV5m5h0XdxoSFyiRWXlUY8iMSZJxcb6q4W5CluI7hUhQL8nX-mg-7acqxN-hKfU-keBk9A1_2YUT'
   });
+
+  const triggerAutosavePing = () => {
+    setDraftStatus('Saving...');
+    setTimeout(() => {
+      setDraftStatus('Auto-draft saved');
+    }, 600);
+  };
 
   const [newItemTag, setNewItemTag] = useState('');
 
   // Preset Image Gallery
   const presetImages = [
+    { label: 'Kathiyawadi Deluxe', url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAoCpsKFtBQ7Y0PkpVHBLhBG0mf0yNeKZ3xpD2Mf9ygH1gzqxHtJshyX53UEIfiCHfxroI2IgNooZWl7FqBrAIeMh_eUK1KRYAGrGr2twEdq1wf6xVjKrm7fXHUxmR6aAzBpFi-ae0Lk_qbfbNvdLX69eafIpARsneiz0HcrbrKmV5m5h0XdxoSFyiRWXlUY8iMSZJxcb6q4W5CluI7hUhQL8nX-mg-7acqxN-hKfU-keBk9A1_2YUT' },
+    { label: 'Traditional Royal Thali', url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBEdtTNfW6M_QAdqnbORp39Gj1CeBJSWxHGcGuLI4qICxfcxdEyA1_jSsc9E3Vk-Ytvs3Zc8kxVoigf_YjdvuzdKsKNJc8IzKzCbJojPA0KJ2xto_qwxKVPlixSFP43Ryem_4mgijJ2QUwgp4V6znBXsEWUtAUPMnoeNwW87XfE9UClWOKbc7YAw5YMGFb08jj9BHm1U7blUpHsC-_-mu1Q7zBMi7p-aLE_hn5PQQez9fRb10NbJUVC' },
     { label: 'Gujarati Special', url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAgVbGgvOlqEPwBhHCO0mfTLEfVaodryI5Y-OTN8CXcfAHNIZH_kIdBNi64elpWcbnfv99KLJ-C6fXTTMseFJiZNgrZ1xWRlvnK3Ozg9qQk_oEAGawxyLchVvSwK7aEPuNgLl_gKPbV2WioOVbUZyE1kR0Ycg-qRHtv59KPm0tjW393jmrHiDyIEX3qxzCHTO_qphuMzbM_FmS9_8ViNHwKQAL0dQ7tp5yH_InNUEbHmYKkZu1sc_dy' },
     { label: 'Amritsari Punjabi', url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDwUcUoJ6r89gVPSfnHsNZQ8qlsAlTmq2iqCNe6MqERgBZmGW39wzerJvrTStWCEEOkak684jpl3pjEBzf3uogJwAEB7hqmYBHvBY5114CyEBjV6-piEoG31mlLGXlBX_d2K_cS3tdacpiR4S66b9NlYmZ7E1xKK6mKLTxx2P21p5MuUBJpgb2cpHg_a2ToVphk6OelK7cpIFpJ43HDOwJdsaX0jB3RUrP2NyrrRBUGiJoUNYZ1G9s8' },
     { label: 'Jain Sattvik', url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBBGiHMFySV6bH3-LhYPSoVn_XmeLd5_1OAVDnW-aNKiNV9Lci1Lq-LhAWA_5qYrc9DKcWKLpIZN7bssaIvrRaeQhCXsEInCCq25acAy8buMN6gqh1-GkkF13Q_GXeTnllVMxnuJWL1B_dMgjDpEokpmIxmU7eTQV2cjCVTQTQioabCpkhSRpUxZ1uCoyAbbqeKJ0es3BCs7Ps6J08jhEBPTifsKhJS3lGU5DRRwk7SaEuTeLWaIG5D' },
@@ -65,15 +128,19 @@ export default function MyTiffinsTab({
     { label: 'Surti Winter Feast', url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDIPaXCdYL-aMcUxd3Aebu-CST9OAnixKoFULmf3OlJyHWK9BHjM3zmyyCBYcyrOYgPTw-8cQlMHvrMvv8fMXlw8zrynGl0dfrKTajRQ7nN3FymU7jygJCfNuXJP7GCOlF61I8QMjd3SmjMmhbAg69kyAhxVJ7YXVDC_2J8j4GvpwOixJIDbXixyvEegQl2l5cNpp6g4XuFN19Ny_HCYM3uzqbfop7apNGoA9Eo0mdIGzvHZ4q1DE18' }
   ];
 
-  // Fetch Tiffins & Categories from MongoDB
+  // Fetch Tiffins, Categories & Items from MongoDB
   useEffect(() => {
     fetchTiffins();
     fetchCategories();
+    fetchMenuItems();
   }, []);
 
   useEffect(() => {
     if (initialSubView) {
-      setSubView(initialSubView);
+      const validViews = ['all', 'add', 'availability', 'categories', 'meal-builder'];
+      if (validViews.includes(initialSubView)) {
+        setSubView(initialSubView);
+      }
     }
   }, [initialSubView]);
 
@@ -117,6 +184,100 @@ export default function MyTiffinsTab({
     } catch (err) {
       console.error('Error fetching categories:', err);
     }
+  };
+
+  const fetchMenuItems = async () => {
+    try {
+      setLoadingMenuItems(true);
+      const json = await apiRequest('/tiffin-items');
+      if (json.success && Array.isArray(json.data)) {
+        setAvailableMenuItems(json.data.map(i => ({ ...i, id: i._id || i.id })));
+      }
+    } catch (err) {
+      console.error('Error fetching tiffin items:', err);
+    } finally {
+      setLoadingMenuItems(false);
+    }
+  };
+
+  const handleCreateCategory = async (e) => {
+    if (e) e.preventDefault();
+    if (!newCatForm.name.trim()) {
+      showToast('⚠️ Please enter a category name');
+      return;
+    }
+    setIsSubmittingCat(true);
+    try {
+      const res = await apiRequest('/categories', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newCatForm.name.trim(),
+          description: newCatForm.description.trim() || 'Authentic homestyle meal category',
+          status: newCatForm.status || 'Active'
+        })
+      });
+      if (res.success) {
+        showToast(`✓ Category "${newCatForm.name.trim()}" created successfully!`);
+        await fetchCategories();
+        setFormState(prev => ({ ...prev, category: newCatForm.name.trim() }));
+        setNewCatForm({ name: '', description: '', status: 'Active' });
+        setShowAddCategoryModal(false);
+      } else {
+        showToast(`⚠️ ${res.message || 'Failed to create category'}`);
+      }
+    } catch (err) {
+      console.error('Error creating category:', err);
+      showToast('⚠️ Failed to save category: ' + err.message);
+    } finally {
+      setIsSubmittingCat(false);
+    }
+  };
+
+  const combinedCatalogItems = useMemo(() => {
+    const list = [...availableMenuItems.map(i => ({ name: i.name, category: i.category || 'Other' }))];
+    PRESET_CATALOG_ITEMS.forEach(p => {
+      if (!list.some(item => item.name.toLowerCase() === p.name.toLowerCase())) {
+        list.push(p);
+      }
+    });
+    return list;
+  }, [availableMenuItems]);
+
+  const filteredCatalogItems = useMemo(() => {
+    if (selectedItemCategoryFilter === 'All') return combinedCatalogItems;
+    return combinedCatalogItems.filter(i => i.category === selectedItemCategoryFilter);
+  }, [combinedCatalogItems, selectedItemCategoryFilter]);
+
+  const toggleInclusionItem = (itemName) => {
+    setFormState(prev => {
+      const current = Array.isArray(prev.items) ? [...prev.items] : [];
+      const exists = current.includes(itemName);
+      const next = exists ? current.filter(i => i !== itemName) : [...current, itemName];
+      return { ...prev, items: next };
+    });
+    triggerAutosavePing();
+  };
+
+  const addCustomInclusion = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = customInclusionInput.trim();
+    if (!trimmed) return;
+    if (!formState.items?.includes(trimmed)) {
+      setFormState(prev => ({
+        ...prev,
+        items: [...(Array.isArray(prev.items) ? prev.items : []), trimmed]
+      }));
+      triggerAutosavePing();
+    }
+    setCustomInclusionInput('');
+  };
+
+  const removeInclusion = (itemToRemove) => {
+    setFormState(prev => ({
+      ...prev,
+      items: (Array.isArray(prev.items) ? prev.items : []).filter(i => i !== itemToRemove)
+    }));
+    triggerAutosavePing();
   };
 
   // Toggle Tiffin Active / Inactive
@@ -168,30 +329,38 @@ export default function MyTiffinsTab({
       showToast('⚠️ Please enter a tiffin name');
       return;
     }
-    if (!formState.price || Number(formState.price) <= 0) {
-      showToast('⚠️ Please enter a valid price greater than 0');
-      return;
-    }
 
     setIsSubmitting(true);
-    const selectedDaysArr = Object.keys(formState.days).filter(d => formState.days[d]);
+    const selectedDaysArr = DAYS_CONFIG
+      .filter(d => formState.days[d.key] || formState.days[d.full])
+      .map(d => d.full);
+
+    const isAvailableForCustomers = publishLive ? (formState.isAvailable ?? true) : false;
 
     const payload = {
       name: formState.name.trim(),
-      description: formState.description || 'Authentic home-cooked thali prepared daily.',
-      price: Number(formState.price),
+      description: formState.description || 'Prepared with cold-pressed peanut oil and slow-simmered spices.',
+      price: Number(formState.price) > 0 ? Number(formState.price) : 160,
+      monthlyPrice: Number(formState.monthlySubPrice) || 3640,
+      weeklyPrice: Number(formState.weeklyPrice) || 899,
+      isSubscriptionOnly: formState.isSubscriptionOnly ?? true,
       discount: Number(formState.discount) || 0,
-      category: formState.category,
-      foodType: formState.foodType,
-      capacity: Number(formState.capacity) || 25,
-      noticeTime: formState.noticeTime,
-      prepStation: formState.prepStation,
+      category: formState.category || 'Kathiyawadi',
+      foodType: formState.foodType || 'Pure Veg',
+      mealType: formState.mealType || 'Lunch',
+      startTime: formState.startTime || '12:00 PM',
+      endTime: formState.endTime || '02:00 PM',
+      orderCutoff: formState.orderCutoff || '10:00 AM',
+      capacity: Number(formState.capacity) || 40,
+      available: Number(formState.capacity) || 40,
+      noticeTime: formState.noticeTime || '2 Hours Notice',
+      prepStation: formState.prepStation || 'Station 1',
       days: selectedDaysArr.length > 0 ? selectedDaysArr : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
       area: formState.area || 'All Localities',
-      ingredients: formState.ingredients || 'Fresh veggies, Whole wheat flour, Pure Ghee',
-      items: formState.items,
-      status: publishLive ? 'Active' : 'Inactive',
-      image: formState.image
+      ingredients: formState.ingredients || 'Cold-pressed peanut oil, slow-simmered spices',
+      items: Array.isArray(formState.items) && formState.items.length > 0 ? formState.items : ['4 Rotlas', '2 Sabzis', 'Kadhi-Khichdi', 'Chaas'],
+      status: isAvailableForCustomers ? 'Active' : 'Inactive',
+      image: formState.image || presetImages[0].url
     };
 
     if (editingTiffin) {
@@ -216,7 +385,7 @@ export default function MyTiffinsTab({
           body: JSON.stringify(payload)
         });
         if (json.success && json.data) {
-          showToast(`✓ Tiffin "${payload.name}" published to kitchen catalog!`);
+          showToast(publishLive ? `✓ Tiffin "${payload.name}" published to marketplace!` : `✓ Tiffin "${payload.name}" saved as draft!`);
           fetchTiffins();
         }
       } catch (err) {
@@ -232,20 +401,26 @@ export default function MyTiffinsTab({
   const resetForm = () => {
     setEditingTiffin(null);
     setFormState({
-      name: '',
-      category: 'Gujarati',
+      name: 'Kathiyawadi Deluxe Homestyle Thali',
+      category: 'Kathiyawadi',
       foodType: 'Pure Veg',
-      description: '',
-      price: '220',
-      discount: '10',
-      capacity: '25',
-      noticeTime: '2 Hours Notice',
-      prepStation: 'Station 2 (Slow Curries)',
-      days: { Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true, Saturday: true, Sunday: false },
-      area: 'Navrangpura, Satellite, Vastrapur',
-      ingredients: 'Fresh vegetables, Whole wheat flour, Pure A2 Ghee',
-      items: ['4x Phulka Rotis (A2 Ghee)', '1x Sev Tameta Gravy 250ml', '1x Ringan Olo (Baingan Bharta) 200g', '1x Handcrafted Dryfruit Ladoo', '1x Masala Buttermilk 200ml'],
+      capacity: '40',
+      days: { Mon: true, Tue: true, Wed: true, Thu: true, Fri: true, Sat: true, Sun: false, Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true, Saturday: true, Sunday: false },
+      mealType: 'Lunch',
+      startTime: '12:00 PM',
+      endTime: '02:00 PM',
+      orderCutoff: '10:00 AM',
+      price: '160',
+      monthlySubPrice: '3640',
+      discount: '0',
+      description: 'Prepared with cold-pressed peanut oil and slow-simmered spices. Includes 4 hand-rolled Bajra Rotlas, Ringan No Olo (charred eggplant), Sev Tameta Shaak, authentic Kadhi, steamed rice, and pure churned Gir cow Chaas.',
+      isAvailable: true,
       status: 'Active',
+      noticeTime: '2 Hours Notice',
+      prepStation: 'Station 1',
+      area: 'All Localities',
+      ingredients: 'Cold-pressed peanut oil, slow-simmered spices',
+      items: ['4 Rotlas', '2 Sabzis', 'Kadhi-Khichdi', 'Chaas'],
       image: presetImages[0].url
     });
   };
@@ -253,25 +428,40 @@ export default function MyTiffinsTab({
   const startEditTiffin = (tiffin, e) => {
     if (e) e.stopPropagation();
     setEditingTiffin(tiffin);
-    const dayObj = { Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false, Saturday: false, Sunday: false };
+    const dayObj = { Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false, Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false, Saturday: false, Sunday: false };
     if (Array.isArray(tiffin.days)) {
-      tiffin.days.forEach(d => { dayObj[d] = true; });
+      tiffin.days.forEach(d => {
+        dayObj[d] = true;
+        const short = d.slice(0, 3);
+        dayObj[short] = true;
+      });
+    } else {
+      ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(d => { dayObj[d] = true; dayObj[d + 'day'] = true; });
     }
+    const singlePrice = tiffin.price ? Number(tiffin.price) : 160;
     setFormState({
       name: tiffin.name || '',
-      category: tiffin.category || 'Gujarati',
+      category: tiffin.category || 'Kathiyawadi',
       foodType: tiffin.foodType || 'Pure Veg',
-      description: tiffin.description || '',
-      price: tiffin.price ? tiffin.price.toString() : '220',
-      discount: tiffin.discount ? tiffin.discount.toString() : '10',
-      capacity: tiffin.capacity ? tiffin.capacity.toString() : '25',
-      noticeTime: tiffin.noticeTime || '2 Hours Notice',
-      prepStation: tiffin.prepStation || 'Station 2 (Slow Curries)',
+      capacity: tiffin.capacity ? tiffin.capacity.toString() : '40',
       days: dayObj,
+      mealType: tiffin.mealType || 'Lunch',
+      startTime: tiffin.startTime || '12:00 PM',
+      endTime: tiffin.endTime || '02:00 PM',
+      orderCutoff: tiffin.orderCutoff || '10:00 AM',
+      price: singlePrice.toString(),
+      monthlySubPrice: (tiffin.monthlyPrice || Math.round(singlePrice * 26 * 0.875)).toString(),
+      weeklyPrice: (tiffin.weeklyPrice || 899).toString(),
+      isSubscriptionOnly: tiffin.isSubscriptionOnly ?? true,
+      discount: tiffin.discount ? tiffin.discount.toString() : '0',
+      description: tiffin.description || '',
+      isAvailable: tiffin.status === 'Active',
+      status: tiffin.status || 'Active',
+      noticeTime: tiffin.noticeTime || '2 Hours Notice',
+      prepStation: tiffin.prepStation || 'Station 1',
       area: tiffin.area || '',
       ingredients: tiffin.ingredients || '',
-      items: Array.isArray(tiffin.items) && tiffin.items.length > 0 ? tiffin.items : ['4x Phulka Rotis', '1x Sabzi', '1x Dal & Rice', '1x Dessert'],
-      status: tiffin.status || 'Active',
+      items: Array.isArray(tiffin.items) && tiffin.items.length > 0 ? tiffin.items : ['4 Rotlas', '2 Sabzis', 'Kadhi-Khichdi', 'Chaas'],
       image: tiffin.image || presetImages[0].url
     });
     setSubView('add');
@@ -356,9 +546,100 @@ export default function MyTiffinsTab({
         </div>
       )}
 
+      {/* Add Category Modal */}
+      {showAddCategoryModal && (
+        <div className="fixed inset-0 bg-onyx-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest border border-sand-neutral rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between border-b border-sand-neutral pb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-clay-earth text-[22px]">category</span>
+                <h3 className="font-headline-md text-xl text-onyx-black">Add Tiffin Menu Category</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddCategoryModal(false)}
+                className="text-secondary hover:text-onyx-black p-1 cursor-pointer transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategory} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block font-label-caps text-xs uppercase tracking-wider text-onyx-black font-semibold">
+                  Category Name <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newCatForm.name}
+                  onChange={e => setNewCatForm({ ...newCatForm, name: e.target.value })}
+                  placeholder="e.g. Kathiyawadi, Punjabi, Rajasthani Special"
+                  className="w-full bg-surface-container-low px-4 py-2.5 rounded-lg border border-sand-neutral focus:border-onyx-black focus:outline-none text-sm text-onyx-black"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-label-caps text-xs uppercase tracking-wider text-onyx-black font-semibold">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={newCatForm.description}
+                  onChange={e => setNewCatForm({ ...newCatForm, description: e.target.value })}
+                  placeholder="Describe culinary characteristics, flavours, and regional cooking traditions..."
+                  className="w-full bg-surface-container-low px-4 py-2.5 rounded-lg border border-sand-neutral focus:border-onyx-black focus:outline-none text-sm text-onyx-black"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-label-caps text-xs uppercase tracking-wider text-onyx-black font-semibold">
+                  Status
+                </label>
+                <select
+                  value={newCatForm.status}
+                  onChange={e => setNewCatForm({ ...newCatForm, status: e.target.value })}
+                  className="w-full bg-surface-container-low px-4 py-2.5 rounded-lg border border-sand-neutral focus:border-onyx-black focus:outline-none text-sm text-onyx-black cursor-pointer"
+                >
+                  <option value="Active">Active (Available on Storefront)</option>
+                  <option value="Inactive">Inactive / Hidden</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-sand-neutral">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCategoryModal(false)}
+                  className="px-4 py-2 rounded-lg bg-surface-container text-on-surface text-xs font-bold hover:bg-surface-container-high transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingCat || !newCatForm.name.trim()}
+                  className="px-5 py-2 rounded-lg bg-onyx-black text-bone-white text-xs font-bold hover:bg-stone-800 transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isSubmittingCat ? (
+                    <>
+                      <span className="animate-spin material-symbols-outlined text-[16px]">progress_activity</span>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[16px]">check</span>
+                      Create Category
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Sub-Header Module Switcher Bar */}
       <div className="bg-surface-container-lowest p-3 rounded-2xl border border-sand-neutral/50 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button 
             type="button"
             onClick={() => setSubView('all')}
@@ -375,7 +656,7 @@ export default function MyTiffinsTab({
               subView === 'add' ? 'bg-onyx-black text-bone-white shadow-xs' : 'text-secondary hover:bg-surface-container-low'
             }`}
           >
-            + Add New Tiffin
+            + Add Tiffin
           </button>
           <button 
             type="button"
@@ -384,12 +665,30 @@ export default function MyTiffinsTab({
               subView === 'availability' ? 'bg-onyx-black text-bone-white shadow-xs' : 'text-secondary hover:bg-surface-container-low'
             }`}
           >
-            Availability & Slots
+            Availability
+          </button>
+          <button 
+            type="button"
+            onClick={() => setSubView('categories')}
+            className={`px-4 py-2 rounded-xl text-xs font-label-caps font-bold transition-all cursor-pointer ${
+              subView === 'categories' ? 'bg-onyx-black text-bone-white shadow-xs' : 'text-secondary hover:bg-surface-container-low'
+            }`}
+          >
+            Categories & Items
+          </button>
+          <button 
+            type="button"
+            onClick={() => setSubView('meal-builder')}
+            className={`px-4 py-2 rounded-xl text-xs font-label-caps font-bold transition-all cursor-pointer ${
+              subView === 'meal-builder' ? 'bg-onyx-black text-bone-white shadow-xs' : 'text-secondary hover:bg-surface-container-low'
+            }`}
+          >
+            ⭐ Meal Builder
           </button>
         </div>
 
         <div className="text-xs font-mono text-secondary">
-          Active Storefront Items: <span className="font-bold text-onyx-black">{activeTiffinsCount}</span> / {totalTiffinsCount}
+          Active: <span className="font-bold text-onyx-black">{activeTiffinsCount}</span> / {totalTiffinsCount}
         </div>
       </div>
 
@@ -763,321 +1062,1036 @@ export default function MyTiffinsTab({
       {/* ========================================================================= */}
       {/* PART 2 — ADD NEW TIFFIN SUB-VIEW                                         */}
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
+      {/* PART 2 — CONFIGURE / ADD TIFFIN SUB-VIEW                                 */}
+      {/* ========================================================================= */}
+      {/* ========================================================================= */}
+      {/* PART 2 — CONFIGURE / ADD TIFFIN SUB-VIEW (EDITORIAL 2-COLUMN WORKSPACE) */}
+      {/* ========================================================================= */}
       {subView === 'add' && (
-        <form onSubmit={(e) => handleSaveTiffin(e, true)} className="space-y-6 max-w-5xl mx-auto">
+        <div className="flex flex-col w-full space-y-6">
           
-          {/* Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-sand-neutral/40">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 font-label-caps text-xs text-secondary tracking-wider uppercase">
-                <span>Provider</span>
-                <span>/</span>
-                <span>My Tiffins</span>
-                <span>/</span>
-                <span className="text-onyx-black font-bold">{editingTiffin ? 'Edit Tiffin' : 'Add New Tiffin'}</span>
+          {/* Top Context Header Bar (Breadcrumb + Autosave State) */}
+          <div className="pb-6 border-b border-sand-neutral">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="space-y-1">
+                <nav className="flex items-center gap-2 font-label-caps text-label-caps text-secondary tracking-wider uppercase">
+                  <button 
+                    type="button"
+                    onClick={() => { resetForm(); setSubView('all'); }}
+                    className="hover:text-onyx-black transition-colors cursor-pointer"
+                  >
+                    My Tiffins
+                  </button>
+                  <span>/</span>
+                  <span className="text-onyx-black font-bold">
+                    {editingTiffin ? 'Edit Tiffin' : 'Add New Tiffin'}
+                  </span>
+                </nav>
+                <h1 className="font-headline-md text-headline-md text-onyx-black tracking-tight">
+                  {editingTiffin ? 'Edit Tiffin Specification' : 'Add New Tiffin'}
+                </h1>
+                <p className="font-body-md text-body-md text-secondary">
+                  Configure authentic homestyle meal allocations, kitchen capacity limits, and ordering windows.
+                </p>
               </div>
-              <h1 class="font-headline-lg text-3xl text-on-surface">{editingTiffin ? 'Edit Tiffin Specification' : 'Add New Tiffin'}</h1>
-              <p class="font-body-md text-xs text-secondary">
-                Author a home-cooked meal offering, define portion architectures, set pricing tiers, and configure kitchen preparation limits.
-              </p>
-            </div>
 
-            <div className="flex items-center gap-3">
-              <button 
-                type="button"
-                onClick={() => setSubView('all')}
-                className="px-4 py-2 rounded-lg bg-surface-container text-on-surface text-xs font-bold hover:bg-surface-container-high transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit"
-                disabled={isSubmitting}
-                className="px-6 py-2 rounded-lg bg-onyx-black text-bone-white text-xs font-bold hover:bg-stone-800 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? 'Saving...' : editingTiffin ? 'Update Tiffin' : 'Save & Publish Live'}
-              </button>
+              {/* Utilities Badge Bar */}
+              <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setSubView('categories')}
+                  className="px-4 py-2 bg-onyx-black hover:bg-stone-900 text-bone-white rounded-lg text-xs font-label-caps font-bold tracking-wider uppercase flex items-center gap-2 shadow-xs cursor-pointer transition-colors border border-sand-neutral"
+                  title="Open Categories & Items"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-amber-400">restaurant_menu</span>
+                  Categories & Items
+                </button>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded border border-sand-neutral">
+                  <span className="w-2 h-2 rounded-full bg-onyx-black"></span>
+                  <span className="font-label-caps text-[11px] uppercase tracking-wider text-onyx-black font-semibold">
+                    Mesh Node #9 • Active
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-lowest rounded border border-sand-neutral shadow-sm">
+                  <span className="material-symbols-outlined text-secondary text-[16px]">cloud_done</span>
+                  <span className="font-label-caps text-[11px] text-secondary tracking-wider uppercase">
+                    {draftStatus}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Content Canvas: Two Column Workspace with Editorial Balance */}
+          <form className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start" onSubmit={(e) => handleSaveTiffin(e, true)}>
             
-            {/* Main Fields (8 columns) */}
-            <div className="lg:col-span-8 space-y-6">
+            {/* Primary Form Stream (Columns 1-8) */}
+            <div className="lg:col-span-8 space-y-10">
               
-              {/* Basic Information */}
-              <div className="p-6 rounded-2xl bg-surface-container-lowest border border-sand-neutral/40 shadow-xs space-y-5">
-                <div className="flex items-center justify-between pb-3 border-b border-sand-neutral/40">
-                  <span className="font-label-caps text-xs uppercase font-bold text-onyx-black">01 / Basic Information</span>
-                  <span className="material-symbols-outlined text-secondary text-[20px]">restaurant_menu</span>
+              {/* 1. TIFFIN INFORMATION */}
+              <section className="bg-surface-container-lowest p-6 sm:p-8 rounded-lg shadow-sm border border-sand-neutral space-y-6">
+                <div className="flex items-baseline justify-between border-b border-sand-neutral pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-label-caps text-label-caps text-secondary tracking-widest uppercase">01</span>
+                    <h2 className="font-headline-md text-[24px] text-onyx-black">Tiffin Information</h2>
+                  </div>
+                  <span className="font-label-caps text-[11px] text-secondary uppercase">* Required parameters</span>
                 </div>
 
+                {/* Tiffin Name */}
                 <div className="space-y-2">
-                  <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Tiffin Name *</label>
+                  <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider" htmlFor="tiffinName">
+                    Tiffin Name <span className="text-error">*</span>
+                  </label>
                   <input 
+                    id="tiffinName"
                     type="text"
                     required
                     value={formState.name}
-                    onChange={e => setFormState({ ...formState, name: e.target.value })}
-                    placeholder="e.g. Gujarati Special Kathiyawadi Thali"
-                    className="w-full bg-surface-container-low px-4 py-2.5 rounded-xl text-xs text-on-surface border border-sand-neutral/40 focus:outline-none focus:bg-surface-container-lowest"
+                    onChange={e => {
+                      setFormState({ ...formState, name: e.target.value });
+                      triggerAutosavePing();
+                    }}
+                    placeholder="e.g. Kathiyawadi Deluxe Homestyle Thali"
+                    className="w-full bg-surface-container-low px-4 py-3 rounded border border-sand-neutral focus:border-onyx-black focus:outline-none font-body-md text-onyx-black transition-all"
                   />
+                  <p className="font-label-caps text-[11px] text-secondary">
+                    A recognizable, heritage-led culinary title displayed on search cards.
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Category & Food Type Selection Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Category *</label>
-                    <select 
-                      value={formState.category}
-                      onChange={e => setFormState({ ...formState, category: e.target.value })}
-                      className="w-full bg-surface-container-low px-4 py-2.5 rounded-xl text-xs text-on-surface border border-sand-neutral/40 focus:outline-none cursor-pointer"
-                    >
-                      <option value="Gujarati">Gujarati</option>
-                      <option value="Punjabi">Punjabi</option>
-                      <option value="Jain">Jain</option>
-                      <option value="Kathiyawadi">Kathiyawadi</option>
-                      <option value="Wellness">Wellness</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Dietary Type *</label>
-                    <select 
-                      value={formState.foodType}
-                      onChange={e => setFormState({ ...formState, foodType: e.target.value })}
-                      className="w-full bg-surface-container-low px-4 py-2.5 rounded-xl text-xs text-on-surface border border-sand-neutral/40 focus:outline-none cursor-pointer"
-                    >
-                      <option value="Pure Veg">Pure Veg</option>
-                      <option value="Jain Friendly">Jain Friendly</option>
-                      <option value="Vegan">Vegan</option>
-                      <option value="High Protein">High Protein</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Description & Ingredients</label>
-                  <textarea 
-                    rows={3}
-                    value={formState.description}
-                    onChange={e => setFormState({ ...formState, description: e.target.value })}
-                    placeholder="Slow-roasted eggplant, phulka rotis, sev tameta gravy, whipped buttermilk, and sweet."
-                    className="w-full bg-surface-container-low p-3 rounded-xl text-xs text-on-surface border border-sand-neutral/40 focus:outline-none focus:bg-surface-container-lowest"
-                  />
-                </div>
-
-                {/* Compartments Tag Builder */}
-                <div className="space-y-2">
-                  <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Included Items (Compartments)</label>
-                  <div className="flex flex-wrap gap-2 p-3 bg-surface-container-low rounded-xl border border-sand-neutral/40">
-                    {formState.items.map((item, idx) => (
-                      <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container-lowest border border-sand-neutral/40 rounded-lg text-xs font-label-caps font-bold text-onyx-black">
-                        {item}
-                        <button 
-                          type="button" 
-                          onClick={() => setFormState({ ...formState, items: formState.items.filter((_, i) => i !== idx) })} 
-                          className="text-secondary hover:text-rose-600 font-bold"
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider" htmlFor="tiffinCategory">
+                        Culinary Category <span className="text-error">*</span>
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSubView('categories')}
+                          className="px-2.5 py-1 bg-onyx-black hover:bg-stone-900 text-bone-white rounded text-[11px] font-semibold flex items-center gap-1 shadow-2xs cursor-pointer transition-all border border-stone-800"
+                          title="Open Categories & Items View"
                         >
-                          ✕
+                          <span className="material-symbols-outlined text-[13px] text-amber-400">restaurant_menu</span>
+                          Categories & Items
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddCategoryModal(true)}
+                          className="px-2.5 py-1 bg-surface-container-low hover:bg-surface-container text-onyx-black rounded text-[11px] font-semibold flex items-center gap-1 border border-sand-neutral cursor-pointer transition-all"
+                          title="Create a new category in MongoDB"
+                        >
+                          <span className="material-symbols-outlined text-[13px] text-clay-earth">add</span>
+                          + Category
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <select 
+                        id="tiffinCategory"
+                        value={formState.category}
+                        onChange={e => {
+                          setFormState({ ...formState, category: e.target.value });
+                          triggerAutosavePing();
+                        }}
+                        className="w-full appearance-none bg-surface-container-low px-4 py-3 pr-10 rounded border border-sand-neutral focus:border-onyx-black focus:outline-none font-body-md text-onyx-black cursor-pointer"
+                      >
+                        {categories && categories.length > 0 ? (
+                          categories.map(cat => (
+                            <option key={cat.id || cat._id || cat.name} value={cat.name}>
+                              {cat.name} {cat.description ? `(${cat.description.slice(0, 30)}...)` : ''}
+                            </option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="Kathiyawadi">Kathiyawadi Tradition</option>
+                            <option value="Gujarati">Gujarati Sattvik Thali</option>
+                            <option value="Punjabi">North Indian / Punjabi Dhabha</option>
+                            <option value="Diet">High-Protein & Low Carb</option>
+                            <option value="Jain">Strict Jain (No Root Veg)</option>
+                            <option value="SouthIndian">South Indian Classic Meals</option>
+                          </>
+                        )}
+                        {formState.category && !categories.some(c => c.name === formState.category) && (
+                          <option value={formState.category}>{formState.category}</option>
+                        )}
+                      </select>
+                      <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-secondary pointer-events-none text-[20px]">
+                        expand_more
                       </span>
-                    ))}
-                    <div className="flex items-center gap-1 flex-1 min-w-[160px]">
+                    </div>
+                    <p className="font-label-caps text-[11px] text-secondary">
+                      Categories fetched dynamically from MongoDB kitchen repository.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider">
+                      Dietary Standard <span className="text-error">*</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { val: 'Pure Veg', label: 'Pure Veg' },
+                        { val: 'Jain Friendly', label: 'Jain' },
+                        { val: 'Non-Veg', label: 'Non-Veg' }
+                      ].map(diet => {
+                        const isSelected = formState.foodType === diet.val;
+                        return (
+                          <button
+                            key={diet.val}
+                            type="button"
+                            onClick={() => {
+                              setFormState({ ...formState, foodType: diet.val });
+                              triggerAutosavePing();
+                            }}
+                            className={`py-2.5 px-2 text-center rounded border font-label-caps text-[11px] tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              isSelected
+                                ? 'border-onyx-black bg-onyx-black text-on-primary font-bold shadow-xs'
+                                : 'border-sand-neutral bg-surface-container-low text-secondary hover:text-onyx-black'
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-emerald-400' : 'bg-sand-neutral'}`}></span>
+                            {diet.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tiffin Menu Items & Compartment Inclusions (Fetched from Catalog) */}
+                <div className="space-y-4 pt-4 border-t border-sand-neutral/60">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider">
+                          Tiffin Menu Inclusions & Compartments
+                        </label>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-onyx-black text-on-primary">
+                          {formState.items?.length || 0} selected
+                        </span>
+                      </div>
+                      <p className="font-label-caps text-[11px] text-secondary">
+                        Meal components fetched from your kitchen catalog or custom added to this tiffin box.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSubView('categories')}
+                      className="self-start sm:self-auto px-3 py-1.5 bg-[#121212] hover:bg-black text-bone-white rounded text-xs font-semibold flex items-center gap-1.5 shadow-sm cursor-pointer transition-all border border-neutral-700"
+                    >
+                      <span className="material-symbols-outlined text-[15px] text-amber-400">category</span>
+                      Categories & Items
+                    </button>
+                  </div>
+
+                  {/* Active Selected Tags in this Tiffin */}
+                  <div className="p-3.5 bg-surface-container-low rounded-lg border border-sand-neutral space-y-2">
+                    <span className="font-label-caps text-[10px] uppercase tracking-wider text-secondary font-bold block">
+                      Currently Included in this Tiffin Plan:
+                    </span>
+                    {Array.isArray(formState.items) && formState.items.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {formState.items.map((item, idx) => (
+                          <span 
+                            key={idx} 
+                            className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container-lowest text-onyx-black text-xs font-medium rounded-full border border-sand-neutral shadow-2xs group"
+                          >
+                            <span>{item}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeInclusion(item)}
+                              className="text-secondary hover:text-error transition-colors p-0.5 cursor-pointer"
+                              title="Remove item"
+                            >
+                              <span className="material-symbols-outlined text-[13px] block">close</span>
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-secondary italic">No items selected yet. Select from the catalog below or add a custom component.</p>
+                    )}
+                  </div>
+
+                  {/* Quick Add Custom Item Input */}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
                       <input 
                         type="text"
-                        value={newItemTag}
-                        onChange={e => setNewItemTag(e.target.value)}
+                        value={customInclusionInput}
+                        onChange={e => setCustomInclusionInput(e.target.value)}
                         onKeyDown={e => {
-                          if (e.key === 'Enter' && newItemTag.trim()) {
+                          if (e.key === 'Enter') {
                             e.preventDefault();
-                            setFormState({ ...formState, items: [...formState.items, newItemTag.trim()] });
-                            setNewItemTag('');
+                            addCustomInclusion(e);
                           }
                         }}
-                        placeholder="+ Type item & press Enter"
-                        className="w-full bg-transparent text-xs text-on-surface focus:outline-none"
+                        placeholder="Type custom inclusion (e.g. 4 Bajra Rotla, Sev Tameta, Ringan Olo, Gir Chaas...)"
+                        className="w-full bg-surface-container-low px-4 py-2.5 rounded border border-sand-neutral focus:border-onyx-black focus:outline-none font-body-md text-sm text-onyx-black placeholder:text-secondary/70"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addCustomInclusion}
+                      disabled={!customInclusionInput.trim()}
+                      className="px-4 py-2.5 bg-onyx-black hover:bg-stone-800 disabled:opacity-40 text-on-primary rounded text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add</span>
+                      Add Item
+                    </button>
+                  </div>
+
+                  {/* Fetched Menu Items Catalog Picker */}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-caps text-[11px] uppercase tracking-wider text-secondary font-bold">
+                        Kitchen Menu Catalog (Click to toggle in/out):
+                      </span>
+                      {loadingMenuItems && (
+                        <span className="text-[11px] text-secondary flex items-center gap-1">
+                          <span className="animate-spin material-symbols-outlined text-[13px]">progress_activity</span>
+                          Fetching menu items...
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Filter Chips */}
+                    <div className="flex flex-wrap gap-1.5 pb-1">
+                      {['All', 'Breads', 'Vegetable Curries', 'Dal & Kadhi', 'Rice & Khichdi', 'Accompaniments', 'Sweets'].map(cat => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setSelectedItemCategoryFilter(cat)}
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-label-caps transition-colors cursor-pointer ${
+                            selectedItemCategoryFilter === cat
+                              ? 'bg-onyx-black text-on-primary font-bold'
+                              : 'bg-surface-container-low text-secondary hover:text-onyx-black border border-sand-neutral/60'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Items Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-56 overflow-y-auto p-1 border border-sand-neutral/40 rounded-lg bg-surface-container-low/30">
+                      {filteredCatalogItems.map((item, idx) => {
+                        const isIncluded = formState.items?.includes(item.name);
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => toggleInclusionItem(item.name)}
+                            className={`p-2.5 rounded text-left border transition-all cursor-pointer flex items-center justify-between gap-1.5 ${
+                              isIncluded
+                                ? 'bg-surface-container border-onyx-black shadow-2xs'
+                                : 'bg-surface-container-lowest border-sand-neutral hover:bg-surface-container-low hover:border-secondary'
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className={`text-xs font-semibold truncate ${isIncluded ? 'text-onyx-black font-bold' : 'text-secondary'}`}>
+                                {item.name}
+                              </div>
+                              <span className="text-[9px] font-label-caps uppercase text-secondary/70 block">
+                                {item.category}
+                              </span>
+                            </div>
+                            <span className={`material-symbols-outlined text-[16px] shrink-0 ${isIncluded ? 'text-onyx-black font-bold' : 'text-sand-neutral'}`}>
+                              {isIncluded ? 'check_circle' : 'add_circle'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider" htmlFor="tiffinDesc">
+                    Composition & Heritage Description
+                  </label>
+                  <textarea 
+                    id="tiffinDesc"
+                    rows={4}
+                    value={formState.description}
+                    onChange={e => {
+                      setFormState({ ...formState, description: e.target.value });
+                      triggerAutosavePing();
+                    }}
+                    placeholder="Describe this tiffin, ingredients, preparation style, and culinary heritage..."
+                    className="w-full bg-surface-container-low p-4 rounded border border-sand-neutral focus:border-onyx-black focus:outline-none font-body-md text-onyx-black transition-all"
+                  />
+                  <div className="flex justify-between items-center text-secondary font-label-caps text-[11px]">
+                    <span>Include items like bread count, dal varieties, curries, and side digestifs.</span>
+                    <span>{formState.description.length} / 600</span>
+                  </div>
+                </div>
+
+                {/* Visual Asset Upload Zone */}
+                <div className="space-y-3 pt-2">
+                  <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider">
+                    Tiffin Presentation Imagery
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Upload Area */}
+                    <div 
+                      onClick={() => setShowImagePicker(!showImagePicker)}
+                      className="md:col-span-2 border-2 border-dashed border-sand-neutral hover:border-onyx-black rounded-lg p-6 bg-surface-container-low/50 flex flex-col items-center justify-center text-center cursor-pointer transition-colors group"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                        <span className="material-symbols-outlined text-onyx-black text-[24px]">add_photo_alternate</span>
+                      </div>
+                      <div className="font-button-text text-button-text text-onyx-black mb-1">+ Upload Tiffin Cover Image</div>
+                      <p className="font-label-caps text-[10px] text-secondary uppercase tracking-widest mb-3">
+                        JPG, PNG, or WEBP up to 5MB • Recommended 16:9 ratio
+                      </p>
+                      <div className="inline-flex items-center gap-1.5 text-xs text-clay-earth font-label-caps tracking-wider uppercase underline">
+                        {showImagePicker ? 'Close Preset Gallery' : 'Browse Kitchen Storage'}
+                      </div>
+                    </div>
+
+                    {/* Active Preview Container */}
+                    <div 
+                      onClick={() => setShowImagePicker(!showImagePicker)}
+                      className="relative rounded-lg overflow-hidden border border-sand-neutral aspect-[4/3] bg-surface-container group cursor-pointer"
+                    >
+                      <img 
+                        src={formState.image} 
+                        alt="Tiffin Cover" 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-onyx-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="px-2.5 py-1 bg-surface text-onyx-black font-label-caps text-[10px] uppercase font-bold tracking-wider rounded">
+                          Replace File
+                        </span>
+                      </div>
+                      <div className="absolute bottom-2 left-2 bg-onyx-black/80 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-label-caps text-on-primary uppercase tracking-widest">
+                        Primary Frame
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preset Gallery Picker */}
+                  {showImagePicker && (
+                    <div className="p-4 bg-surface-container-low rounded-lg border border-sand-neutral space-y-2">
+                      <span className="font-label-caps text-[11px] font-bold text-secondary uppercase block">
+                        Select Culinary Photo:
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {presetImages.map((img, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setFormState({ ...formState, image: img.url });
+                              setShowImagePicker(false);
+                              triggerAutosavePing();
+                            }}
+                            className={`px-3 py-1.5 rounded text-xs font-semibold border cursor-pointer transition-colors ${
+                              formState.image === img.url
+                                ? 'bg-onyx-black text-on-primary border-onyx-black'
+                                : 'bg-surface-container-lowest text-secondary border-sand-neutral hover:bg-surface-container'
+                            }`}
+                          >
+                            {img.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* 2. AVAILABILITY & CAPACITY */}
+              <section className="bg-surface-container-lowest p-6 sm:p-8 rounded-lg shadow-sm border border-sand-neutral space-y-6">
+                <div className="flex items-baseline justify-between border-b border-sand-neutral pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-label-caps text-label-caps text-secondary tracking-widest uppercase">02</span>
+                    <h2 className="font-headline-md text-[24px] text-onyx-black">Availability & Daily Volume</h2>
+                  </div>
+                  <span className="font-label-caps text-[11px] text-secondary uppercase">Operational Limits</span>
+                </div>
+
+                {/* Daily Capacity Input */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider" htmlFor="capacityInput">
+                      Daily Capacity Limit <span className="text-error">*</span>
+                    </label>
+                    <span className="font-label-caps text-[11px] text-secondary">Kitchen Batch Ceiling</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center bg-surface-container-low rounded border border-sand-neutral overflow-hidden">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const val = Math.max(1, (Number(formState.capacity) || 1) - 5);
+                          setFormState({ ...formState, capacity: val.toString() });
+                          triggerAutosavePing();
+                        }}
+                        className="w-12 h-12 flex items-center justify-center text-onyx-black hover:bg-surface-container transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">remove</span>
+                      </button>
+                      <input 
+                        id="capacityInput"
+                        type="number"
+                        min="1"
+                        max="500"
+                        value={formState.capacity}
+                        onChange={e => {
+                          setFormState({ ...formState, capacity: e.target.value });
+                          triggerAutosavePing();
+                        }}
+                        className="w-20 text-center bg-transparent py-2.5 font-headline-md text-[20px] text-onyx-black focus:outline-none border-x border-sand-neutral"
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const val = (Number(formState.capacity) || 1) + 5;
+                          setFormState({ ...formState, capacity: val.toString() });
+                          triggerAutosavePing();
+                        }}
+                        className="w-12 h-12 flex items-center justify-center text-onyx-black hover:bg-surface-container transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">add</span>
+                      </button>
+                    </div>
+                    <div className="font-body-md text-secondary">
+                      boxes per meal run to safeguard taste and freshness standards.
+                    </div>
+                  </div>
+                  <p className="font-label-caps text-[11px] text-secondary">
+                    Orders will automatically pause once this threshold is claimed by direct orders or active recurring subscriptions.
+                  </p>
+                </div>
+
+                {/* Schedule Days Matrix */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider">
+                      Active Kitchen Days <span className="text-error">*</span>
+                    </label>
+                    {/* Quick Select Buttons */}
+                    <div className="flex items-center gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const nextDays = {};
+                          DAYS_CONFIG.forEach(d => { nextDays[d.key] = true; nextDays[d.full] = true; });
+                          setFormState({ ...formState, days: nextDays });
+                          triggerAutosavePing();
+                        }}
+                        className="font-label-caps text-[10px] uppercase text-secondary hover:text-onyx-black underline tracking-wider cursor-pointer"
+                      >
+                        All Days
+                      </button>
+                      <span className="text-sand-neutral">•</span>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const nextDays = {};
+                          DAYS_CONFIG.forEach(d => {
+                            const isWeekday = d.key !== 'Sat' && d.key !== 'Sun';
+                            nextDays[d.key] = isWeekday;
+                            nextDays[d.full] = isWeekday;
+                          });
+                          setFormState({ ...formState, days: nextDays });
+                          triggerAutosavePing();
+                        }}
+                        className="font-label-caps text-[10px] uppercase text-secondary hover:text-onyx-black underline tracking-wider cursor-pointer"
+                      >
+                        Weekdays
+                      </button>
+                      <span className="text-sand-neutral">•</span>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const nextDays = {};
+                          DAYS_CONFIG.forEach(d => {
+                            const isWeekend = d.key === 'Sat' || d.key === 'Sun';
+                            nextDays[d.key] = isWeekend;
+                            nextDays[d.full] = isWeekend;
+                          });
+                          setFormState({ ...formState, days: nextDays });
+                          triggerAutosavePing();
+                        }}
+                        className="font-label-caps text-[10px] uppercase text-secondary hover:text-onyx-black underline tracking-wider cursor-pointer"
+                      >
+                        Weekends
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Day Pills */}
+                  <div className="grid grid-cols-2 sm:grid-cols-7 gap-2.5">
+                    {DAYS_CONFIG.map(({ key, full, label }) => {
+                      const isSelected = !!(formState.days[key] || formState.days[full]);
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => {
+                            setFormState({
+                              ...formState,
+                              days: {
+                                ...formState.days,
+                                [key]: !isSelected,
+                                [full]: !isSelected
+                              }
+                            });
+                            triggerAutosavePing();
+                          }}
+                          className={`flex flex-col items-center justify-center p-3 rounded border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'border-onyx-black bg-onyx-black text-on-primary shadow-xs'
+                              : 'border-sand-neutral bg-surface-container-low text-secondary hover:border-onyx-black'
+                          }`}
+                        >
+                          <span className="font-label-caps text-[12px] font-bold">{label}</span>
+                          <span className={`material-symbols-outlined text-[14px] mt-1 ${isSelected ? '' : 'opacity-0'}`}>
+                            check
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="font-label-caps text-[11px] text-secondary">
+                    {DAYS_CONFIG.filter(d => formState.days[d.key] || formState.days[d.full]).length} days selected per week. {(!formState.days['Sun'] && !formState.days['Sunday']) ? 'Sunday kitchen maintenance schedule active.' : 'Full week operational schedule active.'}
+                  </p>
+                </div>
+              </section>
+
+              {/* 3. MEAL SCHEDULE & FULFILLMENT WINDOW */}
+              <section className="bg-surface-container-lowest p-6 sm:p-8 rounded-lg shadow-sm border border-sand-neutral space-y-6">
+                <div className="flex items-baseline justify-between border-b border-sand-neutral pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-label-caps text-label-caps text-secondary tracking-widest uppercase">03</span>
+                    <h2 className="font-headline-md text-[24px] text-onyx-black">Fulfillment & Delivery Windows</h2>
+                  </div>
+                  <span className="font-label-caps text-[11px] text-secondary uppercase">Precision Timing</span>
+                </div>
+
+                {/* Meal Slot Type */}
+                <div className="space-y-2">
+                  <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider">
+                    Meal Service Slot <span className="text-error">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                      { val: 'Lunch', label: 'Lunch Service', icon: 'wb_sunny' },
+                      { val: 'Dinner', label: 'Dinner Service', icon: 'bedtime' },
+                      { val: 'All-Day Batch', label: 'Full Day Sub', icon: 'all_inclusive' }
+                    ].map(slot => {
+                      const isSelected = formState.mealType === slot.val;
+                      return (
+                        <label 
+                          key={slot.val}
+                          onClick={() => {
+                            setFormState({ ...formState, mealType: slot.val });
+                            triggerAutosavePing();
+                          }}
+                          className={`flex items-center justify-between p-3.5 rounded border cursor-pointer transition-colors ${
+                            isSelected
+                              ? 'border-onyx-black bg-surface-container shadow-xs'
+                              : 'border-sand-neutral bg-surface-container-low hover:border-onyx-black'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <input 
+                              type="radio"
+                              name="mealType"
+                              value={slot.val}
+                              checked={isSelected}
+                              onChange={() => {}}
+                              className="accent-onyx-black cursor-pointer"
+                            />
+                            <span className="font-body-md text-onyx-black font-medium">{slot.label}</span>
+                          </div>
+                          <span className="material-symbols-outlined text-secondary text-[18px]">{slot.icon}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Window Times Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider" htmlFor="startTime">
+                      Dispatch Start Time <span className="text-error">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary text-[18px]">schedule</span>
+                      <input 
+                        id="startTime"
+                        type="text"
+                        value={formState.startTime}
+                        onChange={e => {
+                          setFormState({ ...formState, startTime: e.target.value });
+                          triggerAutosavePing();
+                        }}
+                        className="w-full bg-surface-container-low pl-10 pr-4 py-3 rounded border border-sand-neutral focus:border-onyx-black focus:outline-none font-body-md text-onyx-black"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider" htmlFor="endTime">
+                      Dispatch End Time <span className="text-error">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary text-[18px]">schedule</span>
+                      <input 
+                        id="endTime"
+                        type="text"
+                        value={formState.endTime}
+                        onChange={e => {
+                          setFormState({ ...formState, endTime: e.target.value });
+                          triggerAutosavePing();
+                        }}
+                        className="w-full bg-surface-container-low pl-10 pr-4 py-3 rounded border border-sand-neutral focus:border-onyx-black focus:outline-none font-body-md text-onyx-black"
                       />
                     </div>
                   </div>
                 </div>
+
+                {/* Cut-off Time Notice Box */}
+                <div className="p-4 bg-surface-container-low rounded-lg border border-sand-neutral space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider" htmlFor="cutoffTime">
+                        Customer Order Cut-off Time <span className="text-error">*</span>
+                      </label>
+                      <p className="font-body-md text-secondary text-sm">Prevents last-minute orders that compromise kitchen batch prep.</p>
+                    </div>
+                    <div className="relative w-40">
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary text-[18px]">lock_clock</span>
+                      <input 
+                        id="cutoffTime"
+                        type="text"
+                        value={formState.orderCutoff}
+                        onChange={e => {
+                          setFormState({ ...formState, orderCutoff: e.target.value });
+                          triggerAutosavePing();
+                        }}
+                        className="w-full bg-surface-container-lowest pl-9 pr-3 py-2 rounded border border-sand-neutral focus:border-onyx-black focus:outline-none font-body-md text-onyx-black text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-clay-earth font-label-caps text-[11px]">
+                    <span className="material-symbols-outlined text-[16px]">info</span>
+                    <span>Calculated buffer: Orders freeze exactly 120 minutes before dispatch release.</span>
+                  </div>
+                </div>
+              </section>
+
+              {/* 4. SUBSCRIPTION PLANS & PRICING */}
+              <section className="bg-surface-container-lowest p-6 sm:p-8 rounded-lg shadow-sm border border-sand-neutral space-y-6">
+                <div className="flex items-baseline justify-between border-b border-sand-neutral pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-label-caps text-label-caps text-secondary tracking-widest uppercase">04</span>
+                    <h2 className="font-headline-md text-[24px] text-onyx-black">Subscription Plans & Pricing</h2>
+                  </div>
+                  <span className="font-label-caps text-[11px] text-secondary uppercase">Subscription Person</span>
+                </div>
+
+                {/* Subscription Member Advisory */}
+                <div className="p-3.5 bg-surface-container-low rounded-lg border border-sand-neutral/60 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="material-symbols-outlined text-onyx-black text-[20px]">loyalty</span>
+                    <div>
+                      <div className="font-label-caps text-xs font-bold text-onyx-black uppercase tracking-wider">
+                        Subscription-Only Meal Service
+                      </div>
+                      <div className="text-secondary text-xs">
+                        Configured specifically for regular recurring tiffin subscribers (Monthly & Weekly meal plans).
+                      </div>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 bg-onyx-black text-on-primary font-label-caps text-[10px] uppercase font-bold rounded">
+                    Active Plan
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Monthly Subscription */}
+                  <div className="space-y-2">
+                    <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider" htmlFor="monthlySubPrice">
+                      Monthly Subscription (26 Days) <span className="text-error">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-body-md text-onyx-black font-semibold">₹</span>
+                      <input 
+                        id="monthlySubPrice"
+                        type="number"
+                        min="1"
+                        value={formState.monthlySubPrice}
+                        onChange={e => {
+                          const val = e.target.value;
+                          const perMeal = val ? Math.round(Number(val) / 26) : 0;
+                          setFormState({ 
+                            ...formState, 
+                            monthlySubPrice: val,
+                            price: perMeal.toString()
+                          });
+                          triggerAutosavePing();
+                        }}
+                        className="w-full bg-surface-container-low pl-8 pr-4 py-3 rounded border border-sand-neutral focus:border-onyx-black focus:outline-none font-body-md text-onyx-black"
+                      />
+                    </div>
+                    <p className="font-label-caps text-[11px] text-secondary">
+                      Full 26-day monthly plan (Effective approx. ₹{formState.price || Math.round((Number(formState.monthlySubPrice) || 3640) / 26)} / meal with 12.5% loyalty discount).
+                    </p>
+                  </div>
+
+                  {/* Weekly Subscription */}
+                  <div className="space-y-2">
+                    <label className="block font-label-caps text-label-caps uppercase text-onyx-black tracking-wider" htmlFor="weeklySubPrice">
+                      Weekly Subscription (6 Days) <span className="text-error">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-body-md text-onyx-black font-semibold">₹</span>
+                      <input 
+                        id="weeklySubPrice"
+                        type="number"
+                        min="1"
+                        value={formState.weeklyPrice}
+                        onChange={e => {
+                          setFormState({ ...formState, weeklyPrice: e.target.value });
+                          triggerAutosavePing();
+                        }}
+                        className="w-full bg-surface-container-low pl-8 pr-4 py-3 rounded border border-sand-neutral focus:border-onyx-black focus:outline-none font-body-md text-onyx-black"
+                      />
+                    </div>
+                    <p className="font-label-caps text-[11px] text-secondary">
+                      Flexible 6-day starter trial subscription for new customers.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Per Meal Billing Breakdown */}
+                <div className="p-3 bg-surface-container-low/70 rounded-lg flex items-center justify-between text-xs font-label-caps text-secondary border border-sand-neutral/40">
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-onyx-black">calculate</span>
+                    Effective Per-Meal Base Subscription:
+                  </span>
+                  <span className="font-bold text-onyx-black text-sm">
+                    ₹{formState.price || Math.round((Number(formState.monthlySubPrice) || 3640) / 26)} / meal
+                  </span>
+                </div>
+              </section>
+
+              {/* 5. STATUS & MARKETPLACE VISIBILITY */}
+              <section className="bg-surface-container-lowest p-6 rounded-lg shadow-sm border border-sand-neutral flex items-center justify-between gap-6">
+                <div className="space-y-1 max-w-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-onyx-black"></span>
+                    <h3 className="font-body-md font-bold text-onyx-black text-base">Available for Immediate Discovery</h3>
+                  </div>
+                  <p className="font-body-md text-secondary text-sm">
+                    When toggled ON, this tiffin plan is indexed instantaneously across student hostels, office corridors, and homes within your 5.0 km delivery polygon.
+                  </p>
+                </div>
+
+                {/* Styled Custom Toggle Switch */}
+                <label className="relative inline-flex items-center cursor-pointer select-none">
+                  <input 
+                    type="checkbox"
+                    checked={formState.isAvailable}
+                    onChange={e => {
+                      setFormState({
+                        ...formState,
+                        isAvailable: e.target.checked,
+                        status: e.target.checked ? 'Active' : 'Inactive'
+                      });
+                      triggerAutosavePing();
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-14 h-8 bg-sand-neutral peer-focus:outline-none rounded-full peer peer-checked:bg-onyx-black transition-colors"></div>
+                  <div className="absolute left-1 top-1 bg-surface-container-lowest w-6 h-6 rounded-full transition-transform peer-checked:translate-x-6 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-onyx-black text-[14px]">check</span>
+                  </div>
+                </label>
+              </section>
+
+              {/* Form Actions Bar (Sticky & Permanent) */}
+              <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-4 pt-4 pb-12 border-t border-sand-neutral">
+                <button 
+                  type="button"
+                  onClick={() => { resetForm(); setSubView('all'); }}
+                  className="w-full sm:w-auto px-6 py-3 rounded border border-sand-neutral text-onyx-black font-button-text hover:bg-surface-container transition-colors tracking-wider uppercase text-xs cursor-pointer"
+                >
+                  Discard Changes
+                </button>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <button 
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={(e) => handleSaveTiffin(e, false)}
+                    className="w-full sm:w-auto px-6 py-3 rounded border border-onyx-black text-onyx-black font-button-text hover:bg-surface-container-low transition-colors tracking-wider uppercase text-xs cursor-pointer disabled:opacity-50"
+                  >
+                    Save as Draft
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full sm:w-auto px-8 py-3 rounded bg-onyx-black text-on-primary font-button-text hover:bg-clay-earth transition-colors flex items-center justify-center gap-2 shadow-md tracking-wider uppercase text-xs font-semibold cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">verified</span>
+                    {isSubmitting ? 'Publishing...' : editingTiffin ? 'Update Tiffin Plan' : 'Publish Tiffin Plan'}
+                  </button>
+                </div>
               </div>
 
-              {/* Kitchen Logistics & Capacity */}
-              <div className="p-6 rounded-2xl bg-surface-container-lowest border border-sand-neutral/40 shadow-xs space-y-5">
-                <div className="flex items-center justify-between pb-3 border-b border-sand-neutral/40">
-                  <span className="font-label-caps text-xs uppercase font-bold text-onyx-black">02 / Kitchen Logistics</span>
-                  <span className="material-symbols-outlined text-secondary text-[20px]">soup_kitchen</span>
+            </div>
+
+            {/* Right Column: Live Marketplace Simulation Card (Columns 9-12) */}
+            <div className="lg:col-span-4 sticky top-24 space-y-6">
+              
+              {/* Preview Widget Header */}
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-onyx-black text-[18px]">visibility</span>
+                  <span className="font-label-caps text-label-caps text-onyx-black uppercase tracking-wider">
+                    Live Customer Preview
+                  </span>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Daily Portion Cap *</label>
-                    <input 
-                      type="number"
-                      required
-                      min={1}
-                      value={formState.capacity}
-                      onChange={e => setFormState({ ...formState, capacity: e.target.value })}
-                      className="w-full bg-surface-container-low px-4 py-2.5 rounded-xl text-xs text-on-surface border border-sand-neutral/40 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Lead Notice Time</label>
-                    <select 
-                      value={formState.noticeTime}
-                      onChange={e => setFormState({ ...formState, noticeTime: e.target.value })}
-                      className="w-full bg-surface-container-low px-4 py-2.5 rounded-xl text-xs text-on-surface border border-sand-neutral/40 focus:outline-none cursor-pointer"
-                    >
-                      <option value="30 Mins Notice">30 Mins Notice</option>
-                      <option value="2 Hours Notice">2 Hours Notice</option>
-                      <option value="4 Hours Notice">4 Hours Notice</option>
-                      <option value="1 Day Prior">1 Day Prior</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Assigned Station</label>
-                    <select 
-                      value={formState.prepStation}
-                      onChange={e => setFormState({ ...formState, prepStation: e.target.value })}
-                      className="w-full bg-surface-container-low px-4 py-2.5 rounded-xl text-xs text-on-surface border border-sand-neutral/40 focus:outline-none cursor-pointer"
-                    >
-                      <option value="Station 1 (Breads & Roti)">Station 1 (Breads)</option>
-                      <option value="Station 2 (Slow Curries)">Station 2 (Curries)</option>
-                      <option value="Station 3 (Packing & QC)">Station 3 (Packing)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Active Service Days</label>
-                  <div className="grid grid-cols-7 gap-1.5">
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => setFormState({
-                          ...formState,
-                          days: { ...formState.days, [day]: !formState.days[day] }
-                        })}
-                        className={`py-2 rounded-xl text-[11px] font-label-caps font-bold transition-all cursor-pointer ${
-                          formState.days[day] ? 'bg-onyx-black text-bone-white' : 'bg-surface-container-low text-secondary'
-                        }`}
-                      >
-                        {day.slice(0, 3)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <span className="font-label-caps text-[10px] bg-surface-container-high px-2 py-0.5 rounded text-secondary font-bold uppercase">
+                  5km Discovery View
+                </span>
               </div>
 
-              {/* Tiffin Image Selector */}
-              <div className="p-6 rounded-2xl bg-surface-container-lowest border border-sand-neutral/40 shadow-xs space-y-5">
-                <div className="flex items-center justify-between pb-3 border-b border-sand-neutral/40">
-                  <span className="font-label-caps text-xs uppercase font-bold text-onyx-black">03 / Tiffin Imagery</span>
-                  <span className="material-symbols-outlined text-secondary text-[20px]">photo_camera</span>
-                </div>
+              {/* Rendered Card Simulation (Matches TiffinLink Consumer App) */}
+              <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-md border border-sand-neutral transition-all">
+                
+                {/* Image Top Bar */}
+                <div className="relative aspect-[16/10] bg-surface-container-low overflow-hidden">
+                  <img 
+                    src={formState.image} 
+                    alt={formState.name} 
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-onyx-black/70 via-transparent to-black/20"></div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <img src={formState.image} alt="Preview" className="w-24 h-24 rounded-xl object-cover border border-sand-neutral/50 shrink-0" />
-                  <div className="space-y-2 flex-1">
-                    <span className="font-label-caps text-xs font-bold text-secondary uppercase block">Select Preset Culinary Image</span>
-                    <div className="flex flex-wrap gap-2">
-                      {presetImages.map((img, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setFormState({ ...formState, image: img.url })}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
-                            formState.image === img.url ? 'bg-onyx-black text-bone-white border-onyx-black' : 'bg-surface-container-low text-secondary border-sand-neutral/40'
-                          }`}
-                        >
-                          {img.label}
-                        </button>
-                      ))}
+                  {/* Badges Over Media */}
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                    <span className="bg-surface-container-lowest/95 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-label-caps text-onyx-black font-bold uppercase tracking-wider flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full ${formState.foodType === 'Pure Veg' ? 'bg-emerald-600' : 'bg-amber-600'}`}></span> 
+                      {formState.foodType}
+                    </span>
+                    <span className="bg-onyx-black/80 backdrop-blur-md text-on-primary px-2 py-0.5 rounded text-[10px] font-label-caps uppercase tracking-wider">
+                      {formState.mealType}
+                    </span>
+                  </div>
+
+                  <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between text-on-primary">
+                    <div>
+                      <span className="font-label-caps text-[10px] uppercase tracking-widest opacity-80">Provider Kitchen</span>
+                      <div className="font-body-md font-semibold text-sm leading-snug">Xoxo Men Homestyle</div>
+                    </div>
+                    <div className="bg-surface-container-lowest/90 text-onyx-black px-2 py-1 rounded text-xs font-bold font-label-caps">
+                      4.9 ★ <span className="text-[10px] text-secondary font-normal">(184)</span>
                     </div>
                   </div>
                 </div>
+
+                {/* Card Content Body */}
+                <div className="p-5 space-y-4">
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-headline-md text-[20px] text-onyx-black leading-tight">
+                        {formState.name || 'Untitled Tiffin Plan'}
+                      </h3>
+                    </div>
+                    <p className="font-body-md text-xs text-secondary mt-1.5 line-clamp-2">
+                      {formState.description || 'No description provided yet.'}
+                    </p>
+                  </div>
+
+                  {/* Inclusions Pills */}
+                  <div className="flex flex-wrap gap-1.5 py-1">
+                    {(Array.isArray(formState.items) && formState.items.length > 0 ? formState.items : ['4 Rotlas', '2 Sabzis', 'Kadhi-Khichdi', 'Chaas']).map((inc, idx) => (
+                      <span key={idx} className="bg-surface-container text-secondary text-[11px] font-label-caps px-2 py-0.5 rounded">
+                        {inc}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Fulfillment Stats */}
+                  <div className="p-3 bg-surface-container-low rounded border border-sand-neutral/60 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-label-caps text-[10px] uppercase text-secondary">Delivery Window</span>
+                      <span className="font-body-md text-onyx-black font-semibold text-xs">
+                        {formState.startTime} – {formState.endTime}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-label-caps text-[10px] uppercase text-secondary">Ordering Cut-Off</span>
+                      <span className="font-label-caps text-[10px] font-bold text-error uppercase">
+                        Orders Close {formState.orderCutoff}
+                      </span>
+                    </div>
+                    <div className="w-full bg-sand-neutral h-1 rounded-full overflow-hidden">
+                      <div className="bg-onyx-black h-full w-3/5"></div>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-label-caps text-secondary">
+                      <span>Daily Quota</span>
+                      <span>{formState.capacity || 0} slots capacity</span>
+                    </div>
+                  </div>
+
+                  {/* Pricing & Call to Action Preview */}
+                  <div className="pt-2 flex items-center justify-between border-t border-sand-neutral">
+                    <div>
+                      <span className="font-label-caps text-[9px] uppercase tracking-widest text-secondary block">
+                        Monthly Subscription
+                      </span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-headline-md text-[22px] text-onyx-black font-bold">
+                          ₹{formState.monthlySubPrice || 3640}
+                        </span>
+                        <span className="font-label-caps text-[10px] text-secondary">
+                          / 26 meals (₹{formState.price || 140}/meal)
+                        </span>
+                      </div>
+                    </div>
+                    <button 
+                      type="button" 
+                      className="px-4 py-2 bg-onyx-black text-on-primary font-button-text text-xs rounded tracking-wider uppercase pointer-events-none opacity-90 shadow-xs"
+                    >
+                      Subscribe Plan
+                    </button>
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* Kitchen Advisory Note */}
+              <div className="p-4 bg-secondary-container/40 rounded-lg border border-secondary-fixed space-y-2">
+                <div className="flex items-center gap-2 text-on-secondary-fixed">
+                  <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                  <span className="font-label-caps text-[11px] font-bold uppercase tracking-wider">
+                    FSSAI Hygiene Standard
+                  </span>
+                </div>
+                <p className="font-body-md text-xs text-on-secondary-fixed-variant leading-relaxed">
+                  All listed tiffins undergo automated random spot audits. Please guarantee thermal food packing vessels are tamper-sealed prior to partner courier pick-up.
+                </p>
               </div>
 
             </div>
 
-            {/* Sidebar Economics & Publication (4 columns) */}
-            <div className="lg:col-span-4 space-y-6">
-              
-              {/* Pricing Architecture */}
-              <div className="p-6 rounded-2xl bg-surface-container-lowest border border-sand-neutral/40 shadow-xs space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-sand-neutral/40">
-                  <span className="font-label-caps text-xs uppercase font-bold text-onyx-black">04 / Economics</span>
-                  <span className="material-symbols-outlined text-secondary text-[20px]">payments</span>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Base Price (₹) *</label>
-                  <input 
-                    type="number"
-                    required
-                    min={1}
-                    value={formState.price}
-                    onChange={e => setFormState({ ...formState, price: e.target.value })}
-                    className="w-full bg-surface-container-low px-4 py-2.5 rounded-xl text-xs font-bold text-on-surface border border-sand-neutral/40 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block font-label-caps text-xs uppercase font-bold text-secondary">Discount (%)</label>
-                  <input 
-                    type="number"
-                    min={0}
-                    max={90}
-                    value={formState.discount}
-                    onChange={e => setFormState({ ...formState, discount: e.target.value })}
-                    className="w-full bg-surface-container-low px-4 py-2.5 rounded-xl text-xs text-on-surface border border-sand-neutral/40 focus:outline-none"
-                  />
-                </div>
-
-                {/* Settlement Ledger Card */}
-                <div className="p-4 bg-surface-container-low rounded-xl space-y-2 font-label-caps text-xs border border-sand-neutral/30">
-                  <div className="flex justify-between items-center text-secondary">
-                    <span>Customer Price:</span>
-                    <span className="font-bold text-onyx-black">₹{netPrice.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-secondary">
-                    <span>TiffinLink Fee (12.5%):</span>
-                    <span>- ₹{(netPrice * 0.125).toFixed(2)}</span>
-                  </div>
-                  <div className="pt-2 border-t border-sand-neutral/40 flex justify-between items-center font-bold">
-                    <span className="text-onyx-black">Est. Provider Payout:</span>
-                    <span className="text-emerald-800 text-sm">₹{estimatedPayout}.00</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Release Gate Actions */}
-              <div className="p-6 rounded-2xl bg-surface-container-lowest border border-sand-neutral/40 shadow-xs space-y-4">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-3 bg-onyx-black text-bone-white text-xs font-bold rounded-xl hover:bg-stone-800 transition-colors cursor-pointer shadow-xs"
-                >
-                  {isSubmitting ? 'Processing...' : 'Save & Publish Live'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={(e) => handleSaveTiffin(e, false)}
-                  disabled={isSubmitting}
-                  className="w-full py-3 bg-surface-container text-on-surface text-xs font-bold rounded-xl hover:bg-surface-container-high transition-colors cursor-pointer"
-                >
-                  Save as Inactive
-                </button>
-              </div>
-
-            </div>
-
-          </div>
-        </form>
+          </form>
+        </div>
       )}
 
       {/* ========================================================================= */}
@@ -1261,6 +2275,31 @@ export default function MyTiffinsTab({
           )}
 
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* PART 4 — CATEGORIES & ITEMS SUB-VIEW                                      */}
+      {/* ========================================================================= */}
+      {subView === 'categories' && (
+        <CategoriesItemsTab
+          tiffins={tiffins}
+          onToast={showToast}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* PART 5 — MEAL BUILDER SUB-VIEW                                             */}
+      {/* ========================================================================= */}
+      {subView === 'meal-builder' && (
+        <MealBuilderTab
+          tiffins={tiffins}
+          onToast={showToast}
+          onNavigateTab={(view) => {
+            if (view === 'categories') setSubView('categories');
+            else if (view === 'add-tiffin') setSubView('add');
+            else if (onNavigateTab) onNavigateTab(view);
+          }}
+        />
       )}
 
     </div>

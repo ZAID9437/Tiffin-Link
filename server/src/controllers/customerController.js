@@ -221,14 +221,86 @@ const getCustomerById = async (req, res) => {
       });
     }
 
-    return res.json({ success: true, message: 'Customer details fetched' });
-  } catch (error) {
-    console.error('Error fetching customer details:', error);
-    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+      return res.json({ success: true, message: 'Customer details fetched' });
+    } catch (error) {
+      console.error('Error fetching customer details:', error);
+      res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+    }
+  };
+
+// @desc    Get customer's saved addresses
+// @route   GET /api/customers/addresses
+const getCustomerAddresses = async (req, res) => {
+  try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    const user = await User.findById(req.user._id);
+    return res.json({ success: true, data: user?.savedAddresses || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Add a saved address for customer
+// @route   POST /api/customers/addresses
+const addCustomerAddress = async (req, res) => {
+  try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    const { label, fullName, phone, street, area, city, state, pincode, lat, lng, landmark, isDefault } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.savedAddresses = user.savedAddresses || [];
+    if (isDefault) {
+      user.savedAddresses.forEach(a => { a.isDefault = false; });
+    }
+    user.savedAddresses.push({
+      label: label || 'Home',
+      fullName: fullName || user.name,
+      phone: phone || user.phone,
+      street: street || '',
+      area: area || '',
+      city: city || 'Ahmedabad',
+      state: state || 'Gujarat',
+      pincode: pincode || '',
+      lat: Number(lat) || 23.0300,
+      lng: Number(lng) || 72.5178,
+      landmark: landmark || '',
+      isDefault: Boolean(isDefault)
+    });
+    await user.save();
+    return res.status(201).json({ success: true, message: 'Address saved successfully', data: user.savedAddresses });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// @desc    Delete a saved address
+// @route   DELETE /api/customers/addresses/:id
+const deleteCustomerAddress = async (req, res) => {
+  try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+    const { id } = req.params;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.savedAddresses = (user.savedAddresses || []).filter(a => String(a._id) !== String(id));
+    await user.save();
+    return res.json({ success: true, message: 'Address removed', data: user.savedAddresses });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
 module.exports = {
   getCustomers,
-  getCustomerById
+  getCustomerById,
+  getCustomerAddresses,
+  addCustomerAddress,
+  deleteCustomerAddress
 };

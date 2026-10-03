@@ -146,12 +146,35 @@ const orderSchema = new mongoose.Schema({
 
   paymentStatus: {
     type: String,
-    enum: ['Paid', 'Cash on Delivery', 'Pending'],
+    enum: ['Paid', 'Cash on Delivery', 'Pending', 'Failed', 'PAYMENT_FAILED'],
     default: 'Paid'
   },
+  paymentId: {
+    type: String,
+    default: ''
+  },
+  gatewayOrderId: {
+    type: String,
+    default: ''
+  },
+  transactionId: {
+    type: String,
+    default: ''
+  },
+  paidAt: Date,
+
   status: {
     type: String,
-    enum: ['New', 'Preparing', 'Ready', 'Completed', 'Cancelled'],
+    enum: [
+      'New', 'PENDING', 'Pending', 'CONFIRMED', 'Confirmed', 
+      'ACCEPTED', 'Accepted', 'PREPARING', 'Preparing', 
+      'READY_FOR_PICKUP', 'Ready', 'DELIVERY_REQUESTED', 
+      'DRIVER_ASSIGNED', 'PICKED_UP', 'Picked Up', 
+      'OUT_FOR_DELIVERY', 'Out for Delivery', 'ARRIVED', 
+      'DELIVERED', 'Completed', 
+      'REJECTED', 'CANCELLED', 'Cancelled', 
+      'PAYMENT_FAILED', 'DELIVERY_FAILED'
+    ],
     default: 'New'
   },
   cancellationReason: {
@@ -159,6 +182,11 @@ const orderSchema = new mongoose.Schema({
     default: ''
   },
   
+  driverId: {
+    type: String,
+    default: '',
+    index: true
+  },
   deliveryStatus: {
     type: String,
     enum: [
@@ -168,7 +196,8 @@ const orderSchema = new mongoose.Schema({
       'Picked Up', 'PICKED_UP',
       'On The Way', 'Out for Delivery', 'OUT_FOR_DELIVERY',
       'Arrived at Customer', 'ARRIVED_CUSTOMER',
-      'Delivered', 'DELIVERED', 'Completed'
+      'Delivered', 'DELIVERED', 'Completed',
+      'CANCELLED', 'EXPIRED', 'FAILED'
     ],
     default: 'Unassigned'
   },
@@ -192,16 +221,41 @@ const orderSchema = new mongoose.Schema({
     type: String,
     default: 'Shreeji Tiffin Kitchen, Satellite, Ahmedabad'
   },
+  pickupOtp: {
+    type: String,
+    default: ''
+  },
+  deliveryOtp: {
+    type: String,
+    default: ''
+  },
+  isReviewed: {
+    type: Boolean,
+    default: false
+  },
+  reviewRating: {
+    type: Number,
+    default: 0
+  },
+
   acceptedAt: Date,
+  preparingAt: Date,
+  readyAt: Date,
+  deliveryRequestedAt: Date,
+  assignedAt: Date,
   pickedUpAt: Date,
+  outForDeliveryAt: Date,
+  arrivedAt: Date,
   deliveredAt: Date,
 
   createdAt: {
     type: Date,
     default: Date.now
   }
-});
+}, { strict: false });
 
+orderSchema.index({ customerId: 1, createdAt: -1 });
+orderSchema.index({ driverId: 1, createdAt: -1 });
 orderSchema.index({ providerId: 1, createdAt: -1 });
 orderSchema.index({ providerId: 1, status: 1, createdAt: -1 });
 orderSchema.index({ providerId: 1, deliveryStatus: 1 });

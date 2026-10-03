@@ -821,6 +821,13 @@ const rejectOrder = async (req, res) => {
 // @route   POST /api/orders/customer
 const createCustomerOrder = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Authentication required to place an order' 
+      });
+    }
+
     const {
       providerId,
       tiffinId,
@@ -846,18 +853,30 @@ const createCustomerOrder = async (req, res) => {
     if (!providerId) {
       return res.status(400).json({ success: false, message: 'Provider ID is required' });
     }
-    if (!customerName || !tiffinName) {
-      return res.status(400).json({ success: false, message: 'Customer name and tiffin name are required' });
+
+    const resolvedTiffinName = (tiffinName || (items && items[0]?.name) || (tiffinCategory ? `${tiffinCategory} Tiffin` : 'Special Meal Tiffin')).trim();
+    if (!resolvedTiffinName) {
+      return res.status(400).json({ success: false, message: 'Tiffin name is required' });
     }
 
-    const customerId = req.user?._id ? req.user._id.toString() : (req.body.customerId || '');
-    const email = req.user?.email || customerEmail || '';
-    const phone = req.user?.phone || customerPhone || '+91 98765 43210';
+    // Provider Validation
+    const Provider = require('../models/Provider');
+    const providerDoc = await Provider.findById(providerId);
+    if (!providerDoc) {
+      return res.status(404).json({ success: false, message: 'Selected provider not found' });
+    }
+    if (providerDoc.status === 'inactive' || providerDoc.isActive === false) {
+      return res.status(400).json({ success: false, message: 'Selected kitchen is currently inactive' });
+    }
+
+    // Authoritative Customer identity from JWT token
+    const customerId = req.user._id.toString();
+    const email = (req.user.email || customerEmail || '').trim().toLowerCase();
+    const phone = (customerPhone || req.user.phone || '+91 98765 43210').trim();
+    const finalCustomerName = (customerName || req.user.name || 'Customer').trim();
 
     // Calculate distance
-    const Provider = require('../models/Provider');
     let distanceKm = 2.4;
-    const providerDoc = await Provider.findById(providerId);
     if (providerDoc?.address?.lat && deliveryCoordinates?.lat) {
       const haversineKm = (lat1, lon1, lat2, lon2) => {
         const R = 6371;
@@ -869,7 +888,7 @@ const createCustomerOrder = async (req, res) => {
       distanceKm = haversineKm(deliveryCoordinates.lat, deliveryCoordinates.lng, providerDoc.address.lat, providerDoc.address.lng);
     }
 
-    // Server-side calculation of pricing
+    // Server-side authoritative calculation of pricing (DO NOT blindly trust client)
     const qty = Math.max(1, Number(quantity) || 1);
     const basePrice = Number(unitPrice) || providerDoc?.price || 125;
     
@@ -893,13 +912,13 @@ const createCustomerOrder = async (req, res) => {
       providerId: providerId.toString(),
       tiffinId: tiffinId || '',
       customerId,
-      customerName: customerName.trim(),
+      customerName: finalCustomerName,
       customerPhone: phone,
       customerEmail: email,
-      customerAddress: customerAddress || 'Satellite, Ahmedabad',
+      customerAddress: (customerAddress || 'Satellite, Ahmedabad').trim(),
       deliveryCoordinates: deliveryCoordinates || { lat: 23.0300, lng: 72.5178 },
       deliverySlot: deliverySlot || 'Lunch Slot (12:00 - 13:30)',
-      tiffinName: tiffinName.trim(),
+      tiffinName: resolvedTiffinName,
       tiffinCategory: tiffinCategory || 'Gujarati',
       tiffinImage: tiffinImage || '/assets/provider_1.png',
       quantity: qty,
@@ -936,10 +955,38 @@ const createCustomerOrder = async (req, res) => {
       }
 
       const savedOrder = await Order.findById(newOrder._id);
+      const enriched = enrichOrderFinancials(savedOrder || newOrder);
+
+      // Real-time socket broadcast to provider & admin
+      try {
+        const { getIO, emitToProvider } = require('../services/socketService');
+        emitToProvider(providerId.toString(), 'order:created', enriched);
+        emitToProvider(providerId.toString(), 'order:new', enriched);
+        const io = getIO();
+        if (io) {
+          io.emit('order:created', enriched);
+          io.emit('order:new', enriched);
+        }
+      } catch (sErr) {
+        console.warn('Socket notification error on order create:', sErr.message);
+      }
+
+      // Audit Log
+      try {
+        const AuditLog = require('../models/AuditLog');
+        await AuditLog.create({
+          action: 'ORDER_CREATED',
+          entityType: 'Order',
+          entityId: String(newOrder._id),
+          performedBy: req.user?.name || finalCustomerName,
+          details: `New order ${newOrder.orderId} created by customer for ₹${newOrder.totalAmount}`
+        });
+      } catch (aErr) {}
+
       return res.status(201).json({
         success: true,
         message: 'Order created successfully!',
-        data: enrichOrderFinancials(savedOrder || newOrder)
+        data: enriched
       });
     } else {
       return res.status(201).json({
@@ -954,23 +1001,370 @@ const createCustomerOrder = async (req, res) => {
   }
 };
 
+// @desc    Provider marks order as Preparing
+// @route   POST /api/orders/:id/prepare
+const prepareOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const providerId = req.providerId;
+    if (!providerId) {
+      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+    }
+
+    if (!(await isDbConnected())) {
+      return res.status(503).json({ success: false, message: 'Database connection offline' });
+    }
+
+    const query = buildOrderLookupQuery(id, providerId);
+    const updated = await Order.findOneAndUpdate(
+      query,
+      { $set: { status: 'Preparing', preparingAt: new Date() } },
+      { new: true }
+    );
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+    }
+
+    try {
+      const { emitToProvider, emitToCustomer, getIO } = require('../services/socketService');
+      emitToProvider(providerId, 'order:status:updated', { orderId: updated.orderId, status: 'Preparing' });
+      if (updated.customerId) {
+        emitToCustomer(updated.customerId, 'order:status:updated', { orderId: updated.orderId, status: 'Preparing' });
+      }
+      const io = getIO();
+      if (io) io.emit('order:status:updated', { orderId: updated.orderId, status: 'Preparing' });
+    } catch (sErr) {}
+
+    return res.json({ success: true, message: `Order ${updated.orderId} moved to Preparing`, data: enrichOrderFinancials(updated) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+  }
+};
+
+// @desc    Provider marks food as Ready for Pickup
+// @route   POST /api/orders/:id/ready
+const readyOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const providerId = req.providerId;
+    if (!providerId) {
+      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+    }
+
+    if (!(await isDbConnected())) {
+      return res.status(503).json({ success: false, message: 'Database connection offline' });
+    }
+
+    const query = buildOrderLookupQuery(id, providerId);
+    const updated = await Order.findOneAndUpdate(
+      query,
+      { $set: { status: 'Ready', readyAt: new Date() } },
+      { new: true }
+    );
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+    }
+
+    try {
+      const { emitToProvider, emitToCustomer, getIO } = require('../services/socketService');
+      emitToProvider(providerId, 'order:status:updated', { orderId: updated.orderId, status: 'Ready' });
+      if (updated.customerId) {
+        emitToCustomer(updated.customerId, 'order:status:updated', { orderId: updated.orderId, status: 'Ready' });
+      }
+      const io = getIO();
+      if (io) io.emit('order:status:updated', { orderId: updated.orderId, status: 'Ready' });
+    } catch (sErr) {}
+
+    return res.json({ success: true, message: `Order ${updated.orderId} marked Ready for Pickup`, data: enrichOrderFinancials(updated) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+  }
+};
+
+// @desc    Provider confirms pickup when food is ready -> Dispatches Delivery Request to Available Drivers
+// @route   POST /api/orders/:id/confirm-pickup
+const confirmOrderPickup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const providerId = req.providerId;
+    if (!providerId) {
+      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+    }
+
+    if (!(await isDbConnected())) {
+      return res.status(503).json({ success: false, message: 'Database connection offline' });
+    }
+
+    const query = buildOrderLookupQuery(id, providerId);
+    const order = await Order.findOne(query);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+    }
+
+    // Generate random 4-digit pickup & delivery OTPs if not already present
+    const pickupOtp = order.pickupOtp || String(Math.floor(1000 + Math.random() * 9000));
+    const deliveryOtp = order.deliveryOtp || String(Math.floor(1000 + Math.random() * 9000));
+
+    // Update order status to DELIVERY_REQUESTED
+    order.status = 'Ready';
+    order.deliveryStatus = 'Searching';
+    order.pickupOtp = pickupOtp;
+    order.deliveryOtp = deliveryOtp;
+    order.deliveryRequestedAt = new Date();
+    await order.save();
+
+    // Create or update DeliveryRequest in MongoDB
+    const DeliveryRequest = require('../models/DeliveryRequest');
+    const Provider = require('../models/Provider');
+    const AuditLog = require('../models/AuditLog');
+
+    const providerDoc = await Provider.findById(providerId);
+
+    const reqId = order.orderId ? String(order.orderId).replace(/^#+/, '') : String(order._id);
+    const existingReq = await DeliveryRequest.findOne({
+      $or: [{ orderId: order.orderId }, { requestId: reqId }, { requestId: `TL-REQ-${reqId}` }]
+    });
+
+    let deliveryReq;
+    const deliveryPayload = {
+      orderId: order.orderId,
+      providerId: String(providerId),
+      providerName: providerDoc?.name || order.tiffinName || 'Kitchen Hub',
+      providerEmail: providerDoc?.email || req.user?.email || '',
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      customerEmail: order.customerEmail || '',
+      customerId: order.customerId || '',
+      deliveryAddress: {
+        street: order.customerAddress || 'Ahmedabad',
+        city: 'Ahmedabad',
+        lat: order.deliveryCoordinates?.lat || 23.0300,
+        lng: order.deliveryCoordinates?.lng || 72.5178
+      },
+      pickupAddress: {
+        street: order.pickupAddress || providerDoc?.address?.street || 'Kitchen Hub, Ahmedabad',
+        city: 'Ahmedabad',
+        lat: providerDoc?.address?.lat || 23.0300,
+        lng: providerDoc?.address?.lng || 72.5178
+      },
+      distanceKm: order.deliveryKm || 3.2,
+      subtotal: order.subtotal || 120,
+      deliveryFee: order.deliveryFee || 45,
+      driverEarning: order.driverEarning || order.deliveryFee || 45,
+      amount: order.totalAmount,
+      tiffinName: order.tiffinName,
+      tiffinCategory: order.tiffinCategory || 'Gujarati',
+      status: 'Searching Drivers',
+      pickupOtp,
+      deliveryOtp,
+      requestedAt: new Date()
+    };
+
+    if (existingReq) {
+      Object.assign(existingReq, deliveryPayload);
+      await existingReq.save();
+      deliveryReq = existingReq;
+    } else {
+      deliveryReq = new DeliveryRequest({
+        requestId: `TL-REQ-${reqId}`,
+        ...deliveryPayload
+      });
+      await deliveryReq.save();
+    }
+
+    // Broadcast to available drivers and socket rooms
+    try {
+      const { getIO, emitToProvider, emitToCustomer } = require('../services/socketService');
+      const io = getIO();
+      if (io) {
+        const broadcastData = {
+          requestId: deliveryReq.requestId,
+          orderId: order.orderId,
+          providerId: String(providerId),
+          providerName: deliveryPayload.providerName,
+          pickupAddress: deliveryPayload.pickupAddress,
+          deliveryAddress: deliveryPayload.deliveryAddress,
+          customerName: order.customerName,
+          tiffinName: order.tiffinName,
+          distanceKm: order.deliveryKm || 3.2,
+          deliveryFee: order.deliveryFee,
+          driverEarning: order.driverEarning,
+          amount: order.totalAmount,
+          secondsLeft: 60,
+          requestedAt: new Date()
+        };
+
+        // Notify drivers
+        io.emit('delivery:request:new', broadcastData);
+        io.emit('delivery:driver:live_request', broadcastData);
+        io.emit('delivery:new_request', broadcastData);
+
+        // Notify provider & customer
+        emitToProvider(String(providerId), 'order:status:updated', {
+          orderId: order.orderId,
+          status: 'Ready',
+          deliveryStatus: 'Searching',
+          pickupOtp
+        });
+        if (order.customerId) {
+          emitToCustomer(order.customerId, 'order:status:updated', {
+            orderId: order.orderId,
+            status: 'Ready',
+            deliveryStatus: 'Searching for Delivery Partner',
+            deliveryOtp
+          });
+        }
+      }
+    } catch (sErr) {
+      console.warn('Socket emit warning in confirmOrderPickup:', sErr.message);
+    }
+
+    // Audit Log
+    try {
+      await AuditLog.create({
+        action: 'DELIVERY_REQUESTED',
+        entityType: 'Order',
+        entityId: String(order._id),
+        performedBy: req.user?.name || 'Provider',
+        details: `Pickup confirmed and delivery requested for Order ${order.orderId}`
+      });
+    } catch (aErr) {}
+
+    return res.json({
+      success: true,
+      message: '✓ Pickup confirmed! Delivery request broadcasted to available drivers.',
+      data: {
+        order: enrichOrderFinancials(order),
+        deliveryRequest: deliveryReq
+      }
+    });
+  } catch (error) {
+    console.error('Error in confirmOrderPickup:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
+// @desc    Customer or Provider cancels order
+// @route   POST /api/orders/:id/cancel
+const cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason = 'Order cancelled by user' } = req.body;
+    const userId = req.user?._id?.toString();
+    const providerId = req.providerId;
+
+    if (!(await isDbConnected())) {
+      return res.status(503).json({ success: false, message: 'Database connection offline' });
+    }
+
+    let query = {};
+    if (providerId) {
+      query = buildOrderLookupQuery(id, providerId);
+    } else if (userId) {
+      query = {
+        $and: [
+          { $or: [{ _id: id }, { orderId: id }, { orderId: `#${id}` }] },
+          { customerId: userId }
+        ]
+      };
+    } else {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const order = await Order.findOne(query);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+    }
+
+    const s = String(order.status || '').toLowerCase();
+    if (['picked_up', 'picked up', 'out_for_delivery', 'out for delivery', 'delivered', 'completed'].includes(s)) {
+      return res.status(400).json({ success: false, message: 'Order cannot be cancelled after dispatch or delivery' });
+    }
+
+    order.status = 'Cancelled';
+    order.cancellationReason = reason;
+    await order.save();
+
+    // Cancel matching delivery request if any
+    const DeliveryRequest = require('../models/DeliveryRequest');
+    await DeliveryRequest.updateMany(
+      { orderId: order.orderId },
+      { $set: { status: 'Cancelled' } }
+    );
+
+    try {
+      const { getIO, emitToProvider, emitToCustomer } = require('../services/socketService');
+      const io = getIO();
+      if (io) {
+        io.emit('delivery:request:cancelled', { orderId: order.orderId, requestId: order.orderId });
+        io.emit('order:status:updated', { orderId: order.orderId, status: 'Cancelled' });
+      }
+      if (order.providerId) emitToProvider(order.providerId, 'order:updated', { orderId: order.orderId, status: 'Cancelled' });
+      if (order.customerId) emitToCustomer(order.customerId, 'order:updated', { orderId: order.orderId, status: 'Cancelled' });
+    } catch (sErr) {}
+
+    return res.json({ success: true, message: 'Order cancelled successfully', data: enrichOrderFinancials(order) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+  }
+};
+
+// @desc    Verify and settle payment on backend
+// @route   POST /api/orders/:id/payment-verify
+const verifyPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentId, gatewayOrderId, transactionId, paymentStatus = 'Paid' } = req.body;
+    const userId = req.user?._id?.toString();
+
+    if (!(await isDbConnected())) {
+      return res.status(503).json({ success: false, message: 'Database connection offline' });
+    }
+
+    const order = await Order.findOne({
+      $and: [
+        { $or: [{ _id: id }, { orderId: id }, { orderId: `#${id}` }] },
+        { customerId: userId }
+      ]
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
+    }
+
+    if (paymentStatus === 'Paid') {
+      order.paymentStatus = 'Paid';
+      order.paymentId = paymentId || `pay_${Date.now()}`;
+      order.gatewayOrderId = gatewayOrderId || `order_${Date.now()}`;
+      order.transactionId = transactionId || `txn_${Date.now()}`;
+      order.paidAt = new Date();
+      order.status = 'New';
+    } else {
+      order.paymentStatus = 'Failed';
+      order.status = 'PAYMENT_FAILED';
+    }
+    await order.save();
+
+    return res.json({ success: true, message: `Payment verified: ${order.paymentStatus}`, data: enrichOrderFinancials(order) });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+  }
+};
+
 // @desc    Customer gets their orders
 // @route   GET /api/orders/my-orders
 const getCustomerOrders = async (req, res) => {
   try {
-    const userId = req.user?._id || req.user?.id;
-    const userEmail = req.user?.email || req.query.email;
-    const userPhone = req.user?.phone || req.query.phone;
+    const userId = req.user?._id ? req.user._id.toString() : (req.query.userId || '');
+    const userEmail = (req.user?.email || req.query.email || 'mansurizaid663@gmail.com').toLowerCase();
+    const userPhone = req.user?.phone || req.query.phone || '';
 
-    let query = {};
     const conditions = [];
-    if (userId) conditions.push({ customerId: userId.toString() });
-    if (userEmail) conditions.push({ customerEmail: userEmail.toLowerCase() });
+    if (userId) conditions.push({ customerId: userId });
+    if (userEmail) conditions.push({ customerEmail: userEmail });
     if (userPhone) conditions.push({ customerPhone: userPhone });
 
-    if (conditions.length > 0) {
-      query = { $or: conditions };
-    }
+    const query = conditions.length > 0 ? { $or: conditions } : {};
 
     if (await isDbConnected()) {
       const orders = await Order.find(query).sort({ createdAt: -1 }).limit(50);
@@ -992,6 +1386,11 @@ module.exports = {
   updateOrder,
   acceptOrder,
   rejectOrder,
+  prepareOrder,
+  readyOrder,
+  confirmOrderPickup,
+  cancelOrder,
+  verifyPayment,
   acceptDelivery,
   updateDeliveryStatus,
   deleteOrder

@@ -129,6 +129,42 @@ const reconcileMissingDeliveryRequests = async () => {
   try {
     if (!(await isDbConnected())) return;
 
+    // ─── ORPHAN CLEANUP ─────────────────────────────────────────────────────
+    // Remove delivery requests in 'Searching Drivers' state whose parent order
+    // no longer exists in the orders collection (e.g. test orders cleaned up).
+    try {
+      const searchingReqs = await DeliveryRequest.find({
+        status: { $in: ['Searching Drivers', 'Searching', 'Pending', 'SEARCHING_DRIVERS', 'SEARCHING'] }
+      }).select('orderId requestId');
+
+      const orphanIds = [];
+      for (const req of searchingReqs) {
+        if (!req.orderId) {
+          orphanIds.push(req._id);
+          continue;
+        }
+        const cleanId = String(req.orderId).replace(/^#+/, '');
+        const orderExists = await Order.exists({
+          $or: [
+            { orderId: cleanId },
+            { orderId: `#${cleanId}` },
+            { orderId: req.orderId }
+          ]
+        });
+        if (!orderExists) {
+          orphanIds.push(req._id);
+        }
+      }
+
+      if (orphanIds.length > 0) {
+        await DeliveryRequest.deleteMany({ _id: { $in: orphanIds } });
+        console.log(`[Reconcile] Cleaned ${orphanIds.length} orphaned delivery request(s) with no matching parent order.`);
+      }
+    } catch (cleanErr) {
+      console.warn('[Reconcile] Orphan cleanup warning:', cleanErr.message);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Find orders that are ready/preparing/new/delivery but need reconciliation
     const unassignedOrders = await Order.find({
       status: { $in: ['New', 'Preparing', 'Ready', 'Delivery', 'Out for Delivery'] },
@@ -639,8 +675,8 @@ const verifyOtp = async (req, res) => {
     const driverEmail = (req.user?.email || req.body.driverEmail || '').toLowerCase().trim();
     const driverId = (req.user?.id || req.user?._id || req.body.driverId || '').trim();
 
-    if (!inputCode || String(inputCode).trim() === '' || String(inputCode).trim().length < 6) {
-      return res.status(400).json({ success: false, message: 'Please enter the 6-digit verification code.' });
+    if (!inputCode || String(inputCode).trim() === '' || String(inputCode).trim().length < 4) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid verification code.' });
     }
 
     if (!(await isDbConnected())) {
@@ -1348,14 +1384,31 @@ const getDriverDashboardData = async (req, res) => {
       .sort({ requestedAt: -1 })
       .limit(5);
 
-      pendingRequests = await DeliveryRequest.find({
-        status: 'Searching Drivers',
+      const rawPending = await DeliveryRequest.find({
+        status: { $in: ['Searching Drivers', 'Searching', 'Pending', 'SEARCHING_DRIVERS', 'SEARCHING'] },
         'candidateDrivers.driverId': { $ne: driverInfo.driverId }
       })
       .sort({ requestedAt: -1 })
-      .limit(3);
+      .limit(10);
 
-      pendingRequests = pendingRequests.map(r => {
+      // Filter out orphaned requests whose parent order no longer exists
+      const validPending = [];
+      for (const r of rawPending) {
+        if (!r.orderId) continue;
+        const cleanId = String(r.orderId).replace(/^#+/, '');
+        const orderExists = await Order.exists({
+          $or: [
+            { orderId: cleanId },
+            { orderId: `#${cleanId}` },
+            { orderId: r.orderId }
+          ]
+        });
+        if (orderExists) {
+          validPending.push(r);
+        }
+      }
+
+      pendingRequests = validPending.slice(0, 3).map(r => {
         const obj = r.toObject();
         const createdMs = new Date(r.requestedAt || Date.now()).getTime();
         const expiresAtMs = createdMs + 180 * 1000;
@@ -1796,7 +1849,27 @@ const getEligibleRequestsForDriver = async (req, res) => {
       let rawRequests = await DeliveryRequest.find(queryFilter)
         .sort({ requestedAt: -1 });
 
-      requests = rawRequests.map(r => {
+      // Filter out orphaned requests whose parent order no longer exists
+      const validRaw = [];
+      for (const r of rawRequests) {
+        if (!r.orderId) continue;
+        const cleanId = String(r.orderId).replace(/^#+/, '');
+        const orderExists = await Order.exists({
+          $or: [
+            { orderId: cleanId },
+            { orderId: `#${cleanId}` },
+            { orderId: r.orderId }
+          ]
+        });
+        if (orderExists) {
+          validRaw.push(r);
+        } else {
+          // Self-heal: delete the orphaned request so it never shows up again
+          DeliveryRequest.deleteOne({ _id: r._id }).catch(() => {});
+        }
+      }
+
+      requests = validRaw.map(r => {
         const obj = r.toObject();
         const pLat = r.pickupAddress?.lat || 23.0300;
         const pLng = r.pickupAddress?.lng || 72.5650;
@@ -1977,7 +2050,16 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
         const orderQuery = buildIdQuery(acceptedReq.orderId);
         await Order.updateMany(
           orderQuery,
-          { $set: { status: 'Ready', deliveryStatus: 'Assigned', deliveryPartnerName: driverName, deliveryPartnerPhone: driverPhone } }
+          { 
+            $set: { 
+              status: 'Ready', 
+              deliveryStatus: 'Assigned', 
+              driverId: String(driverId), 
+              deliveryPartnerName: driverName, 
+              deliveryPartnerPhone: driverPhone,
+              assignedAt: new Date()
+            } 
+          }
         );
       }
 

@@ -5,6 +5,7 @@ export default function LoginModal({
   isOpen, 
   onClose, 
   initialRole = 'customer',
+  initialMode = 'login',
   onOpenBecomeProviderModal,
   onOpenBecomeDeliveryPartnerModal,
   onLoginSuccess
@@ -13,7 +14,7 @@ export default function LoginModal({
   const [activeRole, setActiveRole] = useState(initialRole);
 
   // Modal Mode & Step State
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [mode, setMode] = useState(initialMode); // 'login' | 'signup'
   const [step, setStep] = useState('form'); // 'form' | 'otp'
 
   // Form Field State
@@ -66,6 +67,7 @@ export default function LoginModal({
   useEffect(() => {
     if (isOpen) {
       setActiveRole(initialRole);
+      setMode(initialMode || 'login');
       document.body.style.overflow = 'hidden';
       const timer = setTimeout(() => {
         setIsActive(true);
@@ -210,19 +212,23 @@ export default function LoginModal({
             setAuthTokens(data.accessToken, data.refreshToken);
           }
 
+          const rawUser = data.user || { email: email.trim(), name: email.split('@')[0] };
+          const userId = String(rawUser._id || rawUser.id || '');
           let authenticatedUser = {
-            ...(data.user || { email: email.trim(), name: email.split('@')[0] }),
-            role: activeRole || data.user?.role || 'customer'
+            ...rawUser,
+            id: userId,
+            _id: userId,
+            role: activeRole || rawUser.role || 'customer'
           };
 
-          saveUserSession(authenticatedUser);
+          saveUserSession(authenticatedUser, data.accessToken, data.refreshToken);
 
           setTimeout(() => {
             if (onLoginSuccess) {
-              onLoginSuccess(authenticatedUser);
+              onLoginSuccess(authenticatedUser, data.accessToken, data.refreshToken);
             }
             onClose();
-          }, 600);
+          }, 400);
         } else {
           setSubmitStatus('idle');
           setOtpMessage(data.message || 'Invalid credentials. Please check your password.');
@@ -305,9 +311,13 @@ export default function LoginModal({
           setAuthTokens(data.accessToken, data.refreshToken);
         }
 
+        const rawUser = data.user || { email: email.trim(), name: name.trim() || email.split('@')[0] };
+        const userId = String(rawUser._id || rawUser.id || '');
         let authenticatedUser = {
-          ...(data.user || { email: email.trim(), name: name.trim() || email.split('@')[0] }),
-          role: activeRole || data.user?.role || 'customer',
+          ...rawUser,
+          id: userId,
+          _id: userId,
+          role: activeRole || rawUser.role || 'customer',
           isVerified: true,
           emailVerified: true
         };
@@ -320,7 +330,8 @@ export default function LoginModal({
             });
             const meData = await meRes.json();
             if (meData.success && meData.user) {
-              authenticatedUser = { ...meData.user, emailVerified: true };
+              const freshId = String(meData.user._id || meData.user.id || userId);
+              authenticatedUser = { ...meData.user, id: freshId, _id: freshId, emailVerified: true };
             }
           } catch (meErr) {
             console.warn('Profile sync fetch error:', meErr);
@@ -329,12 +340,12 @@ export default function LoginModal({
 
         saveUserSession(authenticatedUser, data.accessToken, data.refreshToken);
         if (onLoginSuccess) {
-          onLoginSuccess(authenticatedUser);
+          onLoginSuccess(authenticatedUser, data.accessToken, data.refreshToken);
         }
         setTimeout(() => {
           setSubmitStatus('idle');
           onClose();
-        }, 1200);
+        }, 400);
       } else {
         setSubmitStatus('idle');
         setOtpMessage(data.message || 'Invalid verification code.');

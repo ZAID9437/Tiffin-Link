@@ -124,24 +124,32 @@ const createTiffin = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Provider authorization required' });
     }
 
-    const { name, description, price, category, foodType, capacity, days, area, ingredients, image, status } = req.body;
+    const { name, description, price, category, foodType, mealType, capacity, days, area, ingredients, items, image, status, startTime, endTime, orderCutoff, monthlyPrice, weeklyPrice, isSubscriptionOnly } = req.body;
     
-    if (!name || !price) {
-      return res.status(400).json({ success: false, message: 'Please provide tiffin name and price' });
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Please provide tiffin name' });
     }
 
     const tiffinData = {
       providerId,
       name: name.trim(),
       description: description || 'Authentic home-cooked thali prepared daily.',
-      price: Number(price),
+      price: price !== undefined && price !== '' ? Number(price) : (monthlyPrice ? Math.round(Number(monthlyPrice) / 26) : 140),
+      monthlyPrice: monthlyPrice ? Number(monthlyPrice) : 3640,
+      weeklyPrice: weeklyPrice ? Number(weeklyPrice) : 899,
+      isSubscriptionOnly: isSubscriptionOnly !== undefined ? Boolean(isSubscriptionOnly) : true,
       category: category || 'Gujarati',
       foodType: foodType || 'Veg',
-      capacity: Number(capacity) || 30,
-      available: Number(capacity) || 30,
-      days: Array.isArray(days) ? days : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      mealType: mealType || 'Lunch',
+      startTime: startTime || '12:00 PM',
+      endTime: endTime || '02:00 PM',
+      orderCutoff: orderCutoff || '10:00 AM',
+      capacity: Number(capacity) || 40,
+      available: Number(capacity) || 40,
+      days: Array.isArray(days) ? days : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
       area: area || 'All Localities',
       ingredients: ingredients || 'Fresh veggies, Whole wheat flour, Ghee',
+      items: Array.isArray(items) ? items : [],
       ordersToday: 0,
       rating: 4.8,
       status: status || 'Active',

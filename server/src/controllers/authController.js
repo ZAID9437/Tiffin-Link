@@ -21,17 +21,21 @@ const hashOtp = (otp) => {
 };
 
 // Format user payload safely without passwords
-const formatUserPayload = (user) => ({
-  id: user._id || user.id,
-  name: user.name || (user.email ? user.email.split('@')[0] : ''),
-  email: user.email,
-  phone: user.phone || '',
-  role: user.role || 'customer',
-  isActive: user.isActive !== false,
-  isVerified: user.isVerified !== false,
-  emailVerified: user.isVerified !== false,
-  lastLogin: user.lastLogin
-});
+const formatUserPayload = (user) => {
+  const userId = String(user._id || user.id);
+  return {
+    id: userId,
+    _id: userId,
+    name: user.name || (user.email ? user.email.split('@')[0] : ''),
+    email: user.email,
+    phone: user.phone || '',
+    role: user.role || 'customer',
+    isActive: user.isActive !== false,
+    isVerified: user.isVerified !== false,
+    emailVerified: user.isVerified !== false,
+    lastLogin: user.lastLogin
+  };
+};
 
 // User-friendly display names for roles
 const getRoleDisplayName = (role) => {

@@ -340,6 +340,14 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       apiEndpoint = `/orders/${encodeURIComponent(cleanDbId)}/accept`;
       method = 'POST';
       bodyObj = {};
+    } else if (newStatus === 'Ready') {
+      apiEndpoint = `/orders/${encodeURIComponent(cleanDbId)}/ready`;
+      method = 'POST';
+      bodyObj = {};
+    } else if (newStatus === 'Confirm Pickup' || newStatus === 'Delivery' || newStatus === 'DELIVERY_REQUESTED') {
+      apiEndpoint = `/orders/${encodeURIComponent(cleanDbId)}/confirm-pickup`;
+      method = 'POST';
+      bodyObj = {};
     } else if (newStatus === 'Cancelled') {
       apiEndpoint = `/orders/${encodeURIComponent(cleanDbId)}/reject`;
       method = 'POST';
@@ -2080,24 +2088,55 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateOrderStatus(selectedOrder.orderId, 'Delivery')}
-                      className="col-span-2 py-3 px-4 bg-onyx-black hover:bg-stone-800 text-bone-white font-button-text text-button-text text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px] text-emerald-400">local_shipping</span>
-                      <span>Handover to Courier</span>
-                    </button>
+                  <div className="space-y-2">
+                    {selectedOrder.deliveryStatus === 'Searching' || selectedOrder.status === 'DELIVERY_REQUESTED' ? (
+                      <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+                          <span className="font-bold text-amber-900">Broadcast Active: Searching Available Couriers</span>
+                        </div>
+                        {selectedOrder.pickupOtp && (
+                          <span className="font-mono bg-white px-2 py-0.5 rounded border border-amber-300 font-bold text-amber-900">
+                            Pickup OTP: {selectedOrder.pickupOtp}
+                          </span>
+                        )}
+                      </div>
+                    ) : selectedOrder.deliveryStatus === 'Assigned' ? (
+                      <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            Courier Assigned: {selectedOrder.driverName || 'Partner'}
+                          </span>
+                          {selectedOrder.pickupOtp && (
+                            <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300 font-bold text-emerald-900">
+                              Pickup OTP: {selectedOrder.pickupOtp}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-emerald-800">Phone: {selectedOrder.driverPhone || 'Contacting...'}</div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateOrderStatus(selectedOrder.orderId, 'Confirm Pickup')}
+                          className="col-span-2 py-3 px-4 bg-onyx-black hover:bg-stone-800 text-bone-white font-button-text text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer font-bold"
+                        >
+                          <span className="material-symbols-outlined text-[18px] text-amber-400">send</span>
+                          <span>Confirm Pickup & Dispatch</span>
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setRejectingOrder(selectedOrder)}
-                      className="col-span-1 py-3 px-3 border border-sand-neutral/60 bg-surface-container-lowest hover:bg-error-container hover:text-on-error-container hover:border-error rounded-lg text-xs font-button-text transition-colors flex items-center justify-center gap-1 text-secondary cursor-pointer font-bold"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">cancel</span>
-                      <span>Cancel</span>
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => setRejectingOrder(selectedOrder)}
+                          className="col-span-1 py-3 px-3 border border-sand-neutral/60 bg-surface-container-lowest hover:bg-error-container hover:text-on-error-container hover:border-error rounded-lg text-xs font-button-text transition-colors flex items-center justify-center gap-1 text-secondary cursor-pointer font-bold"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">cancel</span>
+                          <span>Cancel</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               ) : selectedOrder.status === 'Preparing' || selectedOrder.status === 'In Prep' ? (

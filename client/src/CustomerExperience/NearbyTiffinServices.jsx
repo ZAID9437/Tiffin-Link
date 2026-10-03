@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
+import LoginRequiredModal from '../components/LoginRequiredModal';
+import ProviderConflictModal from '../components/ProviderConflictModal';
 
 const AHMEDABAD_LOCALITIES = {
   'satellite': { lat: 23.0300, lng: 72.5178 },
@@ -16,7 +20,7 @@ const AHMEDABAD_LOCALITIES = {
   'memnagar': { lat: 23.0500, lng: 72.5330 }
 };
 
-export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }) {
+export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, onOpenLogin }) {
   const dossierRef = useRef(null);
 
   // Geolocation & Search Parameters
@@ -114,9 +118,22 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
   });
   const [instructions, setInstructions] = useState('Less spicy, no green chillies in dal.');
 
+  const { currentUser, isAuthenticated, loading: authLoading } = useAuth();
+  const {
+    cart,
+    addToCart,
+    clearCart,
+    savePendingCheckout,
+    getPendingCheckout,
+    clearPendingCheckout,
+    providerConflict,
+    resolveProviderConflict
+  } = useCart();
+
   // Cart & Order State
   const [cartFeedback, setCartFeedback] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isLoginRequiredOpen, setIsLoginRequiredOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -125,18 +142,73 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [placedOrder, setPlacedOrder] = useState(null);
 
-  // Load User profile from storage if logged in
+  // Sync customer details when currentUser is available
   useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem('tiffinlink_user');
-      if (savedUser) {
-        const u = JSON.parse(savedUser);
-        if (u.name) setCustomerName(u.name);
-        if (u.phone) setCustomerPhone(u.phone);
-        if (u.email) setCustomerEmail(u.email);
+    if (currentUser) {
+      if (currentUser.name) setCustomerName(currentUser.name);
+      if (currentUser.phone) setCustomerPhone(currentUser.phone);
+      if (currentUser.email) setCustomerEmail(currentUser.email);
+    } else {
+      try {
+        const savedUser = localStorage.getItem('tiffinlink_user');
+        if (savedUser) {
+          const u = JSON.parse(savedUser);
+          if (u.name) setCustomerName(u.name);
+          if (u.phone) setCustomerPhone(u.phone);
+          if (u.email) setCustomerEmail(u.email);
+        }
+      } catch (e) {}
+    }
+  }, [currentUser]);
+
+  // Restore pending checkout state after successful login or page reload
+  useEffect(() => {
+    if (isAuthenticated) {
+      setIsLoginRequiredOpen(false);
+    }
+    const pending = getPendingCheckout();
+    if (pending) {
+      const pData = pending.checkout || pending;
+      if (pData.provider) {
+        setSelectedProvider(pData.provider);
       }
-    } catch (e) {}
-  }, []);
+      if (pData.selectedCategory) setSelectedCategory(pData.selectedCategory);
+      if (pData.selectedTiffin) setSelectedTiffin(pData.selectedTiffin);
+      if (pData.selectedShaak) setSelectedShaak(pData.selectedShaak);
+      if (pData.rotliCount) setRotliCount(pData.rotliCount);
+      if (pData.quantity) setQuantity(pData.quantity);
+      if (pData.extras) setExtras(pData.extras);
+      if (pData.instructions) setInstructions(pData.instructions);
+      if (pData.deliveryAddress) setDeliveryAddress(pData.deliveryAddress);
+      if (pData.paymentMethod) setPaymentMethod(pData.paymentMethod);
+      if (pData.selectedSlot) setSelectedSlot(pData.selectedSlot);
+
+      if (currentUser) {
+        setCustomerName(currentUser.name || pData.customerName || '');
+        setCustomerPhone(currentUser.phone || pData.customerPhone || '');
+        setCustomerEmail(currentUser.email || pData.customerEmail || '');
+      } else {
+        if (pData.customerName) setCustomerName(pData.customerName);
+        if (pData.customerPhone) setCustomerPhone(pData.customerPhone);
+        if (pData.customerEmail) setCustomerEmail(pData.customerEmail);
+      }
+
+      setIsCheckoutOpen(true);
+    }
+  }, [currentUser, isAuthenticated]);
+
+  // Check URL deep-linking for checkout
+  useEffect(() => {
+    const hash = window.location.hash || '';
+    if (hash.includes('checkout=true')) {
+      if (authLoading) return;
+      if (!isAuthenticated && !currentUser) {
+        setIsLoginRequiredOpen(true);
+      } else {
+        setIsCheckoutOpen(true);
+      }
+    }
+  }, [authLoading, isAuthenticated, currentUser]);
 
   // Fetch Providers dynamically from MongoDB based on coordinates, radius, dietary, and filters
   const fetchProviders = async () => {
@@ -261,38 +333,92 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
   const deliveryFee = 20;
   const finalPayable = subtotal + deliveryFee;
 
-  // Add to Cart action
+  // Add to Cart action with full provider and item specification
   const handleAddToCart = () => {
-    setCartFeedback(true);
-    setTimeout(() => setCartFeedback(false), 2000);
+    if (!selectedProvider) return;
+    const selectedExtrasList = [];
+    if (extras.chaas) selectedExtrasList.push({ name: 'Fresh Masala Chaas (250ml Clay Pot)', price: 15 });
+    if (extras.sweet) selectedExtrasList.push({ name: 'Elaichi Kesar Shrikhand (100g Cup)', price: 20 });
+    if (extras.extraRotli) selectedExtrasList.push({ name: 'Extra Rotli Pair (+2 Pieces)', price: 10 });
+
+    const item = {
+      tiffinId: selectedTiffin?._id || '',
+      tiffinName: selectedTiffin?.name || `${selectedProvider.name} ${selectedCategory || 'Standard Thali'}`,
+      selectedCategory: selectedCategory || 'Gujarati Thali',
+      unitPrice: basePrice,
+      quantity,
+      selectedShaak,
+      rotliCount,
+      extras: selectedExtrasList,
+      instructions
+    };
+
+    const res = addToCart(selectedProvider, item);
+    if (res.success) {
+      setCartFeedback(true);
+      setTimeout(() => setCartFeedback(false), 2000);
+    }
   };
 
-  // Place Order API execution
+  // Place Order API execution with mandatory authentication check
   const handlePlaceOrder = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!customerName || !customerPhone) {
       alert('Please enter your Name and Phone Number to complete the order.');
       return;
     }
 
+    const selectedExtrasList = [];
+    if (extras.chaas) selectedExtrasList.push({ name: 'Fresh Masala Chaas (250ml Clay Pot)', price: 15 });
+    if (extras.sweet) selectedExtrasList.push({ name: 'Elaichi Kesar Shrikhand (100g Cup)', price: 20 });
+    if (extras.extraRotli) selectedExtrasList.push({ name: 'Extra Rotli Pair (+2 Pieces)', price: 10 });
+
+    const checkoutPayload = {
+      provider: selectedProvider,
+      selectedCategory,
+      selectedTiffin,
+      selectedShaak,
+      rotliCount,
+      quantity,
+      extras,
+      instructions,
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      customerEmail: customerEmail.trim() || currentUser?.email || '',
+      deliveryAddress: deliveryAddress.trim() || address,
+      paymentMethod,
+      selectedSlot,
+      coordinates
+    };
+
+    // 1. RULE: Check current authentication state
+    if (authLoading) return;
+
+    const isAuthed = Boolean(isAuthenticated || (currentUser && (currentUser._id || currentUser.id)));
+    if (!isAuthed) {
+      savePendingCheckout(checkoutPayload);
+      setIsLoginRequiredOpen(true);
+      return;
+    }
+
+    // 2. Prevent double-click duplicate orders
+    if (orderSubmitting) return;
     setOrderSubmitting(true);
+
     try {
-      const selectedExtrasList = [];
-      if (extras.chaas) selectedExtrasList.push({ name: 'Fresh Masala Chaas (250ml Clay Pot)', price: 15 });
-      if (extras.sweet) selectedExtrasList.push({ name: 'Elaichi Kesar Shrikhand (100g Cup)', price: 20 });
-      if (extras.extraRotli) selectedExtrasList.push({ name: 'Extra Rotli Pair (+2 Pieces)', price: 10 });
+      const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('tiffinlink_token') || '';
 
       const payload = {
         providerId: selectedProvider._id,
         tiffinId: selectedTiffin?._id || '',
-        tiffinName: selectedTiffin?.name || `${selectedProvider.name} ${selectedCategory}`,
+        tiffinName: selectedTiffin?.name || `${selectedProvider.name} ${selectedCategory || 'Standard Thali'}`,
         tiffinCategory: selectedCategory || 'Gujarati Thali',
         tiffinImage: selectedProvider.image || '/assets/provider_1.png',
         quantity,
         unitPrice: basePrice,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
-        customerEmail: customerEmail.trim(),
+        customerEmail: customerEmail.trim() || currentUser?.email || '',
         customerAddress: deliveryAddress.trim() || address,
         deliveryCoordinates: coordinates,
         deliverySlot: selectedSlot,
@@ -310,13 +436,30 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
 
       const res = await fetch('http://localhost:5000/api/orders/customer', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(payload)
       });
 
       const data = await res.json();
+
+      if (res.status === 401 || (data.success === false && (data.message?.toLowerCase().includes('authentication') || data.message?.toLowerCase().includes('unauthorized')))) {
+        savePendingCheckout(checkoutPayload);
+        setIsLoginRequiredOpen(true);
+        return;
+      }
+
       if (data.success && data.data) {
         setPlacedOrder(data.data);
+        localStorage.setItem('tiffinlink_recent_order', data.data.orderId);
+        clearCart();
+        clearPendingCheckout();
+        setIsCheckoutOpen(false);
+        setIsLoginRequiredOpen(false);
+        clearCart();
+        clearPendingCheckout();
         setIsCheckoutOpen(false);
       } else {
         alert('Could not place order: ' + (data.message || 'Please try again.'));
@@ -1092,11 +1235,31 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
                 </div>
               </div>
 
+                {/* Authentication Notice Pill */}
+                <div className="p-3 bg-[#f5f3ef] rounded-xl border border-[#ded9d1]/60 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">{currentUser ? '🟢' : '🔒'}</span>
+                    <div>
+                      <span className="font-bold text-[#1a1a1a] block">
+                        {currentUser ? `Ordering as ${currentUser.name || currentUser.email.split('@')[0]}` : 'Guest Checkout'}
+                      </span>
+                      <span className="text-[#665d52] text-[11px]">
+                        {currentUser ? 'Verified account authenticated' : 'Login will be requested before order is created'}
+                      </span>
+                    </div>
+                  </div>
+                  {!currentUser && (
+                    <span className="text-[10px] uppercase font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                      Login Required on Confirm
+                    </span>
+                  )}
+                </div>
+
               <div className="pt-2">
                 <button 
                   type="submit"
                   disabled={orderSubmitting}
-                  className="w-full py-3.5 rounded-xl bg-[#1a1a1a] hover:bg-[#4a4238] text-[#f5f3ef] font-button-text text-xs uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="w-full py-3.5 rounded-xl bg-[#1a1a1a] hover:bg-[#4a4238] text-[#f5f3ef] font-button-text text-xs uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-md active:scale-98"
                 >
                   {orderSubmitting ? (
                     <>
@@ -1104,7 +1267,7 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
                       <span>Creating Order in MongoDB...</span>
                     </>
                   ) : (
-                    <span>Confirm &amp; Place Order (₹{finalPayable})</span>
+                    <span>Confirm Order (₹{finalPayable})</span>
                   )}
                 </button>
               </div>
@@ -1112,6 +1275,31 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
           </div>
         </div>
       )}
+
+      {/* Login Required Modal (Prevents order creation before authentication) */}
+      <LoginRequiredModal 
+        isOpen={isLoginRequiredOpen && !isAuthenticated}
+        onClose={() => setIsLoginRequiredOpen(false)}
+        onOpenLogin={() => {
+          setIsLoginRequiredOpen(false);
+          if (onOpenLogin) onOpenLogin('login');
+        }}
+        onOpenSignup={() => {
+          setIsLoginRequiredOpen(false);
+          if (onOpenLogin) onOpenLogin('signup');
+        }}
+        orderDetails={{
+          providerName: selectedProvider?.name || cart.provider?.name,
+          totalAmount: finalPayable || cart.totalAmount || 0,
+          itemCount: quantity || (cart.items && cart.items.length) || 1
+        }}
+      />
+
+      {/* Provider Collision Modal (Single Provider Rule) */}
+      <ProviderConflictModal 
+        conflict={providerConflict}
+        onResolve={resolveProviderConflict}
+      />
 
       {/* Order Confirmation & Tracking Screen */}
       {placedOrder && (
@@ -1123,33 +1311,60 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {} }
 
             <div className="space-y-1">
               <span className="font-label-caps text-xs text-[#1b5e20] uppercase font-bold tracking-widest">Order Confirmed</span>
-              <h3 style={{ fontFamily: "'EB Garamond', serif'" }} className="text-3xl font-bold text-[#1a1a1a]">Order #{placedOrder.orderId}</h3>
+              <h3 style={{ fontFamily: "'EB Garamond', serif" }} className="text-3xl font-bold text-[#1a1a1a]">Order #{placedOrder.orderId}</h3>
               <p className="text-xs text-[#665d52]">Saved to database &amp; dispatched to {selectedProvider?.name}</p>
             </div>
 
             <div className="p-4 bg-[#f5f3ef] rounded-2xl border border-[#ded9d1]/60 text-left space-y-2 text-xs">
               <div className="flex justify-between font-bold text-[#1a1a1a]">
-                <span>Kitchen:</span>
+                <span>Kitchen Provider:</span>
                 <span>{selectedProvider?.name}</span>
+              </div>
+              <div className="flex justify-between text-[#665d52]">
+                <span>Meal Selected:</span>
+                <span className="font-semibold text-[#1a1a1a]">{placedOrder.quantity}x {placedOrder.tiffinName}</span>
               </div>
               <div className="flex justify-between text-[#665d52]">
                 <span>Delivery To:</span>
                 <span className="text-right truncate max-w-[240px] text-[#1a1a1a]">{placedOrder.customerAddress}</span>
               </div>
               <div className="flex justify-between text-[#665d52]">
+                <span>Corridor Delivery Charge:</span>
+                <span className="font-mono text-[#1a1a1a]">₹{placedOrder.deliveryFee || 20}</span>
+              </div>
+              <div className="flex justify-between text-[#665d52]">
+                <span>Payment Status:</span>
+                <span className="font-semibold text-emerald-800">{placedOrder.paymentStatus || 'Paid'}</span>
+              </div>
+              <div className="flex justify-between text-[#665d52]">
+                <span>Estimated Delivery:</span>
+                <span className="font-semibold text-[#1a1a1a]">25 - 35 mins</span>
+              </div>
+              <div className="flex justify-between text-[#665d52] pt-1">
                 <span>Delivery OTP for Handover:</span>
                 <span className="font-mono font-bold text-sm text-[#1b5e20] bg-[#e8f5e9] px-2 py-0.5 rounded">8429</span>
               </div>
               <div className="flex justify-between font-bold text-sm text-[#1a1a1a] pt-2 border-t border-[#ded9d1]">
-                <span>Total Amount:</span>
+                <span>Total Amount Paid:</span>
                 <span className="font-mono text-base text-[#1b5e20]">₹{placedOrder.totalAmount}</span>
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2.5">
+              <button 
+                onClick={() => {
+                  setPlacedOrder(null);
+                  if (onNavigate) onNavigate('#orders');
+                  else window.location.hash = '#orders';
+                }}
+                className="flex-1 py-3 px-4 rounded-xl bg-[#1a1a1a] hover:bg-[#4a4238] text-[#f5f3ef] font-button-text text-xs uppercase tracking-wider font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+              >
+                <span>Go to My Orders</span>
+                <span>➔</span>
+              </button>
               <button 
                 onClick={() => setPlacedOrder(null)}
-                className="flex-1 py-3 rounded-xl bg-[#1a1a1a] hover:bg-[#4a4238] text-[#f5f3ef] font-button-text text-xs uppercase tracking-wider font-bold transition-all cursor-pointer"
+                className="py-3 px-5 rounded-xl bg-[#f5f3ef] hover:bg-[#ded9d1] text-[#1a1a1a] font-button-text text-xs uppercase tracking-wider font-bold transition-all cursor-pointer border border-[#ded9d1]"
               >
                 Done
               </button>

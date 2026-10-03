@@ -251,24 +251,31 @@ const createReview = async (req, res) => {
       comment
     } = req.body;
 
-    if (!customerName || !tiffinName || !comment) {
-      return res.status(400).json({ success: false, message: 'Customer name, tiffin name and comment are required' });
+    const customerId = req.user?._id?.toString() || '';
+    const finalCustomerName = (req.user?.name || customerName || 'Verified Diner').trim();
+    const finalCustomerPhone = req.user?.phone || customerPhone || '+91 98250 12345';
+    const finalCustomerEmail = req.user?.email || '';
+
+    if (!finalCustomerName || !comment) {
+      return res.status(400).json({ success: false, message: 'Customer name and comment are required' });
     }
 
     const reviewData = {
-      providerId,
-      orderId,
-      customerName,
-      customerPhone,
-      tiffinName,
-      rating: Number(rating),
-      foodQualityRating: Number(foodQualityRating) || Number(rating),
-      packagingRating: Number(packagingRating) || Number(rating),
-      tasteRating: Number(tasteRating) || Number(rating),
-      deliveryRating: Number(deliveryRating) || Number(rating),
+      providerId: String(providerId),
+      orderId: String(orderId),
+      customerId,
+      customerName: finalCustomerName,
+      customerPhone: finalCustomerPhone,
+      customerEmail: finalCustomerEmail,
+      tiffinName: tiffinName || 'Artisanal Thali',
+      rating: Number(rating) || 5,
+      foodQualityRating: Number(foodQualityRating) || Number(rating) || 5,
+      packagingRating: Number(packagingRating) || Number(rating) || 5,
+      tasteRating: Number(tasteRating) || Number(rating) || 5,
+      deliveryRating: Number(deliveryRating) || Number(rating) || 5,
       orderAmount: Number(orderAmount) || 240,
-      orderQuantity: Number(orderQuantity) || 2,
-      comment,
+      orderQuantity: Number(orderQuantity) || 1,
+      comment: String(comment).trim(),
       providerReply: '',
       createdAt: new Date()
     };
@@ -276,6 +283,16 @@ const createReview = async (req, res) => {
     if (await isDbConnected()) {
       const newRev = new Review(reviewData);
       await newRev.save();
+
+      // Update Order isReviewed flag
+      try {
+        const Order = require('../models/Order');
+        await Order.updateMany(
+          { $or: [{ orderId }, { orderId: `#${orderId}` }, { _id: orderId }] },
+          { $set: { isReviewed: true, reviewRating: reviewData.rating } }
+        );
+      } catch (oErr) {}
+
       return res.status(201).json({ success: true, message: '✓ Review submitted successfully', data: newRev });
     }
 

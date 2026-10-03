@@ -42,6 +42,7 @@ import LoginModal from './components/LoginModal';
 import DemoModal from './components/DemoModal';
 import CookieConsentModal from './components/CookieConsentModal';
 import CustomerDeliveryTrackingModal from './components/CustomerDeliveryTrackingModal';
+import CartDrawer from './components/CartDrawer';
 
 import { useAuth } from './context/AuthContext';
 import { clearAuthTokens, getCookie, setCookie, saveUserSession } from './services/api';
@@ -49,9 +50,19 @@ import { CheckCircle2 } from 'lucide-react';
 
 export default function App() {
   const { currentUser, loading: authLoading, loginUser, logoutUser, updateUser } = useAuth();
+  const [loginModalMode, setLoginModalMode] = useState('login');
 
-  const handleLoginSuccess = (userObj) => {
-    loginUser(userObj);
+  const handleLoginSuccess = async (userObj, accessToken, refreshToken) => {
+    await loginUser(userObj, accessToken, refreshToken);
+    setIsLoginModalOpen(false);
+
+    const pendingCheckout = localStorage.getItem('tiffinlink_pending_checkout');
+    if (pendingCheckout) {
+      setView('find-tiffin');
+      window.location.hash = '#find-tiffin?checkout=true';
+      showToastNotification(`Welcome back, ${userObj.name || userObj.email}! Signed in successfully. Resuming your checkout.`);
+      return;
+    }
     if (userObj.role === 'admin') {
       window.location.hash = '#admin';
     } else if (userObj.role === 'delivery' || userObj.role === 'driver') {
@@ -88,7 +99,15 @@ export default function App() {
     if (hash.startsWith('#/admin') || hash.startsWith('#admin') || currentUser?.role === 'admin') return 'admin';
     if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || currentUser?.role === 'delivery' || currentUser?.role === 'driver') return 'delivery';
     if (hash.startsWith('#/provider') || hash.startsWith('#provider') || currentUser?.role === 'provider') return 'provider';
-    if (hash.startsWith('#orders') || hash.startsWith('#my-orders')) return 'orders';
+    if (
+      hash.startsWith('#orders') || 
+      hash.startsWith('#my-orders') || 
+      hash.startsWith('#active-orders') || 
+      hash.startsWith('#track-order') || 
+      hash.startsWith('#upcoming-tiffins') || 
+      hash.startsWith('#order-history') || 
+      hash.startsWith('#cancelled-orders')
+    ) return 'orders';
     if (hash.startsWith('#find-tiffin') || hash.startsWith('#order-tiffin')) return 'find-tiffin';
     return 'home';
   });
@@ -101,7 +120,15 @@ export default function App() {
       if (hash.startsWith('#/admin') || hash.startsWith('#admin') || activeRole === 'admin') currentView = 'admin';
       else if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || activeRole === 'delivery' || activeRole === 'driver') currentView = 'delivery';
       else if (hash.startsWith('#/provider') || hash.startsWith('#provider') || activeRole === 'provider') currentView = 'provider';
-      else if (hash.startsWith('#orders') || hash.startsWith('#my-orders')) currentView = 'orders';
+      else if (
+        hash.startsWith('#orders') || 
+        hash.startsWith('#my-orders') || 
+        hash.startsWith('#active-orders') || 
+        hash.startsWith('#track-order') || 
+        hash.startsWith('#upcoming-tiffins') || 
+        hash.startsWith('#order-history') || 
+        hash.startsWith('#cancelled-orders')
+      ) currentView = 'orders';
       else if (hash.startsWith('#find-tiffin') || hash.startsWith('#order-tiffin')) currentView = 'find-tiffin';
       setView(currentView);
     };
@@ -505,7 +532,10 @@ export default function App() {
       <Navbar 
         onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)} 
         onOpenBecomeDeliveryPartnerModal={() => setIsBecomeDeliveryPartnerModalOpen(true)}
-        onOpenLogin={() => setIsLoginModalOpen(true)}
+        onOpenLogin={(mode) => {
+          setLoginModalMode(mode || 'login');
+          setIsLoginModalOpen(true);
+        }}
         onOpenTrackingModal={() => setIsCustomerTrackingModalOpen(true)}
         onOpenProfileModal={(tab) => {
           setProfileModalTab(tab || 'profile');
@@ -542,6 +572,10 @@ export default function App() {
           <NearbyTiffinServices 
             onNavigate={(hash) => { setView(hash.replace(/^#/, '')); window.location.hash = hash; }} 
             initialFilters={searchFilters} 
+            onOpenLogin={(mode) => {
+              setLoginModalMode(mode || 'login');
+              setIsLoginModalOpen(true);
+            }}
           />
         ) : (
           <>
@@ -600,9 +634,18 @@ export default function App() {
         isOpen={isLoginModalOpen} 
         onClose={() => setIsLoginModalOpen(false)}
         initialRole={view === 'provider' ? 'provider' : (view === 'delivery' ? 'delivery' : 'customer')}
+        initialMode={loginModalMode}
         onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)}
         onOpenBecomeDeliveryPartnerModal={() => setIsBecomeDeliveryPartnerModalOpen(true)}
         onLoginSuccess={handleLoginSuccess}
+      />
+
+      {/* Persistent Customer Cart Drawer */}
+      <CartDrawer 
+        onProceedToCheckout={() => {
+          setView('find-tiffin');
+          window.location.hash = '#find-tiffin?checkout=true';
+        }}
       />
 
       <BecomeProviderModal 

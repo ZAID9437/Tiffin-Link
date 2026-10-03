@@ -11,9 +11,13 @@ const protect = async (req, res, next) => {
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
   ) {
-    try {
-      token = req.headers.authorization.split(' ')[1];
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies?.tiffinlink_token || req.cookies?.token) {
+    token = req.cookies.tiffinlink_token || req.cookies.token;
+  }
 
+  if (token) {
+    try {
       const decoded = jwt.verify(
         token,
         process.env.JWT_SECRET || 'tiffinlink_super_secret_jwt_access_key_2026'
@@ -84,43 +88,7 @@ const protect = async (req, res, next) => {
     }
   }
 
-  // If token is missing, check if specific identity email/phone query parameter was explicitly provided
-  const email = req.query?.email || req.body?.email || '';
-  const phone = req.query?.phone || req.body?.phone || '';
-
-  if (email || phone) {
-    try {
-      const queryOr = [
-        ...(email ? [{ email: email.toLowerCase() }] : []),
-        ...(phone ? [{ phone }] : [])
-      ];
-
-      const user = await User.findOne({ $or: queryOr }).select('-password');
-      if (user && user.isActive !== false) {
-        req.user = user;
-        if (user.role === 'provider') {
-          const provider = await Provider.findOne({ $or: [{ userId: user._id }, { email: user.email }] });
-          if (provider) {
-            req.provider = provider;
-            req.providerId = provider._id.toString();
-          }
-        } else if (user.role === 'delivery' || user.role === 'driver' || user.role === 'delivery_partner') {
-          const driver = await Driver.findOne({ $or: [{ userId: user._id }, { email: user.email }] });
-          if (driver) {
-            req.driver = driver;
-            req.driverId = driver.driverId || driver._id.toString();
-          } else {
-            req.driverId = user._id.toString();
-          }
-        }
-        return next();
-      }
-    } catch (err) {
-      console.error('Explicit query auth error:', err);
-    }
-  }
-
-  return res.status(401).json({ success: false, message: 'Not authorized, no access token provided' });
+  return res.status(401).json({ success: false, message: 'Authentication required to place an order' });
 };
 
 const requireProvider = (req, res, next) => {

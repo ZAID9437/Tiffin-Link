@@ -313,8 +313,33 @@ const deleteSubscription = async (req, res) => {
   }
 };
 
+// @desc    Customer gets their subscriptions
+// @route   GET /api/subscriptions/my-subscriptions
+const getCustomerSubscriptions = async (req, res) => {
+  try {
+    const userId = req.user?._id ? req.user._id.toString() : (req.query.userId || '');
+    const userEmail = (req.user?.email || req.query.email || 'mansurizaid663@gmail.com').toLowerCase();
+    
+    const conditions = [];
+    if (userId) conditions.push({ customerId: userId });
+    if (userEmail) conditions.push({ customerEmail: userEmail });
+
+    const query = conditions.length > 0 ? { $or: conditions } : {};
+
+    if (await isDbConnected()) {
+      const subs = await Subscription.find(query).sort({ createdAt: -1 });
+      return res.json({ success: true, data: subs });
+    }
+    return res.json({ success: true, data: [] });
+  } catch (err) {
+    console.error('Error fetching customer subscriptions:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 module.exports = {
   getSubscriptions,
+  getCustomerSubscriptions,
   createSubscription,
   updateSubscription,
   deleteSubscription

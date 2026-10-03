@@ -13,7 +13,7 @@ export default function DriverSidebar({
   setIsOnline,
   currentUser,
   onLogout,
-  counts = { requests: 3, active: 1, notifications: 3 }
+  counts = { requests: 0, active: 0, notifications: 0 }
 }) {
   const driverName = currentUser?.name || 'Rajesh Kumar';
   const driverId = currentUser?.id || currentUser?._id || 'TL-8041';

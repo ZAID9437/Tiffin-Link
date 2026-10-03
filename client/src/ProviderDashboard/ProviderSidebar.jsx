@@ -41,7 +41,7 @@ export default function ProviderSidebar({
   useEffect(() => {
     if (['orders', 'orders-all', 'orders-new', 'orders-preparing', 'orders-ready', 'orders-completed', 'orders-cancelled'].includes(activeTab)) {
       setOpenSections(prev => ({ ...prev, orders: true }));
-    } else if (['tiffins', 'add-tiffin', 'availability', 'categories'].includes(activeTab)) {
+    } else if (['tiffins', 'add-tiffin', 'availability', 'categories', 'meal-builder'].includes(activeTab)) {
       setOpenSections(prev => ({ ...prev, tiffins: true }));
     } else if (['earnings', 'transactions', 'incentives', 'wallet', 'bank-payout'].includes(activeTab)) {
       setOpenSections(prev => ({ ...prev, earnings: true }));
@@ -241,7 +241,7 @@ export default function ProviderSidebar({
           <div className="space-y-1">
             <div
               onClick={() => toggleSection('tiffins')}
-              className={parentClass('tiffins', ['tiffins', 'add-tiffin', 'availability'])}
+              className={parentClass('tiffins', ['tiffins', 'add-tiffin', 'availability', 'categories', 'meal-builder'])}
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">restaurant_menu</span>
@@ -262,6 +262,15 @@ export default function ProviderSidebar({
                 </div>
                 <div onClick={() => handleNavClick('availability')} className={childClass('availability')}>
                   <span>Availability</span>
+                </div>
+                <div onClick={() => handleNavClick('categories')} className={childClass('categories')}>
+                  <span>Categories & Items</span>
+                </div>
+                <div onClick={() => handleNavClick('meal-builder')} className={childClass('meal-builder')}>
+                  <div className="flex items-center gap-1.5">
+                    <span>Meal Builder</span>
+                    <span className="font-label-caps text-[8px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-bold uppercase">PRO</span>
+                  </div>
                 </div>
               </div>
             )}

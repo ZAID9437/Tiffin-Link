@@ -139,9 +139,9 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
 
   // Dynamic Milestone / Daily Earnings Target State
   const [milestone, setMilestone] = useState({
-    todayEarnings: 820,
+    todayEarnings: 0,
     targetEarnings: 1200,
-    completedTrips: 4,
+    completedTrips: 0,
     targetTrips: 6,
     bonusAmount: 200
   });

@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Bell, User, MapPin, CreditCard, Utensils, Calendar, 
   Settings, LogOut, CheckCircle2, Truck, Clock, ShieldCheck, 
-  ChevronDown, X, ShoppingBag
+  ChevronDown, X, ShoppingBag, LogIn
 } from 'lucide-react';
+import { useCart } from '../context/CartContext';
 
 export default function Navbar({ 
   onOpenBecomeProviderModal, 
@@ -25,6 +26,7 @@ export default function Navbar({
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  const { totalCount, setIsCartOpen } = useCart();
   const lastScrollY = useRef(0);
   const userMenuRef = useRef(null);
   const notifMenuRef = useRef(null);
@@ -190,7 +192,12 @@ export default function Navbar({
     window.location.hash.includes('find-tiffin') || 
     window.location.hash.includes('order-tiffin') || 
     window.location.hash.includes('orders') ||
-    window.location.hash.includes('my-orders')
+    window.location.hash.includes('my-orders') ||
+    window.location.hash.includes('active-orders') ||
+    window.location.hash.includes('track-order') ||
+    window.location.hash.includes('upcoming-tiffins') ||
+    window.location.hash.includes('order-history') ||
+    window.location.hash.includes('cancelled-orders')
   );
   const showSolidNav = isScrolled || forceSolid || isMobileMenuOpen || isLightPage || isHashLight;
 
@@ -262,6 +269,25 @@ export default function Navbar({
               <span>📍 Live Track</span>
             </button>
           )}
+
+          {/* 🛒 Desktop Cart Trigger with Badge */}
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className={`p-2 rounded-full transition-all relative cursor-pointer ${
+              showSolidNav 
+                ? 'hover:bg-black/5 text-[#1a1a1a]' 
+                : 'hover:bg-white/10 text-bone-white'
+            }`}
+            aria-label="View Cart"
+            title="View Cart"
+          >
+            <ShoppingBag size={20} />
+            {totalCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-[#a0522d] text-white font-mono text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow">
+                {totalCount}
+              </span>
+            )}
+          </button>
 
           {/* 🔔 Notifications Button & Dropdown */}
           <div className="relative" ref={notifMenuRef}>
@@ -346,130 +372,149 @@ export default function Navbar({
             )}
           </div>
 
-          {/* 👤 Profile Button & Dropdown */}
-          <div className="relative" ref={userMenuRef}>
-            <button 
-              onClick={() => {
-                setIsUserMenuOpen(!isUserMenuOpen);
-                setIsNotificationsOpen(false);
-              }}
-              className={`flex items-center gap-2 md:gap-2.5 px-2.5 sm:px-3.5 py-1.5 rounded-full border transition-all duration-300 cursor-pointer ${
-                showSolidNav
-                  ? 'border-[#1a1a1a]/20 bg-black/5 hover:bg-black/10 text-[#1a1a1a]' 
-                  : 'border-white/30 bg-white/10 hover:bg-white/20 text-bone-white'
+          {/* 👤 Profile Button / Guest Sign In */}
+          {!currentUser ? (
+            <button
+              onClick={onOpenLogin}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full font-button-text text-xs uppercase tracking-wider font-bold transition-all cursor-pointer shadow-xs ${
+                showSolidNav 
+                  ? 'bg-[#1a1a1a] hover:bg-[#333] text-white' 
+                  : 'bg-white/20 hover:bg-white/30 text-white backdrop-blur-xs'
               }`}
             >
-              <div className="w-7 h-7 rounded-full bg-[#a0522d] text-white font-bold flex items-center justify-center text-xs shadow">
-                {userInitial}
-              </div>
-              <div className="text-left hidden sm:block pr-1">
-                <p className={`text-xs font-bold leading-none ${showSolidNav ? 'text-[#1a1a1a]' : 'text-bone-white'}`}>
-                  {currentUser ? (currentUser.name || currentUser.email.split('@')[0]) : 'Zaid Mansuri'}
-                </p>
-                <p className={`text-[9px] leading-none mt-1 uppercase tracking-wider font-semibold ${showSolidNav ? 'text-[#665d52]' : 'opacity-75'}`}>
-                  {roleLabel}
-                </p>
-              </div>
-              <ChevronDown size={14} className={`opacity-60 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+              <LogIn size={14} />
+              <span>Sign In</span>
             </button>
-
-            {/* Profile Dropdown Menu (Exact structure requested) */}
-            {isUserMenuOpen && (
-              <div className="absolute right-0 mt-3 w-64 bg-[#fbf9f5] border border-[#ded9d1] rounded-2xl shadow-2xl p-4 text-[#1a1a1a] z-[110] animate-in fade-in slide-in-from-top-2">
-                
-                {/* User Info Header */}
-                <div className="pb-3 border-b border-[#ded9d1] mb-2">
-                  <p className="text-[10px] text-[#a0522d] font-bold uppercase tracking-wider">Signed in as</p>
-                  <p className="text-sm font-bold truncate mt-0.5">{currentUser?.name || 'Zaid Mansuri'}</p>
-                  <p className="text-xs text-[#665d52] truncate">{currentUser?.email || 'zaid@example.com'}</p>
-                  <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#1b5e20]/10 text-[#1b5e20] uppercase">
-                    Verified Customer Diner
-                  </span>
+          ) : (
+            <div className="relative" ref={userMenuRef}>
+              <button 
+                onClick={() => {
+                  setIsUserMenuOpen(!isUserMenuOpen);
+                  setIsNotificationsOpen(false);
+                }}
+                className={`flex items-center gap-2 md:gap-2.5 px-2.5 sm:px-3.5 py-1.5 rounded-full border transition-all duration-300 cursor-pointer ${
+                  showSolidNav
+                    ? 'border-[#1a1a1a]/20 bg-black/5 hover:bg-black/10 text-[#1a1a1a]' 
+                    : 'border-white/30 bg-white/10 hover:bg-white/20 text-bone-white'
+                }`}
+              >
+                <div className="w-7 h-7 rounded-full bg-[#a0522d] text-white font-bold flex items-center justify-center text-xs shadow">
+                  {userInitial}
                 </div>
-
-                {/* Profile Links Matching Specification */}
-                <div className="space-y-1 text-xs font-semibold">
-                  <button
-                    onClick={() => handleProfileItemClick('profile')}
-                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
-                  >
-                    <User size={15} className="text-[#665d52]" />
-                    <span>Personal Information</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleProfileItemClick('addresses')}
-                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
-                  >
-                    <MapPin size={15} className="text-[#665d52]" />
-                    <span>Saved Addresses</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleProfileItemClick('payments')}
-                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
-                  >
-                    <CreditCard size={15} className="text-[#665d52]" />
-                    <span>Payment Methods</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleProfileItemClick('preferences')}
-                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
-                  >
-                    <Utensils size={15} className="text-[#665d52]" />
-                    <span>Tiffin Preferences</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleProfileItemClick('subscriptions')}
-                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
-                  >
-                    <Calendar size={15} className="text-[#665d52]" />
-                    <span>Subscriptions</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleProfileItemClick('notifications')}
-                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
-                  >
-                    <Settings size={15} className="text-[#665d52]" />
-                    <span>Notifications Settings</span>
-                  </button>
+                <div className="text-left hidden sm:block pr-1">
+                  <p className={`text-xs font-bold leading-none ${showSolidNav ? 'text-[#1a1a1a]' : 'text-bone-white'}`}>
+                    {currentUser.name || currentUser.email.split('@')[0]}
+                  </p>
+                  <p className={`text-[9px] leading-none mt-1 uppercase tracking-wider font-semibold ${showSolidNav ? 'text-[#665d52]' : 'opacity-75'}`}>
+                    {roleLabel}
+                  </p>
                 </div>
+                <ChevronDown size={14} className={`opacity-60 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-                {/* Sign Out Action */}
-                <div className="pt-2 border-t border-[#ded9d1] mt-2">
-                  <button 
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      if (onLogout) onLogout();
-                      else if (onOpenLogin) onOpenLogin();
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 font-bold flex items-center justify-between cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <LogOut size={15} />
-                      <span>{currentUser ? 'Logout' : 'Sign In / Switch'}</span>
-                    </div>
-                    <span>➔</span>
-                  </button>
+              {/* Profile Dropdown Menu (Exact structure requested) */}
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-3 w-64 bg-[#fbf9f5] border border-[#ded9d1] rounded-2xl shadow-2xl p-4 text-[#1a1a1a] z-[110] animate-in fade-in slide-in-from-top-2">
+                  
+                  {/* User Info Header */}
+                  <div className="pb-3 border-b border-[#ded9d1] mb-2">
+                    <p className="text-[10px] text-[#a0522d] font-bold uppercase tracking-wider">Signed in as</p>
+                    <p className="text-sm font-bold truncate mt-0.5">{currentUser.name || currentUser.email.split('@')[0]}</p>
+                    <p className="text-xs text-[#665d52] truncate">{currentUser.email}</p>
+                    <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#1b5e20]/10 text-[#1b5e20] uppercase">
+                      Verified Customer Diner
+                    </span>
+                  </div>
+
+                  {/* Profile Links Matching Specification */}
+                  <div className="space-y-1 text-xs font-semibold">
+                    <button
+                      onClick={() => handleProfileItemClick('profile')}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
+                    >
+                      <User size={15} className="text-[#665d52]" />
+                      <span>Personal Information</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleProfileItemClick('addresses')}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
+                    >
+                      <MapPin size={15} className="text-[#665d52]" />
+                      <span>Saved Addresses</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleProfileItemClick('payments')}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
+                    >
+                      <CreditCard size={15} className="text-[#665d52]" />
+                      <span>Payment Methods</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleProfileItemClick('preferences')}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
+                    >
+                      <Utensils size={15} className="text-[#665d52]" />
+                      <span>Tiffin Preferences</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleProfileItemClick('subscriptions')}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
+                    >
+                      <Calendar size={15} className="text-[#665d52]" />
+                      <span>Subscriptions</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleProfileItemClick('notifications')}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-black/5 flex items-center gap-2.5 text-[#1a1a1a] cursor-pointer transition-colors"
+                    >
+                      <Settings size={15} className="text-[#665d52]" />
+                      <span>Notifications Settings</span>
+                    </button>
+                  </div>
+
+                  {/* Sign Out Action */}
+                  <div className="pt-2 border-t border-[#ded9d1] mt-2">
+                    <button 
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        if (onLogout) onLogout();
+                        else if (onOpenLogin) onOpenLogin();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 font-bold flex items-center justify-between cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <LogOut size={15} />
+                        <span>Logout</span>
+                      </div>
+                      <span>➔</span>
+                    </button>
+                  </div>
+
                 </div>
-
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Mobile Right: Cart Icon (as requested in spec: ☰ TiffinLink 🛒 🔔) */}
-          <a
-            href="#orders"
-            className={`md:hidden p-2 rounded-full cursor-pointer transition-all ${
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className={`md:hidden p-2 rounded-full cursor-pointer relative transition-all ${
               showSolidNav ? 'text-[#1a1a1a] hover:bg-black/5' : 'text-bone-white hover:bg-white/10'
             }`}
             aria-label="Orders Cart"
           >
             <ShoppingBag size={20} />
-          </a>
+            {totalCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-[#a0522d] text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                {totalCount}
+              </span>
+            )}
+          </button>
 
           {/* Mobile Hamburger Trigger (☰) */}
           <button 

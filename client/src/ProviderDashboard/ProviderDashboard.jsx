@@ -68,6 +68,7 @@ const getProviderTabFromHash = (rawHash) => {
   if (hash.includes('/tiffins/add')) return 'add-tiffin';
   if (hash.includes('/tiffins/availability')) return 'availability';
   if (hash.includes('/tiffins/categories')) return 'categories';
+  if (hash.includes('/tiffins/meal-builder')) return 'meal-builder';
   if (hash.includes('/tiffins')) return 'tiffins';
 
   if (hash.includes('/delivery-management')) return 'delivery-management';
@@ -103,6 +104,7 @@ const getHashFromProviderTab = (tab) => {
     case 'add-tiffin': return '#/provider/tiffins/add';
     case 'availability': return '#/provider/tiffins/availability';
     case 'categories': return '#/provider/tiffins/categories';
+    case 'meal-builder': return '#/provider/tiffins/meal-builder';
     case 'orders':
     case 'orders-all': return '#/provider/orders';
     case 'orders-new': return '#/provider/orders/new';
@@ -240,6 +242,8 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
           return <MyTiffinsTab currentUser={currentUser} key="availability" initialSubView="availability" onNavigateTab={setActiveTab} />;
         case 'categories':
           return <MyTiffinsTab currentUser={currentUser} key="categories" initialSubView="categories" onNavigateTab={setActiveTab} />;
+        case 'meal-builder':
+          return <MyTiffinsTab currentUser={currentUser} key="meal-builder" initialSubView="meal-builder" onNavigateTab={setActiveTab} />;
         case 'orders':
         case 'orders-all':
           return <OrdersTab currentUser={currentUser} initialStatus="All" />;

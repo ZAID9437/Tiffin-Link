@@ -17,7 +17,19 @@ const tiffinSchema = new mongoose.Schema({
   },
   price: {
     type: Number,
-    required: true
+    default: 140
+  },
+  monthlyPrice: {
+    type: Number,
+    default: 3640
+  },
+  weeklyPrice: {
+    type: Number,
+    default: 899
+  },
+  isSubscriptionOnly: {
+    type: Boolean,
+    default: true
   },
   category: {
     type: String,
@@ -26,6 +38,23 @@ const tiffinSchema = new mongoose.Schema({
   foodType: {
     type: String,
     default: 'Veg'
+  },
+  mealType: {
+    type: String,
+    enum: ['Breakfast', 'Lunch', 'Dinner', 'All Day'],
+    default: 'Lunch'
+  },
+  startTime: {
+    type: String,
+    default: '12:00 PM'
+  },
+  endTime: {
+    type: String,
+    default: '02:00 PM'
+  },
+  orderCutoff: {
+    type: String,
+    default: '10:00 AM'
   },
   capacity: {
     type: Number,
@@ -46,6 +75,10 @@ const tiffinSchema = new mongoose.Schema({
   ingredients: {
     type: String,
     default: 'Fresh veggies, Whole wheat flour, Pure Ghee'
+  },
+  items: {
+    type: [String],
+    default: []
   },
   ordersToday: {
     type: Number,
