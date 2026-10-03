@@ -31,6 +31,11 @@ const tiffinSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  tiffinCategoryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
+    index: true
+  },
   category: {
     type: String,
     default: 'Gujarati'

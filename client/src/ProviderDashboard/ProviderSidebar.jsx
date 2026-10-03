@@ -41,7 +41,7 @@ export default function ProviderSidebar({
   useEffect(() => {
     if (['orders', 'orders-all', 'orders-new', 'orders-preparing', 'orders-ready', 'orders-completed', 'orders-cancelled'].includes(activeTab)) {
       setOpenSections(prev => ({ ...prev, orders: true }));
-    } else if (['tiffins', 'add-tiffin', 'availability', 'categories', 'meal-builder'].includes(activeTab)) {
+    } else if (['tiffins', 'add-tiffin', 'availability', 'categories', 'tiffin-items', 'meal-builder'].includes(activeTab)) {
       setOpenSections(prev => ({ ...prev, tiffins: true }));
     } else if (['earnings', 'transactions', 'incentives', 'wallet', 'bank-payout'].includes(activeTab)) {
       setOpenSections(prev => ({ ...prev, earnings: true }));
@@ -241,10 +241,10 @@ export default function ProviderSidebar({
           <div className="space-y-1">
             <div
               onClick={() => toggleSection('tiffins')}
-              className={parentClass('tiffins', ['tiffins', 'add-tiffin', 'availability', 'categories', 'meal-builder'])}
+              className={parentClass('tiffins', ['tiffins', 'categories', 'add-tiffin', 'tiffin-items', 'availability'])}
             >
               <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[18px]">restaurant_menu</span>
+                <span className="material-symbols-outlined text-[18px]">lunch_dining</span>
                 <span className="font-button-text text-button-text font-bold">My Tiffins</span>
               </div>
               <span className="material-symbols-outlined text-[18px] text-secondary transition-transform duration-200" style={{ transform: openSections.tiffins ? 'rotate(180deg)' : 'rotate(0deg)' }}>
@@ -257,20 +257,17 @@ export default function ProviderSidebar({
                 <div onClick={() => handleNavClick('tiffins')} className={childClass('tiffins')}>
                   <span>All Tiffins</span>
                 </div>
+                <div onClick={() => handleNavClick('categories')} className={childClass('categories')}>
+                  <span>Tiffin Categories</span>
+                </div>
                 <div onClick={() => handleNavClick('add-tiffin')} className={childClass('add-tiffin')}>
                   <span>Add Tiffin</span>
                 </div>
+                <div onClick={() => handleNavClick('tiffin-items')} className={childClass('tiffin-items')}>
+                  <span>Tiffin Items</span>
+                </div>
                 <div onClick={() => handleNavClick('availability')} className={childClass('availability')}>
                   <span>Availability</span>
-                </div>
-                <div onClick={() => handleNavClick('categories')} className={childClass('categories')}>
-                  <span>Categories & Items</span>
-                </div>
-                <div onClick={() => handleNavClick('meal-builder')} className={childClass('meal-builder')}>
-                  <div className="flex items-center gap-1.5">
-                    <span>Meal Builder</span>
-                    <span className="font-label-caps text-[8px] bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-bold uppercase">PRO</span>
-                  </div>
                 </div>
               </div>
             )}

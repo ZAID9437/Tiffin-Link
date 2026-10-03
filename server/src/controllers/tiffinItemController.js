@@ -51,6 +51,8 @@ const createTiffinItem = async (req, res) => {
       minQuantity,
       maxQuantity,
       unitPrice,
+      price,
+      availableQuantity,
       isDefault,
       isAvailable,
       isCustomizable,
@@ -67,6 +69,9 @@ const createTiffinItem = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Tiffin not found or not authorized' });
     }
 
+    const effectivePrice = Number(price !== undefined ? price : unitPrice) || 0;
+    const effectiveQty = Number(availableQuantity !== undefined ? availableQuantity : (defaultQuantity || 50));
+
     const item = new TiffinItem({
       tiffinId,
       providerId,
@@ -78,7 +83,9 @@ const createTiffinItem = async (req, res) => {
       defaultQuantity: Number(defaultQuantity) || 1,
       minQuantity: Number(minQuantity) || 0,
       maxQuantity: Number(maxQuantity) || 10,
-      unitPrice: Number(unitPrice) || 0,
+      unitPrice: effectivePrice,
+      price: effectivePrice,
+      availableQuantity: effectiveQty,
       isDefault: isDefault !== undefined ? Boolean(isDefault) : true,
       isAvailable: isAvailable !== undefined ? Boolean(isAvailable) : true,
       isCustomizable: isCustomizable !== undefined ? Boolean(isCustomizable) : true,
@@ -111,13 +118,19 @@ const updateTiffinItem = async (req, res) => {
     const allowedFields = [
       'category', 'name', 'description', 'image', 'unit',
       'defaultQuantity', 'minQuantity', 'maxQuantity', 'unitPrice',
+      'price', 'availableQuantity',
       'isDefault', 'isAvailable', 'isCustomizable', 'sortOrder'
     ];
 
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {
-        if (['defaultQuantity', 'minQuantity', 'maxQuantity', 'unitPrice', 'sortOrder'].includes(field)) {
+        if (['defaultQuantity', 'minQuantity', 'maxQuantity', 'unitPrice', 'price', 'availableQuantity', 'sortOrder'].includes(field)) {
           item[field] = Number(req.body[field]);
+          if (field === 'price' && req.body.unitPrice === undefined) {
+            item.unitPrice = Number(req.body[field]);
+          } else if (field === 'unitPrice' && req.body.price === undefined) {
+            item.price = Number(req.body[field]);
+          }
         } else if (['isDefault', 'isAvailable', 'isCustomizable'].includes(field)) {
           item[field] = Boolean(req.body[field]);
         } else {

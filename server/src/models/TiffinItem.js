@@ -51,9 +51,18 @@ const tiffinItemSchema = new mongoose.Schema({
     default: 10,
     min: 1
   },
+  price: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  availableQuantity: {
+    type: Number,
+    default: 50,
+    min: 0
+  },
   unitPrice: {
     type: Number,
-    required: true,
     default: 0,
     min: 0
   },

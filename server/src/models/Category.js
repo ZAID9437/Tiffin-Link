@@ -1,10 +1,13 @@
 const mongoose = require('mongoose');
 
 const categorySchema = new mongoose.Schema({
+  providerId: {
+    type: String,
+    index: true
+  },
   name: {
     type: String,
     required: true,
-    unique: true,
     trim: true
   },
   description: {
@@ -19,11 +22,9 @@ const categorySchema = new mongoose.Schema({
   image: {
     type: String,
     default: '/assets/provider_1.png'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
   }
-});
+}, { timestamps: true });
+
+categorySchema.index({ providerId: 1, name: 1 });
 
 module.exports = mongoose.model('Category', categorySchema);

@@ -16,9 +16,21 @@ const defaultInitialCategories = [
 // @route   GET /api/categories
 const getCategories = async (req, res) => {
   try {
+    const providerId = req.providerId || req.query.providerId || (req.user && req.user.id);
     if (await isDbConnected()) {
-      let categories = await Category.find().sort({ createdAt: -1 });
-      if (categories.length === 0) {
+      let query = {};
+      if (providerId) {
+        // Query categories belonging to this provider or default unassigned categories
+        query = {
+          $or: [
+            { providerId: String(providerId) },
+            { providerId: null },
+            { providerId: { $exists: false } }
+          ]
+        };
+      }
+      let categories = await Category.find(query).sort({ createdAt: -1 });
+      if (categories.length === 0 && !providerId) {
         await Category.insertMany(defaultInitialCategories);
         categories = await Category.find().sort({ createdAt: -1 });
       }
@@ -37,6 +49,7 @@ const getCategories = async (req, res) => {
 const createCategory = async (req, res) => {
   try {
     const { name, description, status, image } = req.body;
+    const providerId = req.providerId || (req.user && req.user.id) || req.body.providerId;
     
     if (!name) {
       return res.status(400).json({ success: false, message: 'Please provide category name' });
@@ -46,11 +59,18 @@ const createCategory = async (req, res) => {
       name: name.trim(),
       description: description || 'Delicious home-cooked meal category.',
       status: status || 'Active',
-      image: image || '/assets/provider_1.png'
+      image: image || '/assets/provider_1.png',
+      providerId: providerId ? String(providerId) : undefined
     };
 
     if (await isDbConnected()) {
-      const existing = await Category.findOne({ name: name.trim() });
+      const existingQuery = { 
+        name: { $regex: new RegExp(`^${name.trim()}$`, 'i') }
+      };
+      if (providerId) {
+        existingQuery.providerId = String(providerId);
+      }
+      const existing = await Category.findOne(existingQuery);
       if (existing) {
         return res.status(400).json({ success: false, message: `Category "${name}" already exists` });
       }
@@ -82,8 +102,22 @@ const createCategory = async (req, res) => {
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId || (req.user && req.user.id);
+    
     if (await isDbConnected()) {
-      const updated = await Category.findByIdAndUpdate(id, req.body, { new: true });
+      const filter = { _id: id };
+      if (providerId) {
+        // Enforce provider ownership if category has a providerId
+        filter.$or = [
+          { providerId: String(providerId) },
+          { providerId: null },
+          { providerId: { $exists: false } }
+        ];
+      }
+      const updated = await Category.findOneAndUpdate(filter, req.body, { new: true });
+      if (!updated) {
+        return res.status(404).json({ success: false, message: 'Category not found or unauthorized' });
+      }
       return res.json({ success: true, message: 'Category updated successfully', data: updated });
     }
     return res.json({ success: true, message: 'Category updated', data: req.body });
@@ -98,8 +132,21 @@ const updateCategory = async (req, res) => {
 const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
+    const providerId = req.providerId || (req.user && req.user.id);
+    
     if (await isDbConnected()) {
-      await Category.findByIdAndDelete(id);
+      const filter = { _id: id };
+      if (providerId) {
+        filter.$or = [
+          { providerId: String(providerId) },
+          { providerId: null },
+          { providerId: { $exists: false } }
+        ];
+      }
+      const deleted = await Category.findOneAndDelete(filter);
+      if (!deleted) {
+        return res.status(404).json({ success: false, message: 'Category not found or unauthorized' });
+      }
       return res.json({ success: true, message: 'Category deleted successfully' });
     }
     return res.json({ success: true, message: 'Category deleted (in-memory)' });
