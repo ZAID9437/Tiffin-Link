@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import LoginRequiredModal from '../components/LoginRequiredModal';
 import ProviderConflictModal from '../components/ProviderConflictModal';
+import TiffinCustomizer from './TiffinCustomizer';
 
 const AHMEDABAD_LOCALITIES = {
   'satellite': { lat: 23.0300, lng: 72.5178 },
@@ -22,6 +23,9 @@ const AHMEDABAD_LOCALITIES = {
 
 export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, onOpenLogin }) {
   const dossierRef = useRef(null);
+
+  // Full-page Artisanal Tiffin Customizer State
+  const [customizingTiffin, setCustomizingTiffin] = useState(null);
 
   // Geolocation & Search Parameters
   const [address, setAddress] = useState(initialFilters.location || 'Satellite, Ahmedabad');
@@ -472,6 +476,21 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
     }
   };
 
+  if (customizingTiffin) {
+    return (
+      <TiffinCustomizer
+        tiffin={customizingTiffin.tiffin}
+        provider={customizingTiffin.provider}
+        currentUser={currentUser}
+        onBack={() => setCustomizingTiffin(null)}
+        onOpenLogin={onOpenLogin}
+        onCheckout={(order) => {
+          localStorage.setItem('tiffinlink_recent_order', order.orderId || order._id);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a] pt-24 sm:pt-28">
       {/* Hyperlocal Context Header & Geospatial Status */}
@@ -786,9 +805,15 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
                               <span className="text-[#1a1a1a] font-medium">{(prov.categories || ['Gujarati Thali']).join(' • ')}</span>
                             </div>
                             <button 
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                loadProviderDossier(prov);
+                                const targetTiffin = prov.tiffins?.[0] || {
+                                  name: `${prov.name} Special Thali`,
+                                  price: prov.price || 130,
+                                  category: prov.categories?.[0] || 'Gujarati'
+                                };
+                                setCustomizingTiffin({ provider: prov, tiffin: targetTiffin });
                               }}
                               className={`px-4 py-2 rounded-xl font-button-text text-xs uppercase tracking-wider font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                                 isSelected 
@@ -859,6 +884,25 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
                         <span className="flex items-center gap-1">✓ FSSAI Verified</span>
                       </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomizingTiffin({
+                          provider: selectedProvider,
+                          tiffin: selectedTiffin || selectedProvider.tiffins?.[0] || {
+                            name: `${selectedProvider.name} Special Thali`,
+                            price: selectedProvider.price || 130,
+                            category: selectedCategory || 'Gujarati'
+                          }
+                        });
+                      }}
+                      className="w-full py-3 bg-[#1a1a1a] hover:bg-[#4a4238] text-white rounded-xl font-button-text text-xs uppercase tracking-wider font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">tune</span>
+                      <span>Open Full Customizer Studio</span>
+                      <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </button>
                   </div>
 
                   {/* 1. Cuisine Category Selector Tabs (Provider Specific!) */}
