@@ -121,7 +121,7 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
   };
 
   return (
-    <section className="pt-12 md:pt-section-gap pb-12 px-4 sm:px-6 md:px-margin-desktop bg-bone-white">
+    <section id="meal-request-form" className="pt-12 md:pt-section-gap pb-12 px-4 sm:px-6 md:px-margin-desktop bg-bone-white scroll-mt-20">
       <div className="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-gutter">
         {/* Left column: Title and form */}
         <div className="md:col-span-5 reveal-on-scroll">
