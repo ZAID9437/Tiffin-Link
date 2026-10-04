@@ -374,7 +374,7 @@ const updateOrder = async (req, res) => {
     const providerId = req.providerId;
     const updateData = { ...req.body };
 
-    if (updateData.status === 'Ready' && (!updateData.deliveryStatus || updateData.deliveryStatus === 'Unassigned')) {
+    if ((updateData.status === 'Delivery' || updateData.status === 'Ready') && (!updateData.deliveryStatus || updateData.deliveryStatus === 'Unassigned')) {
       updateData.deliveryStatus = 'Searching';
     }
 
@@ -1122,12 +1122,19 @@ const confirmOrderPickup = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
     }
 
+    if (order.status === 'Delivery' || order.status === 'Out for Delivery' || order.status === 'Completed') {
+      return res.status(400).json({
+        success: false,
+        message: `Order ${order.orderId} is already in ${order.status} stage.`
+      });
+    }
+
     // Generate random 4-digit pickup & delivery OTPs if not already present
     const pickupOtp = order.pickupOtp || String(Math.floor(1000 + Math.random() * 9000));
     const deliveryOtp = order.deliveryOtp || String(Math.floor(1000 + Math.random() * 9000));
 
-    // Update order status to DELIVERY_REQUESTED
-    order.status = 'Ready';
+    // Update order status to Delivery and searching for couriers
+    order.status = 'Delivery';
     order.deliveryStatus = 'Searching';
     order.pickupOtp = pickupOtp;
     order.deliveryOtp = deliveryOtp;
@@ -1223,18 +1230,29 @@ const confirmOrderPickup = async (req, res) => {
         // Notify provider & customer
         emitToProvider(String(providerId), 'order:status:updated', {
           orderId: order.orderId,
-          status: 'Ready',
+          status: 'Delivery',
+          deliveryStatus: 'Searching',
+          pickupOtp
+        });
+        emitToProvider(String(providerId), 'order:updated', {
+          orderId: order.orderId,
+          status: 'Delivery',
           deliveryStatus: 'Searching',
           pickupOtp
         });
         if (order.customerId) {
           emitToCustomer(order.customerId, 'order:status:updated', {
             orderId: order.orderId,
-            status: 'Ready',
+            status: 'Delivery',
             deliveryStatus: 'Searching for Delivery Partner',
             deliveryOtp
           });
         }
+        io.emit('order:status:updated', {
+          orderId: order.orderId,
+          status: 'Delivery',
+          deliveryStatus: 'Searching'
+        });
       }
     } catch (sErr) {
       console.warn('Socket emit warning in confirmOrderPickup:', sErr.message);

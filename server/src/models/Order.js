@@ -193,6 +193,7 @@ const orderSchema = new mongoose.Schema({
       'New', 'PENDING', 'Pending', 'CONFIRMED', 'Confirmed', 
       'ACCEPTED', 'Accepted', 'PREPARING', 'Preparing', 
       'READY_FOR_PICKUP', 'Ready', 'DELIVERY_REQUESTED', 
+      'Delivery', 'Dispatched', 'In Transit', 'At Kitchen',
       'DRIVER_ASSIGNED', 'PICKED_UP', 'Picked Up', 
       'OUT_FOR_DELIVERY', 'Out for Delivery', 'ARRIVED', 
       'DELIVERED', 'Completed', 

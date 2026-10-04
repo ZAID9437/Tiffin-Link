@@ -165,14 +165,13 @@ const reconcileMissingDeliveryRequests = async () => {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    // Find orders that are ready/preparing/new/delivery but need reconciliation
+    // Find orders that are in delivery or searching for couriers that need reconciliation
     const unassignedOrders = await Order.find({
-      status: { $in: ['New', 'Preparing', 'Ready', 'Delivery', 'Out for Delivery'] },
       $or: [
-        { deliveryStatus: { $in: ['Searching', 'Unassigned', 'Pending', null, ''] } },
-        { deliveryPartnerName: { $in: [null, ''] } },
-        { deliveryPartnerName: { $exists: false } }
-      ]
+        { status: { $in: ['Delivery', 'Out for Delivery'] } },
+        { deliveryStatus: 'Searching' }
+      ],
+      status: { $nin: ['Cancelled', 'Completed', 'Delivered'] }
     });
 
     for (const ord of unassignedOrders) {
@@ -482,7 +481,7 @@ const createDeliveryRequest = async (req, res) => {
         if (providerId) ordFilter.providerId = providerId;
         await Order.findOneAndUpdate(
           ordFilter,
-          { $set: { status: 'Ready', deliveryStatus: 'Searching', deliveryPartnerName: '' } }
+          { $set: { status: 'Delivery', deliveryStatus: 'Searching', deliveryPartnerName: '' } }
         );
       }
 
@@ -600,7 +599,7 @@ const assignDriver = async (req, res) => {
         const ordQuery = isValidObjectId(requestId) ? { $or: [{ orderId: requestId }, { _id: requestId }] } : { orderId: requestId };
         await Order.findOneAndUpdate(
           ordQuery,
-          { $set: { status: 'Ready', deliveryStatus: 'Assigned', deliveryPartnerName: selectedDriver.name, deliveryPartnerPhone: selectedDriver.phone } }
+          { $set: { status: 'Delivery', deliveryStatus: 'Assigned', deliveryPartnerName: selectedDriver.name, deliveryPartnerPhone: selectedDriver.phone } }
         );
       }
 
@@ -1285,7 +1284,7 @@ const broadcastDeliveryRequest = async (req, res) => {
             if (request.orderId) {
               await Order.findOneAndUpdate(
                 { $or: [{ orderId: request.orderId }, { _id: request.orderId }] },
-                { $set: { status: 'Ready', deliveryStatus: 'Assigned', deliveryPartnerName: bestDriver.name, deliveryPartnerPhone: bestDriver.phone } }
+                { $set: { status: 'Delivery', deliveryStatus: 'Assigned', deliveryPartnerName: bestDriver.name, deliveryPartnerPhone: bestDriver.phone } }
               );
             }
           } catch (e) {
@@ -2041,19 +2040,27 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
     let resolvedDriver = null;
     if (await isDbConnected()) {
       if (req.user?._id || req.user?.id) {
-        resolvedDriver = await Driver.findOne({
-          $or: [
-            { userId: req.user._id },
-            { _id: req.user._id },
-            { email: req.user.email },
-            { phone: req.user.phone }
-          ]
-        });
+        const uId = req.user._id || req.user.id;
+        const driverOrQuery = [];
+        if (isValidObjectId(uId)) {
+          driverOrQuery.push({ _id: uId }, { userId: uId });
+        } else if (uId) {
+          driverOrQuery.push({ driverId: uId });
+        }
+        if (req.user?.email) driverOrQuery.push({ email: req.user.email });
+        if (req.user?.phone) driverOrQuery.push({ phone: req.user.phone });
+
+        if (driverOrQuery.length > 0) {
+          resolvedDriver = await Driver.findOne({ $or: driverOrQuery });
+        }
       }
       if (!resolvedDriver && req.body.driverId) {
-        resolvedDriver = await Driver.findOne({
-          $or: [{ driverId: req.body.driverId }, { _id: req.body.driverId }]
-        });
+        const dId = req.body.driverId;
+        const dQuery = [{ driverId: dId }];
+        if (isValidObjectId(dId)) {
+          dQuery.push({ _id: dId });
+        }
+        resolvedDriver = await Driver.findOne({ $or: dQuery });
       }
     }
 
@@ -2158,7 +2165,7 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
           orderQuery,
           { 
             $set: { 
-              status: 'Ready', 
+              status: 'Delivery', 
               deliveryStatus: 'Assigned', 
               driverId: String(driverId), 
               deliveryPartnerName: driverName, 
@@ -2178,6 +2185,7 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
           if (acceptedReq.providerId) {
             emitToProvider(acceptedReq.providerId, 'delivery:assigned', {
               orderId: acceptedReq.orderId,
+              status: 'Delivery',
               driverId,
               driverName,
               driverPhone,
@@ -2185,8 +2193,23 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
             });
             emitToProvider(acceptedReq.providerId, 'order:updated', {
               orderId: acceptedReq.orderId,
+              status: 'Delivery',
               deliveryStatus: 'Assigned',
-              deliveryPartnerName: driverName
+              driverId,
+              driverName,
+              driverPhone,
+              deliveryPartnerName: driverName,
+              deliveryPartnerPhone: driverPhone
+            });
+            emitToProvider(acceptedReq.providerId, 'order:status:updated', {
+              orderId: acceptedReq.orderId,
+              status: 'Delivery',
+              deliveryStatus: 'Assigned',
+              driverId,
+              driverName,
+              driverPhone,
+              deliveryPartnerName: driverName,
+              deliveryPartnerPhone: driverPhone
             });
           }
           io.emit('delivery:request:accepted', {
@@ -2202,7 +2225,11 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
           });
           io.emit('order:status:updated', {
             orderId: acceptedReq.orderId,
+            status: 'Delivery',
             deliveryStatus: 'Assigned',
+            driverId,
+            driverName,
+            driverPhone,
             deliveryPartnerName: driverName
           });
         }
@@ -3610,7 +3637,7 @@ const verifyCustomerArrivalOtp = async (req, res) => {
         buildIdQuery(targetDoc.orderId),
         {
           $set: {
-            status: 'Ready',
+            status: 'Delivery',
             deliveryStatus: 'Arrived at Customer',
             customerArrivalConfirmed: true,
             customerArrivedAt: new Date()

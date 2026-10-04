@@ -34,6 +34,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const [error, setError] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
+  const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
   useEffect(() => {
     setActiveStatusTab(initialStatus);
@@ -68,12 +69,18 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         socket.on('order:updated', handleRealtimeOrderEvent);
         socket.on('order:status:updated', handleRealtimeOrderEvent);
         socket.on('delivery:status:updated', handleRealtimeOrderEvent);
+        socket.on('delivery:assigned', handleRealtimeOrderEvent);
+        socket.on('delivery:accepted', handleRealtimeOrderEvent);
+        socket.on('delivery:request:new', handleRealtimeOrderEvent);
 
         return () => {
           socket.off('order:created', handleRealtimeOrderEvent);
           socket.off('order:updated', handleRealtimeOrderEvent);
           socket.off('order:status:updated', handleRealtimeOrderEvent);
           socket.off('delivery:status:updated', handleRealtimeOrderEvent);
+          socket.off('delivery:assigned', handleRealtimeOrderEvent);
+          socket.off('delivery:accepted', handleRealtimeOrderEvent);
+          socket.off('delivery:request:new', handleRealtimeOrderEvent);
         };
       }
     } catch (err) {
@@ -165,11 +172,13 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             status: o.status || 'New',
             deliveryMode: o.deliveryMode || 'Courier Dispatch',
             deliveryTarget: o.deliveryTarget || 'Standard',
-            deliveryDistance: o.deliveryDistance || '—',
+            deliveryDistance: o.deliveryDistance || (o.deliveryKm ? `${o.deliveryKm} km` : '3.2 km'),
             driverName: o.driverName || o.driver?.name || o.deliveryPartnerName || 'Unassigned',
             driverPhone: o.driverPhone || o.driver?.phone || o.deliveryPartnerPhone || '—',
             driverVehicle: o.driverVehicle || o.driver?.vehicle || '—',
-            deliveryStatus: o.deliveryStatus || (o.status === 'Ready' ? 'Awaiting Pickup' : o.status === 'Delivery' ? 'In Transit' : o.status === 'Completed' ? 'Delivered' : 'Unassigned'),
+            deliveryStatus: o.deliveryStatus || (o.status === 'Ready' ? 'Awaiting Pickup' : o.status === 'Delivery' ? 'Searching' : o.status === 'Completed' ? 'Delivered' : 'Unassigned'),
+            pickupOtp: o.pickupOtp || '',
+            deliveryOtp: o.deliveryOtp || '',
             cancelledBy: o.cancelledBy || 'Customer',
             cancellationReason: o.cancellationReason || 'Order cancelled.',
             cancelledAt: o.cancelledAt || o.updatedAt || o.createdAt,
@@ -323,6 +332,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   };
 
   const handleUpdateOrderStatus = async (orderId, newStatus, reason = '') => {
+    if (updatingOrderId) return;
     const targetOrder = orders.find(o => 
       (o._id && String(o._id) === String(orderId)) ||
       (o.id && String(o.id) === String(orderId)) ||
@@ -355,6 +365,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
     }
 
     try {
+      setUpdatingOrderId(orderId);
       const res = await apiRequest(apiEndpoint, {
         method,
         body: JSON.stringify(bodyObj)
@@ -362,30 +373,51 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       const json = typeof res?.json === 'function' ? await res.json() : res;
 
       if (json && json.success) {
+        const nextDeliveryStatus = (newStatus === 'Delivery' || newStatus === 'Confirm Pickup') ? 'Searching' : undefined;
+        const newPickupOtp = json.data?.order?.pickupOtp || json.data?.deliveryRequest?.pickupOtp;
+        const newDeliveryOtp = json.data?.order?.deliveryOtp || json.data?.deliveryRequest?.deliveryOtp;
+
         setOrders(prev => prev.map(o => {
           const isMatch = (o.id && String(o.id) === String(targetOrder.id)) ||
                           (o._id && String(o._id) === String(targetOrder.id)) ||
                           (o.orderId && String(o.orderId) === String(targetOrder.orderId));
-          return isMatch ? { ...o, status: newStatus } : o;
+          if (!isMatch) return o;
+          return {
+            ...o,
+            status: newStatus === 'Confirm Pickup' ? 'Delivery' : newStatus,
+            ...(nextDeliveryStatus ? { deliveryStatus: nextDeliveryStatus } : {}),
+            ...(newPickupOtp ? { pickupOtp: newPickupOtp } : {}),
+            ...(newDeliveryOtp ? { deliveryOtp: newDeliveryOtp } : {})
+          };
         }));
 
         if (selectedOrder) {
           const isSelMatch = (selectedOrder.id && String(selectedOrder.id) === String(targetOrder.id)) ||
                              (selectedOrder.orderId && String(selectedOrder.orderId) === String(targetOrder.orderId));
           if (isSelMatch) {
-            setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+            setSelectedOrder(prev => ({
+              ...prev,
+              status: newStatus === 'Confirm Pickup' ? 'Delivery' : newStatus,
+              ...(nextDeliveryStatus ? { deliveryStatus: nextDeliveryStatus } : {}),
+              ...(newPickupOtp ? { pickupOtp: newPickupOtp } : {}),
+              ...(newDeliveryOtp ? { deliveryOtp: newDeliveryOtp } : {})
+            }));
           }
         }
 
         if (newStatus === 'Preparing' || newStatus === 'Accepted') {
           showToast(`✓ Order ${targetOrder.orderId} Accepted! Moved to Kitchen Prep Queue.`);
           setActiveStatusTab('Preparing');
+        } else if (newStatus === 'Delivery' || newStatus === 'Confirm Pickup') {
+          showToast(`✓ Order ${targetOrder.orderId} dispatched to courier network! Delivery broadcast active.`);
+          setActiveStatusTab('Delivery');
         } else if (newStatus === 'Cancelled') {
           showToast(`Order ${targetOrder.orderId} Declined. Reason logged.`);
         } else {
           showToast(`✓ Order ${targetOrder.orderId} status updated to ${newStatus}`);
         }
       } else {
+        console.error('Order status update failed on backend:', json);
         showToast(`⚠️ ${json?.message || 'Action could not be completed'}`);
       }
       fetchOrders(false);
@@ -393,6 +425,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       console.error('Error updating order status in MongoDB:', err);
       showToast('⚠️ Failed to communicate with database engine');
       fetchOrders(false);
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -1588,13 +1622,24 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                             <td className="py-3.5 px-4">
                               <div className="font-bold text-onyx-black">{ord.customerName}</div>
                               <div className="text-[11px] text-secondary font-mono">{ord.customerPhone}</div>
+                              <div className="text-[10px] text-secondary truncate max-w-[160px] font-sans" title={ord.customerAddress}>{ord.customerAddress}</div>
                             </td>
-                            <td className="py-3.5 px-4 font-medium text-onyx-black">{ord.tiffinName}</td>
+                            <td className="py-3.5 px-4">
+                              <div className="font-medium text-onyx-black">{ord.tiffinName}</div>
+                              {ord.itemsBreakdown && ord.itemsBreakdown.length > 0 && (
+                                <div className="text-[10px] text-secondary truncate max-w-[150px]">{ord.itemsBreakdown.join(', ')}</div>
+                              )}
+                            </td>
                             <td className="py-3.5 px-4 font-mono font-bold">{ord.quantity}</td>
-                            <td className="py-3.5 px-4 font-mono font-bold text-onyx-black">₹{ord.grossAmount}.00</td>
+                            <td className="py-3.5 px-4 font-mono">
+                              <div className="font-bold text-onyx-black">₹{ord.grossAmount}.00</div>
+                              <div className="text-[10px] text-secondary font-mono">Sub: ₹{ord.subtotal} • Fee: ₹{ord.deliveryFee}</div>
+                              <div className="text-[10px] text-emerald-800 font-bold">{ord.paymentStatus}</div>
+                            </td>
                             <td className="py-3.5 px-4">
                               <div className="font-bold text-onyx-black text-xs">{ord.driverName}</div>
                               <div className="text-[10px] font-mono text-secondary">{ord.driverPhone}</div>
+                              <div className="text-[10px] text-secondary font-sans">{ord.deliveryDistance}</div>
                             </td>
                             <td className="py-3.5 px-4">
                               {isDriverAcceptedForOrder(ord) ? (
@@ -1785,10 +1830,18 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                                 ) : (
                                   <button
                                     type="button"
+                                    disabled={updatingOrderId === ord.orderId}
                                     onClick={() => handleUpdateOrderStatus(ord.orderId, 'Delivery')}
-                                    className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
+                                    className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                                   >
-                                    Courier
+                                    {updatingOrderId === ord.orderId ? (
+                                      <>
+                                        <span className="w-3 h-3 border-2 border-bone-white/30 border-t-bone-white rounded-full animate-spin"></span>
+                                        <span>Courier...</span>
+                                      </>
+                                    ) : (
+                                      'Courier'
+                                    )}
                                   </button>
                                 )
                               ) : ord.status === 'Preparing' || ord.status === 'In Prep' || isPreparingTab ? (
@@ -2058,14 +2111,46 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                   </span>
                 </div>
               ) : selectedOrder.status === 'Delivery' || selectedOrder.status === 'Out for Delivery' || selectedOrder.status === 'In Transit' ? (
-                <button
-                  type="button"
-                  onClick={() => handleUpdateOrderStatus(selectedOrder.orderId, 'Completed')}
-                  className="w-full py-3 px-4 bg-onyx-black hover:bg-stone-800 text-bone-white font-button-text text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer font-bold"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-emerald-400">task_alt</span>
-                  <span>Mark as Delivered</span>
-                </button>
+                <div className="space-y-2">
+                  {selectedOrder.deliveryStatus === 'Searching' || selectedOrder.deliveryStatus === 'SEARCHING' || selectedOrder.deliveryStatus === 'Searching Drivers' || !isDriverAcceptedForOrder(selectedOrder) ? (
+                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+                        <span className="font-bold text-amber-900">Broadcast Active: Searching Available Couriers</span>
+                      </div>
+                      {selectedOrder.pickupOtp && (
+                        <span className="font-mono bg-white px-2 py-0.5 rounded border border-amber-300 font-bold text-amber-900">
+                          Pickup OTP: {selectedOrder.pickupOtp}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          Courier Assigned: {selectedOrder.driverName || selectedOrder.deliveryPartnerName || 'Partner'}
+                        </span>
+                        {selectedOrder.pickupOtp && (
+                          <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300 font-bold text-emerald-900">
+                            Pickup OTP: {selectedOrder.pickupOtp}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-emerald-800">Phone: {selectedOrder.driverPhone || selectedOrder.deliveryPartnerPhone || 'Contacting...'}</div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={updatingOrderId === selectedOrder.orderId}
+                    onClick={() => handleUpdateOrderStatus(selectedOrder.orderId, 'Completed')}
+                    className="w-full py-3 px-4 bg-onyx-black hover:bg-stone-800 text-bone-white font-button-text text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer font-bold disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <span className="material-symbols-outlined text-[18px] text-emerald-400">task_alt</span>
+                    <span>Mark as Delivered</span>
+                  </button>
+                </div>
               ) : selectedOrder.status === 'Ready' ? (
                 selectedOrder.deliveryMode.toLowerCase().includes('pickup') ? (
                   <div className="grid grid-cols-3 gap-2">
@@ -2120,11 +2205,21 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                       <div className="grid grid-cols-3 gap-2">
                         <button
                           type="button"
-                          onClick={() => handleUpdateOrderStatus(selectedOrder.orderId, 'Confirm Pickup')}
-                          className="col-span-2 py-3 px-4 bg-onyx-black hover:bg-stone-800 text-bone-white font-button-text text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer font-bold"
+                          disabled={updatingOrderId === selectedOrder.orderId}
+                          onClick={() => handleUpdateOrderStatus(selectedOrder.orderId, 'Delivery')}
+                          className="col-span-2 py-3 px-4 bg-onyx-black hover:bg-stone-800 text-bone-white font-button-text text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer font-bold disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          <span className="material-symbols-outlined text-[18px] text-amber-400">send</span>
-                          <span>Confirm Pickup & Dispatch</span>
+                          {updatingOrderId === selectedOrder.orderId ? (
+                            <>
+                              <span className="w-4 h-4 border-2 border-bone-white/30 border-t-bone-white rounded-full animate-spin"></span>
+                              <span>Dispatching Courier...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="material-symbols-outlined text-[18px] text-amber-400">send</span>
+                              <span>Confirm Pickup & Dispatch</span>
+                            </>
+                          )}
                         </button>
 
                         <button
