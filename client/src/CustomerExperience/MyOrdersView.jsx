@@ -351,6 +351,347 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
     window.print();
   };
 
+  // Download / Print Official Tax Invoice & Bill
+  const handleDownloadBill = (order) => {
+    const targetOrder = order || modalPayload || activeConsignment;
+    if (!targetOrder) {
+      triggerToast('Unable to locate order details for invoice generation.');
+      return;
+    }
+    triggerToast(`Generating Tax Invoice for ${targetOrder.orderId || 'Order'}...`);
+
+    const orderId = targetOrder.orderId || ('#TL-' + (targetOrder._id ? String(targetOrder._id).slice(-6).toUpperCase() : '8421'));
+    const dateStr = targetOrder.date || new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const providerName = targetOrder.providerName || 'Artisanal Culinary Hub';
+    const providerAddress = targetOrder.providerAddress || 'Satellite Central Kitchen, Ahmedabad, Gujarat 380015';
+    const customerAddress = targetOrder.customerAddress || 'Ahmedabad, Gujarat';
+    const fssai = targetOrder.fssai || '10721026000412';
+    const paymentMethod = targetOrder.paymentMethod || 'Cash on Delivery';
+    const paymentStatus = targetOrder.paymentStatus || 'Paid';
+    const canisterId = targetOrder.canisterId || '#TK-9021';
+    const totalAmount = Number(targetOrder.totalAmount || 0);
+
+    let items = [];
+    if (Array.isArray(targetOrder.items) && targetOrder.items.length > 0) {
+      items = targetOrder.items.map(it => {
+        const qty = Number(it.quantity) || 1;
+        const lineTotal = Number(it.totalPrice || (it.unitPrice && it.quantity ? it.unitPrice * it.quantity : it.price || totalAmount));
+        const unit = Number(it.unitPrice || (lineTotal / qty));
+        return {
+          name: it.name || it.tiffinName || 'Homestyle Meal',
+          qty,
+          unitPrice: unit,
+          totalPrice: lineTotal
+        };
+      });
+    } else {
+      items = [{
+        name: targetOrder.tiffinName || 'Gujarati Special Thali (Phulkas, Bhindi, Dal, Rice)',
+        qty: 1,
+        unitPrice: totalAmount > 0 ? totalAmount : 140,
+        totalPrice: totalAmount > 0 ? totalAmount : 140
+      }];
+    }
+
+    const calculatedSubtotal = items.reduce((acc, it) => acc + (it.totalPrice || 0), 0) || totalAmount || 140;
+    const subtotal = calculatedSubtotal > 0 ? (calculatedSubtotal / 1.05) : 0;
+    const cgst = subtotal * 0.025;
+    const sgst = subtotal * 0.025;
+    const grandTotal = totalAmount > 0 ? totalAmount : (subtotal + cgst + sgst);
+
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      triggerToast('Popup blocked. Please allow popups to view and download your bill.');
+      return;
+    }
+
+    const invoiceHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tax Invoice - ${orderId}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: #1a1a1a;
+      background: #ffffff;
+      padding: 36px;
+      max-width: 820px;
+      margin: 0 auto;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #1a1a1a;
+      padding-bottom: 18px;
+      margin-bottom: 24px;
+    }
+    .brand-title {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #1a1a1a;
+    }
+    .brand-subtitle {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #9e472a;
+      font-weight: 700;
+      margin-top: 3px;
+    }
+    .brand-sub {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+    .invoice-badge {
+      text-align: right;
+    }
+    .invoice-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #9e472a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .invoice-num {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-top: 3px;
+    }
+    .invoice-date {
+      font-size: 12px;
+      color: #666;
+      margin-top: 3px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      background: #faf8f5;
+      border: 1px solid #e7e2d8;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: 13px;
+    }
+    .meta-col h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #736b63;
+      margin-bottom: 6px;
+    }
+    .meta-col p {
+      line-height: 1.5;
+      color: #2b2b2b;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+    }
+    th {
+      background: #1a1a1a;
+      color: #ffffff;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 10px 14px;
+      text-align: left;
+    }
+    th.num, td.num {
+      text-align: right;
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #ebe7e0;
+      font-size: 13.5px;
+    }
+    .totals-wrap {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 28px;
+    }
+    .totals-table {
+      width: 340px;
+      border-collapse: collapse;
+    }
+    .totals-table td {
+      padding: 7px 12px;
+      font-size: 13.5px;
+      border-bottom: 1px solid #f0eee9;
+    }
+    .totals-table tr.grand-total td {
+      font-size: 16px;
+      font-weight: 800;
+      color: #1a1a1a;
+      border-top: 2px solid #1a1a1a;
+      border-bottom: 2px solid #1a1a1a;
+      padding: 10px 12px;
+      background: #faf8f5;
+    }
+    .footer-note {
+      background: #f7f6f2;
+      border-left: 4px solid #9e472a;
+      padding: 14px 18px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #4a453f;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .signature-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-top: 36px;
+      padding-top: 18px;
+      border-top: 1px solid #e5e0d8;
+      font-size: 12px;
+      color: #777;
+    }
+    .btn-actions {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .btn-print {
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      padding: 10px 22px;
+      font-size: 13.5px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-print:hover {
+      background: #9e472a;
+    }
+    @media print {
+      .btn-actions { display: none; }
+      body { padding: 0; }
+      @page { margin: 15mm; size: A4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="btn-actions">
+    <button class="btn-print" onclick="window.print()">
+      🖨️ Print or Save as PDF
+    </button>
+  </div>
+  <div class="header">
+    <div>
+      <div class="brand-title">TIFFIN LINK</div>
+      <div class="brand-subtitle">Culinary Escrow & Logistics Network</div>
+      <div class="brand-sub">GSTIN: 24AABCT1342M1Z5 • FSSAI Lic: ${fssai}</div>
+    </div>
+    <div class="invoice-badge">
+      <div class="invoice-title">Tax Invoice</div>
+      <div class="invoice-num">${orderId}</div>
+      <div class="invoice-date">Date: ${dateStr}</div>
+    </div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-col">
+      <h4>Billed From (Kitchen Hub)</h4>
+      <p><strong>${providerName}</strong></p>
+      <p>${providerAddress}</p>
+      <p>FSSAI Registration: ${fssai}</p>
+    </div>
+    <div class="meta-col">
+      <h4>Delivered To (Customer)</h4>
+      <p><strong>Destination:</strong> ${customerAddress}</p>
+      <p>Payment: <strong>${paymentMethod} (${paymentStatus})</strong></p>
+      <p>Eco-Canister Ref: <strong>${canisterId}</strong> (304 Stainless)</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 44px;">#</th>
+        <th>Meal Description</th>
+        <th class="num" style="width: 70px;">Qty</th>
+        <th class="num" style="width: 110px;">Unit (₹)</th>
+        <th class="num" style="width: 120px;">Amount (₹)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${items.map((it, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td><strong>${it.name}</strong></td>
+          <td class="num">${it.qty}</td>
+          <td class="num">₹${it.unitPrice.toFixed(2)}</td>
+          <td class="num">₹${it.totalPrice.toFixed(2)}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+
+  <div class="totals-wrap">
+    <table class="totals-table">
+      <tr>
+        <td>Subtotal (Taxable)</td>
+        <td class="num">₹${subtotal.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td>SGST (2.5%)</td>
+        <td class="num">₹${sgst.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td>CGST (2.5%)</td>
+        <td class="num">₹${cgst.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td>304 Canister Sterilization Deposit</td>
+        <td class="num" style="color: #2e7d32; font-weight: 600;">Waived (₹0.00)</td>
+      </tr>
+      <tr>
+        <td>Thermal Transit Delivery Fee</td>
+        <td class="num" style="color: #2e7d32; font-weight: 600;">Free / Included</td>
+      </tr>
+      <tr class="grand-total">
+        <td>Grand Total</td>
+        <td class="num">₹${grandTotal.toFixed(2)}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="footer-note">
+    <strong>Culinary &amp; Quality Guarantee:</strong> Prepared with fresh daily ingredients adhering strictly to FSSAI culinary standards. Sealed in food-grade 304 stainless steel thermal canisters. Verified digitally under TiffinLink Escrow Protocol SEC-889102-AHM.
+  </div>
+
+  <div class="signature-row">
+    <div>Authorized Signatory: TiffinLink Escrow Ledger</div>
+    <div>Original for Recipient • Computer Generated Invoice</div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+      }, 350);
+    };
+  </script>
+</body>
+</html>`;
+
+    printWin.document.write(invoiceHtml);
+    printWin.document.close();
+  };
+
   return (
     <div className="flex flex-col w-full bg-surface font-body-md text-on-surface antialiased pt-20 sm:pt-24 pb-20">
       
@@ -882,13 +1223,22 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                           <span className="material-symbols-outlined text-[18px]">north_east</span>
                         </button>
                         <button
-                          className="py-3 px-4 bg-surface-container rounded border border-sand-neutral font-button-text text-button-text text-onyx-black hover:bg-surface-container-high transition-colors"
+                          className="py-3 px-4 bg-surface-container rounded border border-sand-neutral font-button-text text-button-text text-onyx-black hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1.5"
                           onClick={() => {
                             setModalPayload(activeConsignment);
                             setActiveModal('dossier');
                           }}
                         >
-                          View Dossier
+                          <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                          <span>View Bill</span>
+                        </button>
+                        <button
+                          className="py-3 px-4 bg-surface-container rounded border border-sand-neutral font-button-text text-button-text text-onyx-black hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1.5"
+                          onClick={() => handleDownloadBill(activeConsignment)}
+                          title="Download Bill (PDF)"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">download</span>
+                          <span>Download Bill</span>
                         </button>
                       </div>
 
@@ -1440,6 +1790,26 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                         {activeConsignment.paymentStatus === 'Paid' ? 'Paid Online' : 'Exact cash or scan UPI at door'}
                       </p>
                     </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-sand-neutral/60 flex flex-col sm:flex-row items-center gap-2.5">
+                    <button
+                      onClick={() => {
+                        setModalPayload(activeConsignment);
+                        setActiveModal('receipt');
+                      }}
+                      className="w-full sm:flex-1 py-2.5 px-3 bg-surface-container hover:bg-surface-container-high border border-sand-neutral rounded font-button-text text-button-text text-onyx-black flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                      <span>View Detailed Bill</span>
+                    </button>
+                    <button
+                      onClick={() => handleDownloadBill(activeConsignment)}
+                      className="w-full sm:w-auto py-2.5 px-4 bg-onyx-black hover:bg-clay-earth text-on-primary rounded font-button-text text-button-text flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">download</span>
+                      <span>Download Bill (PDF)</span>
+                    </button>
                   </div>
 
                   <div className="pt-3 border-t border-sand-neutral/40 flex items-center justify-between text-[13px] text-secondary">
@@ -2244,15 +2614,24 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                           <span className="material-symbols-outlined text-[16px] text-secondary">verified_user</span>
                           <span className="font-label-caps text-label-caps text-secondary">Culinary audit complete</span>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-wrap items-center gap-3">
                           <button
                             onClick={() => {
                               setModalPayload(order);
                               setActiveModal('receipt');
                             }}
-                            className="px-5 py-2.5 bg-surface-container hover:bg-surface-variant font-button-text text-button-text text-onyx-black transition-colors"
+                            className="px-4 py-2.5 bg-surface-container hover:bg-surface-variant font-button-text text-button-text text-onyx-black transition-colors flex items-center gap-1.5"
                           >
-                            View Receipt / Dossier
+                            <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                            <span>View Bill</span>
+                          </button>
+                          <button
+                            onClick={() => handleDownloadBill(order)}
+                            className="px-4 py-2.5 bg-surface-container hover:bg-surface-variant font-button-text text-button-text text-onyx-black transition-colors flex items-center gap-1.5"
+                            title="Download Bill as PDF"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">download</span>
+                            <span>Download</span>
                           </button>
                           <button
                             onClick={() => {
@@ -2260,7 +2639,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                               if (onNavigate) onNavigate('#order-tiffin');
                               else window.location.hash = '#order-tiffin';
                             }}
-                            className="px-6 py-2.5 bg-onyx-black hover:bg-clay-earth text-on-primary font-button-text text-button-text transition-colors"
+                            className="px-5 py-2.5 bg-onyx-black hover:bg-clay-earth text-on-primary font-button-text text-button-text transition-colors"
                           >
                             Reorder This Tiffin
                           </button>
@@ -3114,123 +3493,162 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
       )}
 
       {/* 6. Tax Receipt & Dossier Modal */}
-      {(activeModal === 'receipt' || activeModal === 'dossier') && (
-        <div className="fixed inset-0 bg-onyx-black/60 backdrop-blur-sm z-50 transition-opacity flex items-center justify-center p-4 sm:p-6">
-          <div className="bg-surface-container-lowest w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-10 relative flex flex-col justify-between animate-in zoom-in-95">
-            <div className="flex items-start justify-between pb-6">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-headline-md text-headline-md text-onyx-black">
-                    {modalPayload.orderId || '#TL-4521'}
-                  </span>
-                  <span className="px-2 py-0.5 bg-surface-container font-label-caps text-label-caps text-clay-earth uppercase">
-                    Verified Tax Dossier
-                  </span>
-                </div>
-                <span className="font-label-caps text-label-caps text-secondary block">
-                  Culinary Escrow Protocol Ref • SEC-889102-AHM
-                </span>
-              </div>
-              <button
-                className="p-2 text-secondary hover:text-onyx-black transition-colors"
-                onClick={() => setActiveModal(null)}
-              >
-                <span className="material-symbols-outlined text-[24px]">close</span>
-              </button>
-            </div>
+      {/* 6. Tax Receipt & Dossier Modal */}
+      {(activeModal === 'receipt' || activeModal === 'dossier') && modalPayload && (() => {
+        const total = Number(modalPayload.totalAmount || 140);
+        const itemsList = Array.isArray(modalPayload.items) && modalPayload.items.length > 0
+          ? modalPayload.items.map(it => ({
+              name: it.name || it.tiffinName || 'Homestyle Culinary Meal',
+              quantity: Number(it.quantity) || 1,
+              price: Number(it.totalPrice || (it.unitPrice && it.quantity ? it.unitPrice * it.quantity : it.price || total))
+            }))
+          : [
+              {
+                name: modalPayload.tiffinName || 'Gujarati Special Thali (Phulkas, Bhindi, Dal, Rice)',
+                quantity: 1,
+                price: total > 0 ? total : 140
+              }
+            ];
 
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 bg-surface-container-low">
-                <div>
-                  <span className="font-label-caps text-label-caps text-secondary block uppercase">Timestamp</span>
-                  <span className="font-body-md text-body-md text-onyx-black">
-                    {modalPayload.date || '02 Oct 2026, 12:48 PM'}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-label-caps text-label-caps text-secondary block uppercase">FSSAI Registration</span>
-                  <span className="font-body-md text-body-md text-onyx-black">
-                    {modalPayload.fssai || '10721026000412'}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-label-caps text-label-caps text-secondary block uppercase">Hub Routing</span>
-                  <span className="font-body-md text-body-md text-onyx-black">Satellite #4 Express</span>
-                </div>
-              </div>
+        const calculatedSubtotal = itemsList.reduce((acc, it) => acc + (it.price || 0), 0) || total || 140;
+        const subtotal = calculatedSubtotal > 0 ? (calculatedSubtotal / 1.05) : 0;
+        const cgst = subtotal * 0.025;
+        const sgst = subtotal * 0.025;
+        const grandTotal = total > 0 ? total : (subtotal + cgst + sgst);
 
-              <div className="space-y-3">
-                <span className="font-label-caps text-label-caps text-secondary uppercase block">Meal Line Items</span>
-                <div className="flex justify-between py-2 bg-surface px-3">
-                  <span className="font-body-md text-body-md text-onyx-black">
-                    {modalPayload.tiffinName || 'Gujarati Special Thali (Phulkas, Bhindi, Dal, Rice)'}
-                  </span>
-                  <span className="font-button-text text-button-text text-onyx-black">₹120.00</span>
-                </div>
-                <div className="flex justify-between py-2 bg-surface px-3">
-                  <span className="font-body-md text-body-md text-onyx-black">Fresh Masala Chaas (250ml Sealed Glass Flask)</span>
-                  <span className="font-button-text text-button-text text-onyx-black">₹20.00</span>
-                </div>
-              </div>
-
-              <div className="space-y-2 p-4 bg-surface-container">
-                <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
-                  <span>Subtotal</span>
-                  <span>₹140.00</span>
-                </div>
-                <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
-                  <span>Packaging &amp; 304 Canister Sterilization Fee</span>
-                  <span>₹0.00 (Waived)</span>
-                </div>
-                <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
-                  <span>FSSAI Quality &amp; SGST (2.5%)</span>
-                  <span>₹3.50</span>
-                </div>
-                <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
-                  <span>CGST (2.5%)</span>
-                  <span>₹3.50</span>
-                </div>
-                <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
-                  <span>Kitchen Escrow Retainer Discount</span>
-                  <span className="text-clay-earth">-₹7.00</span>
-                </div>
-                <div className="flex justify-between font-headline-md text-headline-md text-onyx-black pt-2">
-                  <span>Grand Total Settled</span>
-                  <span>₹{modalPayload.totalAmount || 140}.00</span>
-                </div>
-              </div>
-
-              <div className="p-4 bg-surface-container-high flex items-start gap-3">
-                <span className="material-symbols-outlined text-clay-earth text-[20px]">inventory_2</span>
+        return (
+          <div className="fixed inset-0 bg-onyx-black/60 backdrop-blur-sm z-50 transition-opacity flex items-center justify-center p-4 sm:p-6">
+            <div className="bg-surface-container-lowest w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-10 relative flex flex-col justify-between animate-in zoom-in-95">
+              <div className="flex items-start justify-between pb-6">
                 <div className="space-y-1">
-                  <span className="font-button-text text-button-text text-onyx-black block">
-                    304 Stainless Steel Return Acknowledged
+                  <div className="flex items-center gap-2">
+                    <span className="font-headline-md text-headline-md text-onyx-black">
+                      {modalPayload.orderId || ('#TL-' + (modalPayload._id ? String(modalPayload._id).slice(-6).toUpperCase() : '4521'))}
+                    </span>
+                    <span className="px-2 py-0.5 bg-surface-container font-label-caps text-label-caps text-clay-earth uppercase">
+                      Official Tax Invoice &amp; Dossier
+                    </span>
+                  </div>
+                  <span className="font-label-caps text-label-caps text-secondary block">
+                    Culinary Escrow Protocol Ref • SEC-889102-AHM • GSTIN 24AABCT1342M1Z5
                   </span>
-                  <p className="font-body-md text-body-md text-on-surface-variant">
-                    Courier scanner recorded vessel exchange code #VS-9912. Stainless canister returned sanitized to kitchen hub. No security hold charged.
-                  </p>
+                </div>
+                <button
+                  className="p-2 text-secondary hover:text-onyx-black transition-colors"
+                  onClick={() => setActiveModal(null)}
+                >
+                  <span className="material-symbols-outlined text-[24px]">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4 bg-surface-container-low rounded">
+                  <div>
+                    <span className="font-label-caps text-label-caps text-secondary block uppercase">Timestamp</span>
+                    <span className="font-body-md text-body-md text-onyx-black">
+                      {modalPayload.date || '02 Oct 2026, 12:48 PM'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-label-caps text-label-caps text-secondary block uppercase">FSSAI Registration</span>
+                    <span className="font-body-md text-body-md text-onyx-black">
+                      {modalPayload.fssai || '10721026000412'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-label-caps text-label-caps text-secondary block uppercase">Payment Mode</span>
+                    <span className="font-body-md text-body-md text-onyx-black">
+                      {modalPayload.paymentMethod || 'Cash on Delivery'} ({modalPayload.paymentStatus || 'Paid'})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Kitchen & Customer details */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-surface rounded border border-sand-neutral/50">
+                  <div>
+                    <span className="font-label-caps text-label-caps text-secondary uppercase block mb-1">Prepared By (Kitchen)</span>
+                    <p className="font-button-text text-button-text text-onyx-black">{modalPayload.providerName || 'Artisanal Culinary Hub'}</p>
+                    <p className="font-body-md text-[13px] text-secondary mt-0.5">{modalPayload.providerAddress || 'Ahmedabad, Gujarat'}</p>
+                  </div>
+                  <div>
+                    <span className="font-label-caps text-label-caps text-secondary uppercase block mb-1">Delivery Destination</span>
+                    <p className="font-body-md text-[13px] text-onyx-black">{modalPayload.customerAddress || 'Customer Address'}</p>
+                    <p className="font-body-md text-[12px] text-secondary mt-0.5">Canister ID: {modalPayload.canisterId || '#TK-9021'}</p>
+                  </div>
+                </div>
+
+                {/* Dynamic Line items */}
+                <div className="space-y-3">
+                  <span className="font-label-caps text-label-caps text-secondary uppercase block">Meal Line Items</span>
+                  <div className="divide-y divide-sand-neutral/40 border border-sand-neutral/50 rounded overflow-hidden">
+                    {itemsList.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center py-2.5 bg-surface px-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-secondary font-label-caps text-xs">{item.quantity}×</span>
+                          <span className="font-body-md text-body-md text-onyx-black font-medium">{item.name}</span>
+                        </div>
+                        <span className="font-button-text text-button-text text-onyx-black">₹{Number(item.price).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bill Breakdown */}
+                <div className="space-y-2 p-4 bg-surface-container rounded">
+                  <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
+                    <span>Taxable Subtotal</span>
+                    <span>₹{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
+                    <span>Packaging &amp; 304 Canister Sterilization Fee</span>
+                    <span className="text-emerald-700 font-medium">₹0.00 (Waived)</span>
+                  </div>
+                  <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
+                    <span>SGST (2.5%)</span>
+                    <span>₹{sgst.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
+                    <span>CGST (2.5%)</span>
+                    <span>₹{cgst.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-headline-md text-headline-md text-onyx-black pt-2 border-t border-sand-neutral/60">
+                    <span>Grand Total Settled</span>
+                    <span className="font-bold">₹{grandTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-surface-container-high rounded flex items-start gap-3">
+                  <span className="material-symbols-outlined text-clay-earth text-[20px]">inventory_2</span>
+                  <div className="space-y-1">
+                    <span className="font-button-text text-button-text text-onyx-black block">
+                      304 Stainless Steel Return Acknowledged
+                    </span>
+                    <p className="font-body-md text-body-md text-on-surface-variant">
+                      Courier scanner recorded vessel exchange code #{modalPayload.canisterId || 'VS-9912'}. Stainless canister returned sanitized to kitchen hub. No security hold charged.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-end gap-4 pt-6">
-              <button
-                className="w-full sm:w-auto px-6 py-2.5 bg-surface-container hover:bg-surface-variant font-button-text text-button-text text-onyx-black transition-colors"
-                onClick={() => setActiveModal(null)}
-              >
-                Close Window
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="w-full sm:w-auto px-6 py-2.5 bg-onyx-black hover:bg-clay-earth text-on-primary font-button-text text-button-text transition-colors flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[16px]">print</span>
-                <span>Print Official Invoice</span>
-              </button>
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-end gap-3 pt-6 border-t border-sand-neutral/50">
+                <button
+                  className="w-full sm:w-auto px-6 py-2.5 bg-surface-container hover:bg-surface-variant font-button-text text-button-text text-onyx-black transition-colors rounded"
+                  onClick={() => setActiveModal(null)}
+                >
+                  Close Window
+                </button>
+                <button
+                  onClick={() => handleDownloadBill(modalPayload)}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-onyx-black hover:bg-clay-earth text-on-primary font-button-text text-button-text transition-colors flex items-center justify-center gap-2 rounded"
+                >
+                  <span className="material-symbols-outlined text-[16px]">download</span>
+                  <span>Download Bill (PDF)</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 7. Review Meal Modal */}
       {activeModal === 'review' && reviewOrder && (
