@@ -1373,7 +1373,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                       activeConsignment.items.map((it, idx) => (
                         <div key={idx} className="flex justify-between items-center text-onyx-black">
                           <span>{it.quantity ? `${it.quantity}x ` : '1x '}{it.name || it.tiffinName || 'Homestyle Dish'}</span>
-                          <span className="font-medium">₹{Number(it.price || (activeConsignment.totalAmount / activeConsignment.items.length) || 0).toFixed(2)}</span>
+                          <span className="font-medium">₹{Number(it.totalPrice || (it.unitPrice && it.quantity ? it.unitPrice * it.quantity : it.price) || 0).toFixed(2)}</span>
                         </div>
                       ))
                     ) : (

@@ -1008,14 +1008,30 @@ const createCustomerOrder = async (req, res) => {
       }
     }
 
-    // Dynamic Delivery Fee Calculation: ₹25 base + ₹8/km
+    // Dynamic Delivery Fee Calculation: ₹25 base + ₹8/km (based on KM)
     const deliveryFee = Math.max(25, Math.round(25 + (distanceKm * 8)));
-    const tiffinBaseAmount = basePrice * qty;
-    const subtotal = tiffinBaseAmount + itemsAmount + extrasTotal;
+
+    // Dynamic Item-Based Meal Pricing:
+    // If customer selected items, mealSubtotal is SUM(item.price * quantity) + extras
+    // Fixed tiffin base price is not charged when customer builds their own meal.
+    const isCustomizedMeal = sanitizedItemsSnapshot.length > 0;
+    const mealSubtotal = isCustomizedMeal 
+      ? (itemsAmount + extrasTotal) 
+      : (basePrice * qty + extrasTotal);
+    const subtotal = mealSubtotal;
     const totalAmount = subtotal + deliveryFee;
+    const tiffinBaseAmount = isCustomizedMeal ? 0 : (basePrice * qty);
 
     const orderNum = Math.floor(1000 + Math.random() * 9000);
     const orderId = `TL-${orderNum}`;
+
+    const formattedSelectedItems = sanitizedItemsSnapshot.map(i => ({
+      itemId: i.itemId || i.menuItemId,
+      itemName: i.name,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      totalPrice: i.totalPrice
+    }));
 
     const orderData = {
       orderId,
@@ -1032,17 +1048,21 @@ const createCustomerOrder = async (req, res) => {
       tiffinCategory: resolvedTiffinCategory,
       tiffinImage: resolvedTiffinImage,
       quantity: qty,
-      unitPrice: basePrice,
+      unitPrice: isCustomizedMeal ? 0 : basePrice,
       tiffinBaseAmount,
       itemsAmount,
+      mealSubtotal,
       subtotal,
       deliveryKm: distanceKm,
+      deliveryDistance: `${distanceKm} km`,
       deliveryFee,
       driverEarning: deliveryFee,
       packagingFee: 0,
       gstTax: Math.round(subtotal * 0.05),
+      finalTotal: totalAmount,
       totalAmount,
       items: sanitizedItemsSnapshot,
+      selectedItems: formattedSelectedItems,
       extras: sanitizedExtras,
       rotliCount: rotliCount || 4,
       selectedShaak: selectedShaak || '',

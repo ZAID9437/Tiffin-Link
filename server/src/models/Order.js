@@ -48,10 +48,22 @@ const orderSchema = new mongoose.Schema({
   },
   items: [
     {
+      itemId: String,
       name: String,
       category: String,
       price: Number,
-      quantity: Number
+      unitPrice: Number,
+      quantity: Number,
+      totalPrice: Number
+    }
+  ],
+  selectedItems: [
+    {
+      itemId: String,
+      itemName: String,
+      quantity: Number,
+      unitPrice: Number,
+      totalPrice: Number
     }
   ],
   extras: [
@@ -60,6 +72,14 @@ const orderSchema = new mongoose.Schema({
       price: Number
     }
   ],
+  mealSubtotal: {
+    type: Number,
+    default: 0
+  },
+  finalTotal: {
+    type: Number,
+    default: 0
+  },
   rotliCount: {
     type: Number,
     default: 4

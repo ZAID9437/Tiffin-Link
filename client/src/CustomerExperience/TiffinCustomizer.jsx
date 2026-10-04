@@ -189,11 +189,9 @@ export default function TiffinCustomizer({
     return Math.max(25, Math.round(25 + distanceKm * 8));
   }, [distanceKm]);
 
-  // Financial Calculations
-  const baseTiffinPrice = Number(dbTiffin?.price !== undefined ? dbTiffin.price : (tiffin?.price || 140));
-
-  const { itemsExtraTotal, totalCustomizedCount, activeReceiptItems } = useMemo(() => {
-    let extra = 0;
+  // Financial Calculations: 100% Dynamic Item-Based Meal Pricing
+  const { mealSubtotal, totalCustomizedCount, activeReceiptItems } = useMemo(() => {
+    let subtotal = 0;
     let count = 0;
     const receipt = [];
 
@@ -202,7 +200,7 @@ export default function TiffinCustomizer({
       if (qty > 0) {
         const unitP = Number(item.price !== undefined ? item.price : (item.unitPrice || 0));
         const lineTotal = unitP * qty;
-        extra += lineTotal;
+        subtotal += lineTotal;
         count += qty;
         receipt.push({
           id: item.id,
@@ -215,17 +213,23 @@ export default function TiffinCustomizer({
     });
 
     return {
-      itemsExtraTotal: extra,
+      mealSubtotal: subtotal,
       totalCustomizedCount: count,
       activeReceiptItems: receipt
     };
   }, [dbItems, quantities]);
 
-  const grandTotal = baseTiffinPrice + itemsExtraTotal + deliveryFee;
+  const finalTotal = mealSubtotal + deliveryFee;
+  const grandTotal = finalTotal;
 
   // Handle Checkout / Confirmation
   const handleProceedToCheckout = async () => {
     setOrderError('');
+
+    if (activeReceiptItems.length === 0) {
+      setOrderError('Please select at least 1 item to build your customized meal.');
+      return;
+    }
 
     // If not authenticated, save selection and open login
     if (!currentUser) {
@@ -253,8 +257,10 @@ export default function TiffinCustomizer({
       const selectedItemsList = activeReceiptItems.map(r => ({
         itemId: r.id,
         name: r.name,
+        itemName: r.name,
         quantity: r.qty,
-        unitPrice: r.unitPrice
+        unitPrice: r.unitPrice,
+        totalPrice: r.lineTotal
       }));
 
       const payload = {
@@ -264,7 +270,11 @@ export default function TiffinCustomizer({
         tiffinCategory: dbTiffin?.category || tiffin?.category || 'Gujarati Traditional',
         tiffinImage: dbTiffin?.image || tiffin?.image || '/assets/provider_1.png',
         quantity: 1,
-        unitPrice: baseTiffinPrice,
+        unitPrice: 0,
+        mealSubtotal,
+        deliveryDistance: `${distanceKm} km`,
+        deliveryFee,
+        finalTotal,
         customerName: currentUser.name || currentUser.fullName || 'Customer',
         customerEmail: currentUser.email || '',
         customerPhone: currentUser.phone || currentUser.mobile || '+91 98765 43210',
@@ -273,6 +283,7 @@ export default function TiffinCustomizer({
           ? { lat: Number(customerCoordinates.lat), lng: Number(customerCoordinates.lng) }
           : (currentUser?.currentLocation?.latitude ? { lat: Number(currentUser.currentLocation.latitude), lng: Number(currentUser.currentLocation.longitude) } : null),
         items: selectedItemsList,
+        selectedItems: selectedItemsList,
         instructions: instructions,
         paymentMethod: 'Online Payment'
       };
@@ -331,20 +342,16 @@ export default function TiffinCustomizer({
               <strong className="text-[#1a1a1a]">{confirmedOrder.tiffinName || activeTiffinName}</strong>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-[#665d52]">Base Price:</span>
-              <span className="text-[#1a1a1a]">₹{(confirmedOrder.unitPrice || baseTiffinPrice).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-[#665d52]">Customized Items:</span>
-              <span className="text-[#1a1a1a]">₹{(confirmedOrder.itemsAmount || itemsExtraTotal).toFixed(2)}</span>
+              <span className="text-[#665d52]">Meal Subtotal ({totalCustomizedCount} items):</span>
+              <span className="text-[#1a1a1a]">₹{(confirmedOrder.mealSubtotal || confirmedOrder.subtotal || mealSubtotal).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-[#665d52]">Delivery Corridor ({distanceKm} km):</span>
               <span className="text-[#1a1a1a]">₹{(confirmedOrder.deliveryFee || deliveryFee).toFixed(2)}</span>
             </div>
             <div className="border-t border-[#ded9d1] pt-3 flex justify-between font-bold text-base">
-              <span>Total Paid:</span>
-              <span>₹{(confirmedOrder.totalAmount || grandTotal).toFixed(2)}</span>
+              <span>Final Payable:</span>
+              <span>₹{(confirmedOrder.finalTotal || confirmedOrder.totalAmount || grandTotal).toFixed(2)}</span>
             </div>
           </div>
 
@@ -608,37 +615,32 @@ export default function TiffinCustomizer({
                   </div>
                 </div>
 
-                {/* Base Allocation Tag */}
+                {/* Meal Customization Status Tag */}
                 <div className="py-3 px-3.5 bg-[#f5f3ef] flex items-center justify-between my-4 border border-[#ded9d1]/60">
                   <div>
                     <span className="text-xs font-semibold text-[#1a1a1a] block">{activeTiffinName}</span>
-                    <span className="font-label-caps text-[10px] text-[#665d52] uppercase">Standard Meal Run</span>
+                    <span className="font-label-caps text-[10px] text-[#665d52] uppercase">Custom Meal Selection</span>
                   </div>
-                  <span className="text-xs font-semibold text-[#1a1a1a]">₹{baseTiffinPrice.toFixed(2)}</span>
+                  <span className="text-xs font-semibold text-[#8c531b]">{totalCustomizedCount} Selected</span>
                 </div>
 
                 {/* Line Items Breakdown */}
                 <div className="space-y-3 text-sm text-[#665d52] py-3 border-b border-[#ded9d1]">
                   <div className="flex items-center justify-between">
-                    <span>Tiffin Base Allocation</span>
-                    <span className="text-[#1a1a1a] font-medium">₹{baseTiffinPrice.toFixed(2)}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-[#1a1a1a]">Selected Items Extra</span>
+                      <span className="text-[#1a1a1a] font-medium">Meal Subtotal</span>
                       <span className="block font-label-caps text-[11px] text-[#665d52]">
-                        {totalCustomizedCount} items customized
+                        {totalCustomizedCount} item{totalCustomizedCount !== 1 ? 's' : ''} configured
                       </span>
                     </div>
-                    <span className="text-[#1a1a1a] font-medium">₹{itemsExtraTotal.toFixed(2)}</span>
+                    <span className="text-[#1a1a1a] font-bold text-base">₹{mealSubtotal.toFixed(2)}</span>
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
                     <div>
-                      <span className="text-[#1a1a1a]">Delivery Corridor Fee</span>
+                      <span className="text-[#1a1a1a]">Delivery Fee ({distanceKm} km)</span>
                       <span className="block font-label-caps text-[11px] text-[#665d52]">
-                        {distanceKm} km corridor (₹25 base + ₹8/km)
+                        Calculated by distance (₹25 base + ₹8/km)
                       </span>
                     </div>
                     <span className="text-[#1a1a1a] font-medium">₹{deliveryFee.toFixed(2)}</span>
@@ -659,7 +661,7 @@ export default function TiffinCustomizer({
                     Active Tray Configuration:
                   </div>
                   {activeReceiptItems.length === 0 ? (
-                    <p className="italic text-[11px]">No extra items selected (Base thali included)</p>
+                    <p className="italic text-[11px]">No items selected yet. Select items on the left to build your meal.</p>
                   ) : (
                     activeReceiptItems.map(item => (
                       <div key={item.id} className="flex justify-between">
@@ -689,10 +691,10 @@ export default function TiffinCustomizer({
                   <div className="flex items-baseline justify-between">
                     <div>
                       <span className="font-label-caps text-xs text-[#665d52] uppercase tracking-widest block font-bold">
-                        Total Payable
+                        Final Payable
                       </span>
                       <span className="font-label-caps text-[11px] text-[#665d52]">
-                        Calculated dynamically from DB prices
+                        Meal Subtotal + KM Delivery Fee
                       </span>
                     </div>
                     <span style={{ fontFamily: "'EB Garamond', serif" }} className="text-3xl font-semibold text-[#1a1a1a]">
@@ -711,12 +713,14 @@ export default function TiffinCustomizer({
                 <div className="mt-6 flex flex-col gap-2.5">
                   <button
                     type="button"
-                    disabled={isSubmitting || availableSlots <= 0}
+                    disabled={isSubmitting || availableSlots <= 0 || totalCustomizedCount === 0}
                     onClick={handleProceedToCheckout}
-                    className="w-full py-4 bg-[#1a1a1a] hover:bg-[#4a4238] disabled:bg-[#ded9d1] text-[#fbf9f5] font-button-text text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-3 transition-colors cursor-pointer"
+                    className="w-full py-4 bg-[#1a1a1a] hover:bg-[#4a4238] disabled:bg-[#ded9d1] disabled:cursor-not-allowed text-[#fbf9f5] font-button-text text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-3 transition-colors cursor-pointer"
                   >
                     {isSubmitting ? (
                       <span>Validating Kitchen Slot...</span>
+                    ) : totalCustomizedCount === 0 ? (
+                      <span>Select Items to Build Meal</span>
                     ) : (
                       <>
                         <span>Quick Checkout</span>

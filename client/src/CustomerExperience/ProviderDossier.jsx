@@ -340,9 +340,14 @@ export default function ProviderDossier({
                           <h3 style={{ fontFamily: "'EB Garamond', serif" }} className="text-2xl text-[#1a1a1a] leading-tight font-medium">
                             {tif.name}
                           </h3>
-                          <span style={{ fontFamily: "'EB Garamond', serif" }} className="text-2xl text-[#1a1a1a] whitespace-nowrap">
-                            ₹{tif.price}<span className="font-body-md text-xs text-[#665d52] block text-right font-normal">base</span>
-                          </span>
+                          <div className="text-right shrink-0">
+                            <span className="font-label-caps text-xs text-[#8c531b] uppercase tracking-wider font-bold bg-[#fcf6ee] px-2.5 py-1 rounded border border-[#eedcc8] whitespace-nowrap block">
+                              Custom Pricing
+                            </span>
+                            <span className="font-body-md text-[11px] text-[#665d52] block mt-0.5">
+                              Build Your Meal
+                            </span>
+                          </div>
                         </div>
 
                         {/* Tags */}
@@ -363,7 +368,7 @@ export default function ProviderDossier({
                           <p className="font-body-md text-xs text-[#665d52] leading-relaxed">
                             {tif.description ? `${tif.description} ` : ''}
                             <span className="inline-block mt-1 text-[#8c531b] font-medium bg-[#fcf6ee] px-2 py-0.5 rounded border border-[#eedcc8]">
-                              ✨ You can create your favorite meal under this price
+                              ✨ Select items & build your customized meal
                             </span>
                           </p>
                         </div>
@@ -390,7 +395,7 @@ export default function ProviderDossier({
                         onClick={() => onSelectTiffin(tif)}
                         className="w-full bg-[#1a1a1a] hover:bg-[#4a4238] text-white py-3.5 px-4 font-button-text text-xs uppercase tracking-widest text-center transition-colors flex items-center justify-center gap-2 cursor-pointer font-bold"
                       >
-                        <span>Customize Tiffin</span>
+                        <span>CUSTOMIZE MEAL</span>
                         <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
                       </button>
 
@@ -507,7 +512,7 @@ export default function ProviderDossier({
               <div>
                 <span className="font-label-caps text-xs text-[#665d52] uppercase block font-semibold">TIFFIN SPECIFICATION SHEET</span>
                 <h3 style={{ fontFamily: "'EB Garamond', serif" }} className="text-2xl text-[#1a1a1a] leading-tight mt-1 font-semibold">
-                  {selectedDetailsTiffin.name} (₹{selectedDetailsTiffin.price})
+                  {selectedDetailsTiffin.name} (Custom Pricing)
                 </h3>
               </div>
               <button
@@ -520,13 +525,13 @@ export default function ProviderDossier({
 
             <div className="space-y-4">
               <div className="bg-[#fcf6ee] p-4 border border-[#eedcc8]">
-                <span className="font-label-caps text-xs text-[#8c531b] uppercase block mb-1 font-bold">Base Price & Customization</span>
+                <span className="font-label-caps text-xs text-[#8c531b] uppercase block mb-1 font-bold">Item-Based Custom Pricing</span>
                 <p className="font-body-md text-xs text-[#1a1a1a] leading-relaxed">
                   {selectedDetailsTiffin.description || 'Authentic traditional home-cooked meal.'}
                 </p>
                 <p className="font-body-md text-xs text-[#8c531b] font-medium mt-1.5 flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[16px]">tune</span>
-                  <span>You can customize and create your favorite meal under this ₹{selectedDetailsTiffin.price} base price.</span>
+                  <span>Select items and portion quantities to build your favorite meal. Final price is computed dynamically from chosen items.</span>
                 </p>
               </div>
 
