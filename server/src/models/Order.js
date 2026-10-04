@@ -98,11 +98,11 @@ const orderSchema = new mongoose.Schema({
   },
   tiffinCategory: {
     type: String,
-    default: 'Gujarati'
+    default: ''
   },
   tiffinImage: {
     type: String,
-    default: '/assets/provider_1.png'
+    default: ''
   },
   quantity: {
     type: Number,
@@ -121,7 +121,7 @@ const orderSchema = new mongoose.Schema({
   },
   deliveryFee: {
     type: Number,
-    default: 45
+    default: 0
   },
   driverEarning: {
     type: Number,

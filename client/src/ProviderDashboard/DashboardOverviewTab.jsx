@@ -162,11 +162,11 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
               return true;
             });
             const formatted = uniqueRaw.map(o => ({
-              id: o.id || '#1027',
+              id: o.id || o.orderId || '#ORD',
               customer: o.customer || 'Customer',
               items: o.qtyText || 'Tiffin Meal',
               time: 'Today',
-              amount: o.amount || 120,
+              amount: o.amount || 0,
               status: o.status,
               statusBg: o.statusBg || 'bg-indigo-100 text-indigo-800 border-indigo-200'
             }));
@@ -181,13 +181,13 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
           if (pendingList.length > 0) {
             const req = pendingList[0];
             setLiveRequest({
-              id: req._id || 'REQ-1092',
-              customerName: req.customerName || 'Rahul Shah',
-              customerPhone: req.customerPhone || '+91 98765 12345',
-              items: `${req.quantity || 1} × ${req.mealType || 'Veg Tiffin'}`,
-              time: `${req.date || 'Today'} • ${req.time || '5:00 PM'}`,
-              distance: `${req.distance || '1.8 km'} • ${req.deliveryType || 'Delivery'}`,
-              price: req.budget || 120,
+              id: req._id ? `REQ-${String(req._id).slice(-4).toUpperCase()}` : 'REQ',
+              customerName: req.customerName || 'Customer',
+              customerPhone: req.customerPhone || '—',
+              items: `${req.quantity || 1} × ${req.mealType || 'Tiffin'}`,
+              time: `${req.date || 'Today'}${req.time ? ` • ${req.time}` : ''}`,
+              distance: `${req.distance || ''}${req.deliveryType ? ` • ${req.deliveryType}` : ''}`,
+              price: req.budget || 0,
               secondsLeft: 60
             });
           } else {

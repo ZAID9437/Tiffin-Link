@@ -27,7 +27,34 @@ const filterByDateRange = (dateObj, range) => {
 // @route   GET /api/reviews
 const getReviews = async (req, res) => {
   try {
-    const providerId = req.providerId || '6a7f3051d4b48741d8722416';
+    const providerId = req.providerId || req.user?._id?.toString() || req.query.providerId;
+    if (!providerId) {
+      return res.json({
+        success: true,
+        data: {
+          stats: {
+            overallRating: '0.0',
+            totalReviews: 0,
+            positivePercent: 0,
+            needAttentionCount: 0,
+            thisMonthCount: 0,
+            breakdownCounts: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+            ratingDistribution: {
+              5: { count: 0, percent: 0 },
+              4: { count: 0, percent: 0 },
+              3: { count: 0, percent: 0 },
+              2: { count: 0, percent: 0 },
+              1: { count: 0, percent: 0 }
+            },
+            tiffinPerformance: [],
+            uniqueTiffins: []
+          },
+          pagination: { total: 0, page: 1, limit: 10, totalPages: 1 },
+          reviews: []
+        },
+        source: 'database'
+      });
+    }
     const {
       search = '',
       rating = 'All',
@@ -51,11 +78,11 @@ const getReviews = async (req, res) => {
     // Dynamic Summary Calculations across ALL provider reviews
     const totalReviews = reviewList.length;
     const totalRatingSum = reviewList.reduce((sum, r) => sum + (Number(r.rating) || 5), 0);
-    const overallRating = totalReviews > 0 ? (totalRatingSum / totalReviews).toFixed(1) : '4.8';
+    const overallRating = totalReviews > 0 ? (totalRatingSum / totalReviews).toFixed(1) : '0.0';
 
     // Positive Reviews (4 & 5 stars)
     const positiveCount = reviewList.filter(r => r.rating >= 4).length;
-    const positivePercent = totalReviews > 0 ? Math.round((positiveCount / totalReviews) * 100) : 92;
+    const positivePercent = totalReviews > 0 ? Math.round((positiveCount / totalReviews) * 100) : 0;
 
     // Need Attention (Unanswered / Pending Replies)
     const needAttentionCount = reviewList.filter(r => !r.providerReply || r.providerReply.trim() === '').length;
@@ -77,17 +104,17 @@ const getReviews = async (req, res) => {
     };
 
     const ratingDistribution = {
-      5: { count: breakdownCounts[5], percent: totalReviews > 0 ? Math.round((breakdownCounts[5] / totalReviews) * 100) : 75 },
-      4: { count: breakdownCounts[4], percent: totalReviews > 0 ? Math.round((breakdownCounts[4] / totalReviews) * 100) : 15 },
-      3: { count: breakdownCounts[3], percent: totalReviews > 0 ? Math.round((breakdownCounts[3] / totalReviews) * 100) : 5 },
-      2: { count: breakdownCounts[2], percent: totalReviews > 0 ? Math.round((breakdownCounts[2] / totalReviews) * 100) : 3 },
-      1: { count: breakdownCounts[1], percent: totalReviews > 0 ? Math.round((breakdownCounts[1] / totalReviews) * 100) : 2 }
+      5: { count: breakdownCounts[5], percent: totalReviews > 0 ? Math.round((breakdownCounts[5] / totalReviews) * 100) : 0 },
+      4: { count: breakdownCounts[4], percent: totalReviews > 0 ? Math.round((breakdownCounts[4] / totalReviews) * 100) : 0 },
+      3: { count: breakdownCounts[3], percent: totalReviews > 0 ? Math.round((breakdownCounts[3] / totalReviews) * 100) : 0 },
+      2: { count: breakdownCounts[2], percent: totalReviews > 0 ? Math.round((breakdownCounts[2] / totalReviews) * 100) : 0 },
+      1: { count: breakdownCounts[1], percent: totalReviews > 0 ? Math.round((breakdownCounts[1] / totalReviews) * 100) : 0 }
     };
 
     // Dynamic Tiffin Performance Grouping
     const tiffinMap = {};
     reviewList.forEach(r => {
-      const name = r.tiffinName || 'Gujarati Special Kathiyawadi Thali';
+      const name = r.tiffinName || 'Tiffin Meal';
       if (!tiffinMap[name]) {
         tiffinMap[name] = { tiffinName: name, totalRating: 0, count: 0 };
       }
@@ -191,8 +218,8 @@ const getReviews = async (req, res) => {
 const replyToReview = async (req, res) => {
   try {
     const { id } = req.params;
-    const providerId = req.providerId || '6a7f3051d4b48741d8722416';
-    const { providerReply, repliedBy = 'Mansuri Kitchen' } = req.body;
+    const providerId = req.providerId || req.user?._id?.toString() || req.body.providerId;
+    const { providerReply, repliedBy = (req.user?.businessName || req.user?.name || 'Kitchen Partner') } = req.body;
 
     if (!providerReply || providerReply.trim() === '') {
       return res.status(400).json({ success: false, message: 'Please provide a valid reply message' });
@@ -236,24 +263,24 @@ const replyToReview = async (req, res) => {
 const createReview = async (req, res) => {
   try {
     const {
-      providerId = '6a7f3051d4b48741d8722416',
-      orderId = '#1024',
+      providerId = req.body.providerId || '',
+      orderId = '',
       customerName,
-      customerPhone = '+91 98250 12345',
+      customerPhone,
       tiffinName,
       rating = 5,
-      foodQualityRating = 5,
-      packagingRating = 5,
-      tasteRating = 5,
-      deliveryRating = 5,
-      orderAmount = 240,
-      orderQuantity = 2,
+      foodQualityRating,
+      packagingRating,
+      tasteRating,
+      deliveryRating,
+      orderAmount,
+      orderQuantity,
       comment
     } = req.body;
 
-    const customerId = req.user?._id?.toString() || '';
-    const finalCustomerName = (req.user?.name || customerName || 'Verified Diner').trim();
-    const finalCustomerPhone = req.user?.phone || customerPhone || '+91 98250 12345';
+    const customerId = req.user?._id?.toString() || req.body.customerId || '';
+    const finalCustomerName = (req.user?.name || req.user?.fullName || customerName || 'Verified Diner').trim();
+    const finalCustomerPhone = req.user?.phone || req.user?.mobile || customerPhone || '';
     const finalCustomerEmail = req.user?.email || '';
 
     if (!finalCustomerName || !comment) {
@@ -267,13 +294,13 @@ const createReview = async (req, res) => {
       customerName: finalCustomerName,
       customerPhone: finalCustomerPhone,
       customerEmail: finalCustomerEmail,
-      tiffinName: tiffinName || 'Artisanal Thali',
+      tiffinName: tiffinName || 'Tiffin Meal',
       rating: Number(rating) || 5,
       foodQualityRating: Number(foodQualityRating) || Number(rating) || 5,
       packagingRating: Number(packagingRating) || Number(rating) || 5,
       tasteRating: Number(tasteRating) || Number(rating) || 5,
       deliveryRating: Number(deliveryRating) || Number(rating) || 5,
-      orderAmount: Number(orderAmount) || 240,
+      orderAmount: Number(orderAmount) || 0,
       orderQuantity: Number(orderQuantity) || 1,
       comment: String(comment).trim(),
       providerReply: '',

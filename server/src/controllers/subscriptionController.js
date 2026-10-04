@@ -25,81 +25,6 @@ const calculateNextDeliveryDate = (deliveryDays = ['Mon', 'Tue', 'Wed', 'Thu', '
   return `${current.getDate()} ${current.toLocaleString('en', { month: 'short' })} ${current.getFullYear()}`;
 };
 
-const initialSeedSubscriptions = [
-  {
-    subId: 'SUB-801',
-    customerName: 'Raj Patel',
-    customerEmail: 'raj.patel@gmail.com',
-    customerPhone: '+91 98250 12345',
-    plan: 'Monthly Deluxe Gujarati Thali',
-    frequency: 'Daily',
-    deliveryDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-    mealType: 'Lunch',
-    pricePerMeal: 120,
-    amount: 3200,
-    startDate: '01 Aug 2026',
-    endDate: '31 Aug 2026',
-    nextDeliveryDate: '18 Aug 2026',
-    address: '402 Sunrise Towers, Navrangpura, Ahmedabad',
-    paymentStatus: 'PAID',
-    status: 'ACTIVE'
-  },
-  {
-    subId: 'SUB-802',
-    customerName: 'Amit Shah',
-    customerEmail: 'amit.shah@yahoo.com',
-    customerPhone: '+91 99798 54321',
-    plan: 'Weekly Jain Special Plan',
-    frequency: 'Weekly',
-    deliveryDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-    mealType: 'Lunch & Dinner',
-    pricePerMeal: 140,
-    amount: 1800,
-    startDate: '05 Aug 2026',
-    endDate: '25 Aug 2026',
-    nextDeliveryDate: '19 Aug 2026',
-    address: '12 Shrinand Nagar, Vejalpur, Ahmedabad',
-    paymentStatus: 'PAID',
-    status: 'ACTIVE'
-  },
-  {
-    subId: 'SUB-803',
-    customerName: 'Neha Patel',
-    customerEmail: 'neha.patel@outlook.com',
-    customerPhone: '+91 94260 98765',
-    plan: 'Monthly Executive Tiffin',
-    frequency: 'Monthly',
-    deliveryDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    mealType: 'Lunch',
-    pricePerMeal: 150,
-    amount: 2900,
-    startDate: '01 Aug 2026',
-    endDate: '31 Aug 2026',
-    nextDeliveryDate: '20 Aug 2026',
-    address: '701 Iscon Elegance, Prahlad Nagar, Ahmedabad',
-    paymentStatus: 'PAID',
-    status: 'PAUSED'
-  },
-  {
-    subId: 'SUB-804',
-    customerName: 'Vikram Mehta',
-    customerEmail: 'vikram.mehta@gmail.com',
-    customerPhone: '+91 98980 11223',
-    plan: 'Kathiyawadi Meal Subscription',
-    frequency: 'Daily',
-    deliveryDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-    mealType: 'Dinner',
-    pricePerMeal: 130,
-    amount: 3400,
-    startDate: '10 Aug 2026',
-    endDate: '22 Aug 2026',
-    nextDeliveryDate: '18 Aug 2026',
-    address: '105 Bodakdev Heights, Satellite, Ahmedabad',
-    paymentStatus: 'PAID',
-    status: 'ACTIVE'
-  }
-];
-
 // @desc    Get provider-specific subscriptions with pagination, search, filters & summary metrics
 // @route   GET /api/subscriptions
 const getSubscriptions = async (req, res) => {
@@ -166,7 +91,7 @@ const getSubscriptions = async (req, res) => {
 
     const monthlyRevenue = subList
       .filter(s => s.status === 'ACTIVE')
-      .reduce((sum, s) => sum + (s.amount || 3200), 0);
+      .reduce((sum, s) => sum + (s.amount || 0), 0);
 
     // Apply Pagination
     const totalFiltered = filtered.length;
@@ -213,7 +138,7 @@ const createSubscription = async (req, res) => {
       frequency = 'Daily',
       deliveryDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
       mealType = 'Lunch',
-      amount = 3200,
+      amount = 0,
       startDate,
       endDate,
       address,
@@ -231,17 +156,17 @@ const createSubscription = async (req, res) => {
       providerId,
       subId: `SUB-${subIdNum}`,
       customerName: customerName.trim(),
-      customerPhone: customerPhone || '+91 98250 12345',
+      customerPhone: customerPhone || '',
       customerEmail: customerEmail || '',
       plan: plan.trim(),
       frequency,
       deliveryDays,
       mealType,
-      amount: Number(amount) || 3200,
-      startDate: startDate || '01 Aug 2026',
-      endDate: endDate || '31 Aug 2026',
+      amount: Number(amount) || 0,
+      startDate: startDate || new Date().toISOString(),
+      endDate: endDate || '',
       nextDeliveryDate: calculatedNextDelivery,
-      address: address || 'Ahmedabad',
+      address: address || '',
       paymentStatus,
       status: 'ACTIVE',
       createdAt: new Date()
@@ -318,13 +243,17 @@ const deleteSubscription = async (req, res) => {
 const getCustomerSubscriptions = async (req, res) => {
   try {
     const userId = req.user?._id ? req.user._id.toString() : (req.query.userId || '');
-    const userEmail = (req.user?.email || req.query.email || 'mansurizaid663@gmail.com').toLowerCase();
+    const userEmail = (req.user?.email || req.query.email || '').toLowerCase();
     
     const conditions = [];
     if (userId) conditions.push({ customerId: userId });
     if (userEmail) conditions.push({ customerEmail: userEmail });
 
-    const query = conditions.length > 0 ? { $or: conditions } : {};
+    if (conditions.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const query = { $or: conditions };
 
     if (await isDbConnected()) {
       const subs = await Subscription.find(query).sort({ createdAt: -1 });

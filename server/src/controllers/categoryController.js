@@ -3,15 +3,6 @@ const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
 
-const defaultInitialCategories = [
-  { name: 'Gujarati', description: 'Traditional home-style Gujarati meals', status: 'Active', image: '/assets/provider_1.png' },
-  { name: 'Jain', description: 'Pure satvik meal options without onion & garlic', status: 'Active', image: '/assets/provider_3.png' },
-  { name: 'Kathiyawadi', description: 'Spicy & flavorful traditional Kathiyawadi feast', status: 'Active', image: '/assets/provider_2.png' },
-  { name: 'Panjabi', description: 'Rich North-Indian curry thalis prepared in pure butter', status: 'Active', image: '/assets/provider_4.png' },
-  { name: 'South Indian', description: 'Dosa, Idli & Sambhar daily combos', status: 'Active', image: '/assets/food_south_indian.png' },
-  { name: 'Fitness / Diet', description: 'High-protein salad & lean thali options', status: 'Active', image: '/assets/provider_5.png' }
-];
-
 // @desc    Get all categories from MongoDB
 // @route   GET /api/categories
 const getCategories = async (req, res) => {
@@ -29,14 +20,10 @@ const getCategories = async (req, res) => {
           ]
         };
       }
-      let categories = await Category.find(query).sort({ createdAt: -1 });
-      if (categories.length === 0 && !providerId) {
-        await Category.insertMany(defaultInitialCategories);
-        categories = await Category.find().sort({ createdAt: -1 });
-      }
+      const categories = await Category.find(query).sort({ createdAt: -1 });
       return res.json({ success: true, data: categories, source: 'database', databaseName: 'tiffinlink' });
     } else {
-      return res.json({ success: true, data: defaultInitialCategories, source: 'in-memory' });
+      return res.json({ success: true, data: [], source: 'in-memory' });
     }
   } catch (error) {
     console.error('Error fetching categories:', error);
@@ -57,9 +44,9 @@ const createCategory = async (req, res) => {
 
     const catData = {
       name: name.trim(),
-      description: description || 'Delicious home-cooked meal category.',
+      description: description || '',
       status: status || 'Active',
-      image: image || '/assets/provider_1.png',
+      image: image || '',
       providerId: providerId ? String(providerId) : undefined
     };
 

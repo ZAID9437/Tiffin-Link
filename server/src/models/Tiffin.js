@@ -79,7 +79,7 @@ const tiffinSchema = new mongoose.Schema({
   },
   ingredients: {
     type: String,
-    default: 'Fresh veggies, Whole wheat flour, Pure Ghee'
+    default: ''
   },
   items: {
     type: [String],
@@ -91,7 +91,7 @@ const tiffinSchema = new mongoose.Schema({
   },
   rating: {
     type: Number,
-    default: 4.8
+    default: 0
   },
   status: {
     type: String,
@@ -100,7 +100,7 @@ const tiffinSchema = new mongoose.Schema({
   },
   image: {
     type: String,
-    default: '/assets/provider_1.png'
+    default: ''
   },
   createdAt: {
     type: Date,

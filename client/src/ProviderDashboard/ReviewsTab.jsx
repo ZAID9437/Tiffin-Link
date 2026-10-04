@@ -160,7 +160,7 @@ export default function ReviewsTab({ currentUser }) {
         method: 'PUT',
         body: JSON.stringify({
           providerReply: replyText.trim(),
-          repliedBy: 'Mansuri Kitchen'
+          repliedBy: currentUser?.businessName || currentUser?.kitchenName || currentUser?.name || 'Kitchen Partner'
         })
       });
 
@@ -654,7 +654,7 @@ export default function ReviewsTab({ currentUser }) {
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-extrabold text-[#0A8B5F] flex items-center gap-1.5">
                         <MessageSquare size={13} />
-                        Provider Reply ({rev.repliedBy || 'Mansuri Kitchen'})
+                        Provider Reply ({rev.repliedBy || currentUser?.businessName || currentUser?.kitchenName || currentUser?.name || 'Kitchen Partner'})
                       </span>
                       <span className="text-[10px] text-[#6B7280] font-semibold">
                         {getRelativeTime(rev.repliedAt)}

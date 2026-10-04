@@ -91,7 +91,7 @@ const getProviders = async (req, res) => {
           pObj.rating = Number(avg);
           pObj.reviewCount = reviews.length;
         } else {
-          pObj.rating = pObj.rating || 4.8;
+          pObj.rating = pObj.rating || 0;
           pObj.reviewCount = pObj.reviewCount || 0;
         }
 
@@ -120,8 +120,8 @@ const getProviders = async (req, res) => {
         pObj.eta = `${pObj.etaMinutes}–${pObj.etaMinutes + 10} MIN`;
 
         // Available daily slots
-        const maxCap = Number(p.maxCapacity) || 35;
-        pObj.availableSlots = Math.max(5, maxCap - (pObj.reviewCount % 12));
+        const maxCap = Number(p.maxCapacity) || 0;
+        pObj.availableSlots = maxCap;
 
         // Provider specific tiffins
         const tiffins = await Tiffin.find({ providerId: pIdStr, status: 'Active' });
@@ -131,8 +131,8 @@ const getProviders = async (req, res) => {
           pObj.price = minTiffinPrice;
           pObj.categories = Array.from(new Set(tiffins.map(t => t.category).filter(Boolean)));
         } else {
-          pObj.price = pObj.price || 120;
-          pObj.categories = ['Gujarati Thali', 'Kathiyawadi'];
+          pObj.price = pObj.price || 0;
+          pObj.categories = [];
         }
 
         return pObj;
@@ -238,7 +238,7 @@ const getProviderById = async (req, res) => {
         pObj.reviewCount = reviews.length;
         pObj.recentReviews = reviews.slice(0, 5);
       } else {
-        pObj.rating = pObj.rating || 4.8;
+        pObj.rating = pObj.rating || 0;
         pObj.reviewCount = 0;
         pObj.recentReviews = [];
       }
@@ -252,7 +252,7 @@ const getProviderById = async (req, res) => {
       tiffins.forEach(t => {
         if (t.category) catSet.add(t.category);
       });
-      pObj.categories = catSet.size > 0 ? Array.from(catSet) : ['Gujarati Thali', 'Kathiyawadi'];
+      pObj.categories = catSet.size > 0 ? Array.from(catSet) : [];
 
       return res.json({ success: true, data: pObj, source: 'database' });
     }
@@ -329,14 +329,14 @@ const registerProvider = async (req, res) => {
     const payload = req.body || {};
     
     // Provide sensible defaults for essential display fields if not explicitly passed
-    const providerName = payload.businessName || payload.name || payload.fullName || 'Artisanal Home Kitchen';
-    const providerDesc = payload.description || 'Authentic home-cooked meals prepared with care and fresh ingredients.';
+    const providerName = payload.businessName || payload.name || payload.fullName || '';
+    const providerDesc = payload.description || '';
     const providerEta = (payload.opens && payload.closes) ? `${payload.opens} - ${payload.closes}` : (payload.eta || '30-40 min');
-    const providerPrice = Number(payload.mealPrice || payload.price) || 120;
+    const providerPrice = Number(payload.mealPrice || payload.price) || 0;
     const providerTags = Array.isArray(payload.tags) && payload.tags.length > 0
       ? payload.tags
-      : [payload.businessType || 'Home Kitchen', payload.cuisines || 'Pure Veg'];
-    const providerImage = payload.kitchenPhotos || payload.image || '/assets/provider_1.png';
+      : (payload.cuisines ? [payload.cuisines] : ['Pure Veg']);
+    const providerImage = payload.kitchenPhotos || payload.image || '';
 
     const providerData = {
       name: providerName,
@@ -378,13 +378,13 @@ const registerProvider = async (req, res) => {
       upiId: payload.upiId || '',
       deliveryPreference: payload.deliveryPreference || 'TiffinLink Partner',
       languagesSpoken: payload.languagesSpoken || '',
-      hearSource: payload.hearSource || 'Instagram',
+      hearSource: payload.hearSource || '',
       mealTitle: payload.mealTitle || '',
       mealIngredients: payload.mealIngredients || '',
       mealPrice: Number(payload.mealPrice) || 0,
       mealPrepTime: payload.mealPrepTime || '',
       skipMenu: Boolean(payload.skipMenu),
-      rating: 4.8,
+      rating: 0,
       eta: providerEta,
       price: providerPrice,
       tags: providerTags,

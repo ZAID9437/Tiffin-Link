@@ -67,7 +67,7 @@ const providerSchema = new mongoose.Schema({
   skipMenu: { type: Boolean, default: false },
   rating: {
     type: Number,
-    default: 4.8
+    default: 0
   },
   eta: {
     type: String,
@@ -75,7 +75,7 @@ const providerSchema = new mongoose.Schema({
   },
   price: {
     type: Number,
-    default: 120
+    default: 0
   },
   tags: {
     type: [String],
@@ -83,7 +83,7 @@ const providerSchema = new mongoose.Schema({
   },
   image: {
     type: String,
-    default: '/assets/provider_1.png'
+    default: ''
   },
   status: {
     type: String,

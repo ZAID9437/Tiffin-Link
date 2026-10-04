@@ -332,6 +332,14 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
     });
   }, [orders, statusFilter, providerFilter]);
 
+  const dynamicKitchensFromOrders = useMemo(() => {
+    return Array.from(new Set(orders.map(o => o.providerName).filter(Boolean)));
+  }, [orders]);
+
+  const dynamicKitchensFromSubs = useMemo(() => {
+    return Array.from(new Set(subscriptions.map(s => s.providerName || (typeof s.providerId === 'object' && s.providerId?.name)).filter(Boolean)));
+  }, [subscriptions]);
+
   // Export handlers
   const handleExportOrdersCsv = () => {
     if (orders.length === 0) {
@@ -705,11 +713,9 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                   className="bg-[#fbf9f5] border border-[#ded9d1] px-3 py-2 font-mono text-xs text-[#1b1c1a] outline-none cursor-pointer"
                 >
                   <option value="ALL">Kitchens: All Hubs</option>
-                  <option value="Xoxo">Xoxo Men Kitchen</option>
-                  <option value="Ghar">Ghar Ka Khana</option>
-                  <option value="Annapurna">Maa Annapurna Rasoi</option>
-                  <option value="Priya">Priya's Home Kitchen</option>
-                  <option value="Rasoi">Rasoi Express</option>
+                  {dynamicKitchensFromOrders.map(k => (
+                    <option key={k} value={k}>{k}</option>
+                  ))}
                 </select>
 
                 <button
@@ -1194,10 +1200,9 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                   className="px-3 py-2.5 bg-[#fbf9f5] border border-[#ded9d1] font-mono text-xs text-[#1a1a1a] outline-none"
                 >
                   <option value="ALL">All Kitchen Providers</option>
-                  <option value="Xoxo">Xoxo Men Kitchen</option>
-                  <option value="Ghar">Ghar Ka Khana</option>
-                  <option value="Annapurna">Maa Annapurna Rasoi</option>
-                  <option value="Priya">Priya's Home Kitchen</option>
+                  {dynamicKitchensFromOrders.map(k => (
+                    <option key={k} value={k}>{k}</option>
+                  ))}
                 </select>
 
                 <button
@@ -1997,12 +2002,9 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                   className="w-full appearance-none bg-transparent text-xs text-[#1a1a1a] pl-3 pr-8 py-2.5 focus:outline-none cursor-pointer"
                 >
                   <option value="ALL">All Kitchens (All hubs)</option>
-                  <option value="Mansuri">Mansuri Kitchen</option>
-                  <option value="Xoxo">Xoxo Men Kitchen</option>
-                  <option value="Ghar">Ghar Ka Khana</option>
-                  <option value="Mom">Mom's Kitchen</option>
-                  <option value="Shree">Shree Tiffin Service</option>
-                  <option value="Foodie">Foodie Home Kitchen</option>
+                  {dynamicKitchensFromSubs.map(k => (
+                    <option key={k} value={k}>{k}</option>
+                  ))}
                 </select>
                 <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#665d52]" />
               </div>

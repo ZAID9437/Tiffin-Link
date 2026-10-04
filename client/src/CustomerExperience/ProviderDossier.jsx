@@ -49,28 +49,24 @@ export default function ProviderDossier({
   }, [providerId]);
 
   const p = dbProvider || provider || {};
-  const providerName = p.name || 'Mansuri Kitchen';
-  const providerDesc = p.description || 'Mindfully slow-cooked home dining, rooted in multi-generational Ahmedabad culinary heritage. Pure Satvik oil-balanced preparations crafted with zero additives, cold-pressed groundnut oil, and fresh stone-ground spice blends.';
-  const providerImg = p.image && p.image.startsWith('http') ? p.image : 'https://lh3.googleusercontent.com/aida-public/AB6AXuA7hoPsyOHMXxV4J543NdSXFNSDHhCslvatggHYER30u5ITFTRxhvO7OxJSe712C1FWAEbcE1jYNEVPOHOoR38N1rlm5w5wxumEbFBHUpYg5Sy_6YnxtC__bx9bGaH0ZRA1ZykZXsGJjoreSOhsFZFbzTdljqCesVoTDUhERFaKzxsAgE5xx8_GBaVMqWeCyp6bfAFUyW5P4bIncxVyG3tXZ6p0R38Bzlb_N1YN1fj_jaQi9H9nuotU';
-  const fssai = p.fssaiNumber || '208240091823';
-  const rating = p.rating || 4.8;
-  const reviewCount = p.reviewCount || 312;
-  const distanceKm = p.distanceKm || 1.2;
-  const locality = p.address?.locality || 'Satellite';
-  const street = p.address?.street || 'Heritage Heights, Satellite Road';
-  const phone = p.mobile || '+91 98765 44210';
-  const cuisines = (p.tags && p.tags.length > 0) ? p.tags.join(' / ') : 'Gujarati Traditional / Strict Jain / Home Food';
+  const providerName = p.name || 'Kitchen Partner';
+  const providerDesc = p.description || 'Authentic home-cooked meals prepared with care and fresh ingredients.';
+  const providerImg = p.image && p.image.startsWith('http') ? p.image : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
+  const fssai = p.fssaiNumber || '—';
+  const rating = p.rating || 0;
+  const reviewCount = p.reviewCount || 0;
+  const distanceKm = p.distanceKm || 0;
+  const locality = p.address?.locality || p.city || 'Local Area';
+  const street = p.address?.street || (typeof p.address === 'string' ? p.address : '') || 'Kitchen Address';
+  const phone = p.mobile || p.phone || '—';
+  const cuisines = (p.tags && p.tags.length > 0) ? p.tags.join(' / ') : (p.cuisine || p.category || 'Home Food');
 
   const scrollToCatalog = () => {
     const el = document.getElementById('tiffin-catalog');
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const featuredTiffin = tiffins.length > 0 ? tiffins[0] : {
-    name: `${providerName} Special Thali`,
-    price: p.price || 140,
-    category: 'Gujarati Traditional'
-  };
+  const featuredTiffin = tiffins.length > 0 ? tiffins[0] : null;
 
   return (
     <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a]">
@@ -235,8 +231,9 @@ export default function ProviderDossier({
 
                 <button
                   type="button"
-                  onClick={() => onSelectTiffin(featuredTiffin)}
-                  className="flex-1 bg-[#efeeea] hover:bg-[#e4e2de] text-[#1a1a1a] font-button-text text-xs uppercase tracking-widest text-center py-4 px-6 transition-colors flex items-center justify-center gap-2 cursor-pointer font-bold border border-[#ded9d1]"
+                  disabled={!featuredTiffin}
+                  onClick={() => featuredTiffin && onSelectTiffin(featuredTiffin)}
+                  className={`flex-1 ${featuredTiffin ? 'bg-[#efeeea] hover:bg-[#e4e2de] text-[#1a1a1a] cursor-pointer' : 'bg-[#f5f3ef] text-[#a0988c] cursor-not-allowed'} font-button-text text-xs uppercase tracking-widest text-center py-4 px-6 transition-colors flex items-center justify-center gap-2 font-bold border border-[#ded9d1]`}
                 >
                   <span>Customize Featured</span>
                   <span className="material-symbols-outlined text-[16px]">tune</span>
@@ -314,7 +311,7 @@ export default function ProviderDossier({
 
                 const compositionList = Array.isArray(tif.items) && tif.items.length > 0 
                   ? tif.items 
-                  : (tif.ingredients ? tif.ingredients.split(',').map(s => s.trim()) : ['4 Phulka Rotli', 'Fresh Shaak', 'Dal', 'Rice']);
+                  : (tif.ingredients ? tif.ingredients.split(',').map(s => s.trim()).filter(Boolean) : []);
 
                 return (
                   <article key={tif._id} className="bg-white flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow border border-[#ded9d1] group">
@@ -330,7 +327,7 @@ export default function ProviderDossier({
                           {tif.category || 'FEATURED ATELIER'}
                         </div>
                         <div className="absolute bottom-4 right-4 bg-white/95 px-3 py-1 shadow-xs font-label-caps text-[10px] text-[#1a1a1a] font-bold">
-                          {tif.available || 14} SLOTS REMAINING
+                          {tif.available !== undefined ? tif.available : (tif.capacity || 0)} SLOTS REMAINING
                         </div>
                       </div>
 

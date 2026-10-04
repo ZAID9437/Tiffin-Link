@@ -106,8 +106,9 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
   const fetchOrders = async () => {
     try {
       const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('tiffinlink_token') || '';
-      const email = currentUser?.email || 'mansurizaid663@gmail.com';
-      const res = await fetch(`http://localhost:5000/api/orders/my-orders?email=${encodeURIComponent(email)}`, {
+      const email = currentUser?.email || '';
+      const queryParam = email ? `?email=${encodeURIComponent(email)}` : '';
+      const res = await fetch(`http://localhost:5000/api/orders/my-orders${queryParam}`, {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         }
@@ -124,7 +125,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
             o.image ||
             o.tiffinImage ||
             o.providerImage ||
-            '/assets/provider_1.png',
+            'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
           providerName: o.providerName || (typeof o.providerId === 'object' && o.providerId?.name) || 'Kitchen Partner',
           providerAddress: o.providerAddress || (typeof o.providerId === 'object' && o.providerId?.address) || 'Ahmedabad',
           customerAddress: o.customerAddress || o.deliveryAddress || 'Ahmedabad',
@@ -139,10 +140,10 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
           date: o.date || (o.createdAt ? new Date(o.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent'),
           driver: o.driver || {
             name: o.deliveryPartnerName || o.deliveryPartner?.name || 'Assigned Courier',
-            phone: o.deliveryPartnerPhone || o.deliveryPartner?.phone || '+91 98251 44102',
+            phone: o.deliveryPartnerPhone || o.deliveryPartner?.phone || '—',
             vehicle: o.deliveryPartner?.vehicleNumber || 'Courier Partner',
-            rating: '4.9',
-            deliveries: '500+ Deliveries'
+            rating: o.deliveryPartner?.rating ? String(o.deliveryPartner.rating) : '—',
+            deliveries: o.deliveryPartner?.totalDeliveries ? `${o.deliveryPartner.totalDeliveries} Deliveries` : ''
           }
         }));
 

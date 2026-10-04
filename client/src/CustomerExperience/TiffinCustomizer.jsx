@@ -266,18 +266,18 @@ export default function TiffinCustomizer({
       const payload = {
         providerId: targetProviderId,
         tiffinId: targetTiffinId,
-        tiffinName: dbTiffin?.name || tiffin?.name || 'Special Tiffin',
-        tiffinCategory: dbTiffin?.category || tiffin?.category || 'Gujarati Traditional',
-        tiffinImage: dbTiffin?.image || tiffin?.image || '/assets/provider_1.png',
+        tiffinName: dbTiffin?.name || tiffin?.name || 'Tiffin',
+        tiffinCategory: dbTiffin?.category || tiffin?.category || '',
+        tiffinImage: dbTiffin?.image || tiffin?.image || '',
         quantity: 1,
         unitPrice: 0,
         mealSubtotal,
         deliveryDistance: `${distanceKm} km`,
         deliveryFee,
         finalTotal,
-        customerName: currentUser.name || currentUser.fullName || 'Customer',
+        customerName: currentUser.name || currentUser.fullName || currentUser.username || 'Customer',
         customerEmail: currentUser.email || '',
-        customerPhone: currentUser.phone || currentUser.mobile || '+91 98765 43210',
+        customerPhone: currentUser.phone || currentUser.mobile || '',
         customerAddress: deliveryAddress,
         deliveryCoordinates: customerCoordinates?.lat && customerCoordinates?.lng
           ? { lat: Number(customerCoordinates.lat), lng: Number(customerCoordinates.lng) }
@@ -313,11 +313,11 @@ export default function TiffinCustomizer({
     }
   };
 
-  const activeProviderName = dbProvider?.name || provider?.name || 'Mansuri Kitchen';
-  const activeTiffinName = dbTiffin?.name || tiffin?.name || 'Gujarati Special Tiffin';
-  const activeTiffinDesc = dbTiffin?.description || tiffin?.description || 'Traditional home-style meal prepared fresh in pure cold-pressed oil with zero industrial preservatives.';
-  const activeTiffinImg = dbTiffin?.image || tiffin?.image || 'https://lh3.googleusercontent.com/aida-public/AB6AXuCMu_TVgTec0S1wQHIMMwrELkw3t1LX664GkNNa9BT258VzR9SyXuP-XB5KYIGq_KZVXp1A5qIcS4ooyOIfdEsA87ygeKHaE6foMiv-C3yyM21VcGBWEnvu8WvL-RQFZZCXkE0OTNxmoEQF_tdo0sj5L0-0wTY238PdytDxl_KerGP8fiigXMye8nczTLWNQYaTsD1-Ud3QDfxvSghCcVy1TIzjU_6sLPwbEMb1Ras9rHO-tsMIYxzw';
-  const availableSlots = dbTiffin?.available !== undefined ? dbTiffin.available : 14;
+  const activeProviderName = dbProvider?.name || provider?.name || 'Kitchen Partner';
+  const activeTiffinName = dbTiffin?.name || tiffin?.name || 'Tiffin';
+  const activeTiffinDesc = dbTiffin?.description || tiffin?.description || '';
+  const activeTiffinImg = dbTiffin?.image || tiffin?.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
+  const availableSlots = dbTiffin?.available !== undefined ? dbTiffin.available : (dbTiffin?.capacity || 0);
 
   if (orderConfirmed && confirmedOrder) {
     return (

@@ -64,10 +64,10 @@ export default function SubscriptionsTab() {
   const [newPlanName, setNewPlanName] = useState('');
   const [newFrequency, setNewFrequency] = useState('Daily');
   const [newMealType, setNewMealType] = useState('Lunch');
-  const [newAmount, setNewAmount] = useState(3200);
-  const [newStartDate, setNewStartDate] = useState('01 Aug 2026');
-  const [newEndDate, setNewEndDate] = useState('31 Aug 2026');
-  const [newAddress, setNewAddress] = useState('Ahmedabad');
+  const [newAmount, setNewAmount] = useState('');
+  const [newStartDate, setNewStartDate] = useState('');
+  const [newEndDate, setNewEndDate] = useState('');
+  const [newAddress, setNewAddress] = useState('');
   const [newDeliveryDays, setNewDeliveryDays] = useState(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
 
   useEffect(() => {

@@ -4,57 +4,6 @@ const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
 
-const defaultInitialTiffins = [
-  {
-    name: 'Gujarati Home Thali',
-    description: 'Authentic Kathiyawadi style thali with 2 sabzi, 4 rotis, dal, rice, buttermilk & sweet.',
-    price: 120,
-    category: 'Gujarati',
-    foodType: 'Veg',
-    capacity: 30,
-    available: 24,
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-    area: 'Navrangpura, Satellite, Vastrapur',
-    ingredients: 'Paneer, Bhindi, Wheat Flour, Tuver Dal, Desi Ghee',
-    ordersToday: 24,
-    rating: 4.9,
-    status: 'Active',
-    image: '/assets/provider_1.png'
-  },
-  {
-    name: 'Jain Special Thali',
-    description: 'Pure Jain preparation without onion, garlic, or root vegetables cooked in ghee.',
-    price: 140,
-    category: 'Jain',
-    foodType: 'Jain',
-    capacity: 20,
-    available: 20,
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-    area: 'Paldi, Vasna, Ellisbridge',
-    ingredients: 'Paneer, Dudhi, Wheat Flour, Moong Dal, Pure Ghee',
-    ordersToday: 20,
-    rating: 4.8,
-    status: 'Sold Out',
-    image: '/assets/provider_3.png'
-  },
-  {
-    name: 'Kathiyawadi Special Combo',
-    description: 'Baingan bharta, sev tamatar, bajra rotla with fresh butter and jaggery.',
-    price: 150,
-    category: 'Kathiyawadi',
-    foodType: 'Veg',
-    capacity: 25,
-    available: 12,
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-    area: 'SG Highway, Prahlad Nagar',
-    ingredients: 'Eggplant, Bajra, Sev, Garlic, Pure Ghee',
-    ordersToday: 13,
-    rating: 4.7,
-    status: 'Paused',
-    image: '/assets/provider_2.png'
-  }
-];
-
 const Review = require('../models/Review');
 const TiffinItem = require('../models/TiffinItem');
 
@@ -234,27 +183,27 @@ const createTiffin = async (req, res) => {
     const tiffinData = {
       providerId,
       name: name.trim(),
-      description: description || 'Authentic home-cooked thali prepared daily.',
-      price: price !== undefined && price !== '' ? Number(price) : (monthlyPrice ? Math.round(Number(monthlyPrice) / 26) : 140),
-      monthlyPrice: monthlyPrice ? Number(monthlyPrice) : 3640,
-      weeklyPrice: weeklyPrice ? Number(weeklyPrice) : 899,
-      isSubscriptionOnly: isSubscriptionOnly !== undefined ? Boolean(isSubscriptionOnly) : true,
-      category: category || 'Gujarati',
+      description: description || '',
+      price: price !== undefined && price !== '' ? Number(price) : (monthlyPrice ? Math.round(Number(monthlyPrice) / 26) : 0),
+      monthlyPrice: monthlyPrice ? Number(monthlyPrice) : 0,
+      weeklyPrice: weeklyPrice ? Number(weeklyPrice) : 0,
+      isSubscriptionOnly: isSubscriptionOnly !== undefined ? Boolean(isSubscriptionOnly) : false,
+      category: category || '',
       foodType: foodType || 'Veg',
       mealType: mealType || 'Lunch',
       startTime: startTime || '12:00 PM',
       endTime: endTime || '02:00 PM',
       orderCutoff: orderCutoff || '10:00 AM',
-      capacity: Number(capacity) || 40,
-      available: Number(capacity) || 40,
-      days: Array.isArray(days) ? days : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-      area: area || 'All Localities',
-      ingredients: ingredients || 'Fresh veggies, Whole wheat flour, Ghee',
+      capacity: Number(capacity) || 0,
+      available: Number(capacity) || 0,
+      days: Array.isArray(days) ? days : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      area: area || '',
+      ingredients: ingredients || '',
       items: Array.isArray(items) ? items : [],
       ordersToday: 0,
-      rating: 4.8,
+      rating: 0,
       status: status || 'Active',
-      image: image || '/assets/provider_4.png'
+      image: image || ''
     };
 
     if (await isDbConnected()) {

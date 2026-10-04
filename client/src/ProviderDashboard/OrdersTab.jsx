@@ -126,12 +126,12 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
         const now = Date.now();
         const formatted = uniqueRawData.map((o, idx) => {
-          const subtotal = o.pricing?.itemsSubtotal || o.subtotal || (o.quantity || 1) * (o.unitPrice || 120);
-          const deliveryFee = o.pricing?.deliveryCharge || o.deliveryFee || 51;
+          const subtotal = o.pricing?.itemsSubtotal || o.mealSubtotal || o.subtotal || (o.quantity || 1) * (o.unitPrice || 0);
+          const deliveryFee = o.pricing?.deliveryCharge || o.deliveryFee || 0;
           const driverEarning = o.pricing?.driverEarning || o.driverEarning || deliveryFee;
-          const packagingFee = o.pricing?.packagingCharge || o.packagingFee || 15;
+          const packagingFee = o.pricing?.packagingCharge || o.packagingFee || 0;
           const gross = o.pricing?.customerPaidTotal || o.totalAmount || (subtotal + deliveryFee + packagingFee);
-          const comm = o.pricing?.platformFee || o.platformCommission || Math.round(gross * 0.125);
+          const comm = o.pricing?.platformFee || o.platformCommission || 0;
           const net = o.pricing?.providerPayout || o.netPayout || (gross - comm);
 
           let secondsLeft = o.secondsLeft !== undefined ? o.secondsLeft : 165;
@@ -139,7 +139,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
           return {
             id: o._id || o.id,
-            orderId: o.orderId || `#ORD-${1000 + idx}`,
+            orderId: o.orderId || `#ORD-${(o._id || '').slice(-6).toUpperCase()}`,
             createdAt: o.createdAt || new Date(),
             updatedAt: o.updatedAt || o.createdAt || new Date(),
             customerName: o.customerName || o.user?.name || 'Customer',
@@ -152,7 +152,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             itemsBreakdown: o.itemsBreakdown || (o.items && o.items.length > 0 ? o.items.map(i => `${i.qty || 1} × ${i.name || i.tiffinName || 'Item'}`) : [mainTiffinName]),
             specialInstructions: o.specialInstructions || 'None',
             quantity: o.quantity || 1,
-            unitPrice: o.unitPrice || 160,
+            unitPrice: o.unitPrice || (o.quantity ? Math.round(subtotal / o.quantity) : 0),
             subtotal,
             packagingFee,
             deliveryFee,

@@ -12,7 +12,7 @@ const categorySchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    default: 'Delicious home-cooked meal category.'
+    default: ''
   },
   status: {
     type: String,
@@ -21,7 +21,7 @@ const categorySchema = new mongoose.Schema({
   },
   image: {
     type: String,
-    default: '/assets/provider_1.png'
+    default: ''
   }
 }, { timestamps: true });
 

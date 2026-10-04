@@ -4,14 +4,6 @@ const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
 
-const defaultInitialUsers = [
-  { name: 'Raj Patel', email: 'raj.patel@gmail.com', phone: '+91 98250 12345', role: 'customer', isActive: true, address: '402 Sunrise Towers, Navrangpura, Ahmedabad' },
-  { name: 'Amit Shah', email: 'amit.shah@yahoo.com', phone: '+91 99798 54321', role: 'customer', isActive: true, address: '12 Shrinand Nagar, Vejalpur, Ahmedabad' },
-  { name: 'Neha Patel', email: 'neha.patel@outlook.com', phone: '+91 94260 98765', role: 'customer', isActive: true, address: '701 Iscon Elegance, Prahlad Nagar, Ahmedabad' },
-  { name: 'Vikram Mehta', email: 'vikram.mehta@gmail.com', phone: '+91 98980 11223', role: 'customer', isActive: true, address: '105 Bodakdev Heights, Satellite, Ahmedabad' },
-  { name: 'Pooja Sharma', email: 'pooja.sharma@icloud.com', phone: '+91 97129 44556', role: 'customer', isActive: true, address: '304 CG Square, CG Road, Ahmedabad' }
-];
-
 // Helper to filter dates
 const filterByDateRange = (dateStr, range) => {
   if (!dateStr || range === 'All') return true;
@@ -64,7 +56,7 @@ const getCustomers = async (req, res) => {
             _id: { $toLower: { $ifNull: ['$customerPhone', '$customerName'] } },
             id: { $first: '$_id' },
             name: { $first: '$customerName' },
-            phone: { $first: { $ifNull: ['$customerPhone', '+91 98250 12345'] } },
+            phone: { $first: { $ifNull: ['$customerPhone', ''] } },
             email: { $first: { $ifNull: ['$customerEmail', ''] } },
             address: { $first: '$customerAddress' },
             totalOrdersCount: { $sum: 1 },
@@ -89,9 +81,9 @@ const getCustomers = async (req, res) => {
       customerList = groupedCustomers.map(c => ({
         id: c.id,
         name: c.name || 'Customer',
-        phone: c.phone || '+91 98250 12345',
+        phone: c.phone || '',
         email: c.email || '',
-        address: typeof c.address === 'string' ? c.address : (c.address?.street || 'Ahmedabad'),
+        address: typeof c.address === 'string' ? c.address : (c.address?.street || ''),
         status: 'Active',
         totalOrdersCount: c.totalOrdersCount,
         totalSpent: c.totalSpent,
@@ -102,17 +94,7 @@ const getCustomers = async (req, res) => {
         orders: [] // Keep lightweight array for UI summary drawer
       }));
     } else {
-      customerList = defaultInitialUsers.map((u, idx) => ({
-        id: `usr_${idx}`,
-        ...u,
-        totalOrdersCount: 5,
-        totalSpent: 1200,
-        completedCount: 4,
-        cancelledCount: 0,
-        activeCount: 1,
-        lastOrderDate: new Date(),
-        orders: []
-      }));
+      customerList = [];
     }
 
     // Apply Filters
@@ -206,8 +188,8 @@ const getCustomerById = async (req, res) => {
           id: user._id,
           name: user.name,
           email: user.email,
-          phone: user.phone || '+91 98250 12345',
-          address: orders[0]?.customerAddress || user.address || 'Ahmedabad',
+          phone: user.phone || '',
+          address: orders[0]?.customerAddress || user.address || '',
           latitude: orders[0]?.deliveryAddress?.lat || 23.0300,
           longitude: orders[0]?.deliveryAddress?.lng || 72.5650,
           status: user.isActive ? 'Active' : 'Inactive',

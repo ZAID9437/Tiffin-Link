@@ -121,29 +121,29 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
 
             const formattedItems = Array.isArray(r.items) && r.items.length > 0
               ? r.items
-              : [{ name: r.mealType || 'Gujarati Special Kathiyawadi Thali', qty: r.quantity || 1, price: r.budget || 140 }];
+              : [{ name: r.mealType || 'Tiffin Meal', qty: r.quantity || 1, price: r.budget || 0 }];
 
-            const subtotal = r.totalAmount || (r.quantity || 1) * (r.budget || 140);
-            const km = parseFloat(r.distance) || 1.8;
+            const subtotal = r.totalAmount || (r.quantity || 1) * (r.budget || 0);
+            const km = parseFloat(r.distance) || 0;
             const platformFee = Math.round(subtotal * 0.12);
             const estimatedPayout = subtotal - platformFee;
 
             return {
-              id: r.id || (r._id ? `REQ-${r._id.toString().slice(-4).toUpperCase()}` : `REQ-${8419 + i}`),
+              id: r.id || (r._id ? `REQ-${r._id.toString().slice(-4).toUpperCase()}` : 'REQ'),
               dbId: r._id,
               customerName: r.customerName || 'Customer',
-              customerPhone: r.customerPhone || '+91 98201 44321',
-              customerAddress: r.customerAddress || r.location || 'Bodakdev, Ahmedabad',
+              customerPhone: r.customerPhone || '—',
+              customerAddress: r.customerAddress || r.location || '',
               mealType: r.mealType || formattedItems[0]?.name,
-              category: r.category || 'Gujarati',
+              category: r.category || '',
               items: formattedItems,
               quantity: r.quantity || 1,
               totalAmount: subtotal,
               platformFee,
               estimatedPayout,
               distance: `${km} km`,
-              pickupAddress: 'Xoxo Men Kitchen (Bodakdev Hub)',
-              deliveryTarget: r.deliveryTime || 'Today (12:45 PM)',
+              pickupAddress: r.pickupAddress || currentUser?.kitchenName || currentUser?.name || 'Kitchen Address',
+              deliveryTarget: r.deliveryTime || 'As scheduled',
               specialInstructions: r.specialInstructions || '',
               paymentStatus: r.paymentStatus || 'PAID ONLINE',
               secondsLeft,

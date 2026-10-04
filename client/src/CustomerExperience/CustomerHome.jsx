@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from '../context/LocationContext';
+import { apiRequest } from '../services/api';
 
 export default function CustomerHome({ onNavigate }) {
   const { location } = useLocation();
@@ -8,6 +9,27 @@ export default function CustomerHome({ onNavigate }) {
   const [activeDate, setActiveDate] = useState('today');
   const [activeSlot, setActiveSlot] = useState('5:00 PM');
   const [handoverMode, setHandoverMode] = useState('delivery');
+  const [kitchens, setKitchens] = useState([]);
+  const [loadingKitchens, setLoadingKitchens] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchKitchens = async () => {
+      try {
+        const res = await apiRequest('/providers');
+        if (isMounted) {
+          const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+          setKitchens(list);
+        }
+      } catch (err) {
+        console.error('Failed to load kitchens:', err);
+      } finally {
+        if (isMounted) setLoadingKitchens(false);
+      }
+    };
+    fetchKitchens();
+    return () => { isMounted = false; };
+  }, []);
 
   const mealCategories = [
     { id: 'full', emoji: '🍱', label: 'Full Tiffin', sub: '4 Roti, 2 Sabzi, Dal, Rice' },
@@ -19,30 +41,6 @@ export default function CustomerHome({ onNavigate }) {
   const slots = ['12:30 PM', '1:30 PM', '5:00 PM', '7:30 PM', '8:30 PM'];
   const slotLabels = { '12:30 PM': 'Lunch', '1:30 PM': 'Lunch', '5:00 PM': 'Snack / Early', '7:30 PM': 'Dinner', '8:30 PM': 'Late Dinner' };
 
-  const kitchens = [
-    {
-      name: "Priya's Home Kitchen", rating: 4.9, reviews: '480+', distance: '1.2 km away',
-      badge: 'Pure Veg', status: 'Accepting for 5:00 PM',
-      desc: 'Specializes in traditional Kathiyawadi & Gujarati light thalis. Hand-churned buttermilk and cold-pressed peanut oil.',
-      price: '₹130',
-      img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAEO2x5ADCOq24TYttxaaRU7I_j7zv-IlHpo3Qa0Ce3SdyB3wv1e4DvlAi7TnCdX6BqK5DBTgR6q20JhWFP1cOR_iC6gKj7z127_MgXs7EThpFc8siIxgdde--DIl20ovgNWx5OwDscxys95W5ih1dH3ioftgWzoKUPc7UHqaP-0ejxYqG--iWJoM3FPgStJuxm9IhyEoz87bZOOIcVqi3YbR22nEqX8KfOTmx7qBjZBrvXbWX4PJve',
-    },
-    {
-      name: 'Maa Annapurna Rasoi', rating: 4.8, reviews: '620+', distance: '2.4 km away',
-      badge: 'North Homestyle', status: 'Accepting for 5:00 PM',
-      desc: 'Wholesome Punjabi homestyle meals with whole wheat tava rotis, seasonal greens, and homemade A2 cow ghee tempering.',
-      price: '₹145',
-      img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCojpLXtevorwtwK6hXrHmtSQLoYkMGdZf0WHYF65eIZJ5Kfq6w175Jzikqf9wPXF1IaYFS90GMM3sVbSbLvvbt-FHanR1GJwj3PIE5iaTxKT0mkf2ebBSzqVFtsjy1EfDLgfYAD_U8xbxzhqhvO61g-RTOLx532DlvMfElKmlin_Ylkbrv6QXkJ25_jUiVxWBnMDuDZ_mAFB4TquPSvZMTtV_ZWDqLVOuN6Vmu3Y1a1Ni7vb68BdMi',
-    },
-    {
-      name: 'Shreenathji Satvik', rating: 4.9, reviews: '310+', distance: '3.1 km away',
-      badge: 'Jain / Satvik', status: 'Accepting for 5:00 PM',
-      desc: 'Zero onion, zero garlic, root-vegetable free preparations. Focus on gut harmony, steamed grains, and naturally digestible dals.',
-      price: '₹120',
-      img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBR63gvuaZKtSfJDvkSjsKTBrz_RSRzNWmwC6bXy-pgfL-MWizLoHM9tj8NBCBHE86CZfDK5eKIE4av6fSs4cgUN3zbO9EFQzEGNHJ_YeryI6DP8JnDscA7TB-JTyKFWO3QWGwebl3pdlXsveBzvQItMw7wtaZPv3PdO-eZf3xbFQ3Vrceywrf3oCzLG6XdX1uLdLuMLPv8Qmj6pNRYQN4dNs01KqiS-WqyNkQbQ90JlOSLetEnTtYG',
-    },
-  ];
-
   return (
     <div className="flex flex-col w-full bg-[#fbf9f5]">
       {/* Tiffin Discovery Section Heading */}
@@ -51,7 +49,7 @@ export default function CustomerHome({ onNavigate }) {
           <div className="flex items-center gap-2">
             <span className="inline-block w-2 h-2 rounded-full bg-[#4caf50] animate-pulse"></span>
             <span className="font-bold text-xs uppercase tracking-widest text-white">Find Tiffin Near You</span>
-            <span className="hidden md:inline text-white/50 text-xs"> • 18 Artisanal Kitchens Steaming in Satellite</span>
+            <span className="hidden md:inline text-white/50 text-xs"> • {kitchens.length} Artisanal Kitchens Available</span>
           </div>
           <div className="flex items-center gap-4 text-xs text-white/60 uppercase font-semibold">
             <span className="hidden sm:inline">Dispatch Window: 12:00 – 14:30 &amp; 18:30 – 21:00</span>
@@ -210,7 +208,7 @@ export default function CustomerHome({ onNavigate }) {
                     <button type="submit" className="w-full bg-[#1a1a1a] hover:bg-black text-white py-4 px-6 rounded flex items-center justify-between group shadow-xl transition-all">
                       <div className="flex items-center gap-2">
                         <span className="text-base tracking-wider uppercase font-semibold">Find Tiffin Near Me</span>
-                        <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded font-semibold uppercase">18 Kitchens Active</span>
+                        <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded font-semibold uppercase">{kitchens.length} Kitchens Active</span>
                       </div>
                       <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
                     </button>
@@ -263,43 +261,68 @@ export default function CustomerHome({ onNavigate }) {
               <h2 style={{ fontFamily: "'EB Garamond', serif" }} className="text-3xl lg:text-4xl text-[#1a1a1a] mt-1">Trending Kitchens Within 5 km</h2>
             </div>
             <button onClick={() => onNavigate && onNavigate('nearby-tiffin-services')} className="text-xs font-semibold uppercase underline text-[#1a1a1a] hover:text-[#4a4238] transition-colors flex items-center gap-1">
-              <span>View All 18 Kitchens</span>
+              <span>View All {kitchens.length > 0 ? `${kitchens.length} ` : ''}Kitchens</span>
               <span className="material-symbols-outlined text-sm">east</span>
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {kitchens.map((k, i) => (
-              <div key={i} className="bg-white rounded-xl overflow-hidden shadow-lg group flex flex-col justify-between transition-transform duration-300 hover:-translate-y-1">
-                <div className="relative h-60 w-full overflow-hidden bg-[#ded9d1]">
-                  <img src={k.img} alt={k.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  <div className="absolute top-3 left-3 flex gap-2">
-                    <span className="px-2.5 py-1 bg-[#1a1a1a] text-white text-[10px] font-bold uppercase tracking-wider rounded">{k.badge}</span>
-                    <span className="px-2.5 py-1 bg-[#1b5e20] text-white text-[10px] font-bold uppercase tracking-wider rounded flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>{k.status}
-                    </span>
-                  </div>
-                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded text-xs font-bold uppercase text-[#1a1a1a]">{k.distance}</div>
-                </div>
-                <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <h3 style={{ fontFamily: "'EB Garamond', serif" }} className="text-2xl font-semibold text-[#1a1a1a]">{k.name}</h3>
-                      <div className="flex items-center gap-1 bg-[#f5f3ef] px-2 py-0.5 rounded text-xs font-bold text-[#1a1a1a]">★ {k.rating} <span className="text-[#665d52] font-normal text-[10px]">({k.reviews})</span></div>
-                    </div>
-                    <p className="text-xs text-[#665d52] leading-relaxed">{k.desc}</p>
-                  </div>
-                  <div className="pt-4 space-y-3">
-                    <div className="flex items-center justify-between text-xs font-bold uppercase text-[#665d52]">
-                      <span>Daily Menu Rotations</span>
-                      <span className="text-[#1a1a1a]">From {k.price} / meal</span>
-                    </div>
-                    <button onClick={() => onNavigate && onNavigate('provider-showcase')} className="w-full bg-[#f5f3ef] hover:bg-[#1a1a1a] hover:text-white text-[#1a1a1a] py-2.5 rounded text-xs font-bold uppercase tracking-wider transition-colors shadow-sm">
-                      Reserve Tiffin
-                    </button>
-                  </div>
-                </div>
+            {loadingKitchens ? (
+              <div className="col-span-1 md:col-span-3 text-center py-12 text-[#665d52]">
+                <span className="material-symbols-outlined animate-spin text-2xl block mb-2">progress_activity</span>
+                Loading nearby kitchens...
               </div>
-            ))}
+            ) : kitchens.length === 0 ? (
+              <div className="col-span-1 md:col-span-3 text-center py-12 bg-white rounded-xl border border-[#ded9d1]">
+                <span className="material-symbols-outlined text-4xl text-[#a0988c] mb-2 block">storefront</span>
+                <p className="font-semibold text-lg text-[#1a1a1a]">No kitchens found</p>
+                <p className="text-sm text-[#665d52] mt-1">Check back soon as new culinary partners join your area.</p>
+              </div>
+            ) : (
+              kitchens.slice(0, 3).map((k, i) => {
+                const kName = k.name || k.kitchenName || 'Kitchen Partner';
+                const kRating = k.rating || 0;
+                const kReviews = k.reviewCount ? `${k.reviewCount}+` : '0';
+                const kDist = k.distanceKm ? `${k.distanceKm} km away` : (k.distance ? `${k.distance}` : 'Nearby');
+                const kBadge = k.foodType || k.cuisine || (k.tags && k.tags[0]) || 'Pure Veg';
+                const kStatus = k.status === 'busy' ? 'Busy' : 'Accepting Orders';
+                const kDesc = k.description || 'Authentic homestyle dining prepared with fresh ingredients.';
+                const kPrice = k.price ? `₹${k.price}` : 'Custom Pricing';
+                const kImg = k.image && k.image.startsWith('http') ? k.image : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
+
+                return (
+                  <div key={k._id || i} className="bg-white rounded-xl overflow-hidden shadow-lg group flex flex-col justify-between transition-transform duration-300 hover:-translate-y-1">
+                    <div className="relative h-60 w-full overflow-hidden bg-[#ded9d1]">
+                      <img src={kImg} alt={kName} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      <div className="absolute top-3 left-3 flex gap-2">
+                        <span className="px-2.5 py-1 bg-[#1a1a1a] text-white text-[10px] font-bold uppercase tracking-wider rounded">{kBadge}</span>
+                        <span className="px-2.5 py-1 bg-[#1b5e20] text-white text-[10px] font-bold uppercase tracking-wider rounded flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>{kStatus}
+                        </span>
+                      </div>
+                      <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm px-2.5 py-1 rounded text-xs font-bold uppercase text-[#1a1a1a]">{kDist}</div>
+                    </div>
+                    <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <h3 style={{ fontFamily: "'EB Garamond', serif" }} className="text-2xl font-semibold text-[#1a1a1a]">{kName}</h3>
+                          <div className="flex items-center gap-1 bg-[#f5f3ef] px-2 py-0.5 rounded text-xs font-bold text-[#1a1a1a]">★ {kRating} <span className="text-[#665d52] font-normal text-[10px]">({kReviews})</span></div>
+                        </div>
+                        <p className="text-xs text-[#665d52] leading-relaxed">{kDesc}</p>
+                      </div>
+                      <div className="pt-4 space-y-3">
+                        <div className="flex items-center justify-between text-xs font-bold uppercase text-[#665d52]">
+                          <span>Daily Menu Rotations</span>
+                          <span className="text-[#1a1a1a]">{kPrice}</span>
+                        </div>
+                        <button onClick={() => onNavigate && onNavigate('provider-showcase')} className="w-full bg-[#f5f3ef] hover:bg-[#1a1a1a] hover:text-white text-[#1a1a1a] py-2.5 rounded text-xs font-bold uppercase tracking-wider transition-colors shadow-sm">
+                          Reserve Tiffin
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </section>

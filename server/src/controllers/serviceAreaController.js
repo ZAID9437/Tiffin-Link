@@ -6,12 +6,6 @@ const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
 
-const defaultInitialAreas = [
-  { areaName: 'Ahmedabad (Central)', radiusKm: 5, latitude: 23.0225, longitude: 72.5714, customersCount: 84, status: 'ACTIVE' },
-  { areaName: 'Navrangpura', radiusKm: 3, latitude: 23.0365, longitude: 72.5611, customersCount: 26, status: 'ACTIVE' },
-  { areaName: 'Satellite', radiusKm: 4, latitude: 23.0300, longitude: 72.5176, customersCount: 18, status: 'ACTIVE' }
-];
-
 // @desc    Get real-time Service Area Data, Maps Coordinates & Settings
 // @route   GET /api/service-area
 const getServiceArea = async (req, res) => {
@@ -26,8 +20,8 @@ const getServiceArea = async (req, res) => {
     let acceptOrdersOnlyInsideArea = true;
 
     let kitchenLocation = {
-      address: '102, Shivalik Plaza, CG Road, Ahmedabad',
-      locality: 'CG Road',
+      address: '',
+      locality: '',
       city: 'Ahmedabad',
       latitude: 23.0300,
       longitude: 72.5650
@@ -48,12 +42,8 @@ const getServiceArea = async (req, res) => {
         kitchenLocation.city = settings.business.city || kitchenLocation.city;
       }
 
-      // Check or initialize ServiceArea collection for this provider
+      // Check ServiceArea collection for this provider
       areas = await ServiceArea.find({ providerId }).sort({ createdAt: 1 });
-      if (areas.length === 0) {
-        const seedDocs = defaultInitialAreas.map(a => ({ ...a, providerId }));
-        areas = await ServiceArea.insertMany(seedDocs);
-      }
 
       // Calculate real today's deliveries for this provider
       const today = new Date();
@@ -76,7 +66,7 @@ const getServiceArea = async (req, res) => {
         acceptOrdersOnlyInsideArea = settings.serviceAreaSettings.acceptOrdersOnlyInsideArea ?? true;
       }
     } else {
-      areas = defaultInitialAreas.map((a, idx) => ({ _id: 'area_' + idx, ...a, providerId }));
+      areas = [];
     }
 
     const activeAreasCount = areas.filter(a => a.status === 'ACTIVE').length;

@@ -17,7 +17,7 @@ const enrichRequestWithLiveTimer = (reqObj) => {
     ...plain,
     id: plain._id ? `REQ-${plain._id.toString().slice(-4).toUpperCase()}` : `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
     secondsLeft,
-    totalAmount: plain.totalAmount || ((plain.quantity || 1) * (plain.budget || 120))
+    totalAmount: plain.totalAmount || ((plain.quantity || 1) * (plain.budget || 0))
   };
 };
 
@@ -97,7 +97,7 @@ const createRequest = async (req, res) => {
     }
 
     const qty = Number(quantity) || 1;
-    const itemBudget = Number(budget) || (items && items[0] ? items[0].price : 120);
+    const itemBudget = Number(budget) || (items && items[0] ? items[0].price : 0);
     const calculatedTotal = totalAmount ? Number(totalAmount) : (qty * itemBudget);
     const durationMin = Number(validMinutes) || 2;
     const now = new Date();
@@ -105,10 +105,10 @@ const createRequest = async (req, res) => {
 
     const formattedItems = Array.isArray(items) && items.length > 0
       ? items.map(it => ({ name: it.name, qty: Number(it.qty) || 1, price: Number(it.price) || itemBudget }))
-      : [{ name: mealType || 'Veg Special Thali', qty, price: itemBudget }];
+      : [{ name: mealType || 'Custom Meal', qty, price: itemBudget }];
 
-    const cleanCustomerName = customerName || 'Rahul Shah';
-    const cleanCustomerPhone = customerPhone || '+91 98765 12345';
+    const cleanCustomerName = customerName || (req.user?.name || 'Customer');
+    const cleanCustomerPhone = customerPhone || (req.user?.phone || '');
     const cleanMealType = mealType || formattedItems[0].name;
 
     if (await isDbConnected()) {
@@ -204,12 +204,12 @@ const acceptRequest = async (req, res) => {
         providerId: req.providerId,
         customerName: requestDoc.customerName,
         customerPhone: requestDoc.customerPhone,
-        customerAddress: requestDoc.customerAddress || requestDoc.location || 'Satellite, Ahmedabad',
-        tiffinName: firstItem.name || requestDoc.mealType || 'Deluxe Thali',
-        tiffinCategory: requestDoc.category || 'Gujarati',
-        tiffinImage: '/assets/provider_1.png',
+        customerAddress: requestDoc.customerAddress || requestDoc.location || '',
+        tiffinName: firstItem.name || requestDoc.mealType || 'Custom Meal',
+        tiffinCategory: requestDoc.category || '',
+        tiffinImage: requestDoc.image || '',
         quantity: requestDoc.quantity || 1,
-        unitPrice: firstItem.price || requestDoc.budget || 120,
+        unitPrice: firstItem.price || requestDoc.budget || 0,
         subtotal,
         deliveryKm: km,
         deliveryFee,
@@ -219,7 +219,7 @@ const acceptRequest = async (req, res) => {
         paymentStatus: 'Paid',
         status: 'Preparing',
         deliveryStatus: 'Searching',
-        pickupAddress: 'Shreeji Tiffin Kitchen, Satellite, Ahmedabad'
+        pickupAddress: 'Kitchen Hub'
       });
 
       await newOrder.save();

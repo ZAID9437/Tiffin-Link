@@ -19,72 +19,9 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-const INITIAL_NOTIFICATIONS = [
-  {
-    notificationId: 'NOTIF-1001',
-    title: 'New Order Received',
-    message: 'Order #1029 from Raj Patel • ₹240 • Gujarati Veg Thali',
-    category: 'Orders',
-    read: false,
-    referenceId: '1029',
-    referenceType: 'order',
-    createdAt: new Date(Date.now() - 1000 * 60 * 2).toISOString()
-  },
-  {
-    notificationId: 'NOTIF-1002',
-    title: 'Order Ready',
-    message: 'Order #1027 is ready for delivery partner pickup',
-    category: 'Orders',
-    read: false,
-    referenceId: '1027',
-    referenceType: 'order',
-    createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString()
-  },
-  {
-    notificationId: 'NOTIF-1003',
-    title: 'New Customer Review',
-    message: 'Neha Shah rated Gujarati Thali 5 stars: "Super delicious home cooked thali!"',
-    category: 'Reviews',
-    read: false,
-    referenceId: 'rev_1',
-    referenceType: 'review',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString()
-  },
-  {
-    notificationId: 'NOTIF-1004',
-    title: 'Payment Received',
-    message: '₹360.00 received for Order #1025 via UPI',
-    category: 'Payments',
-    read: true,
-    referenceId: '1025',
-    referenceType: 'payment',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString()
-  },
-  {
-    notificationId: 'NOTIF-1005',
-    title: 'Tiffin Availability Alert',
-    message: 'Gujarati Thali has reached today\'s order limit (50 units)',
-    category: 'Tiffins',
-    read: true,
-    referenceId: 'tif_1',
-    referenceType: 'tiffin',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
-  },
-  {
-    notificationId: 'NOTIF-1006',
-    title: 'System Security Alert',
-    message: 'Successful login detected from Chrome (Windows) at 11:20 PM',
-    category: 'System',
-    read: true,
-    referenceId: 'sec_1',
-    referenceType: 'system',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString()
-  }
-];
-
 export default function NotificationsTab({ onNavigateTab }) {
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
-  const [summary, setSummary] = useState({ all: 6, unread: 3, orders: 2, system: 1 });
+  const [notifications, setNotifications] = useState([]);
+  const [summary, setSummary] = useState({ all: 0, unread: 0, orders: 0, system: 0 });
   const [loading, setLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -116,7 +53,7 @@ export default function NotificationsTab({ onNavigateTab }) {
       if (!isBackground) setLoading(true);
       setHasError(false);
       const json = await apiRequest('/notifications');
-      if (json.success && Array.isArray(json.notifications) && json.notifications.length > 0) {
+      if (json.success && Array.isArray(json.notifications)) {
         setNotifications(json.notifications);
         if (json.summary) setSummary(json.summary);
       }
