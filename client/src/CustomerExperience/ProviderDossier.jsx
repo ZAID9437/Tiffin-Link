@@ -346,7 +346,7 @@ export default function ProviderDossier({
                         </div>
 
                         {/* Tags */}
-                        <div className="flex flex-wrap gap-1.5 mb-5">
+                        <div className="flex flex-wrap gap-1.5 mb-3">
                           <span className="bg-[#efeeea] px-2.5 py-0.5 font-label-caps text-[10px] text-[#1a1a1a] uppercase font-semibold">
                             {tif.foodType || 'Veg'}
                           </span>
@@ -356,6 +356,16 @@ export default function ProviderDossier({
                           <span className="bg-[#ded9d1] px-2.5 py-0.5 font-label-caps text-[10px] text-[#1a1a1a] uppercase font-bold">
                             Today's Cycle
                           </span>
+                        </div>
+
+                        {/* Description & Custom Meal Pricing Note */}
+                        <div className="mb-4">
+                          <p className="font-body-md text-xs text-[#665d52] leading-relaxed">
+                            {tif.description ? `${tif.description} ` : ''}
+                            <span className="inline-block mt-1 text-[#8c531b] font-medium bg-[#fcf6ee] px-2 py-0.5 rounded border border-[#eedcc8]">
+                              ✨ You can create your favorite meal under this price
+                            </span>
+                          </p>
                         </div>
 
                         {/* Composition Ledger Box */}
@@ -509,6 +519,17 @@ export default function ProviderDossier({
             </div>
 
             <div className="space-y-4">
+              <div className="bg-[#fcf6ee] p-4 border border-[#eedcc8]">
+                <span className="font-label-caps text-xs text-[#8c531b] uppercase block mb-1 font-bold">Base Price & Customization</span>
+                <p className="font-body-md text-xs text-[#1a1a1a] leading-relaxed">
+                  {selectedDetailsTiffin.description || 'Authentic traditional home-cooked meal.'}
+                </p>
+                <p className="font-body-md text-xs text-[#8c531b] font-medium mt-1.5 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px]">tune</span>
+                  <span>You can customize and create your favorite meal under this ₹{selectedDetailsTiffin.price} base price.</span>
+                </p>
+              </div>
+
               <div className="bg-[#f5f3ef] p-4 border border-[#ded9d1]/60">
                 <span className="font-label-caps text-xs text-[#665d52] uppercase block mb-1 font-bold">Standard Tray Composition</span>
                 <p className="font-body-md text-xs text-[#1a1a1a] leading-relaxed">
