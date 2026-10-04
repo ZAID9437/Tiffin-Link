@@ -131,6 +131,10 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
           customerAddress: o.customerAddress || o.deliveryAddress || 'Ahmedabad',
           tiffinName: o.tiffinName || 'Homestyle Tiffin Meal',
           totalAmount: Number(o.totalAmount) || 0,
+          subtotal: Number(o.subtotal || o.mealSubtotal) || 0,
+          deliveryFee: Number(o.deliveryFee !== undefined && o.deliveryFee !== null ? o.deliveryFee : (o.deliveryCharge !== undefined && o.deliveryCharge !== null ? o.deliveryCharge : 25)),
+          packagingFee: Number(o.packagingFee) || 0,
+          items: Array.isArray(o.items) && o.items.length > 0 ? o.items : (Array.isArray(o.selectedItems) && o.selectedItems.length > 0 ? o.selectedItems : []),
           paymentMethod: o.paymentMethod || (o.paymentStatus === 'Cash on Delivery' ? 'Cash on Delivery (COD)' : 'Online Pre-paid (UPI)'),
           paymentStatus: o.paymentStatus || 'Paid',
           otp: o.deliveryOtp || o.otp || '',
@@ -370,12 +374,18 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
     const paymentStatus = targetOrder.paymentStatus || 'Paid';
     const canisterId = targetOrder.canisterId || '#TK-9021';
     const totalAmount = Number(targetOrder.totalAmount || 0);
+    const deliveryFee = Number(
+      targetOrder.deliveryFee !== undefined && targetOrder.deliveryFee !== null
+        ? targetOrder.deliveryFee
+        : (targetOrder.deliveryCharge !== undefined && targetOrder.deliveryCharge !== null ? targetOrder.deliveryCharge : 25)
+    );
+    const mealAmountTotal = totalAmount > deliveryFee ? (totalAmount - deliveryFee) : totalAmount;
 
     let items = [];
     if (Array.isArray(targetOrder.items) && targetOrder.items.length > 0) {
       items = targetOrder.items.map(it => {
         const qty = Number(it.quantity) || 1;
-        const lineTotal = Number(it.totalPrice || (it.unitPrice && it.quantity ? it.unitPrice * it.quantity : it.price || totalAmount));
+        const lineTotal = Number(it.totalPrice || (it.unitPrice && it.quantity ? it.unitPrice * it.quantity : it.price || mealAmountTotal));
         const unit = Number(it.unitPrice || (lineTotal / qty));
         return {
           name: it.name || it.tiffinName || 'Homestyle Meal',
@@ -385,19 +395,20 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
         };
       });
     } else {
+      const fallbackMealPrice = mealAmountTotal > 0 ? mealAmountTotal : 115;
       items = [{
         name: targetOrder.tiffinName || 'Gujarati Special Thali (Phulkas, Bhindi, Dal, Rice)',
         qty: 1,
-        unitPrice: totalAmount > 0 ? totalAmount : 140,
-        totalPrice: totalAmount > 0 ? totalAmount : 140
+        unitPrice: fallbackMealPrice,
+        totalPrice: fallbackMealPrice
       }];
     }
 
-    const calculatedSubtotal = items.reduce((acc, it) => acc + (it.totalPrice || 0), 0) || totalAmount || 140;
-    const subtotal = calculatedSubtotal > 0 ? (calculatedSubtotal / 1.05) : 0;
+    const calculatedMealTotal = items.reduce((acc, it) => acc + (it.totalPrice || 0), 0) || mealAmountTotal || 115;
+    const subtotal = calculatedMealTotal > 0 ? (calculatedMealTotal / 1.05) : 0;
     const cgst = subtotal * 0.025;
     const sgst = subtotal * 0.025;
-    const grandTotal = totalAmount > 0 ? totalAmount : (subtotal + cgst + sgst);
+    const grandTotal = totalAmount > 0 ? totalAmount : (subtotal + cgst + sgst + deliveryFee);
 
     const printWin = window.open('', '_blank');
     if (!printWin) {
@@ -643,7 +654,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
   <div class="totals-wrap">
     <table class="totals-table">
       <tr>
-        <td>Subtotal (Taxable)</td>
+        <td>Food &amp; Meal Subtotal (Taxable)</td>
         <td class="num">₹${subtotal.toFixed(2)}</td>
       </tr>
       <tr>
@@ -654,16 +665,19 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
         <td>CGST (2.5%)</td>
         <td class="num">₹${cgst.toFixed(2)}</td>
       </tr>
+      <tr style="background: #fdfbf7; border-left: 3px solid #9e472a;">
+        <td><strong>Delivery Charge (Thermal Transit)</strong></td>
+        <td class="num" style="font-weight: 700; color: #9e472a; font-size: 14px;">₹${deliveryFee.toFixed(2)}</td>
+      </tr>
       <tr>
         <td>304 Canister Sterilization Deposit</td>
         <td class="num" style="color: #2e7d32; font-weight: 600;">Waived (₹0.00)</td>
       </tr>
-      <tr>
-        <td>Thermal Transit Delivery Fee</td>
-        <td class="num" style="color: #2e7d32; font-weight: 600;">Free / Included</td>
-      </tr>
       <tr class="grand-total">
-        <td>Grand Total</td>
+        <td>
+          <div>Grand Total</div>
+          <div style="font-size: 10px; font-weight: 500; color: #666; text-transform: uppercase; margin-top: 2px;">Includes ₹${deliveryFee.toFixed(2)} Delivery Charge</div>
+        </td>
         <td class="num">₹${grandTotal.toFixed(2)}</td>
       </tr>
     </table>
@@ -1095,12 +1109,18 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                         <h2 className="font-headline-md text-headline-md text-onyx-black">
                           {activeConsignment.tiffinName || 'Homestyle Tiffin Meal'}
                         </h2>
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-headline-md text-headline-md text-onyx-black">
-                            ₹{activeConsignment.totalAmount || 0}
-                          </span>
-                          <span className="font-label-caps text-[11px] text-secondary uppercase">
-                            {activeConsignment.paymentMethod?.includes('Cash') ? 'COD' : 'UPI'}
+                        <div className="flex flex-col items-end">
+                          <div className="flex items-baseline gap-1">
+                            <span className="font-headline-md text-headline-md text-onyx-black">
+                              ₹{activeConsignment.totalAmount || 0}
+                            </span>
+                            <span className="font-label-caps text-[11px] text-secondary uppercase">
+                              {activeConsignment.paymentMethod?.includes('Cash') ? 'COD' : 'UPI'}
+                            </span>
+                          </div>
+                          <span className="font-label-caps text-[11px] text-clay-earth font-semibold flex items-center gap-1 mt-0.5">
+                            <span className="material-symbols-outlined text-[13px]">local_shipping</span>
+                            <span>incl. ₹{Number(activeConsignment.deliveryFee !== undefined && activeConsignment.deliveryFee !== null ? activeConsignment.deliveryFee : 25).toFixed(2)} delivery</span>
                           </span>
                         </div>
                       </div>
@@ -1771,16 +1791,33 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                         <span className="font-medium">₹{Number(activeConsignment.totalAmount || 0)}.00</span>
                       </div>
                     )}
+                    <div className="flex justify-between items-center text-onyx-black text-[13px] pt-1">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <span className="material-symbols-outlined text-[16px] text-clay-earth">local_shipping</span>
+                        <span>Delivery Charge (Thermal Transit)</span>
+                      </span>
+                      <span className="font-bold text-onyx-black">₹{Number(activeConsignment.deliveryFee !== undefined && activeConsignment.deliveryFee !== null ? activeConsignment.deliveryFee : 25).toFixed(2)}</span>
+                    </div>
                     <div className="flex justify-between items-center text-secondary text-[13px]">
-                      <span>Hygienic Transit &amp; Escrow Protection</span>
-                      <span>Included</span>
+                      <span>Eco-Canister 304-SS Sanitization</span>
+                      <span className="text-emerald-700 font-medium">Waived (₹0.00)</span>
+                    </div>
+                    <div className="flex justify-between items-center text-secondary text-[13px]">
+                      <span>Escrow Purchase Protection</span>
+                      <span>Verified 100%</span>
                     </div>
                   </div>
 
                   <div className="pt-3 border-t border-sand-neutral/60 flex items-center justify-between">
                     <div>
                       <span className="font-label-caps text-label-caps uppercase text-secondary block">Total Payable</span>
-                      <span className="font-headline-md text-[24px] font-bold text-onyx-black">₹{Number(activeConsignment.totalAmount || 0)}.00</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-headline-md text-[24px] font-bold text-onyx-black">₹{Number(activeConsignment.totalAmount || 0)}.00</span>
+                        <span className="font-label-caps text-[11px] text-clay-earth font-semibold flex items-center gap-0.5">
+                          <span className="material-symbols-outlined text-[13px]">local_shipping</span>
+                          <span>(incl. ₹{Number(activeConsignment.deliveryFee !== undefined && activeConsignment.deliveryFee !== null ? activeConsignment.deliveryFee : 25).toFixed(2)} delivery)</span>
+                        </span>
+                      </div>
                     </div>
                     <div className="text-right">
                       <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-fixed font-label-caps text-label-caps uppercase rounded">
@@ -2493,6 +2530,10 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                           </span>
                           <span className="font-label-caps text-label-caps text-secondary uppercase">
                             {order.paymentStatus || order.paymentMethod || 'Paid'}
+                          </span>
+                          <span className="font-label-caps text-[11px] text-clay-earth font-semibold mt-0.5 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[13px]">local_shipping</span>
+                            <span>incl. ₹{Number(order.deliveryFee !== undefined && order.deliveryFee !== null ? order.deliveryFee : 25).toFixed(2)} delivery</span>
                           </span>
                         </div>
                       </div>
@@ -3246,7 +3287,12 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                 </div>
                 <div className="flex justify-between font-label-caps text-label-caps uppercase text-secondary">
                   <span>Escrow Billing Status</span>
-                  <span className="text-onyx-black font-semibold">{modalPayload.amount || '₹140'}</span>
+                  <div className="text-right">
+                    <span className="text-onyx-black font-semibold">{modalPayload.amount || '₹140'}</span>
+                    <span className="block text-[10px] text-clay-earth font-medium">
+                      (incl. ₹{Number(modalPayload.deliveryFee !== undefined && modalPayload.deliveryFee !== null ? modalPayload.deliveryFee : 25).toFixed(2)} delivery charge)
+                    </span>
+                  </div>
                 </div>
               </div>
               <p className="text-body-md text-on-surface-variant text-[14px]">
@@ -3496,25 +3542,32 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
       {/* 6. Tax Receipt & Dossier Modal */}
       {(activeModal === 'receipt' || activeModal === 'dossier') && modalPayload && (() => {
         const total = Number(modalPayload.totalAmount || 140);
+        const deliveryFee = Number(
+          modalPayload.deliveryFee !== undefined && modalPayload.deliveryFee !== null
+            ? modalPayload.deliveryFee
+            : (modalPayload.deliveryCharge !== undefined && modalPayload.deliveryCharge !== null ? modalPayload.deliveryCharge : 25)
+        );
+        const mealAmountFallback = total > deliveryFee ? (total - deliveryFee) : total;
+
         const itemsList = Array.isArray(modalPayload.items) && modalPayload.items.length > 0
           ? modalPayload.items.map(it => ({
               name: it.name || it.tiffinName || 'Homestyle Culinary Meal',
               quantity: Number(it.quantity) || 1,
-              price: Number(it.totalPrice || (it.unitPrice && it.quantity ? it.unitPrice * it.quantity : it.price || total))
+              price: Number(it.totalPrice || (it.unitPrice && it.quantity ? it.unitPrice * it.quantity : it.price || mealAmountFallback))
             }))
           : [
               {
                 name: modalPayload.tiffinName || 'Gujarati Special Thali (Phulkas, Bhindi, Dal, Rice)',
                 quantity: 1,
-                price: total > 0 ? total : 140
+                price: mealAmountFallback > 0 ? mealAmountFallback : 115
               }
             ];
 
-        const calculatedSubtotal = itemsList.reduce((acc, it) => acc + (it.price || 0), 0) || total || 140;
-        const subtotal = calculatedSubtotal > 0 ? (calculatedSubtotal / 1.05) : 0;
+        const calculatedItemsTotal = itemsList.reduce((acc, it) => acc + (it.price || 0), 0) || mealAmountFallback || 115;
+        const subtotal = calculatedItemsTotal > 0 ? (calculatedItemsTotal / 1.05) : 0;
         const cgst = subtotal * 0.025;
         const sgst = subtotal * 0.025;
-        const grandTotal = total > 0 ? total : (subtotal + cgst + sgst);
+        const grandTotal = total > 0 ? total : (subtotal + cgst + sgst + deliveryFee);
 
         return (
           <div className="fixed inset-0 bg-onyx-black/60 backdrop-blur-sm z-50 transition-opacity flex items-center justify-center p-4 sm:p-6">
@@ -3593,11 +3646,18 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                   </div>
                 </div>
 
-                {/* Bill Breakdown */}
-                <div className="space-y-2 p-4 bg-surface-container rounded">
+                {/* Bill Breakdown with Delivery Charge explicitly shown */}
+                <div className="space-y-2.5 p-5 bg-surface-container rounded-lg border border-sand-neutral/60">
                   <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
-                    <span>Taxable Subtotal</span>
+                    <span>Taxable Meal Subtotal</span>
                     <span>₹{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-onyx-black font-body-md text-body-md bg-bone-white px-3.5 py-2.5 rounded border border-sand-neutral shadow-xs">
+                    <span className="flex items-center gap-2 font-semibold">
+                      <span className="material-symbols-outlined text-[18px] text-clay-earth">local_shipping</span>
+                      <span>Delivery Charge (Thermal Transit)</span>
+                    </span>
+                    <span className="font-bold text-onyx-black text-[15px]">₹{deliveryFee.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-on-surface-variant font-body-md text-body-md">
                     <span>Packaging &amp; 304 Canister Sterilization Fee</span>
@@ -3611,9 +3671,12 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                     <span>CGST (2.5%)</span>
                     <span>₹{cgst.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between font-headline-md text-headline-md text-onyx-black pt-2 border-t border-sand-neutral/60">
-                    <span>Grand Total Settled</span>
-                    <span className="font-bold">₹{grandTotal.toFixed(2)}</span>
+                  <div className="flex justify-between items-center font-headline-md text-headline-md text-onyx-black pt-3 border-t border-sand-neutral/70">
+                    <div className="flex flex-col">
+                      <span>Grand Total Settled</span>
+                      <span className="text-[11px] text-secondary font-normal font-label-caps tracking-wider">Includes ₹{deliveryFee.toFixed(2)} Delivery Charge + Taxes</span>
+                    </div>
+                    <span className="font-bold text-2xl">₹{grandTotal.toFixed(2)}</span>
                   </div>
                 </div>
 
