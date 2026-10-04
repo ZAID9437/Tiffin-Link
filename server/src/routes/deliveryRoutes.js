@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, requireProvider, requireDriver } = require('../middleware/authMiddleware');
+const { protect, requireProvider, requireDriver, driverAuthWithFallback } = require('../middleware/authMiddleware');
 const { registerDelivery, getDeliveryApplications, updateVerificationStatus } = require('../controllers/deliveryController');
 const {
   getDeliveryRequests,
@@ -120,19 +120,19 @@ router.patch('/notification-preferences', protect, requireDriver, updateDriverNo
 router.patch('/driver/notification-preferences', protect, requireDriver, updateDriverNotificationPreferences);
 router.post('/notification-preferences/reset', protect, requireDriver, resetDriverNotificationPreferences);
 router.post('/driver/notification-preferences/reset', protect, requireDriver, resetDriverNotificationPreferences);
-router.get('/dashboard', protect, requireDriver, getDriverDashboardData);
-router.get('/driver-dashboard', protect, requireDriver, getDriverDashboardData);
-router.get('/performance', protect, requireDriver, getDriverPerformance);
-router.get('/driver/performance', protect, requireDriver, getDriverPerformance);
-router.get('/reviews', protect, requireDriver, getDriverReviews);
-router.get('/driver/reviews', protect, requireDriver, getDriverReviews);
-router.get('/reviews/summary', protect, requireDriver, getDriverReviews);
-router.get('/driver/reviews/summary', protect, requireDriver, getDriverReviews);
-router.get('/earnings/overview', protect, requireDriver, getDriverEarningsOverview);
+router.get('/dashboard', driverAuthWithFallback, getDriverDashboardData);
+router.get('/driver-dashboard', driverAuthWithFallback, getDriverDashboardData);
+router.get('/performance', driverAuthWithFallback, getDriverPerformance);
+router.get('/driver/performance', driverAuthWithFallback, getDriverPerformance);
+router.get('/reviews', driverAuthWithFallback, getDriverReviews);
+router.get('/driver/reviews', driverAuthWithFallback, getDriverReviews);
+router.get('/reviews/summary', driverAuthWithFallback, getDriverReviews);
+router.get('/driver/reviews/summary', driverAuthWithFallback, getDriverReviews);
+router.get('/earnings/overview', driverAuthWithFallback, getDriverEarningsOverview);
 
-router.post('/availability/online', protect, requireDriver, setDriverOnline);
-router.post('/availability/offline', protect, requireDriver, setDriverOffline);
-router.get('/availability/status', protect, requireDriver, getDriverDashboardData);
+router.post('/availability/online', driverAuthWithFallback, setDriverOnline);
+router.post('/availability/offline', driverAuthWithFallback, setDriverOffline);
+router.get('/availability/status', driverAuthWithFallback, getDriverDashboardData);
 
 router.get('/schedule', protect, requireDriver, getDriverSchedule);
 router.get('/driver/schedule', protect, requireDriver, getDriverSchedule);

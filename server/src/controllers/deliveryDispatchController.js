@@ -1315,9 +1315,9 @@ const broadcastDeliveryRequest = async (req, res) => {
 // @route   GET /api/delivery/driver-dashboard
 const getDriverDashboardData = async (req, res) => {
   try {
-    const driverEmail = (req.user?.email || req.query.email || req.query.driverEmail || '').toLowerCase().trim();
-    const driverPhone = (req.user?.phone || req.query.phone || '').trim();
-    const driverIdParam = (req.user?.id || req.user?._id || req.query.driverId || '').trim();
+    const driverEmail = String(req.user?.email || req.query.email || req.query.driverEmail || '').toLowerCase().trim();
+    const driverPhone = String(req.user?.phone || req.query.phone || '').trim();
+    const driverIdParam = String(req.user?.id || req.user?._id || req.query.driverId || '').trim();
 
     let isOnline = true;
     let driverInfo = {
@@ -1444,24 +1444,37 @@ const getDriverDashboardData = async (req, res) => {
         activeDelivery = obj;
       }
 
+      const driverCompletedConditions = [
+        ...(driverInfo.driverId ? [{ 'assignedDriver.driverId': String(driverInfo.driverId) }] : []),
+        ...(driverRecord?.driverId ? [{ 'assignedDriver.driverId': String(driverRecord.driverId) }] : []),
+        ...(driverRecord?._id ? [{ 'assignedDriver.driverId': String(driverRecord._id) }] : []),
+        ...(driverEmail ? [{ 'assignedDriver.email': driverEmail }] : []),
+        ...(driverPhone ? [{ 'assignedDriver.phone': driverPhone }, { 'assignedDriver.phone': `+91 ${driverPhone.replace(/\D/g, '')}` }] : []),
+        ...(driverInfo.name ? [{ 'assignedDriver.name': driverInfo.name }] : []),
+        ...(driverRecord?.name ? [{ 'assignedDriver.name': driverRecord.name }] : [])
+      ];
+
       const completedReqs = await DeliveryRequest.find({
-        $or: [
-          ...(driverInfo.driverId ? [{ 'assignedDriver.driverId': driverInfo.driverId }] : []),
-          ...(driverEmail ? [{ 'assignedDriver.email': driverEmail }] : [])
-        ],
-        status: 'Delivered',
-        deliveredAt: { $gte: startOfDay, $lte: endOfDay }
+        $and: [
+          { $or: driverCompletedConditions.length > 0 ? driverCompletedConditions : [{ 'assignedDriver.email': driverEmail }] },
+          { status: { $in: ['Delivered', 'DELIVERED', 'Completed', 'COMPLETED'] } },
+          {
+            $or: [
+              { deliveredAt: { $gte: startOfDay, $lte: endOfDay } },
+              { requestedAt: { $gte: startOfDay, $lte: endOfDay } },
+              { updatedAt: { $gte: startOfDay, $lte: endOfDay } },
+              { deliveredAt: { $exists: false } }
+            ]
+          }
+        ]
       });
 
       completedToday = completedReqs.length;
-      totalEarningsToday = completedReqs.reduce((sum, r) => sum + (r.driverEarning || r.deliveryFee || 51), 0);
+      totalEarningsToday = completedReqs.reduce((sum, r) => sum + Number(r.driverEarning || r.deliveryFee || 51), 0);
 
-      recentDeliveries = await DeliveryRequest.find({
-        $or: [
-          ...(driverInfo.driverId ? [{ 'assignedDriver.driverId': driverInfo.driverId }] : []),
-          ...(driverEmail ? [{ 'assignedDriver.email': driverEmail }] : [])
-        ]
-      })
+      recentDeliveries = await DeliveryRequest.find(
+        driverCompletedConditions.length > 0 ? { $or: driverCompletedConditions } : { 'assignedDriver.email': driverEmail }
+      )
       .sort({ requestedAt: -1 })
       .limit(5);
 

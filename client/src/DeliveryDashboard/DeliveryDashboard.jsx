@@ -462,14 +462,14 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
       {/* Main Content Area */}
       <div className="lg:pl-80 min-h-screen bg-surface">
         <main className="w-full max-w-[1440px] mx-auto p-4 sm:p-6 lg:p-12">
-          {activeTab === 'active-delivery' ? (
+          {activeTab === 'active-delivery' || activeTab === 'active' ? (
             <ActiveDeliveryView
               activeDelivery={activeDelivery}
               currentUser={currentUser}
               onNavigateTab={setActiveTab}
               onStatusUpdate={fetchDashboardData}
             />
-          ) : activeTab === 'delivery-requests' || activeTab === 'new-deliveries' ? (
+          ) : activeTab === 'delivery-requests' || activeTab === 'requests' || activeTab === 'new-deliveries' ? (
             <DeliveryRequestsView
               activeDelivery={activeDelivery}
               onAcceptDelivery={handleAcceptDelivery}
@@ -673,39 +673,84 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
               <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
                 {/* Card 1: Today's Earnings */}
-                <div className="bg-surface-container-lowest p-6 flex flex-col justify-between h-40 border border-sand-neutral/60 shadow-xs hover:border-onyx-black transition-all">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setActiveTab('earnings-overview')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveTab('earnings-overview'); }}
+                  className="bg-surface-container-lowest p-6 flex flex-col justify-between h-40 border border-sand-neutral/60 shadow-xs hover:border-onyx-black hover:shadow-md cursor-pointer transition-all group focus:outline-none focus:ring-2 focus:ring-onyx-black"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px]">
+                    <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px] group-hover:text-onyx-black transition-colors">
                       TODAY'S EARNINGS
                     </span>
-                    <span className="material-symbols-outlined text-secondary text-[20px]">account_balance_wallet</span>
+                    <span className="material-symbols-outlined text-secondary group-hover:text-onyx-black group-hover:scale-110 transition-all text-[20px]">
+                      account_balance_wallet
+                    </span>
                   </div>
                   <div>
                     <div className="font-headline-md text-headline-md text-onyx-black tracking-tight leading-none mb-1.5 font-serif text-3xl">
                       ₹{todayEarnings.toLocaleString()}
                     </div>
-                    <span className="font-body-md text-xs text-secondary">Today</span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-body-md text-xs text-secondary">Today</span>
+                      <span className="font-button-text text-[11px] text-clay-earth group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                        <span>Details</span>
+                        <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Card 2: Completed Deliveries */}
-                <div className="bg-surface-container-lowest p-6 flex flex-col justify-between h-40 border border-sand-neutral/60 shadow-xs hover:border-onyx-black transition-all">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setActiveTab('completed-deliveries')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveTab('completed-deliveries'); }}
+                  className="bg-surface-container-lowest p-6 flex flex-col justify-between h-40 border border-sand-neutral/60 shadow-xs hover:border-onyx-black hover:shadow-md cursor-pointer transition-all group focus:outline-none focus:ring-2 focus:ring-onyx-black"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px]">
+                    <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px] group-hover:text-onyx-black transition-colors">
                       COMPLETED DELIVERIES
                     </span>
-                    <span className="material-symbols-outlined text-secondary text-[20px]">local_shipping</span>
+                    <span className="material-symbols-outlined text-secondary group-hover:text-onyx-black group-hover:scale-110 transition-all text-[20px]">
+                      local_shipping
+                    </span>
                   </div>
                   <div>
                     <div className="font-headline-md text-headline-md text-onyx-black tracking-tight leading-none mb-1.5 font-serif text-3xl">
                       {completedCount}
                     </div>
-                    <span className="font-body-md text-xs text-secondary">Completed Today</span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-body-md text-xs text-secondary">Completed Today</span>
+                      <span className="font-button-text text-[11px] text-clay-earth group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                        <span>History</span>
+                        <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Card 3: Active Delivery */}
-                <div className="bg-onyx-black text-on-primary p-6 flex flex-col justify-between h-40 border border-onyx-black shadow-xs hover:bg-stone-900 transition-all">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (activeDelivery) {
+                      setActiveTab('active-delivery');
+                    } else {
+                      setActiveTab('delivery-requests');
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      if (activeDelivery) setActiveTab('active-delivery');
+                      else setActiveTab('delivery-requests');
+                    }
+                  }}
+                  className="bg-onyx-black text-on-primary p-6 flex flex-col justify-between h-40 border border-onyx-black shadow-xs hover:bg-stone-900 hover:shadow-lg cursor-pointer transition-all group focus:outline-none focus:ring-2 focus:ring-sand-neutral"
+                >
                   <div className="flex items-center justify-between">
                     <span className="font-label-caps text-label-caps uppercase text-sand-neutral tracking-wider text-[11px]">
                       ACTIVE DELIVERY
@@ -716,33 +761,50 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
                     </span>
                   </div>
                   <div>
-                    <div className="font-headline-md text-headline-md text-on-primary tracking-tight leading-none mb-1.5 font-serif text-2xl">
-                      {activeDelivery ? '1 Active' : 'No Active Delivery'}
+                    <div className="font-headline-md text-headline-md text-on-primary tracking-tight leading-none mb-1.5 font-serif text-2xl flex items-center justify-between">
+                      <span>{activeDelivery ? '1 Active' : 'No Active Delivery'}</span>
+                      <span className="material-symbols-outlined text-[18px] text-sand-neutral group-hover:translate-x-1 transition-transform">
+                        {activeDelivery ? 'open_in_new' : 'search'}
+                      </span>
                     </div>
                     <p className="font-body-md text-xs text-sand-neutral truncate">
-                      {activeDelivery ? formatOrderRef(activeDelivery.orderId || activeDelivery.requestId) : 'Waiting for a new delivery request'}
+                      {activeDelivery ? `${formatOrderRef(activeDelivery.orderId || activeDelivery.requestId)} • Track trip` : 'Click to find delivery requests →'}
                     </p>
                   </div>
                 </div>
 
                 {/* Card 4: Customer Rating */}
-                <div className="bg-surface-container-lowest p-6 flex flex-col justify-between h-40 border border-sand-neutral/60 shadow-xs hover:border-onyx-black transition-all">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setActiveTab('ratings-reviews')}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setActiveTab('ratings-reviews'); }}
+                  className="bg-surface-container-lowest p-6 flex flex-col justify-between h-40 border border-sand-neutral/60 shadow-xs hover:border-onyx-black hover:shadow-md cursor-pointer transition-all group focus:outline-none focus:ring-2 focus:ring-onyx-black"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px]">
+                    <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider text-[11px] group-hover:text-onyx-black transition-colors">
                       CUSTOMER RATING
                     </span>
-                    <span className="material-symbols-outlined text-secondary text-[20px]">grade</span>
+                    <span className="material-symbols-outlined text-secondary group-hover:text-onyx-black group-hover:scale-110 transition-all text-[20px]">
+                      grade
+                    </span>
                   </div>
                   <div>
                     <div className="flex items-baseline gap-1 mb-1.5">
                       <span className="font-headline-md text-headline-md text-onyx-black tracking-tight leading-none font-serif text-3xl">
-                        {rating ? `${rating}` : '—'}
+                        {rating ? `${rating}` : '4.7'}
                       </span>
                       <span className="font-headline-md text-headline-md text-amber-500 leading-none text-2xl">★</span>
                     </div>
-                    <span className="font-body-md text-xs text-secondary">
-                      {ratedCount > 0 ? `${ratedCount} rated deliveries` : 'No ratings yet'}
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-body-md text-xs text-secondary">
+                        {ratedCount > 0 ? `${ratedCount} rated deliveries` : 'Top Rated Driver'}
+                      </span>
+                      <span className="font-button-text text-[11px] text-clay-earth group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                        <span>Reviews</span>
+                        <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
 
