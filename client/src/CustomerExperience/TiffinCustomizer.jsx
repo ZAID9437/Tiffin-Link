@@ -366,15 +366,23 @@ export default function TiffinCustomizer({
               onClick={() => {
                 window.location.hash = '#my-orders';
               }}
-              className="flex-1 bg-[#1a1a1a] text-[#f5f3ef] py-3.5 px-6 font-button-text text-xs uppercase tracking-wider font-semibold hover:bg-[#4a4238] transition-colors text-center"
+              className="flex-1 bg-[#1a1a1a] text-[#f5f3ef] py-3.5 px-6 font-button-text text-xs uppercase tracking-wider font-semibold hover:bg-[#4a4238] transition-colors text-center cursor-pointer"
             >
               Track In My Orders →
             </button>
             <button
               onClick={onBack}
-              className="flex-1 bg-[#f5f3ef] text-[#1a1a1a] py-3.5 px-6 font-button-text text-xs uppercase tracking-wider font-semibold hover:bg-[#ded9d1] transition-colors text-center border border-[#ded9d1]"
+              className="flex-1 bg-[#f5f3ef] text-[#1a1a1a] py-3.5 px-6 font-button-text text-xs uppercase tracking-wider font-semibold hover:bg-[#ded9d1] transition-colors text-center border border-[#ded9d1] cursor-pointer"
             >
               Back to Kitchen
+            </button>
+            <button
+              onClick={() => {
+                window.location.hash = '#home';
+              }}
+              className="flex-1 bg-white text-[#1a1a1a] py-3.5 px-6 font-button-text text-xs uppercase tracking-wider font-semibold hover:bg-[#efeeea] transition-colors text-center border border-[#ded9d1] cursor-pointer"
+            >
+              Back to Home
             </button>
           </div>
         </div>
@@ -387,13 +395,22 @@ export default function TiffinCustomizer({
       {/* Top Navigation Corridor */}
       <div className="w-full bg-[#f5f3ef] py-4 px-4 sm:px-6 lg:px-20 border-b border-[#ded9d1]">
         <div className="max-w-[1440px] mx-auto flex items-center justify-between">
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-2 font-label-caps text-xs text-[#665d52] hover:text-[#1a1a1a] tracking-widest uppercase transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-            Back to {activeProviderName}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-2 bg-white hover:bg-[#efeeea] px-3.5 py-1.5 border border-[#ded9d1] transition-colors group cursor-pointer shadow-xs"
+            >
+              <span className="material-symbols-outlined text-[16px] text-[#1a1a1a] transition-transform group-hover:-translate-x-1">arrow_back</span>
+              <span className="font-button-text text-xs uppercase tracking-wider text-[#1a1a1a] font-bold">Back to {activeProviderName}</span>
+            </button>
+            <div className="h-4 w-px bg-[#ded9d1] hidden sm:block"></div>
+            <button
+              onClick={() => { window.location.hash = '#home'; }}
+              className="hidden sm:inline-flex items-center gap-1.5 font-label-caps text-xs text-[#665d52] hover:text-[#1a1a1a] uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              <span>Home</span>
+            </button>
+          </div>
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#ded9d1]/50 text-[#665d52] font-label-caps text-[11px] uppercase">
               <span className={`w-1.5 h-1.5 rounded-full ${availableSlots > 0 ? 'bg-[#1b5e20]' : 'bg-[#ba1a1a]'} animate-pulse`}></span>

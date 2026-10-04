@@ -366,6 +366,33 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-margin-desktop w-full flex flex-col">
         
+        {/* Top Back & Quick Action Corridor */}
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-sand-neutral/50">
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigate) onNavigate('#home');
+              else window.location.hash = '#home';
+            }}
+            className="inline-flex items-center gap-2 bg-[#efeeea] hover:bg-[#e4e2de] px-3.5 py-1.5 transition-colors group cursor-pointer border border-[#ded9d1]"
+          >
+            <span className="material-symbols-outlined text-[16px] text-[#1a1a1a] transition-transform group-hover:-translate-x-1">arrow_back</span>
+            <span className="font-button-text text-xs uppercase tracking-wider text-[#1a1a1a] font-semibold">Back to Home</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigate) onNavigate('#order-tiffin');
+              else window.location.hash = '#order-tiffin';
+            }}
+            className="inline-flex items-center gap-2 bg-white hover:bg-[#efeeea] px-3.5 py-1.5 transition-colors group cursor-pointer border border-[#ded9d1]"
+          >
+            <span className="material-symbols-outlined text-[16px] text-[#1a1a1a]">restaurant_menu</span>
+            <span className="font-button-text text-xs uppercase tracking-wider text-[#1a1a1a] font-semibold">Order More Tiffin</span>
+          </button>
+        </div>
+
         {/* COMMON TOP SUB-NAVIGATION (Exact 5-tab bar with Dynamic Badges) */}
         <header className="w-full bg-surface/90 border-b border-sand-neutral mb-8">
           <div className="h-14 flex items-center justify-between overflow-x-auto">
@@ -501,15 +528,26 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                 <p className="font-body-md text-on-surface-variant max-w-md mx-auto">
                   All your past orders have been safely delivered. Browse artisanal home kitchens in Satellite and Bodakdev to order fresh homestyle tiffins!
                 </p>
-                <button
-                  onClick={() => {
-                    if (onNavigate) onNavigate('#order-tiffin');
-                    else window.location.hash = '#order-tiffin';
-                  }}
-                  className="px-6 py-3 bg-onyx-black text-on-primary rounded font-button-text text-button-text hover:bg-neutral-800 transition-colors"
-                >
-                  Order Tiffin Now
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (onNavigate) onNavigate('#order-tiffin');
+                      else window.location.hash = '#order-tiffin';
+                    }}
+                    className="px-6 py-3 bg-onyx-black text-on-primary rounded font-button-text text-button-text hover:bg-neutral-800 transition-colors"
+                  >
+                    Order Tiffin Now
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (onNavigate) onNavigate('#home');
+                      else window.location.hash = '#home';
+                    }}
+                    className="px-6 py-3 bg-[#efeeea] text-[#1a1a1a] rounded font-button-text text-button-text hover:bg-[#eae8e4] transition-colors border border-[#ded9d1]"
+                  >
+                    Back to Home
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="w-full bg-surface-container-lowest rounded-xl border border-sand-neutral/70 shadow-sm overflow-hidden flex flex-col">

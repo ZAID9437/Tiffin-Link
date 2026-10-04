@@ -83,6 +83,8 @@ export default function ProviderDossier({
             </button>
             <div className="h-4 w-px bg-[#ded9d1] hidden sm:block"></div>
             <nav aria-label="Breadcrumb" className="hidden sm:flex items-center gap-2 font-label-caps text-xs text-[#665d52] uppercase">
+              <span className="hover:text-[#1a1a1a] cursor-pointer" onClick={() => { window.location.hash = '#home'; }}>Home</span>
+              <span>/</span>
               <span className="hover:text-[#1a1a1a] cursor-pointer" onClick={onBack}>Providers</span>
               <span>/</span>
               <span>{locality}</span>

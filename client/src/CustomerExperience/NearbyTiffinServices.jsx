@@ -346,6 +346,18 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
       <section className="w-full bg-[#f5f3ef]/90 backdrop-blur-md sticky top-20 z-40 shadow-xs border-b border-[#ded9d1]">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-20 py-3.5 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center flex-wrap gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                if (onNavigate) onNavigate('#home');
+                else window.location.hash = '#home';
+              }}
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-[#efeeea] px-3.5 py-1.5 border border-[#ded9d1] transition-colors group cursor-pointer shadow-xs mr-1 text-[#1a1a1a]"
+            >
+              <span className="material-symbols-outlined text-[16px] transition-transform group-hover:-translate-x-1">arrow_back</span>
+              <span className="font-button-text text-xs uppercase tracking-wider font-bold">Back to Home</span>
+            </button>
+
             <span className="font-label-caps text-xs uppercase text-[#4a4238] tracking-widest mr-1.5 flex items-center gap-1.5 font-bold">
               <span className="w-2 h-2 rounded-full bg-[#1a1a1a]"></span>Active Polygon Filter
             </span>
@@ -403,6 +415,16 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
       {isSearchFormOpen && (
         <section className="w-full bg-[#f5f3ef] border-b border-[#ded9d1] py-10 px-4 sm:px-6 lg:px-20 transition-all duration-500">
           <div className="max-w-[1440px] mx-auto">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                type="button"
+                onClick={() => setIsSearchFormOpen(false)}
+                className="inline-flex items-center gap-1.5 bg-white hover:bg-[#eae8e4] px-3.5 py-1.5 border border-[#ded9d1] transition-colors group cursor-pointer text-[#1a1a1a]"
+              >
+                <span className="material-symbols-outlined text-[16px] transition-transform group-hover:-translate-x-1">arrow_back</span>
+                <span className="font-button-text text-xs uppercase tracking-wider font-bold">Back to Kitchens</span>
+              </button>
+            </div>
             <div className="max-w-4xl space-y-2 mb-8">
               <span className="font-label-caps text-xs uppercase tracking-widest text-[#4a4238] block font-bold">
                 DISCOVERY &amp; REQUISITION PROTOCOL
@@ -722,11 +744,23 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-[#ded9d1]">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigate) onNavigate('#home');
+                  else window.location.hash = '#home';
+                }}
+                className="inline-flex items-center gap-1.5 font-label-caps text-xs text-[#665d52] hover:text-[#1a1a1a] uppercase tracking-wider transition-colors cursor-pointer group"
+              >
+                <span className="material-symbols-outlined text-[15px] transition-transform group-hover:-translate-x-1">arrow_back</span>
+                <span className="font-bold">Home</span>
+              </button>
+              <span className="text-[#ded9d1]">/</span>
               <span className="font-label-caps text-xs text-[#4a4238] uppercase tracking-widest font-bold">
                 Geolocation Index // R-{radiusKm}km
               </span>
               <span className="w-8 h-[1px] bg-[#ded9d1]"></span>
-              <span className="font-label-caps text-xs text-[#665d52] uppercase font-semibold">
+              <span className="font-label-caps text-xs text-[#665d52] uppercase font-semibold hidden sm:inline">
                 Haversine Spatial Verification Passed
               </span>
             </div>
@@ -771,12 +805,23 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
             <p className="text-sm text-[#665d52] max-w-md mx-auto">
               Try extending your search radius to 10 km or adjust the meal type filter to discover more verified home kitchens.
             </p>
-            <button
-              onClick={() => { setRadiusKm(10); setIsSearchFormOpen(true); }}
-              className="px-6 py-3 bg-[#1a1a1a] text-white text-xs uppercase font-bold tracking-wider cursor-pointer"
-            >
-              Expand to 10 KM &amp; Edit Search
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={() => { setRadiusKm(10); setIsSearchFormOpen(true); }}
+                className="px-6 py-3 bg-[#1a1a1a] text-white text-xs uppercase font-bold tracking-wider cursor-pointer"
+              >
+                Expand to 10 KM &amp; Edit Search
+              </button>
+              <button
+                onClick={() => {
+                  if (onNavigate) onNavigate('#home');
+                  else window.location.hash = '#home';
+                }}
+                className="px-6 py-3 bg-[#f5f3ef] hover:bg-[#eae8e4] text-[#1a1a1a] text-xs uppercase font-bold tracking-wider cursor-pointer border border-[#ded9d1]"
+              >
+                Back to Home
+              </button>
+            </div>
           </div>
         ) : (
           <>

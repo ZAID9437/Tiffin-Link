@@ -52,6 +52,17 @@ export default function CustomerHome({ onNavigate }) {
             <span className="hidden md:inline text-white/50 text-xs"> • {kitchens.length} Artisanal Kitchens Available</span>
           </div>
           <div className="flex items-center gap-4 text-xs text-white/60 uppercase font-semibold">
+            <button
+              onClick={() => {
+                if (onNavigate) onNavigate('#home');
+                else window.location.hash = '#home';
+              }}
+              className="text-white hover:text-white/80 transition-colors flex items-center gap-1 cursor-pointer font-bold"
+            >
+              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+              <span>Back to Home</span>
+            </button>
+            <span className="hidden sm:inline text-white/30">|</span>
             <span className="hidden sm:inline">Dispatch Window: 12:00 – 14:30 &amp; 18:30 – 21:00</span>
             <span className="text-white">Ahmedabad West</span>
           </div>
