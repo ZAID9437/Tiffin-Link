@@ -169,6 +169,10 @@ const orderSchema = new mongoose.Schema({
     enum: ['Paid', 'Cash on Delivery', 'Pending', 'Failed', 'PAYMENT_FAILED'],
     default: 'Paid'
   },
+  paymentMethod: {
+    type: String,
+    default: 'UPI'
+  },
   paymentId: {
     type: String,
     default: ''

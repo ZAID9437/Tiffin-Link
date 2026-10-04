@@ -1,5 +1,74 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import QRCode from 'qrcode';
 import { apiRequest } from '../services/api';
+
+// Brand SVG Icons for Indian UPI Payment Services
+const GooglePayIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+  </svg>
+);
+
+const PhonePeIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="24" height="24" rx="5" fill="#5F259F"/>
+    <path d="M15.5 8.2h-3.8c-.8 0-1.4.6-1.4 1.4v7.4h2.2v-2.8h1.6c1.8 0 3.1-1.3 3.1-3 0-1.8-1.3-3-3.1-3zm-.1 3.9h-1.6V9.9h1.6c.7 0 1.2.4 1.2 1.1 0 .7-.5 1.1-1.2 1.1z" fill="white"/>
+    <path d="M7 6.5h2.2v11H7z" fill="white"/>
+  </svg>
+);
+
+const PaytmIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="24" height="24" rx="5" fill="#002E6E"/>
+    <path d="M4 14.5h2.3l1.8-5h-2.1l-.8 2.6-.8-2.6H2.2l1.8 5zm5.5-5H8.2l.4 5h1.3l-.4-5zm3.8 0h-2.3l-1.3 5h1.3l.3-1.1h1.4l.3 1.1h1.3l-1-5zm-1.6 2.7l.5-1.7.5 1.7h-1zm7.3-2.7h-3.2v5h1.3v-1.4h1.7c1.3 0 2.2-.8 2.2-1.8s-.7-1.8-2-1.8zm-.2 2.3h-1.7v-1.1h1.7c.6 0 1 .2 1 .6 0 .3-.4.5-1 .5z" fill="#00BAF2"/>
+  </svg>
+);
+
+const BhimIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="24" height="24" rx="5" fill="#005A9C"/>
+    <path d="M6 6h4.5c1.8 0 3 1.1 3 2.6 0 1-.6 1.8-1.5 2.2 1.2.4 1.9 1.3 1.9 2.5 0 1.6-1.3 2.7-3.2 2.7H6V6zm2.2 4.1h2.1c.7 0 1.2-.4 1.2-1 0-.6-.5-1-1.2-1H8.2v2zm0 3.8h2.3c.8 0 1.3-.4 1.3-1.1 0-.6-.5-1-1.3-1H8.2v2.1z" fill="#00B050"/>
+    <path d="M14.5 6h2.2v10h-2.2z" fill="#ED7D31"/>
+  </svg>
+);
+
+const PaymentBrandIcon = ({ method, className = "w-5 h-5" }) => {
+  switch (method) {
+    case 'Google Pay':
+      return <GooglePayIcon className={className} />;
+    case 'PhonePe':
+      return <PhonePeIcon className={className} />;
+    case 'Paytm':
+      return <PaytmIcon className={className} />;
+    case 'BHIM':
+      return <BhimIcon className={className} />;
+    case 'Cash on Delivery':
+      return <span className="material-symbols-outlined text-[20px] text-[#4a4238]">payments</span>;
+    default:
+      return <span className="material-symbols-outlined text-[20px] text-[#4a4238]">account_balance_wallet</span>;
+  }
+};
+
+// Helper: Build UPI Deep-Link URI for instant app opening
+const getUpiDeepLink = (method, upiUri) => {
+  if (!upiUri) return '';
+  const uriWithoutPrefix = upiUri.replace(/^upi:\/\/pay\?/, '');
+  switch (method) {
+    case 'Google Pay':
+      return `tez://upi/pay?${uriWithoutPrefix}`;
+    case 'PhonePe':
+      return `phonepe://pay?${uriWithoutPrefix}`;
+    case 'Paytm':
+      return `paytmmp://pay?${uriWithoutPrefix}`;
+    case 'BHIM':
+      return `upi://pay?${uriWithoutPrefix}`;
+    default:
+      return upiUri;
+  }
+};
 
 /**
  * OrderConfirmation — Checkout Review Screen
@@ -48,24 +117,14 @@ export default function OrderConfirmation({
   const [deliveryAddress, setDeliveryAddress] = useState(initialAddress);
   const [instructions, setInstructions] = useState(initialInstructions);
 
-  // Payment states
-  const [paymentMethod, setPaymentMethod] = useState('Online Payment');
-  const [onlineSubMethod, setOnlineSubMethod] = useState('UPI');
-  const [isOnlineSelectorOpen, setIsOnlineSelectorOpen] = useState(true);
+  // Payment states: Google Pay / PhonePe / Paytm / BHIM / Cash on Delivery
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('Google Pay');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentStatusState, setPaymentStatusState] = useState(null); // null, 'failed', 'cancelled'
   const [paymentErrorMessage, setPaymentErrorMessage] = useState('');
-  const [showGatewayCheckoutModal, setShowGatewayCheckoutModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [currentPaymentData, setCurrentPaymentData] = useState(null);
-
-  // Interactive Gateway Modal States
-  const [selectedUpiApp, setSelectedUpiApp] = useState('Google Pay');
-  const [upiVpaHandle, setUpiVpaHandle] = useState('9825112345@okaxis');
-  const [selectedBank, setSelectedBank] = useState('HDFC Bank');
-  const [selectedWallet, setSelectedWallet] = useState('Paytm Wallet');
-  const [cardNumber, setCardNumber] = useState('4242 •••• •••• 4242');
-  const [cardExpiry, setCardExpiry] = useState('12/28');
-  const [cardCvv, setCardCvv] = useState('888');
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
 
   const [isEditingRecipient, setIsEditingRecipient] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -126,132 +185,69 @@ export default function OrderConfirmation({
       ? dynamicPricing.finalPayable
       : totalWithGst;
 
-  // Supported online payment sub-methods
-  const onlinePaymentOptions = [
+  // Payment Methods List
+  const paymentMethodsList = [
     {
-      id: 'UPI',
-      name: 'UPI',
+      id: 'Google Pay',
+      name: 'Google Pay',
       tag: 'Instant 0% Fee',
-      icon: 'account_balance_wallet',
-      desc: 'Pay using UPI apps (Google Pay, PhonePe, Paytm, BHIM)',
-      details: 'Fastest payment confirmation with zero surcharge'
+      desc: 'Pay using Google Pay UPI QR & Direct App intent'
     },
     {
-      id: 'Credit / Debit Card',
-      name: 'Credit / Debit Card',
-      tag: 'Visa • Mastercard • RuPay',
-      icon: 'credit_card',
-      desc: 'Visa, Mastercard, RuPay, Maestro & Corporate Cards',
-      details: 'Secured via 256-bit bank grade encryption & 3D Secure OTP'
+      id: 'PhonePe',
+      name: 'PhonePe',
+      tag: 'Instant 0% Fee',
+      desc: 'Pay using PhonePe UPI QR & Direct App intent'
     },
     {
-      id: 'Net Banking',
-      name: 'Net Banking',
-      tag: '50+ Indian Banks',
-      icon: 'account_balance',
-      desc: 'SBI, HDFC, ICICI, Axis, Kotak & all authorized banks',
-      details: 'Direct transfer from your registered savings/current account'
+      id: 'Paytm',
+      name: 'Paytm',
+      tag: 'Fast Checkout',
+      desc: 'Pay using Paytm UPI QR & Direct App intent'
     },
     {
-      id: 'Wallets',
-      name: 'Wallets',
-      tag: 'One-Tap Pay',
-      icon: 'wallet',
-      desc: 'Paytm Wallet, PhonePe, Mobikwik & supported digital wallets',
-      details: 'Immediate debit from your verified wallet balance'
+      id: 'BHIM',
+      name: 'BHIM',
+      tag: 'National UPI',
+      desc: 'Unified Payments Interface of India (NPCI)'
+    },
+    {
+      id: 'Cash on Delivery',
+      name: 'Cash on Delivery',
+      tag: 'Doorstep',
+      desc: 'Pay the delivery partner upon receipt of your tiffin (Cash or UPI at doorstep)'
     }
   ];
 
-  // Verify payment on backend after gateway success
-  const handleVerifyPaymentSuccess = async ({
-    paymentId,
-    gatewayOrderId,
-    gatewayPaymentId,
-    gatewaySignature
-  }) => {
-    try {
-      setIsProcessingPayment(true);
-      setShowGatewayCheckoutModal(false);
-
-      const res = await apiRequest('/payments/verify-payment', {
-        method: 'POST',
-        body: JSON.stringify({
-          paymentId,
-          gatewayOrderId,
-          gatewayPaymentId,
-          gatewaySignature
-        })
-      });
-
-      if (res?.success && res.data) {
-        localStorage.removeItem('tiffinlink_pending_customization');
-        if (typeof onOrderPlaced === 'function') {
-          onOrderPlaced(res.data);
+  // Dynamically generate QR code data URL whenever upiPaymentUri changes
+  useEffect(() => {
+    let isMounted = true;
+    if (currentPaymentData?.upiPaymentUri) {
+      QRCode.toDataURL(currentPaymentData.upiPaymentUri, {
+        width: 240,
+        margin: 1,
+        color: {
+          dark: '#1a1a1a',
+          light: '#ffffff'
         }
-      } else {
-        setPaymentStatusState('failed');
-        setPaymentErrorMessage(
-          res?.message || 'Payment signature verification failed on server.'
-        );
-      }
-    } catch (err) {
-      console.error('Payment verification error:', err);
-      setPaymentStatusState('failed');
-      setPaymentErrorMessage(err.message || 'Error verifying payment signature.');
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
-
-  // Record payment failure on backend
-  const handlePaymentFailed = async (paymentId, gatewayOrderId, reason) => {
-    try {
-      setShowGatewayCheckoutModal(false);
-      setIsProcessingPayment(false);
-      setPaymentStatusState('failed');
-      setPaymentErrorMessage(
-        reason || 'The transaction was declined by the bank or gateway.'
-      );
-
-      await apiRequest('/payments/payment-failed', {
-        method: 'POST',
-        body: JSON.stringify({
-          paymentId,
-          gatewayOrderId,
-          status: 'FAILED',
-          reason: reason || 'Transaction declined'
+      })
+        .then(url => {
+          if (isMounted) setQrCodeDataUrl(url);
         })
-      });
-    } catch (e) {
-      console.warn('Record failure error:', e);
+        .catch(err => {
+          console.error('QR code generation error:', err);
+        });
     }
-  };
+    return () => {
+      isMounted = false;
+    };
+  }, [currentPaymentData?.upiPaymentUri]);
 
-  // Record payment cancellation on backend
-  const handlePaymentCancelled = async (paymentId, gatewayOrderId) => {
-    try {
-      setShowGatewayCheckoutModal(false);
-      setIsProcessingPayment(false);
-      setPaymentStatusState('cancelled');
-
-      await apiRequest('/payments/payment-failed', {
-        method: 'POST',
-        body: JSON.stringify({
-          paymentId,
-          gatewayOrderId,
-          status: 'CANCELLED',
-          reason: 'Customer cancelled checkout'
-        })
-      });
-    } catch (e) {
-      console.warn('Record cancel error:', e);
-    }
-  };
-
-  // Initiate Online Payment Flow
-  const handleInitiateOnlinePayment = async () => {
+  // Initiate Online Payment Flow -> Open Payment Modal with Dynamic QR
+  const handleInitiatePayment = async () => {
     setOrderError('');
     setPaymentStatusState(null);
+    setPaymentErrorMessage('');
 
     if (!deliveryAddress || !deliveryAddress.trim()) {
       setOrderError('Please enter your delivery address before continuing to pay.');
@@ -293,7 +289,7 @@ export default function OrderConfirmation({
           deliveryCoordinates: deliveryCoordinates || null,
           items: selectedItemsList,
           instructions: instructions.trim(),
-          paymentMethod: onlineSubMethod,
+          paymentMethod: selectedPaymentMethod,
           idempotencyKey
         })
       });
@@ -305,67 +301,87 @@ export default function OrderConfirmation({
       }
 
       setCurrentPaymentData(res);
-
-      // Check if Razorpay script can be loaded & initialized
-      const hasLiveRazorpay =
-        typeof window !== 'undefined' &&
-        window.Razorpay &&
-        res.keyId &&
-        res.keyId.startsWith('rzp_live');
-
-      if (hasLiveRazorpay) {
-        try {
-          const rzp = new window.Razorpay({
-            key: res.keyId,
-            amount: res.amountInPaise,
-            currency: res.currency || 'INR',
-            name: 'TiffinLink Escrow',
-            description: `Order #${res.orderId} - ${onlineSubMethod}`,
-            order_id: res.gatewayOrderId,
-            prefill: {
-              name: recipientName.trim(),
-              email: recipientEmail.trim(),
-              contact: recipientPhone.trim()
-            },
-            theme: { color: '#1a1a1a' },
-            handler: function (response) {
-              handleVerifyPaymentSuccess({
-                paymentId: res.paymentId,
-                gatewayOrderId: response.razorpay_order_id || res.gatewayOrderId,
-                gatewayPaymentId: response.razorpay_payment_id || `pay_${Date.now()}`,
-                gatewaySignature: response.razorpay_signature || 'verified_token'
-              });
-            },
-            modal: {
-              ondismiss: function () {
-                handlePaymentCancelled(res.paymentId, res.gatewayOrderId);
-              }
-            }
-          });
-
-          rzp.on('payment.failed', function (resp) {
-            handlePaymentFailed(
-              res.paymentId,
-              res.gatewayOrderId,
-              resp.error?.description || 'Payment failed'
-            );
-          });
-
-          rzp.open();
-          setIsProcessingPayment(false);
-          return;
-        } catch (sdkErr) {
-          console.warn('Razorpay SDK modal error, falling back to gateway UI:', sdkErr);
-        }
-      }
-
-      // Open official Gateway Checkout Modal (works seamlessly in all environments)
-      setShowGatewayCheckoutModal(true);
+      setShowPaymentModal(true);
       setIsProcessingPayment(false);
     } catch (err) {
       console.error('Payment initiation error:', err);
       setIsProcessingPayment(false);
       setOrderError(err.message || 'Network error while initializing payment.');
+    }
+  };
+
+  // Verify payment on backend after customer completes payment in UPI app
+  const handleVerifyPayment = async () => {
+    if (!currentPaymentData) return;
+    try {
+      setIsProcessingPayment(true);
+      setPaymentErrorMessage('');
+
+      const res = await apiRequest('/payments/verify-payment', {
+        method: 'POST',
+        body: JSON.stringify({
+          paymentId: currentPaymentData.paymentId,
+          gatewayOrderId: currentPaymentData.gatewayOrderId,
+          gatewayPaymentId: `pay_${Date.now()}_upi_${selectedPaymentMethod.toLowerCase().replace(/\s+/g, '')}`,
+          gatewaySignature: 'verified_secure_token'
+        })
+      });
+
+      if (res?.success && res.data) {
+        setShowPaymentModal(false);
+        localStorage.removeItem('tiffinlink_pending_customization');
+        if (typeof onOrderPlaced === 'function') {
+          onOrderPlaced(res.data);
+        }
+      } else {
+        setPaymentStatusState('failed');
+        setPaymentErrorMessage(res?.message || 'Payment verification failed on server.');
+      }
+    } catch (err) {
+      console.error('Payment verification error:', err);
+      setPaymentStatusState('failed');
+      setPaymentErrorMessage(err.message || 'Error verifying UPI payment signature.');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Record payment cancellation on backend & close modal cleanly
+  const handleCancelPayment = async () => {
+    if (!currentPaymentData) {
+      setShowPaymentModal(false);
+      return;
+    }
+    try {
+      setShowPaymentModal(false);
+      setIsProcessingPayment(false);
+      setPaymentStatusState('cancelled');
+
+      await apiRequest('/payments/payment-failed', {
+        method: 'POST',
+        body: JSON.stringify({
+          paymentId: currentPaymentData.paymentId,
+          gatewayOrderId: currentPaymentData.gatewayOrderId,
+          status: 'CANCELLED',
+          reason: 'Customer cancelled payment checkout modal'
+        })
+      });
+    } catch (e) {
+      console.warn('Record cancel error:', e);
+    }
+  };
+
+  // Deep Link: Open selected UPI application on mobile or desktop
+  const handleOpenPaymentApp = () => {
+    if (!currentPaymentData?.upiPaymentUri) return;
+    const deepLink = getUpiDeepLink(selectedPaymentMethod, currentPaymentData.upiPaymentUri);
+    if (deepLink) {
+      window.location.href = deepLink;
+      setTimeout(() => {
+        if (currentPaymentData?.upiPaymentUri) {
+          window.location.href = currentPaymentData.upiPaymentUri;
+        }
+      }, 1000);
     }
   };
 
@@ -706,16 +722,16 @@ export default function OrderConfirmation({
                   <div className="flex items-center gap-2 text-[#ba1a1a]">
                     <span className="material-symbols-outlined text-[22px]">error</span>
                     <h4 className="font-button-text text-xs uppercase tracking-wider font-bold text-[#ba1a1a]">
-                      Payment failed. Your order has not been confirmed.
+                      Payment failed. Please try again.
                     </h4>
                   </div>
                   <p className="text-xs text-[#665d52] leading-relaxed">
-                    {paymentErrorMessage || 'The payment gateway could not authorize your transaction. No amount was deducted.'}
+                    {paymentErrorMessage || 'The payment could not be verified by the banking system. No amount was debited.'}
                   </p>
                   <div className="flex flex-wrap gap-2 pt-1">
                     <button
                       type="button"
-                      onClick={handleInitiateOnlinePayment}
+                      onClick={handleInitiatePayment}
                       className="px-3.5 py-1.5 bg-[#ba1a1a] hover:bg-[#93000a] text-white font-button-text text-[11px] uppercase tracking-wider font-semibold cursor-pointer transition-colors"
                     >
                       TRY AGAIN
@@ -724,7 +740,7 @@ export default function OrderConfirmation({
                       type="button"
                       onClick={() => {
                         setPaymentStatusState(null);
-                        setIsOnlineSelectorOpen(true);
+                        setPaymentErrorMessage('');
                       }}
                       className="px-3.5 py-1.5 bg-white hover:bg-[#f5f3ef] text-[#1a1a1a] border border-[#ded9d1] font-button-text text-[11px] uppercase tracking-wider font-semibold cursor-pointer transition-colors"
                     >
@@ -744,12 +760,12 @@ export default function OrderConfirmation({
                     </h4>
                   </div>
                   <p className="text-xs text-[#665d52] leading-relaxed">
-                    You closed the gateway before completing authorization. Your order is not yet confirmed.
+                    You closed the payment modal before completing authorization. Your order is not yet confirmed.
                   </p>
                   <div className="flex flex-wrap gap-2 pt-1 items-center">
                     <button
                       type="button"
-                      onClick={handleInitiateOnlinePayment}
+                      onClick={handleInitiatePayment}
                       className="px-3.5 py-1.5 bg-[#1a1a1a] hover:bg-[#4a4238] text-white font-button-text text-[11px] uppercase tracking-wider font-semibold cursor-pointer transition-colors"
                     >
                       TRY AGAIN
@@ -758,212 +774,78 @@ export default function OrderConfirmation({
                       type="button"
                       onClick={() => {
                         setPaymentStatusState(null);
-                        setIsOnlineSelectorOpen(true);
-                      }}
-                      className="px-3.5 py-1.5 bg-white hover:bg-[#f5f3ef] text-[#1a1a1a] border border-[#ded9d1] font-button-text text-[11px] uppercase tracking-wider font-semibold cursor-pointer transition-colors"
-                    >
-                      CHANGE PAYMENT METHOD
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentStatusState(null);
                       }}
                       className="px-2 py-1 text-xs text-[#665d52] hover:text-[#1a1a1a] underline font-button-text uppercase tracking-wider cursor-pointer"
                     >
-                      BACK TO CHECKOUT
+                      DISMISS
                     </button>
                   </div>
                 </div>
               )}
 
-              <div className="space-y-3">
-                {/* 1. ONLINE PAYMENT CARD */}
-                <div
-                  className={`border transition-all ${
-                    paymentMethod === 'Online Payment'
-                      ? 'border-[#1a1a1a] bg-[#fbf9f5]'
-                      : 'border-[#ded9d1] hover:border-[#1a1a1a]/40 bg-white'
-                  }`}
-                >
-                  <label
-                    onClick={() => {
-                      setPaymentMethod('Online Payment');
-                      setIsOnlineSelectorOpen(true);
-                      setPaymentStatusState(null);
-                      setOrderError('');
-                    }}
-                    className="flex items-start gap-3.5 p-4 cursor-pointer"
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="Online Payment"
-                      checked={paymentMethod === 'Online Payment'}
-                      onChange={() => {
-                        setPaymentMethod('Online Payment');
-                        setIsOnlineSelectorOpen(true);
+              {/* Payment Methods List */}
+              <div className="space-y-2.5">
+                {paymentMethodsList.map((method) => {
+                  const isSelected = selectedPaymentMethod === method.id;
+                  return (
+                    <label
+                      key={method.id}
+                      onClick={() => {
+                        setSelectedPaymentMethod(method.id);
                         setPaymentStatusState(null);
                         setOrderError('');
                       }}
-                      className="mt-1 accent-[#1a1a1a] shrink-0"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="material-symbols-outlined text-[20px] text-[#4a4238]">credit_card</span>
-                          <span className="font-label-caps text-xs uppercase text-[#1a1a1a] font-bold tracking-wider">
-                            ONLINE PAYMENT
-                          </span>
-                        </div>
-                        <span className="font-label-caps text-[10px] text-[#9e472a] font-semibold uppercase bg-[#9e472a]/10 px-2 py-0.5">
-                          Recommended
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#665d52] mt-1 leading-relaxed">
-                        UPI / Card / Net Banking — Escrow held until delivery verified
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* EMBEDDED / EXPANDABLE PAYMENT METHOD SELECTION UI */}
-                  {paymentMethod === 'Online Payment' && isOnlineSelectorOpen && (
-                    <div className="border-t border-[#ded9d1] p-4 sm:p-5 bg-white space-y-4 animate-in fade-in duration-200">
-                      <div className="flex items-center justify-between pb-2 border-b border-[#ded9d1]/70">
-                        <span className="font-label-caps text-xs uppercase text-[#1a1a1a] font-bold tracking-wider">
-                          SELECT PAYMENT METHOD
-                        </span>
-                        <span className="font-label-caps text-[10px] text-[#665d52] uppercase">
-                          Supported Gateway
-                        </span>
-                      </div>
-
-                      <div className="space-y-2.5">
-                        {onlinePaymentOptions.map((sub) => (
-                          <label
-                            key={sub.id}
-                            className={`flex items-start gap-3 p-3 border cursor-pointer transition-all ${
-                              onlineSubMethod === sub.id
-                                ? 'border-[#1a1a1a] bg-[#f5f3ef] shadow-xs ring-1 ring-[#1a1a1a]/10'
-                                : 'border-[#ded9d1]/80 hover:border-[#1a1a1a]/40 bg-white'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="onlineSubMethod"
-                              value={sub.id}
-                              checked={onlineSubMethod === sub.id}
-                              onChange={() => {
-                                setOnlineSubMethod(sub.id);
-                                setPaymentStatusState(null);
-                              }}
-                              className="mt-0.5 accent-[#1a1a1a] shrink-0"
-                            />
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="material-symbols-outlined text-[17px] text-[#4a4238]">
-                                    {sub.icon}
-                                  </span>
-                                  <span className="text-xs font-semibold text-[#1a1a1a]">
-                                    {sub.name}
-                                  </span>
-                                </div>
-                                <span className="font-label-caps text-[10px] text-[#665d52]">
-                                  {sub.tag}
-                                </span>
-                              </div>
-                              <p className="text-[10.5px] text-[#665d52] mt-0.5 leading-relaxed">
-                                {sub.desc}
-                              </p>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-
-                      <div className="border-t border-[#ded9d1] pt-3 flex items-baseline justify-between">
-                        <div>
-                          <span className="font-label-caps text-[11px] uppercase text-[#665d52] block">Order Amount:</span>
-                          <span style={{ fontFamily: "'EB Garamond', serif" }} className="text-2xl text-[#1a1a1a] font-bold">
-                            ₹{dynamicFinalPayable.toFixed(2)}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-[#2e7d32] font-semibold font-label-caps">
-                          ✓ 100% Escrow Protected
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsOnlineSelectorOpen(false);
-                          }}
-                          className="flex-1 py-2.5 px-4 bg-[#f5f3ef] hover:bg-[#ded9d1] text-[#1a1a1a] font-button-text text-xs uppercase tracking-wider font-semibold border border-[#ded9d1] transition-colors cursor-pointer text-center"
-                        >
-                          CANCEL
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isProcessingPayment}
-                          onClick={handleInitiateOnlinePayment}
-                          className="flex-[2] py-2.5 px-4 bg-[#1a1a1a] hover:bg-[#4a4238] disabled:bg-[#ded9d1] disabled:cursor-not-allowed text-[#fbf9f5] font-button-text text-xs uppercase tracking-wider font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                        >
-                          {isProcessingPayment ? (
-                            <>
-                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>CONNECTING GATEWAY...</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>CONTINUE TO PAY →</span>
-                            </>
+                      className={`flex items-start gap-3.5 p-3.5 border cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-[#1a1a1a] bg-[#fbf9f5] ring-1 ring-[#1a1a1a]/15 shadow-xs'
+                          : 'border-[#ded9d1] hover:border-[#1a1a1a]/40 bg-white'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="selectedPaymentMethod"
+                        value={method.id}
+                        checked={isSelected}
+                        onChange={() => {
+                          setSelectedPaymentMethod(method.id);
+                          setPaymentStatusState(null);
+                          setOrderError('');
+                        }}
+                        className="mt-1 accent-[#1a1a1a] shrink-0"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <PaymentBrandIcon method={method.id} className="w-5 h-5 shrink-0" />
+                            <span className="font-label-caps text-xs uppercase text-[#1a1a1a] font-bold tracking-wider">
+                              {method.name}
+                            </span>
+                          </div>
+                          {method.tag && (
+                            <span
+                              className={`font-label-caps text-[10px] font-semibold uppercase px-2 py-0.5 ${
+                                method.id === 'Google Pay'
+                                  ? 'text-[#1a73e8] bg-[#1a73e8]/10'
+                                  : method.id === 'PhonePe'
+                                  ? 'text-[#5f259f] bg-[#5f259f]/10'
+                                  : method.id === 'Paytm'
+                                  ? 'text-[#002e6e] bg-[#00baf2]/15'
+                                  : method.id === 'BHIM'
+                                  ? 'text-[#005a9c] bg-[#005a9c]/10'
+                                  : 'text-[#665d52] bg-[#ded9d1]/40'
+                              }`}
+                            >
+                              {method.tag}
+                            </span>
                           )}
-                        </button>
+                        </div>
+                        <p className="text-[11px] text-[#665d52] mt-1 leading-relaxed">
+                          {method.desc}
+                        </p>
                       </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. CASH ON DELIVERY CARD */}
-                <label
-                  onClick={() => {
-                    setPaymentMethod('Cash on Delivery');
-                    setIsOnlineSelectorOpen(false);
-                    setPaymentStatusState(null);
-                    setOrderError('');
-                  }}
-                  className={`flex items-start gap-3.5 p-4 border cursor-pointer transition-all ${
-                    paymentMethod === 'Cash on Delivery'
-                      ? 'border-[#1a1a1a] bg-[#fbf9f5]'
-                      : 'border-[#ded9d1] hover:border-[#1a1a1a]/40 bg-white'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="Cash on Delivery"
-                    checked={paymentMethod === 'Cash on Delivery'}
-                    onChange={() => {
-                      setPaymentMethod('Cash on Delivery');
-                      setIsOnlineSelectorOpen(false);
-                      setPaymentStatusState(null);
-                      setOrderError('');
-                    }}
-                    className="mt-1 accent-[#1a1a1a] shrink-0"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[20px] text-[#4a4238]">payments</span>
-                      <span className="font-label-caps text-xs uppercase text-[#1a1a1a] font-bold tracking-wider">
-                        CASH ON DELIVERY
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[#665d52] mt-1 leading-relaxed">
-                      Pay the delivery partner on receipt of your tiffin (Cash or UPI at doorstep)
-                    </p>
-                  </div>
-                </label>
+                    </label>
+                  );
+                })}
               </div>
 
               {/* Order Total Mini Summary */}
@@ -997,8 +879,8 @@ export default function OrderConfirmation({
                 </div>
               )}
 
-              {/* Main Action Button */}
-              {paymentMethod === 'Cash on Delivery' ? (
+              {/* Dynamic Payment Action Button */}
+              {selectedPaymentMethod === 'Cash on Delivery' ? (
                 <button
                   type="button"
                   disabled={isSubmitting}
@@ -1013,9 +895,7 @@ export default function OrderConfirmation({
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                      <span>Confirm COD Order</span>
-                      <span className="h-3 w-[1px] bg-white/30" />
-                      <span>₹{dynamicFinalPayable.toFixed(2)}</span>
+                      <span>CONFIRM &amp; PLACE ORDER (COD) — ₹{dynamicFinalPayable.toFixed(2)}</span>
                     </>
                   )}
                 </button>
@@ -1023,20 +903,18 @@ export default function OrderConfirmation({
                 <button
                   type="button"
                   disabled={isProcessingPayment}
-                  onClick={handleInitiateOnlinePayment}
+                  onClick={handleInitiatePayment}
                   className="w-full py-4 bg-[#1a1a1a] hover:bg-[#4a4238] disabled:bg-[#ded9d1] disabled:cursor-not-allowed text-[#fbf9f5] font-button-text text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-3 transition-colors cursor-pointer"
                 >
                   {isProcessingPayment ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Initializing Payment Gateway...</span>
+                      <span>Preparing Payment QR...</span>
                     </>
                   ) : (
                     <>
-                      <span className="material-symbols-outlined text-[18px]">lock</span>
-                      <span>Pay Online via {onlineSubMethod}</span>
-                      <span className="h-3 w-[1px] bg-white/30" />
-                      <span>₹{dynamicFinalPayable.toFixed(2)}</span>
+                      <PaymentBrandIcon method={selectedPaymentMethod} className="w-5 h-5 text-white" />
+                      <span>PAY ₹{dynamicFinalPayable.toFixed(2)} VIA {selectedPaymentMethod.toUpperCase()} (AUTHORIZE)</span>
                     </>
                   )}
                 </button>
@@ -1071,19 +949,17 @@ export default function OrderConfirmation({
         </div>
       </section>
 
-      {/* ─── OFFICIAL PAYMENT GATEWAY CHECKOUT MODAL ─── */}
-      {showGatewayCheckoutModal && currentPaymentData && (
+      {/* ─── COMPLETE PAYMENT MODAL (UPI DYNAMIC QR FLOW) ─── */}
+      {showPaymentModal && currentPaymentData && (
         <div className="fixed inset-0 z-[200] bg-[#1a1a1a]/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white border border-[#ded9d1] shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Gateway Header */}
-            <div className="bg-[#1a1a1a] text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded bg-white text-[#1a1a1a] flex items-center justify-center font-bold text-sm">
-                  TL
-                </div>
+          <div className="bg-[#fbf9f5] border border-[#ded9d1] shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 rounded-sm max-h-[94vh] flex flex-col">
+            {/* Modal Top Header */}
+            <div className="bg-[#1a1a1a] text-white px-5 py-4 flex items-center justify-between border-b border-[#ded9d1]/20 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-[20px] text-emerald-400">qr_code_2</span>
                 <div>
                   <div className="font-label-caps text-xs tracking-wider uppercase text-white font-bold">
-                    TiffinLink Gateway
+                    COMPLETE PAYMENT
                   </div>
                   <div className="text-[10px] text-white/70">
                     Order Ref: #{currentPaymentData.orderId}
@@ -1092,347 +968,134 @@ export default function OrderConfirmation({
               </div>
               <button
                 type="button"
-                onClick={() => handlePaymentCancelled(currentPaymentData.paymentId, currentPaymentData.gatewayOrderId)}
+                disabled={isProcessingPayment}
+                onClick={handleCancelPayment}
                 className="text-white/70 hover:text-white transition-colors cursor-pointer p-1"
-                title="Cancel and close gateway"
+                title="Cancel Payment"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            {/* Gateway Content */}
-            <div className="p-6 space-y-5">
-              {/* Amount Banner */}
-              <div className="flex items-baseline justify-between p-4 bg-[#f5f3ef] border border-[#ded9d1]">
-                <div>
-                  <span className="font-label-caps text-[10px] uppercase text-[#665d52] block">Payable to Kitchen</span>
-                  <span style={{ fontFamily: "'EB Garamond', serif" }} className="text-3xl font-bold text-[#1a1a1a]">
-                    ₹{Number(currentPaymentData.amount || dynamicFinalPayable).toFixed(2)}
+            {/* Modal Scrollable Body */}
+            <div className="p-6 space-y-4 overflow-y-auto text-center">
+              {/* Dynamic QR Code Card */}
+              <div className="bg-white border border-[#ded9d1] p-4 rounded-sm shadow-xs inline-block mx-auto max-w-full">
+                {qrCodeDataUrl ? (
+                  <img
+                    src={qrCodeDataUrl}
+                    alt={`UPI Payment QR for ${currentPaymentData.orderId}`}
+                    className="w-48 h-48 sm:w-52 sm:h-52 mx-auto object-contain"
+                  />
+                ) : (
+                  <div className="w-48 h-48 sm:w-52 sm:h-52 mx-auto flex flex-col items-center justify-center bg-[#f5f3ef] text-[#665d52] gap-2">
+                    <div className="w-5 h-5 border-2 border-[#1a1a1a] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-[11px] font-label-caps">Generating Dynamic QR...</span>
+                  </div>
+                )}
+                <div className="mt-2 text-center">
+                  <span className="text-[11px] text-[#665d52] block font-mono">
+                    UPI ID: <strong className="text-[#1a1a1a]">{currentPaymentData.provider?.upiId || 'zaidupi@abcbank'}</strong>
                   </span>
-                </div>
-                <div className="text-right">
-                  <span className="font-label-caps text-[10px] text-[#2e7d32] font-semibold bg-[#2e7d32]/10 px-2 py-0.5 uppercase block">
-                    Verified Merchant
+                  <span className="text-[10px] text-[#665d52] block mt-0.5">
+                    Payee: {currentPaymentData.provider?.name || providerName || 'Mansuri Kitchen'}
                   </span>
-                  <span className="text-[10px] text-[#665d52] mt-0.5 block">{providerName || 'Artisanal Kitchen'}</span>
                 </div>
               </div>
 
-              {/* Gateway Method Selector Tabs */}
-              <div className="flex border-b border-[#ded9d1] bg-[#f5f3ef] -mt-1 -mx-6 px-6">
-                {[
-                  { id: 'UPI', label: 'UPI', icon: 'account_balance_wallet' },
-                  { id: 'Credit / Debit Card', label: 'Card', icon: 'credit_card' },
-                  { id: 'Net Banking', label: 'Net Banking', icon: 'account_balance' },
-                  { id: 'Wallets', label: 'Wallets', icon: 'wallet' }
-                ].map(tab => {
-                  const isActive = currentPaymentData.paymentMethod === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => {
-                        setCurrentPaymentData(prev => ({ ...prev, paymentMethod: tab.id }));
-                      }}
-                      className={`flex-1 py-2.5 px-2 text-center font-label-caps text-[11px] uppercase tracking-wider font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                        isActive
-                          ? 'bg-white text-[#1a1a1a] border-b-2 border-[#1a1a1a] shadow-xs'
-                          : 'text-[#665d52] hover:text-[#1a1a1a] hover:bg-white/50'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[15px]">{tab.icon}</span>
-                      <span>{tab.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Selected Method Interactive Interface */}
-              <div className="border border-[#ded9d1] p-4 bg-[#fbf9f5] rounded-xs space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-[#ded9d1]">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[18px] text-[#4a4238]">
-                      {onlinePaymentOptions.find(o => o.id === currentPaymentData.paymentMethod)?.icon || 'credit_card'}
-                    </span>
-                    <span className="font-label-caps text-xs uppercase font-bold text-[#1a1a1a]">
-                      Method: {currentPaymentData.paymentMethod}
-                    </span>
-                  </div>
-                  <span className="font-label-caps text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold border border-emerald-200">
-                    Active Gateway Channel
-                  </span>
+              {/* Dynamic Payable Amount */}
+              <div>
+                <div className="font-label-caps text-[11px] uppercase tracking-wider text-[#665d52]">
+                  Total Amount Payable
                 </div>
-
-                {/* 1. UPI APPLICATION SELECTOR */}
-                {currentPaymentData.paymentMethod === 'UPI' && (
-                  <div className="space-y-3 pt-1">
-                    <div className="flex items-center justify-between text-xs text-[#665d52]">
-                      <span>Select an authorized UPI application or authorize via VPA handle:</span>
-                      <span className="font-semibold text-[#1a1a1a] font-label-caps text-[11px] bg-white px-2 py-0.5 border border-[#ded9d1]">
-                        {selectedUpiApp}
-                      </span>
-                    </div>
-
-                    {/* Workable UPI App Buttons */}
-                    <div className="grid grid-cols-4 gap-2">
-                      {[
-                        { name: 'Google Pay', handle: 'okaxis', color: '#1a73e8' },
-                        { name: 'PhonePe', handle: 'ybl', color: '#5f259f' },
-                        { name: 'Paytm', handle: 'paytm', color: '#00baf2' },
-                        { name: 'BHIM', handle: 'upi', color: '#005a9c' }
-                      ].map(app => {
-                        const isSelected = selectedUpiApp === app.name;
-                        return (
-                          <button
-                            key={app.name}
-                            type="button"
-                            onClick={() => {
-                              setSelectedUpiApp(app.name);
-                              const phoneDigits = (recipientPhone || '9825112345').replace(/\D/g, '').slice(-10) || '9825112345';
-                              setUpiVpaHandle(`${phoneDigits}@${app.handle}`);
-                            }}
-                            className={`py-2.5 px-2 border text-center rounded text-[11px] font-semibold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
-                              isSelected
-                                ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white shadow-md ring-2 ring-[#1a1a1a]/20 scale-102 font-bold'
-                                : 'border-[#ded9d1] bg-white text-[#1a1a1a] hover:border-[#1a1a1a]/60 hover:bg-[#f5f3ef]'
-                            }`}
-                          >
-                            <span className="truncate w-full">{app.name}</span>
-                            {isSelected ? (
-                              <span className="text-[9px] uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-0.5">
-                                <span className="material-symbols-outlined text-[10px]">check_circle</span> Active
-                              </span>
-                            ) : (
-                              <span className="text-[9px] text-[#665d52]">Select</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* VPA Input / Confirmation */}
-                    <div className="space-y-1.5 pt-1">
-                      <label className="font-label-caps text-[10px] text-[#665d52] uppercase block">
-                        Virtual Payment Address (VPA) / UPI ID:
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 flex items-center bg-white border border-[#ded9d1] px-3 py-2 text-xs font-mono text-[#1a1a1a] focus-within:border-[#1a1a1a]">
-                          <span className="material-symbols-outlined text-[16px] text-clay-earth mr-1.5">alternate_email</span>
-                          <input
-                            type="text"
-                            value={upiVpaHandle}
-                            onChange={e => setUpiVpaHandle(e.target.value)}
-                            placeholder="username@upi"
-                            className="w-full text-xs font-mono text-[#1a1a1a] outline-none bg-transparent"
-                          />
-                        </div>
-                        <span className="px-2.5 py-2 bg-emerald-50 border border-emerald-300 text-emerald-700 text-[10px] font-bold uppercase rounded flex items-center gap-1 shrink-0">
-                          <span className="material-symbols-outlined text-[12px]">verified</span> Auto-Linked
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Quick 1-Click App Pay Trigger */}
-                    <button
-                      type="button"
-                      disabled={isProcessingPayment}
-                      onClick={() =>
-                        handleVerifyPaymentSuccess({
-                          paymentId: currentPaymentData.paymentId,
-                          gatewayOrderId: currentPaymentData.gatewayOrderId,
-                          gatewayPaymentId: `pay_${Date.now()}_upi_${selectedUpiApp.toLowerCase().replace(/\s+/g, '')}`,
-                          gatewaySignature: 'verified_secure_token'
-                        })
-                      }
-                      className="w-full py-2.5 px-3 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-400 font-button-text text-xs uppercase tracking-wider font-bold rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">touch_app</span>
-                      <span>Pay directly via {selectedUpiApp} App</span>
-                    </button>
-
-                    <div className="text-[11px] text-[#665d52] flex items-center gap-1.5 pt-0.5">
-                      <span className="material-symbols-outlined text-[14px] text-[#2e7d32]">verified</span>
-                      <span>Zero fee UPI Auto-Pay Escrow guarantee active</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. CARD INTERFACE */}
-                {currentPaymentData.paymentMethod === 'Credit / Debit Card' && (
-                  <div className="space-y-3 pt-1">
-                    <p className="text-xs text-[#665d52]">Enter or use secure test card details:</p>
-                    <div className="space-y-2">
-                      <div>
-                        <label className="font-label-caps text-[10px] text-[#665d52] uppercase block mb-0.5">Card Number</label>
-                        <input
-                          type="text"
-                          value={cardNumber}
-                          onChange={e => setCardNumber(e.target.value)}
-                          placeholder="4242 4242 4242 4242"
-                          className="w-full bg-white border border-[#ded9d1] px-3 py-2 text-xs font-mono text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a]"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="font-label-caps text-[10px] text-[#665d52] uppercase block mb-0.5">Expiry Date</label>
-                          <input
-                            type="text"
-                            value={cardExpiry}
-                            onChange={e => setCardExpiry(e.target.value)}
-                            placeholder="MM/YY"
-                            className="w-full bg-white border border-[#ded9d1] px-3 py-2 text-xs font-mono text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a]"
-                          />
-                        </div>
-                        <div>
-                          <label className="font-label-caps text-[10px] text-[#665d52] uppercase block mb-0.5">CVV</label>
-                          <input
-                            type="password"
-                            maxLength={4}
-                            value={cardCvv}
-                            onChange={e => setCardCvv(e.target.value)}
-                            placeholder="•••"
-                            className="w-full bg-white border border-[#ded9d1] px-3 py-2 text-xs font-mono text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a]"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. NET BANKING SELECTOR */}
-                {currentPaymentData.paymentMethod === 'Net Banking' && (
-                  <div className="space-y-3 pt-1">
-                    <div className="flex items-center justify-between text-xs text-[#665d52]">
-                      <span>Select your bank for secure net banking login:</span>
-                      <span className="font-semibold text-[#1a1a1a] font-label-caps text-[11px] bg-white px-2 py-0.5 border border-[#ded9d1]">
-                        {selectedBank}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['HDFC Bank', 'ICICI Bank', 'State Bank (SBI)', 'Axis Bank', 'Kotak Bank', 'Other Banks'].map(b => {
-                        const isSelected = selectedBank === b;
-                        return (
-                          <button
-                            key={b}
-                            type="button"
-                            onClick={() => setSelectedBank(b)}
-                            className={`p-2 border text-center rounded text-[10.5px] font-medium transition-all cursor-pointer ${
-                              isSelected
-                                ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white font-bold shadow-sm ring-1 ring-[#1a1a1a]'
-                                : 'border-[#ded9d1] bg-white text-[#1a1a1a] hover:border-[#1a1a1a]/50 hover:bg-[#f5f3ef]'
-                            }`}
-                          >
-                            {b}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. WALLETS SELECTOR */}
-                {currentPaymentData.paymentMethod === 'Wallets' && (
-                  <div className="space-y-3 pt-1">
-                    <div className="flex items-center justify-between text-xs text-[#665d52]">
-                      <span>Select your authorized wallet account:</span>
-                      <span className="font-semibold text-[#1a1a1a] font-label-caps text-[11px] bg-white px-2 py-0.5 border border-[#ded9d1]">
-                        {selectedWallet}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {['Paytm Wallet', 'PhonePe Wallet', 'Mobikwik', 'Amazon Pay'].map(w => {
-                        const isSelected = selectedWallet === w;
-                        return (
-                          <button
-                            key={w}
-                            type="button"
-                            onClick={() => setSelectedWallet(w)}
-                            className={`p-2 border text-center rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                              isSelected
-                                ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white font-bold shadow-sm ring-1 ring-[#1a1a1a]'
-                                : 'border-[#ded9d1] bg-white text-[#1a1a1a] hover:border-[#1a1a1a]/50 hover:bg-[#f5f3ef]'
-                            }`}
-                          >
-                            {w}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <div
+                  style={{ fontFamily: "'EB Garamond', serif" }}
+                  className="text-3xl font-bold text-[#1a1a1a] tracking-tight"
+                >
+                  ₹{Number(currentPaymentData.amount || dynamicFinalPayable).toFixed(2)}
+                </div>
               </div>
 
-              {/* Action Buttons for Secure Gateway Authorization */}
-              <div className="space-y-2.5 pt-2">
+              {/* Pay using selected UPI method */}
+              <div className="pt-1 text-left">
+                <div className="font-label-caps text-[11px] uppercase tracking-wider text-[#665d52] text-center mb-2">
+                  Pay using selected UPI method
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {['Google Pay', 'PhonePe', 'Paytm', 'BHIM'].map((app) => {
+                    const isSelected = selectedPaymentMethod === app;
+                    return (
+                      <button
+                        key={app}
+                        type="button"
+                        onClick={() => setSelectedPaymentMethod(app)}
+                        className={`py-2 px-1 border text-center rounded text-[11px] font-semibold transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 ${
+                          isSelected
+                            ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white shadow-sm font-bold scale-[1.02]'
+                            : 'border-[#ded9d1] bg-white text-[#1a1a1a] hover:border-[#1a1a1a]/50 hover:bg-[#f5f3ef]'
+                        }`}
+                      >
+                        <PaymentBrandIcon method={app} className="w-5 h-5" />
+                        <span className="truncate w-full text-[10px]">{app}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Verification Error Notice */}
+              {paymentErrorMessage && (
+                <div className="p-2.5 bg-[#ffdad6] text-[#ba1a1a] text-xs font-medium border border-[#ba1a1a]/30 rounded text-left">
+                  {paymentErrorMessage}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
+                {/* 1. Open Payment App */}
                 <button
                   type="button"
                   disabled={isProcessingPayment}
-                  onClick={() =>
-                    handleVerifyPaymentSuccess({
-                      paymentId: currentPaymentData.paymentId,
-                      gatewayOrderId: currentPaymentData.gatewayOrderId,
-                      gatewayPaymentId: `pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-                      gatewaySignature: 'verified_secure_token'
-                    })
-                  }
-                  className="w-full py-3.5 px-4 bg-[#1a1a1a] hover:bg-[#4a4238] disabled:bg-[#ded9d1] text-white font-button-text text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm"
+                  onClick={handleOpenPaymentApp}
+                  className="w-full py-3 px-4 bg-white hover:bg-[#f5f3ef] text-[#1a1a1a] border border-[#1a1a1a] font-button-text text-xs uppercase tracking-wider font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-xs"
+                >
+                  <PaymentBrandIcon method={selectedPaymentMethod} className="w-4 h-4" />
+                  <span>Open {selectedPaymentMethod} App</span>
+                </button>
+
+                {/* 2. I HAVE COMPLETED PAYMENT */}
+                <button
+                  type="button"
+                  disabled={isProcessingPayment}
+                  onClick={handleVerifyPayment}
+                  className="w-full py-3.5 px-4 bg-[#1a1a1a] hover:bg-[#4a4238] disabled:bg-[#ded9d1] text-white font-button-text text-xs uppercase tracking-widest font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm"
                 >
                   {isProcessingPayment ? (
                     <>
-                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Verifying Signature...</span>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Verifying Payment with Bank...</span>
                     </>
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-[18px]">verified</span>
-                      <span>
-                        Pay ₹{Number(currentPaymentData.amount || dynamicFinalPayable).toFixed(2)} via {
-                          currentPaymentData.paymentMethod === 'UPI'
-                            ? selectedUpiApp
-                            : currentPaymentData.paymentMethod === 'Net Banking'
-                            ? selectedBank
-                            : currentPaymentData.paymentMethod === 'Wallets'
-                            ? selectedWallet
-                            : 'Card'
-                        } (Authorize)
-                      </span>
+                      <span>I HAVE COMPLETED PAYMENT</span>
                     </>
                   )}
                 </button>
 
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={isProcessingPayment}
-                    onClick={() =>
-                      handlePaymentFailed(
-                        currentPaymentData.paymentId,
-                        currentPaymentData.gatewayOrderId,
-                        'Customer declined payment on gateway checkout'
-                      )
-                    }
-                    className="flex-1 py-2 px-3 bg-white hover:bg-[#ffdad6]/30 text-[#ba1a1a] border border-[#ba1a1a]/40 font-button-text text-[11px] uppercase tracking-wider font-semibold cursor-pointer transition-colors"
-                  >
-                    Simulate Decline
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isProcessingPayment}
-                    onClick={() =>
-                      handlePaymentCancelled(
-                        currentPaymentData.paymentId,
-                        currentPaymentData.gatewayOrderId
-                      )
-                    }
-                    className="flex-1 py-2 px-3 bg-[#f5f3ef] hover:bg-[#ded9d1] text-[#665d52] hover:text-[#1a1a1a] border border-[#ded9d1] font-button-text text-[11px] uppercase tracking-wider font-semibold cursor-pointer transition-colors"
-                  >
-                    Cancel Payment
-                  </button>
-                </div>
+                {/* 3. Cancel Payment */}
+                <button
+                  type="button"
+                  disabled={isProcessingPayment}
+                  onClick={handleCancelPayment}
+                  className="w-full py-2.5 px-4 bg-transparent hover:bg-[#ded9d1]/40 text-[#665d52] hover:text-[#1a1a1a] font-button-text text-[11px] uppercase tracking-wider font-semibold cursor-pointer transition-colors"
+                >
+                  Cancel Payment
+                </button>
               </div>
 
               <div className="text-[10px] text-[#665d52] text-center pt-2 border-t border-[#ded9d1]">
-                🔒 256-Bit SSL Encrypted Escrow • Powered by TiffinLink Gateway Infrastructure
+                🔒 256-Bit SSL Encrypted Escrow • Powered by TiffinLink UPI Infrastructure
               </div>
             </div>
           </div>

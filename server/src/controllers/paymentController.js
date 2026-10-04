@@ -207,6 +207,9 @@ const calculateAmount = async (req, res) => {
       deliveryCoordinates
     });
 
+    const providerUpiId = pricing.providerDoc?.upiId || 'zaidupi@abcbank';
+    const providerUpiName = pricing.providerDoc?.businessName || pricing.providerDoc?.name || 'Mansuri Kitchen';
+
     return res.json({
       success: true,
       data: {
@@ -216,7 +219,12 @@ const calculateAmount = async (req, res) => {
         packagingFee: pricing.packagingFee,
         discounts: pricing.discounts,
         finalPayable: pricing.finalPayable,
-        distanceKm: pricing.distanceKm
+        distanceKm: pricing.distanceKm,
+        provider: {
+          id: providerId.toString(),
+          name: providerUpiName,
+          upiId: providerUpiId
+        }
       }
     });
   } catch (error) {
@@ -438,6 +446,9 @@ const createPaymentOrder = async (req, res) => {
     await payment.save();
 
     const safeKeyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_tiffinlink_sandbox';
+    const providerUpiId = pricing.providerDoc?.upiId || 'zaidupi@abcbank';
+    const providerUpiName = pricing.providerDoc?.businessName || pricing.providerDoc?.name || pricing.providerDoc?.accountHolderName || 'Mansuri Kitchen';
+    const upiPaymentUri = `upi://pay?pa=${encodeURIComponent(providerUpiId)}&pn=${encodeURIComponent(providerUpiName)}&am=${pricing.finalPayable.toFixed(2)}&cu=INR&tn=${encodeURIComponent(orderId)}`;
 
     return res.status(201).json({
       success: true,
@@ -449,6 +460,13 @@ const createPaymentOrder = async (req, res) => {
       currency: 'INR',
       keyId: safeKeyId,
       paymentMethod,
+      provider: {
+        id: providerId.toString(),
+        name: providerUpiName,
+        upiId: providerUpiId,
+        businessName: pricing.providerDoc?.businessName || providerUpiName
+      },
+      upiPaymentUri,
       customer: {
         name: finalCustomerName,
         email,
