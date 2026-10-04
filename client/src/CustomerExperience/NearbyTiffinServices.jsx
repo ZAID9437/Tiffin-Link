@@ -338,74 +338,79 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
   };
 
   return (
-    <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a]">
+    <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a] pt-20 sm:pt-24">
       
       {/* ─────────────────────────────────────────────────────────────────────────────
           TOP STICKY FILTER ARCHITECTURE BAR (SCREEN 2)
           ───────────────────────────────────────────────────────────────────────────── */}
-      <section className="w-full bg-[#f5f3ef]/90 backdrop-blur-md sticky top-20 z-40 shadow-xs border-b border-[#ded9d1]">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-20 py-3.5 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center flex-wrap gap-2.5">
+      <section className="w-full bg-[#f5f3ef] sticky top-[64px] sm:top-[72px] z-30 shadow-xs border-b border-[#ded9d1]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-20 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          
+          {/* Left: Back Button & Essential Filter Meta */}
+          <div className="flex items-center gap-2.5 flex-wrap min-w-0">
             <button
               type="button"
               onClick={() => {
                 if (onNavigate) onNavigate('#home');
                 else window.location.hash = '#home';
               }}
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-[#efeeea] px-3.5 py-1.5 border border-[#ded9d1] transition-colors group cursor-pointer shadow-xs mr-1 text-[#1a1a1a]"
+              className="inline-flex items-center gap-1.5 bg-[#1a1a1a] hover:bg-[#4a4238] text-white px-3 py-1.5 transition-all group cursor-pointer shadow-xs font-bold text-xs uppercase tracking-wider shrink-0"
             >
               <span className="material-symbols-outlined text-[16px] transition-transform group-hover:-translate-x-1">arrow_back</span>
-              <span className="font-button-text text-xs uppercase tracking-wider font-bold">Back to Home</span>
+              <span>Back to Home</span>
             </button>
 
-            <span className="font-label-caps text-xs uppercase text-[#4a4238] tracking-widest mr-1.5 flex items-center gap-1.5 font-bold">
-              <span className="w-2 h-2 rounded-full bg-[#1a1a1a]"></span>Active Polygon Filter
+            <div className="h-5 w-px bg-[#ded9d1] hidden sm:block shrink-0"></div>
+
+            <span className="font-label-caps text-xs uppercase text-[#4a4238] tracking-widest flex items-center gap-1.5 font-bold shrink-0">
+              <span className="w-2 h-2 rounded-full bg-[#1b5e20] animate-pulse"></span>Active Filters
             </span>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1]">
-              <span className="material-symbols-outlined text-[15px] text-[#4a4238]">location_on</span>
-              <span className="font-button-text text-xs">{locationAddress}</span>
-            </div>
+            {/* Filter Chips with clean overflow management */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
+                <span className="material-symbols-outlined text-[14px] text-[#4a4238]">location_on</span>
+                <span className="font-button-text truncate max-w-[150px] sm:max-w-[200px]">{locationAddress}</span>
+              </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1]">
-              <span className="material-symbols-outlined text-[15px] text-[#4a4238]">eco</span>
-              <span className="font-button-text text-xs">{mealType}</span>
-            </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
+                <span className="material-symbols-outlined text-[14px] text-[#4a4238]">eco</span>
+                <span className="font-button-text">{mealType}</span>
+              </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1]">
-              <span className="material-symbols-outlined text-[15px] text-[#4a4238]">calendar_today</span>
-              <span className="font-button-text text-xs">{orderDate}</span>
-            </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
+                <span className="material-symbols-outlined text-[14px] text-[#4a4238]">schedule</span>
+                <span className="font-button-text">{timeSlot.split(' ')[0]}</span>
+              </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1]">
-              <span className="material-symbols-outlined text-[15px] text-[#4a4238]">schedule</span>
-              <span className="font-button-text text-xs">{timeSlot.split(' ')[0]}</span>
-            </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
+                <span className="material-symbols-outlined text-[14px] text-[#4a4238]">payments</span>
+                <span className="font-button-text">≤ ₹{budget}</span>
+              </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1]">
-              <span className="material-symbols-outlined text-[15px] text-[#4a4238]">payments</span>
-              <span className="font-button-text text-xs">Budget ≤ ₹{budget}</span>
-            </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs hidden xl:inline-flex">
+                <span className="material-symbols-outlined text-[14px] text-[#4a4238]">near_me</span>
+                <span className="font-button-text">{radiusKm} km</span>
+              </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1]">
-              <span className="material-symbols-outlined text-[15px] text-[#4a4238]">near_me</span>
-              <span className="font-button-text text-xs">Radius: {radiusKm} km</span>
-            </div>
-
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1]">
-              <span className="material-symbols-outlined text-[15px] text-[#4a4238]">two_wheeler</span>
-              <span className="font-button-text text-xs">{fulfillment}</span>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs hidden xl:inline-flex">
+                <span className="material-symbols-outlined text-[14px] text-[#4a4238]">two_wheeler</span>
+                <span className="font-button-text">{fulfillment}</span>
+              </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsSearchFormOpen(!isSearchFormOpen)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-white font-button-text text-xs uppercase tracking-wider hover:bg-[#4a4238] transition-colors cursor-pointer font-bold"
-          >
-            <span className="material-symbols-outlined text-[16px]">tune</span>
-            <span>{isSearchFormOpen ? 'Close Filters' : 'Edit Search'}</span>
-          </button>
+          {/* Right: Edit Search Button */}
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+            <button
+              type="button"
+              onClick={() => setIsSearchFormOpen(!isSearchFormOpen)}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-[#efeeea] text-[#1a1a1a] border border-[#ded9d1] font-button-text text-xs uppercase tracking-wider transition-colors cursor-pointer font-bold shadow-xs"
+            >
+              <span className="material-symbols-outlined text-[16px]">tune</span>
+              <span>{isSearchFormOpen ? 'Close Filters' : 'Edit Search'}</span>
+            </button>
+          </div>
         </div>
       </section>
 
