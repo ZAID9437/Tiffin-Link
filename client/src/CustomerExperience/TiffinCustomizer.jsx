@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiRequest } from '../services/api';
+import OrderConfirmation from './OrderConfirmation';
 
 export default function TiffinCustomizer({
   tiffin,
@@ -29,6 +30,9 @@ export default function TiffinCustomizer({
   const [confirmedOrder, setConfirmedOrder] = useState(null);
   const [orderError, setOrderError] = useState('');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+
+  // Checkout review step: null = customizer, 'review' = OrderConfirmation screen
+  const [checkoutView, setCheckoutView] = useState(null);
 
   const targetTiffinId = tiffin?._id || tiffin?.id;
   const targetProviderId = provider?._id || provider?.id || tiffin?.providerId;
@@ -222,8 +226,8 @@ export default function TiffinCustomizer({
   const finalTotal = mealSubtotal + deliveryFee;
   const grandTotal = finalTotal;
 
-  // Handle Checkout / Confirmation
-  const handleProceedToCheckout = async () => {
+  // Handle Checkout — transitions to OrderConfirmation review screen
+  const handleProceedToCheckout = () => {
     setOrderError('');
 
     if (activeReceiptItems.length === 0) {
@@ -250,67 +254,8 @@ export default function TiffinCustomizer({
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-
-      // Build payload matching backend expectation
-      const selectedItemsList = activeReceiptItems.map(r => ({
-        itemId: r.id,
-        name: r.name,
-        itemName: r.name,
-        quantity: r.qty,
-        unitPrice: r.unitPrice,
-        totalPrice: r.lineTotal
-      }));
-
-      const payload = {
-        providerId: targetProviderId,
-        tiffinId: targetTiffinId,
-        tiffinName: dbTiffin?.name || tiffin?.name || 'Tiffin',
-        tiffinCategory: dbTiffin?.category || tiffin?.category || '',
-        tiffinImage: dbTiffin?.image || tiffin?.image || '',
-        quantity: 1,
-        unitPrice: 0,
-        mealSubtotal,
-        deliveryDistance: `${distanceKm} km`,
-        deliveryFee,
-        finalTotal,
-        customerName: currentUser.name || currentUser.fullName || currentUser.username || 'Customer',
-        customerEmail: currentUser.email || '',
-        customerPhone: currentUser.phone || currentUser.mobile || '',
-        customerAddress: deliveryAddress,
-        deliveryCoordinates: customerCoordinates?.lat && customerCoordinates?.lng
-          ? { lat: Number(customerCoordinates.lat), lng: Number(customerCoordinates.lng) }
-          : (currentUser?.currentLocation?.latitude ? { lat: Number(currentUser.currentLocation.latitude), lng: Number(currentUser.currentLocation.longitude) } : null),
-        items: selectedItemsList,
-        selectedItems: selectedItemsList,
-        instructions: instructions,
-        paymentMethod: 'Online Payment'
-      };
-
-      const res = await apiRequest('/orders/customer', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-
-      if (res?.success && res.data) {
-        setConfirmedOrder(res.data);
-        setOrderConfirmed(true);
-        localStorage.removeItem('tiffinlink_pending_customization');
-
-        // Notify parent / app
-        if (typeof onCheckout === 'function') {
-          onCheckout(res.data);
-        }
-      } else {
-        setOrderError(res?.message || 'Could not confirm order. Please try again.');
-      }
-    } catch (err) {
-      console.error('Checkout error:', err);
-      setOrderError(err.message || 'Network error while placing order.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Transition to checkout review step
+    setCheckoutView('review');
   };
 
   const activeProviderName = dbProvider?.name || provider?.name || 'Kitchen Partner';
@@ -318,6 +263,47 @@ export default function TiffinCustomizer({
   const activeTiffinDesc = dbTiffin?.description || tiffin?.description || '';
   const activeTiffinImg = dbTiffin?.image || tiffin?.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
   const availableSlots = dbTiffin?.available !== undefined ? dbTiffin.available : (dbTiffin?.capacity || 0);
+
+  // Render OrderConfirmation review step
+  if (checkoutView === 'review') {
+    return (
+      <OrderConfirmation
+        checkoutData={{
+          providerId: targetProviderId,
+          tiffinId: targetTiffinId,
+          tiffinName: dbTiffin?.name || tiffin?.name || 'Tiffin',
+          tiffinCategory: dbTiffin?.category || tiffin?.category || '',
+          tiffinImage: dbTiffin?.image || tiffin?.image || '',
+          tiffinDesc: dbTiffin?.description || tiffin?.description || '',
+          providerName: activeProviderName,
+          activeReceiptItems,
+          mealSubtotal,
+          deliveryFee,
+          distanceKm,
+          finalTotal,
+          instructions,
+          deliveryAddress,
+          deliveryCoordinates: customerCoordinates?.lat && customerCoordinates?.lng
+            ? { lat: Number(customerCoordinates.lat), lng: Number(customerCoordinates.lng) }
+            : (currentUser?.currentLocation?.latitude
+                ? { lat: Number(currentUser.currentLocation.latitude), lng: Number(currentUser.currentLocation.longitude) }
+                : null),
+          dbTiffin,
+          dbProvider
+        }}
+        currentUser={currentUser}
+        onBack={() => setCheckoutView(null)}
+        onOrderPlaced={(order) => {
+          setConfirmedOrder(order);
+          setOrderConfirmed(true);
+          setCheckoutView(null);
+          if (typeof onCheckout === 'function') {
+            onCheckout(order);
+          }
+        }}
+      />
+    );
+  }
 
   if (orderConfirmed && confirmedOrder) {
     return (
