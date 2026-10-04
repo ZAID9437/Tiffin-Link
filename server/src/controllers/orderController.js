@@ -516,19 +516,19 @@ const updateOrder = async (req, res) => {
 const acceptDelivery = async (req, res) => {
   try {
     const { id } = req.params;
-    const providerId = req.providerId;
+    const providerId = req.user?.role === 'provider' ? req.providerId : null;
     const { partnerName, partnerPhone } = req.body;
 
-    const deliveryPartnerName = partnerName || 'Rahul M.';
-    const deliveryPartnerPhone = partnerPhone || '+91 98765 11223';
+    const deliveryPartnerName = partnerName || req.user?.fullName || req.user?.name || 'Delivery Partner';
+    const deliveryPartnerPhone = partnerPhone || req.user?.phone || '+91 98765 11223';
+    const driverId = req.user?.driverId || (req.user?._id ? String(req.user._id) : 'DRV-1');
 
     if (await isDbConnected()) {
       const query = buildOrderLookupQuery(id, providerId);
       const updatedOrder = await Order.findOneAndUpdate(
         { 
           ...query,
-          status: 'Ready',
-          deliveryStatus: { $in: ['Unassigned', 'Searching'] }
+          deliveryStatus: { $in: ['Unassigned', 'Searching', 'Searching Drivers', 'Pending'] }
         },
         { 
           $set: {
@@ -544,8 +544,38 @@ const acceptDelivery = async (req, res) => {
       if (!updatedOrder) {
         return res.status(409).json({ 
           success: false, 
-          message: 'Delivery offer is no longer available or unauthorized.' 
+          message: 'Delivery offer is no longer available or already assigned.' 
         });
+      }
+
+      // Synchronize DeliveryRequest in MongoDB
+      try {
+        const DeliveryRequest = require('../models/DeliveryRequest');
+        await DeliveryRequest.updateMany(
+          { 
+            $or: [
+              { orderId: updatedOrder.orderId },
+              { orderId: `#${String(updatedOrder.orderId).replace(/^#+/, '')}` },
+              { orderId: String(updatedOrder.orderId).replace(/^#+/, '') }
+            ]
+          },
+          {
+            $set: {
+              status: 'Driver Assigned',
+              acceptedAt: new Date(),
+              assignedDriver: {
+                driverId: String(driverId),
+                name: deliveryPartnerName,
+                phone: deliveryPartnerPhone,
+                rating: 4.8,
+                vehicleNo: '',
+                location: { lat: 23.0280, lng: 72.5670 }
+              }
+            }
+          }
+        );
+      } catch (dErr) {
+        console.warn('DeliveryRequest sync warning on acceptDelivery:', dErr.message);
       }
 
       return res.json({ 
@@ -854,20 +884,23 @@ const createCustomerOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Provider ID is required' });
     }
 
-    const resolvedTiffinName = (tiffinName || (items && items[0]?.name) || (tiffinCategory ? `${tiffinCategory} Tiffin` : 'Special Meal Tiffin')).trim();
-    if (!resolvedTiffinName) {
-      return res.status(400).json({ success: false, message: 'Tiffin name is required' });
+    // Fetch authoritative Provider & Tiffin from DB
+    const Provider = require('../models/Provider');
+    const Tiffin = require('../models/Tiffin');
+    const TiffinItem = require('../models/TiffinItem');
+    let providerDoc = null;
+    if (providerId && mongoose.Types.ObjectId.isValid(providerId)) {
+      providerDoc = await Provider.findById(providerId);
+    }
+    let tiffinDoc = null;
+    if (tiffinId && mongoose.Types.ObjectId.isValid(tiffinId)) {
+      tiffinDoc = await Tiffin.findOne({ _id: tiffinId, providerId: providerId.toString() });
     }
 
-    // Provider Validation
-    const Provider = require('../models/Provider');
-    const providerDoc = await Provider.findById(providerId);
-    if (!providerDoc) {
-      return res.status(404).json({ success: false, message: 'Selected provider not found' });
-    }
-    if (providerDoc.status === 'inactive' || providerDoc.isActive === false) {
-      return res.status(400).json({ success: false, message: 'Selected kitchen is currently inactive' });
-    }
+    const resolvedTiffinName = (tiffinDoc?.name || tiffinName || (items && items[0]?.name) || (tiffinCategory ? `${tiffinCategory} Tiffin` : 'Special Meal Tiffin')).trim();
+    const resolvedTiffinImage = tiffinDoc?.image || tiffinImage || providerDoc?.image || '/assets/provider_1.png';
+    const resolvedTiffinCategory = tiffinDoc?.category || tiffinCategory || 'Gujarati Traditional';
+    const basePrice = Number(tiffinDoc?.price !== undefined ? tiffinDoc.price : (unitPrice || providerDoc?.price || 140));
 
     // Authoritative Customer identity from JWT token
     const customerId = req.user._id.toString();
@@ -876,7 +909,7 @@ const createCustomerOrder = async (req, res) => {
     const finalCustomerName = (customerName || req.user.name || 'Customer').trim();
 
     // Calculate distance
-    let distanceKm = 2.4;
+    let distanceKm = 1.8;
     if (providerDoc?.address?.lat && deliveryCoordinates?.lat) {
       const haversineKm = (lat1, lon1, lat2, lon2) => {
         const R = 6371;
@@ -888,21 +921,98 @@ const createCustomerOrder = async (req, res) => {
       distanceKm = haversineKm(deliveryCoordinates.lat, deliveryCoordinates.lng, providerDoc.address.lat, providerDoc.address.lng);
     }
 
-    // Server-side authoritative calculation of pricing (DO NOT blindly trust client)
+    // Process & Validate Items against DB (Rule 11 & Rule 16)
     const qty = Math.max(1, Number(quantity) || 1);
-    const basePrice = Number(unitPrice) || providerDoc?.price || 125;
-    
-    // Extras calculation
-    let extrasTotal = 0;
-    if (Array.isArray(extras)) {
-      extrasTotal = extras.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+    let itemsAmount = 0;
+    const sanitizedItemsSnapshot = [];
+    const incomingItems = Array.isArray(items) ? items : [];
+
+    for (const item of incomingItems) {
+      const reqQty = Number(item.quantity) || 0;
+      if (reqQty <= 0) continue;
+
+      let dbItem = null;
+      const itemId = item.itemId || item.id || item._id;
+      if (itemId && mongoose.Types.ObjectId.isValid(itemId)) {
+        dbItem = await TiffinItem.findOne({ _id: itemId, providerId: providerId.toString() });
+      } else if (item.name) {
+        dbItem = await TiffinItem.findOne({ 
+          name: item.name.trim(), 
+          providerId: providerId.toString(),
+          ...(tiffinId ? { tiffinId } : {})
+        });
+      }
+
+      if (dbItem) {
+        // Validate stock availability
+        if (dbItem.isAvailable === false || dbItem.availableQuantity <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: `"${dbItem.name}" is currently OUT OF STOCK.`
+          });
+        }
+        if (reqQty > dbItem.availableQuantity) {
+          return res.status(400).json({
+            success: false,
+            message: `"${dbItem.name}" only has ${dbItem.availableQuantity} portion(s) available in stock. You requested ${reqQty}.`
+          });
+        }
+
+        const effectiveUnitPrice = Number(dbItem.price !== undefined ? dbItem.price : dbItem.unitPrice) || 0;
+        const lineTotal = effectiveUnitPrice * reqQty;
+        itemsAmount += lineTotal;
+
+        sanitizedItemsSnapshot.push({
+          menuItemId: dbItem._id.toString(),
+          itemId: dbItem._id.toString(),
+          name: dbItem.name,
+          category: dbItem.category,
+          image: dbItem.image || '',
+          unit: dbItem.unit || 'portion',
+          unitPrice: effectiveUnitPrice,
+          quantity: reqQty,
+          totalPrice: lineTotal
+        });
+
+        // Atomic inventory decrement
+        await TiffinItem.findByIdAndUpdate(dbItem._id, {
+          $inc: { availableQuantity: -reqQty }
+        });
+      } else {
+        // Fallback for custom extra add-ons
+        const p = Number(item.unitPrice || item.price) || 0;
+        const lineTotal = p * reqQty;
+        itemsAmount += lineTotal;
+        sanitizedItemsSnapshot.push({
+          menuItemId: itemId ? String(itemId) : '',
+          itemId: itemId ? String(itemId) : '',
+          name: item.name || 'Custom Item',
+          category: item.category || 'Add-on',
+          image: item.image || '',
+          unit: item.unit || 'portion',
+          unitPrice: p,
+          quantity: reqQty,
+          totalPrice: lineTotal
+        });
+      }
     }
 
-    const itemsSubtotal = (basePrice + extrasTotal) * qty;
-    const deliveryFee = Math.max(20, Math.round(15 + distanceKm * 8));
-    const packagingFee = 15;
-    const gstTax = Math.round(itemsSubtotal * 0.05);
-    const totalAmount = itemsSubtotal + deliveryFee;
+    // Extras array (e.g. chaas, sweet checkbox addons if passed separately)
+    let extrasTotal = 0;
+    const sanitizedExtras = [];
+    if (Array.isArray(extras)) {
+      for (const ex of extras) {
+        const p = Number(ex.price) || 0;
+        extrasTotal += p;
+        sanitizedExtras.push({ name: ex.name, price: p });
+      }
+    }
+
+    // Dynamic Delivery Fee Calculation: ₹25 base + ₹8/km
+    const deliveryFee = Math.max(25, Math.round(25 + (distanceKm * 8)));
+    const tiffinBaseAmount = basePrice * qty;
+    const subtotal = tiffinBaseAmount + itemsAmount + extrasTotal;
+    const totalAmount = subtotal + deliveryFee;
 
     const orderNum = Math.floor(1000 + Math.random() * 9000);
     const orderId = `TL-${orderNum}`;
@@ -910,7 +1020,7 @@ const createCustomerOrder = async (req, res) => {
     const orderData = {
       orderId,
       providerId: providerId.toString(),
-      tiffinId: tiffinId || '',
+      tiffinId: tiffinId || (tiffinDoc ? tiffinDoc._id.toString() : ''),
       customerId,
       customerName: finalCustomerName,
       customerPhone: phone,
@@ -919,19 +1029,21 @@ const createCustomerOrder = async (req, res) => {
       deliveryCoordinates: deliveryCoordinates || { lat: 23.0300, lng: 72.5178 },
       deliverySlot: deliverySlot || 'Lunch Slot (12:00 - 13:30)',
       tiffinName: resolvedTiffinName,
-      tiffinCategory: tiffinCategory || 'Gujarati',
-      tiffinImage: tiffinImage || '/assets/provider_1.png',
+      tiffinCategory: resolvedTiffinCategory,
+      tiffinImage: resolvedTiffinImage,
       quantity: qty,
       unitPrice: basePrice,
-      subtotal: itemsSubtotal,
+      tiffinBaseAmount,
+      itemsAmount,
+      subtotal,
       deliveryKm: distanceKm,
       deliveryFee,
       driverEarning: deliveryFee,
-      packagingFee,
-      gstTax,
+      packagingFee: 0,
+      gstTax: Math.round(subtotal * 0.05),
       totalAmount,
-      items: items || [],
-      extras: extras || [],
+      items: sanitizedItemsSnapshot,
+      extras: sanitizedExtras,
       rotliCount: rotliCount || 4,
       selectedShaak: selectedShaak || '',
       instructions: instructions || '',

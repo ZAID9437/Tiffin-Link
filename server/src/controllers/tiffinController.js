@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Tiffin = require('../models/Tiffin');
 const { ensureConnected } = require('../config/db');
 
@@ -115,6 +116,58 @@ const getTiffins = async (req, res) => {
   }
 };
 
+// @desc    Get single tiffin by ID with provider details and reviews
+// @route   GET /api/tiffins/:id
+const getTiffinById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (await isDbConnected()) {
+      let tiffin = null;
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        tiffin = await Tiffin.findById(id).lean();
+      }
+      if (!tiffin) {
+        tiffin = await Tiffin.findOne({ name: id }).lean();
+      }
+      if (!tiffin) {
+        return res.status(404).json({ success: false, message: 'Tiffin not found' });
+      }
+
+      // Fetch reviews if available
+      const reviews = await Review.find({
+        $or: [{ tiffinId: tiffin._id.toString() }, { tiffinName: tiffin.name }]
+      }).lean();
+
+      if (reviews.length > 0) {
+        const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 5), 0);
+        tiffin.rating = Number((sum / reviews.length).toFixed(1));
+        tiffin.reviewCount = reviews.length;
+      }
+
+      // Fetch provider info
+      const Provider = require('../models/Provider');
+      const provider = await Provider.findById(tiffin.providerId).lean();
+      if (provider) {
+        tiffin.provider = {
+          _id: provider._id,
+          name: provider.name,
+          image: provider.image,
+          address: provider.address,
+          rating: provider.rating,
+          mobile: provider.mobile,
+          fssaiNumber: provider.fssaiNumber
+        };
+      }
+
+      return res.json({ success: true, data: tiffin, source: 'database' });
+    }
+    return res.status(500).json({ success: false, message: 'Database connection error' });
+  } catch (error) {
+    console.error('Error fetching tiffin by ID:', error);
+    res.status(500).json({ success: false, message: 'Server error: ' + error.message });
+  }
+};
+
 // @desc    Create a new tiffin in MongoDB
 // @route   POST /api/tiffins
 const createTiffin = async (req, res) => {
@@ -221,6 +274,7 @@ const deleteTiffin = async (req, res) => {
 
 module.exports = {
   getTiffins,
+  getTiffinById,
   createTiffin,
   updateTiffin,
   deleteTiffin

@@ -298,25 +298,55 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
 
   // Atomic Delivery Acceptance
   const handleAcceptDelivery = async (order) => {
-    const dbId = order.id || order._id || order.requestId;
+    if (!order) return;
+
+    // If order was already accepted via subview, avoid redundant second accept
+    if (order.status === 'Driver Assigned' || order.status === 'Picked Up') {
+      showToast(`✓ Order ${order.orderId || order.requestId} is now active in your dispatch!`);
+      await fetchDashboardData();
+      setActiveTab('dashboard');
+      return;
+    }
+
+    const rawId = order.requestId || order.orderId || order._id || order.id;
     try {
-      if (dbId) {
-        const encodedId = encodeURIComponent(dbId);
-        const res = await fetch(`http://localhost:5000/api/orders/${encodedId}/accept-delivery`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ partnerName, partnerPhone })
+      if (rawId) {
+        const encodedId = encodeURIComponent(rawId);
+        const activeToken = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || token;
+        const headers = { 'Content-Type': 'application/json' };
+        if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
+
+        // 1. Try atomic delivery request acceptance endpoint first
+        let res = await fetch(`http://localhost:5000/api/delivery/requests/${encodedId}/accept`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            driverId: partnerId || currentUser?.id || currentUser?._id,
+            driverName: driverDisplayName || partnerName,
+            driverPhone: partnerPhone
+          })
         });
-        const json = await res.json();
+        let json = await res.json();
+
+        // 2. If delivery request not found, try order accept endpoint
+        if (!res.ok && res.status === 404) {
+          res = await fetch(`http://localhost:5000/api/orders/${encodedId}/accept-delivery`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ partnerName: driverDisplayName || partnerName, partnerPhone })
+          });
+          json = await res.json();
+        }
+
         if (!res.ok || !json.success) {
           showToast(`⚠️ ${json.message || 'Delivery is no longer available!'}`);
-          fetchDashboardData();
+          await fetchDashboardData();
           return;
         }
       }
 
-      showToast(`✓ Accepted delivery for Order ${order.orderId || order.id || order.requestId}!`);
-      fetchDashboardData();
+      showToast(`✓ Accepted delivery for Order ${order.orderId || order.requestId || rawId}!`);
+      await fetchDashboardData();
       setActiveTab('dashboard');
     } catch (err) {
       console.error('Error accepting delivery:', err);
@@ -984,12 +1014,14 @@ export default function DeliveryDashboard({ currentUser, onLogout }) {
                             <span className="material-symbols-outlined text-[18px] text-onyx-black">lunch_dining</span>
                             <span className="font-bold text-onyx-black text-sm">{req.providerName || 'Tiffin Provider'} → {req.customerName || 'Customer'}</span>
                           </div>
-                          <div className="mt-2 text-xs text-secondary flex items-center gap-3">
+                          <div className="mt-2 text-xs text-secondary flex items-center gap-3 flex-wrap">
                             <span>Pickup: {req.pickupAddress?.street || 'Kitchen'}</span>
                             <span>•</span>
                             <span>Distance: {req.distanceKm || 2.4} km</span>
                             <span>•</span>
-                            <span>Est. Earning: <strong className="text-onyx-black font-bold">₹{req.amount || 165}</strong></span>
+                            <span>Delivery Fee: <strong className="text-emerald-800 font-bold">₹{req.driverEarning || req.deliveryFee || 25}</strong></span>
+                            <span>•</span>
+                            <span>Order Value: <span className="text-onyx-black font-semibold">₹{req.amount || 175}</span></span>
                           </div>
                         </div>
 

@@ -15,6 +15,13 @@ router.get('/', (req, res, next) => {
   next();
 }, getItemsByTiffin);
 
+// GET /api/tiffin-items/tiffin/:tiffinId — direct param route
+router.get('/tiffin/:tiffinId', (req, res, next) => {
+  req.query.tiffinId = req.params.tiffinId;
+  if (req.headers.authorization) return protect(req, res, next);
+  next();
+}, getItemsByTiffin);
+
 // POST /api/tiffin-items — create single item (provider only)
 router.post('/', protect, requireProvider, createTiffinItem);
 

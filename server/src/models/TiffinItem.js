@@ -15,8 +15,8 @@ const tiffinItemSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
-    enum: ['Breads', 'Vegetable Curries', 'Dal & Kadhi', 'Rice & Khichdi', 'Farsan', 'Accompaniments', 'Sweets', 'Other'],
-    default: 'Other'
+    trim: true,
+    default: 'General'
   },
   name: {
     type: String,

@@ -272,8 +272,14 @@ const reconcileMissingDeliveryRequests = async () => {
             {
               $set: {
                 status: 'Driver Assigned',
-                'assignedDriver.name': assignedName,
-                'assignedDriver.phone': assignedPhone,
+                assignedDriver: {
+                  driverId: '',
+                  name: assignedName,
+                  phone: assignedPhone,
+                  rating: 4.8,
+                  vehicleNo: '',
+                  location: { lat: 23.0280, lng: 72.5670 }
+                },
                 acceptedAt: new Date()
               }
             }
@@ -465,7 +471,7 @@ const createDeliveryRequest = async (req, res) => {
       } else {
         await DeliveryRequest.updateOne(
           { _id: request._id },
-          { $set: { status: 'Searching Drivers', 'assignedDriver.name': '', 'assignedDriver.driverId': '' } }
+          { $set: { status: 'Searching Drivers', assignedDriver: { driverId: '', name: '', phone: '', rating: 4.8, vehicleNo: '', location: { lat: 23.0280, lng: 72.5670 } } } }
         );
         request.status = 'Searching Drivers';
         request.assignedDriver = { driverId: '', name: '', phone: '', rating: 4.8, vehicleNo: '' };
@@ -1410,6 +1416,10 @@ const getDriverDashboardData = async (req, res) => {
 
       pendingRequests = validPending.slice(0, 3).map(r => {
         const obj = r.toObject();
+        const fee = Number(r.driverEarning !== undefined ? r.driverEarning : (r.deliveryFee !== undefined ? r.deliveryFee : r.payout)) || 25;
+        obj.deliveryFee = fee;
+        obj.driverEarning = fee;
+        obj.payout = fee;
         const createdMs = new Date(r.requestedAt || Date.now()).getTime();
         const expiresAtMs = createdMs + 180 * 1000;
         const calcSeconds = Math.floor((expiresAtMs - Date.now()) / 1000);
@@ -1877,8 +1887,12 @@ const getEligibleRequestsForDriver = async (req, res) => {
         obj.distanceKm = Number(dist.toFixed(1)) || r.distanceKm || 2.4;
         obj.etaMinutes = Math.round(obj.distanceKm * 4 + 5);
 
-        // Derive Driver Earning (35% of total amount or minimum ₹65)
-        obj.driverEarning = Math.max(65, Math.round((r.amount || 200) * 0.35));
+        // Authoritative Driver Earning: from the delivery fee on the order
+        const fee = Number(r.driverEarning !== undefined ? r.driverEarning : (r.deliveryFee !== undefined ? r.deliveryFee : r.payout)) || 25;
+        obj.deliveryFee = fee;
+        obj.driverEarning = fee;
+        obj.payout = fee;
+        obj.surgeBonus = Number(r.surgeBonus) || 0;
 
         const createdMs = new Date(r.requestedAt || Date.now()).getTime();
         const expiresAtMs = createdMs + 180 * 1000;
@@ -1899,7 +1913,7 @@ const getEligibleRequestsForDriver = async (req, res) => {
 
     const pendingCount = requests.length;
     const nearbyCount = requests.filter(r => r.distanceKm <= 5.0).length;
-    const estEarnings = requests.reduce((sum, r) => sum + (r.driverEarning || Math.max(65, Math.round((r.amount || 200) * 0.35))), 0);
+    const estEarnings = requests.reduce((sum, r) => sum + (r.driverEarning || r.deliveryFee || 25), 0);
 
     if (requests.length === 0) {
       return res.json({
@@ -2013,10 +2027,14 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
         {
           $set: {
             status: 'Driver Assigned',
-            'assignedDriver.driverId': driverId,
-            'assignedDriver.name': driverName,
-            'assignedDriver.phone': driverPhone,
-            'assignedDriver.vehicleNo': vehicleNo,
+            assignedDriver: {
+              driverId: String(driverId),
+              name: driverName,
+              phone: driverPhone,
+              vehicleNo: vehicleNo || '',
+              rating: resolvedDriver?.rating || 4.8,
+              location: { lat: 23.0280, lng: 72.5670 }
+            },
             acceptedAt: new Date()
           }
         },

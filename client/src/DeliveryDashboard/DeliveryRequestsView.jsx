@@ -226,8 +226,10 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
       const lat = userCoords?.lat || 23.0280;
       const lng = userCoords?.lng || 72.5670;
 
-      const res = await apiRequest(`/delivery/driver-requests?driverId=${encodeURIComponent(driverId)}&lat=${lat}&lng=${lng}&filter=${activeFilter}`);
-      const json = typeof res?.json === 'function' ? await res.json() : res;
+      const res = await fetch(`http://localhost:5000/api/delivery/driver-requests?driverId=${encodeURIComponent(driverId)}&lat=${lat}&lng=${lng}&filter=${activeFilter}`, {
+        headers: getAuthHeaders()
+      });
+      const json = await res.json();
 
       if (json && json.success && json.data) {
         const rawList = json.data.requests || [];
@@ -241,20 +243,18 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
           return true;
         });
 
-        // Enrich requests with surge, type and timer attributes
-        const enriched = fetchedList.map((r, idx) => {
+        // Enrich requests with real DB attributes matching the customer order's delivery fee
+        const enriched = fetchedList.map((r) => {
           const type = r.tiffinCategory === 'Subscription' || r.tiffinName?.toLowerCase().includes('plan') ? 'subscription' : 'instant';
-          const isUrgent = idx === 0 || (r.distanceKm && r.distanceKm > 4);
-          const surgeBonus = isUrgent ? 30 : 0;
-          const driverEarning = r.driverEarning || Math.max(135, Math.round((r.distanceKm || 3.2) * 15 + 100 + surgeBonus));
+          const driverEarning = Number(r.driverEarning !== undefined ? r.driverEarning : (r.deliveryFee !== undefined ? r.deliveryFee : r.payout)) || 25;
+          const surgeBonus = Number(r.surgeBonus) || 0;
 
           return {
             ...r,
             type,
-            isUrgent,
             surgeBonus,
             driverEarning,
-            secondsLeft: r.secondsLeft !== undefined ? r.secondsLeft : 5
+            secondsLeft: r.secondsLeft !== undefined ? r.secondsLeft : 120
           };
         });
 
@@ -413,9 +413,9 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
         headers: getAuthHeaders(),
         signal: controller.signal,
         body: JSON.stringify({
-          driverId: currentUser?.id || currentUser?._id || 'TL-8041',
-          driverName: currentUser?.name || 'Rajesh Kumar',
-          driverPhone: currentUser?.phone || '+91 98201 44821'
+          driverId: currentUser?.id || currentUser?._id || 'TL-65013-B',
+          driverName: currentUser?.fullName || currentUser?.name || 'Ziyan Mansuri',
+          driverPhone: currentUser?.phone || '+91 9558601570'
         })
       });
 
@@ -683,9 +683,12 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
                     {/* Payout Block */}
                     <div className="sm:text-right">
                       <div className="flex items-baseline sm:justify-end gap-1.5">
-                        <span className="font-headline-md text-2xl sm:text-3xl text-onyx-black font-serif">₹{req.driverEarning || 165}</span>
-                        <span className="font-label-caps text-[10px] text-secondary uppercase font-semibold">Guaranteed</span>
+                        <span className="font-headline-md text-2xl sm:text-3xl text-onyx-black font-serif">₹{req.driverEarning || req.deliveryFee || 25}</span>
+                        <span className="font-label-caps text-[10px] text-secondary uppercase font-semibold">Delivery Fee</span>
                       </div>
+                      <span className="font-mono text-[10px] text-secondary block sm:text-right mt-0.5">
+                        Order Value: ₹{req.amount || 175}
+                      </span>
                       {req.surgeBonus > 0 && (
                         <span className="inline-block px-2 py-0.5 bg-secondary-fixed text-on-secondary-fixed font-label-caps text-[9px] uppercase font-semibold mt-1">
                           Includes +₹{req.surgeBonus} Surge Bonus
@@ -1020,8 +1023,8 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
                 <span className="font-medium text-onyx-black">Encrypted via App</span>
               </div>
               <div className="flex justify-between border-t border-sand-neutral pt-2">
-                <span className="text-secondary">Guaranteed Payout:</span>
-                <span className="font-bold text-onyx-black">₹{confirmedModalData.driverEarning || 165}</span>
+                <span className="text-secondary">Delivery Fee Payout:</span>
+                <span className="font-bold text-onyx-black">₹{confirmedModalData.driverEarning || confirmedModalData.deliveryFee || 25}</span>
               </div>
             </div>
 

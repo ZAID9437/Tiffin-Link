@@ -43,6 +43,7 @@ const optionalProtect = async (req, res, next) => {
 router.get('/my-orders', optionalProtect, getCustomerOrders);
 
 router.post('/customer', protect, createCustomerOrder);
+router.post('/customer-order', protect, createCustomerOrder);
 
 router.get('/', protect, requireProvider, getOrders);
 router.get('/provider', protect, requireProvider, getOrders);
@@ -75,8 +76,8 @@ router.put('/:id/cancel', protect, cancelOrder);
 
 router.post('/:id/payment-verify', protect, verifyPayment);
 
-router.put('/:id/accept-delivery', protect, requireProvider, acceptDelivery);
-router.put('/:id/delivery-status', protect, requireProvider, updateDeliveryStatus);
+router.put('/:id/accept-delivery', protect, acceptDelivery);
+router.put('/:id/delivery-status', protect, updateDeliveryStatus);
 router.delete('/:id', protect, requireProvider, deleteOrder);
 
 module.exports = router;

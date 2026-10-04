@@ -139,10 +139,7 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
                   <div className="absolute left-0 right-0 mt-2 bg-[#fbf9f5] border border-clay-earth/20 shadow-lg z-[100] transition-all duration-300 max-h-60 overflow-y-auto">
                     {[
                       'Veg Tiffin',
-                      'Non-Veg Tiffin',
-                      'Jain Tiffin',
-                      'Organic Salad',
-                      'Custom Meal'
+                      'Non-Veg Tiffin'
                     ].map((option) => (
                       <div
                         key={option}
