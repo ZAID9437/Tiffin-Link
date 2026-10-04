@@ -24,8 +24,10 @@ const scheduleRoutes = require('./scheduleRoutes');
 const safetyRoutes = require('./safetyRoutes');
 const adminRoutes = require('./adminRoutes');
 const locationRoutes = require('./locationRoutes');
+const paymentRoutes = require('./paymentRoutes');
 
 router.use('/location', locationRoutes);
+router.use('/payments', paymentRoutes);
 router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);
 router.use('/providers', providerRoutes);
