@@ -58,6 +58,15 @@ export default function OrderConfirmation({
   const [showGatewayCheckoutModal, setShowGatewayCheckoutModal] = useState(false);
   const [currentPaymentData, setCurrentPaymentData] = useState(null);
 
+  // Interactive Gateway Modal States
+  const [selectedUpiApp, setSelectedUpiApp] = useState('Google Pay');
+  const [upiVpaHandle, setUpiVpaHandle] = useState('9825112345@okaxis');
+  const [selectedBank, setSelectedBank] = useState('HDFC Bank');
+  const [selectedWallet, setSelectedWallet] = useState('Paytm Wallet');
+  const [cardNumber, setCardNumber] = useState('4242 •••• •••• 4242');
+  const [cardExpiry, setCardExpiry] = useState('12/28');
+  const [cardCvv, setCardCvv] = useState('888');
+
   const [isEditingRecipient, setIsEditingRecipient] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState('');
@@ -1109,74 +1118,245 @@ export default function OrderConfirmation({
                 </div>
               </div>
 
-              {/* Selected Method Details */}
-              <div className="border border-[#ded9d1] p-4 bg-[#fbf9f5]">
-                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[#ded9d1]">
-                  <span className="material-symbols-outlined text-[18px] text-[#4a4238]">
-                    {onlinePaymentOptions.find(o => o.id === currentPaymentData.paymentMethod)?.icon || 'credit_card'}
-                  </span>
-                  <span className="font-label-caps text-xs uppercase font-bold text-[#1a1a1a]">
-                    Method: {currentPaymentData.paymentMethod}
+              {/* Gateway Method Selector Tabs */}
+              <div className="flex border-b border-[#ded9d1] bg-[#f5f3ef] -mt-1 -mx-6 px-6">
+                {[
+                  { id: 'UPI', label: 'UPI', icon: 'account_balance_wallet' },
+                  { id: 'Credit / Debit Card', label: 'Card', icon: 'credit_card' },
+                  { id: 'Net Banking', label: 'Net Banking', icon: 'account_balance' },
+                  { id: 'Wallets', label: 'Wallets', icon: 'wallet' }
+                ].map(tab => {
+                  const isActive = currentPaymentData.paymentMethod === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setCurrentPaymentData(prev => ({ ...prev, paymentMethod: tab.id }));
+                      }}
+                      className={`flex-1 py-2.5 px-2 text-center font-label-caps text-[11px] uppercase tracking-wider font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        isActive
+                          ? 'bg-white text-[#1a1a1a] border-b-2 border-[#1a1a1a] shadow-xs'
+                          : 'text-[#665d52] hover:text-[#1a1a1a] hover:bg-white/50'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Method Interactive Interface */}
+              <div className="border border-[#ded9d1] p-4 bg-[#fbf9f5] rounded-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-[#ded9d1]">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-[#4a4238]">
+                      {onlinePaymentOptions.find(o => o.id === currentPaymentData.paymentMethod)?.icon || 'credit_card'}
+                    </span>
+                    <span className="font-label-caps text-xs uppercase font-bold text-[#1a1a1a]">
+                      Method: {currentPaymentData.paymentMethod}
+                    </span>
+                  </div>
+                  <span className="font-label-caps text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold border border-emerald-200">
+                    Active Gateway Channel
                   </span>
                 </div>
 
+                {/* 1. UPI APPLICATION SELECTOR */}
                 {currentPaymentData.paymentMethod === 'UPI' && (
                   <div className="space-y-3 pt-1">
-                    <p className="text-xs text-[#665d52]">
-                      Select an authorized UPI application or authorize via VPA handle:
-                    </p>
+                    <div className="flex items-center justify-between text-xs text-[#665d52]">
+                      <span>Select an authorized UPI application or authorize via VPA handle:</span>
+                      <span className="font-semibold text-[#1a1a1a] font-label-caps text-[11px] bg-white px-2 py-0.5 border border-[#ded9d1]">
+                        {selectedUpiApp}
+                      </span>
+                    </div>
+
+                    {/* Workable UPI App Buttons */}
                     <div className="grid grid-cols-4 gap-2">
-                      {['Google Pay', 'PhonePe', 'Paytm', 'BHIM'].map(app => (
-                        <div
-                          key={app}
-                          className="p-2 border border-[#ded9d1] bg-white text-center rounded text-[11px] font-semibold text-[#1a1a1a] shadow-xs"
-                        >
-                          {app}
-                        </div>
-                      ))}
+                      {[
+                        { name: 'Google Pay', handle: 'okaxis', color: '#1a73e8' },
+                        { name: 'PhonePe', handle: 'ybl', color: '#5f259f' },
+                        { name: 'Paytm', handle: 'paytm', color: '#00baf2' },
+                        { name: 'BHIM', handle: 'upi', color: '#005a9c' }
+                      ].map(app => {
+                        const isSelected = selectedUpiApp === app.name;
+                        return (
+                          <button
+                            key={app.name}
+                            type="button"
+                            onClick={() => {
+                              setSelectedUpiApp(app.name);
+                              const phoneDigits = (recipientPhone || '9825112345').replace(/\D/g, '').slice(-10) || '9825112345';
+                              setUpiVpaHandle(`${phoneDigits}@${app.handle}`);
+                            }}
+                            className={`py-2.5 px-2 border text-center rounded text-[11px] font-semibold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                              isSelected
+                                ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white shadow-md ring-2 ring-[#1a1a1a]/20 scale-102 font-bold'
+                                : 'border-[#ded9d1] bg-white text-[#1a1a1a] hover:border-[#1a1a1a]/60 hover:bg-[#f5f3ef]'
+                            }`}
+                          >
+                            <span className="truncate w-full">{app.name}</span>
+                            {isSelected ? (
+                              <span className="text-[9px] uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-0.5">
+                                <span className="material-symbols-outlined text-[10px]">check_circle</span> Active
+                              </span>
+                            ) : (
+                              <span className="text-[9px] text-[#665d52]">Select</span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="text-[11px] text-[#665d52] flex items-center gap-1.5 pt-1">
+
+                    {/* VPA Input / Confirmation */}
+                    <div className="space-y-1.5 pt-1">
+                      <label className="font-label-caps text-[10px] text-[#665d52] uppercase block">
+                        Virtual Payment Address (VPA) / UPI ID:
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 flex items-center bg-white border border-[#ded9d1] px-3 py-2 text-xs font-mono text-[#1a1a1a] focus-within:border-[#1a1a1a]">
+                          <span className="material-symbols-outlined text-[16px] text-clay-earth mr-1.5">alternate_email</span>
+                          <input
+                            type="text"
+                            value={upiVpaHandle}
+                            onChange={e => setUpiVpaHandle(e.target.value)}
+                            placeholder="username@upi"
+                            className="w-full text-xs font-mono text-[#1a1a1a] outline-none bg-transparent"
+                          />
+                        </div>
+                        <span className="px-2.5 py-2 bg-emerald-50 border border-emerald-300 text-emerald-700 text-[10px] font-bold uppercase rounded flex items-center gap-1 shrink-0">
+                          <span className="material-symbols-outlined text-[12px]">verified</span> Auto-Linked
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Quick 1-Click App Pay Trigger */}
+                    <button
+                      type="button"
+                      disabled={isProcessingPayment}
+                      onClick={() =>
+                        handleVerifyPaymentSuccess({
+                          paymentId: currentPaymentData.paymentId,
+                          gatewayOrderId: currentPaymentData.gatewayOrderId,
+                          gatewayPaymentId: `pay_${Date.now()}_upi_${selectedUpiApp.toLowerCase().replace(/\s+/g, '')}`,
+                          gatewaySignature: 'verified_secure_token'
+                        })
+                      }
+                      className="w-full py-2.5 px-3 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-400 font-button-text text-xs uppercase tracking-wider font-bold rounded flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">touch_app</span>
+                      <span>Pay directly via {selectedUpiApp} App</span>
+                    </button>
+
+                    <div className="text-[11px] text-[#665d52] flex items-center gap-1.5 pt-0.5">
                       <span className="material-symbols-outlined text-[14px] text-[#2e7d32]">verified</span>
-                      <span>UPI Auto-Pay Escrow Guarantee active</span>
+                      <span>Zero fee UPI Auto-Pay Escrow guarantee active</span>
                     </div>
                   </div>
                 )}
 
+                {/* 2. CARD INTERFACE */}
                 {currentPaymentData.paymentMethod === 'Credit / Debit Card' && (
-                  <div className="space-y-2 pt-1 text-xs text-[#665d52]">
-                    <div className="flex items-center justify-between font-mono bg-white p-2.5 border border-[#ded9d1] text-[#1a1a1a]">
-                      <span>•••• •••• •••• 4242</span>
-                      <span className="text-[10px] font-sans font-bold text-[#4a4238]">VISA</span>
-                    </div>
-                    <div className="flex justify-between text-[11px] text-[#665d52]">
-                      <span>Cardholder: {currentPaymentData.customer?.name || recipientName}</span>
-                      <span>Valid Thru: 12/28</span>
+                  <div className="space-y-3 pt-1">
+                    <p className="text-xs text-[#665d52]">Enter or use secure test card details:</p>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="font-label-caps text-[10px] text-[#665d52] uppercase block mb-0.5">Card Number</label>
+                        <input
+                          type="text"
+                          value={cardNumber}
+                          onChange={e => setCardNumber(e.target.value)}
+                          placeholder="4242 4242 4242 4242"
+                          className="w-full bg-white border border-[#ded9d1] px-3 py-2 text-xs font-mono text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a]"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="font-label-caps text-[10px] text-[#665d52] uppercase block mb-0.5">Expiry Date</label>
+                          <input
+                            type="text"
+                            value={cardExpiry}
+                            onChange={e => setCardExpiry(e.target.value)}
+                            placeholder="MM/YY"
+                            className="w-full bg-white border border-[#ded9d1] px-3 py-2 text-xs font-mono text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a]"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-label-caps text-[10px] text-[#665d52] uppercase block mb-0.5">CVV</label>
+                          <input
+                            type="password"
+                            maxLength={4}
+                            value={cardCvv}
+                            onChange={e => setCardCvv(e.target.value)}
+                            placeholder="•••"
+                            className="w-full bg-white border border-[#ded9d1] px-3 py-2 text-xs font-mono text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a]"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
 
+                {/* 3. NET BANKING SELECTOR */}
                 {currentPaymentData.paymentMethod === 'Net Banking' && (
-                  <div className="space-y-2 pt-1">
-                    <p className="text-xs text-[#665d52]">Supported net banking partners:</p>
+                  <div className="space-y-3 pt-1">
+                    <div className="flex items-center justify-between text-xs text-[#665d52]">
+                      <span>Select your bank for secure net banking login:</span>
+                      <span className="font-semibold text-[#1a1a1a] font-label-caps text-[11px] bg-white px-2 py-0.5 border border-[#ded9d1]">
+                        {selectedBank}
+                      </span>
+                    </div>
                     <div className="grid grid-cols-3 gap-2">
-                      {['HDFC Bank', 'ICICI Bank', 'State Bank (SBI)', 'Axis Bank', 'Kotak Bank', 'Other Banks'].map(b => (
-                        <div key={b} className="p-2 border border-[#ded9d1] bg-white text-center text-[10px] font-medium text-[#1a1a1a]">
-                          {b}
-                        </div>
-                      ))}
+                      {['HDFC Bank', 'ICICI Bank', 'State Bank (SBI)', 'Axis Bank', 'Kotak Bank', 'Other Banks'].map(b => {
+                        const isSelected = selectedBank === b;
+                        return (
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => setSelectedBank(b)}
+                            className={`p-2 border text-center rounded text-[10.5px] font-medium transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white font-bold shadow-sm ring-1 ring-[#1a1a1a]'
+                                : 'border-[#ded9d1] bg-white text-[#1a1a1a] hover:border-[#1a1a1a]/50 hover:bg-[#f5f3ef]'
+                            }`}
+                          >
+                            {b}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
+                {/* 4. WALLETS SELECTOR */}
                 {currentPaymentData.paymentMethod === 'Wallets' && (
-                  <div className="space-y-2 pt-1">
-                    <p className="text-xs text-[#665d52]">Supported digital wallets:</p>
+                  <div className="space-y-3 pt-1">
+                    <div className="flex items-center justify-between text-xs text-[#665d52]">
+                      <span>Select your authorized wallet account:</span>
+                      <span className="font-semibold text-[#1a1a1a] font-label-caps text-[11px] bg-white px-2 py-0.5 border border-[#ded9d1]">
+                        {selectedWallet}
+                      </span>
+                    </div>
                     <div className="grid grid-cols-3 gap-2">
-                      {['Paytm Wallet', 'PhonePe Wallet', 'Mobikwik'].map(w => (
-                        <div key={w} className="p-2 border border-[#ded9d1] bg-white text-center text-[11px] font-semibold text-[#1a1a1a]">
-                          {w}
-                        </div>
-                      ))}
+                      {['Paytm Wallet', 'PhonePe Wallet', 'Mobikwik', 'Amazon Pay'].map(w => {
+                        const isSelected = selectedWallet === w;
+                        return (
+                          <button
+                            key={w}
+                            type="button"
+                            onClick={() => setSelectedWallet(w)}
+                            className={`p-2 border text-center rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-[#1a1a1a] bg-[#1a1a1a] text-white font-bold shadow-sm ring-1 ring-[#1a1a1a]'
+                                : 'border-[#ded9d1] bg-white text-[#1a1a1a] hover:border-[#1a1a1a]/50 hover:bg-[#f5f3ef]'
+                            }`}
+                          >
+                            {w}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1205,7 +1385,17 @@ export default function OrderConfirmation({
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-[18px]">verified</span>
-                      <span>Pay ₹{Number(currentPaymentData.amount || dynamicFinalPayable).toFixed(2)} (Authorize)</span>
+                      <span>
+                        Pay ₹{Number(currentPaymentData.amount || dynamicFinalPayable).toFixed(2)} via {
+                          currentPaymentData.paymentMethod === 'UPI'
+                            ? selectedUpiApp
+                            : currentPaymentData.paymentMethod === 'Net Banking'
+                            ? selectedBank
+                            : currentPaymentData.paymentMethod === 'Wallets'
+                            ? selectedWallet
+                            : 'Card'
+                        } (Authorize)
+                      </span>
                     </>
                   )}
                 </button>
