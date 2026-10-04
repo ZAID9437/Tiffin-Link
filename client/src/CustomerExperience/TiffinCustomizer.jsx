@@ -391,28 +391,30 @@ export default function TiffinCustomizer({
   }
 
   return (
-    <div className="flex flex-col w-full pb-24 bg-[#fbf9f5] min-h-screen text-[#1b1c1a]">
+    <div className="flex flex-col w-full pb-24 bg-[#fbf9f5] min-h-screen text-[#1b1c1a] pt-20 sm:pt-24">
       {/* Top Navigation Corridor */}
       <div className="w-full bg-[#f5f3ef] py-4 px-4 sm:px-6 lg:px-20 border-b border-[#ded9d1]">
-        <div className="max-w-[1440px] mx-auto flex items-center justify-between">
+        <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-2 bg-white hover:bg-[#efeeea] px-3.5 py-1.5 border border-[#ded9d1] transition-colors group cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-2 bg-[#1a1a1a] hover:bg-[#4a4238] text-white px-4 py-2 transition-all group cursor-pointer shadow-sm font-bold"
             >
-              <span className="material-symbols-outlined text-[16px] text-[#1a1a1a] transition-transform group-hover:-translate-x-1">arrow_back</span>
-              <span className="font-button-text text-xs uppercase tracking-wider text-[#1a1a1a] font-bold">Back to {activeProviderName}</span>
+              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:-translate-x-1">arrow_back</span>
+              <span className="font-button-text text-xs uppercase tracking-wider">Back to {activeProviderName}</span>
             </button>
-            <div className="h-4 w-px bg-[#ded9d1] hidden sm:block"></div>
+            <div className="h-5 w-px bg-[#ded9d1] hidden sm:block"></div>
             <button
-              onClick={() => { window.location.hash = '#home'; }}
-              className="hidden sm:inline-flex items-center gap-1.5 font-label-caps text-xs text-[#665d52] hover:text-[#1a1a1a] uppercase tracking-wider transition-colors cursor-pointer"
+              type="button"
+              onClick={() => { window.location.hash = '#find-tiffin'; }}
+              className="hidden sm:inline-flex items-center gap-1.5 font-label-caps text-xs text-[#665d52] hover:text-[#1a1a1a] uppercase tracking-wider transition-colors cursor-pointer font-semibold"
             >
-              <span>Home</span>
+              <span>All Kitchens</span>
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#ded9d1]/50 text-[#665d52] font-label-caps text-[11px] uppercase">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#665d52] font-label-caps text-[11px] uppercase border border-[#ded9d1]">
               <span className={`w-1.5 h-1.5 rounded-full ${availableSlots > 0 ? 'bg-[#1b5e20]' : 'bg-[#ba1a1a]'} animate-pulse`}></span>
               {availableSlots > 0 ? `${availableSlots} Lunch Slots Remaining` : 'Sold Out for Today'}
             </span>
@@ -427,7 +429,15 @@ export default function TiffinCustomizer({
       <section className="max-w-[1440px] mx-auto w-full px-4 sm:px-6 lg:px-20 pt-8 pb-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
           <div className="lg:col-span-8 flex flex-col gap-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 bg-[#efeeea] hover:bg-[#e4e2de] px-3 py-1 text-[#1a1a1a] border border-[#ded9d1] font-label-caps text-xs uppercase tracking-wider transition-colors cursor-pointer group font-bold"
+              >
+                <span className="material-symbols-outlined text-[15px] transition-transform group-hover:-translate-x-1">arrow_back</span>
+                <span>Back to Kitchen</span>
+              </button>
               <span className="font-label-caps text-xs text-[#665d52] uppercase tracking-widest">
                 Culinary Atelier // {activeProviderName}
               </span>

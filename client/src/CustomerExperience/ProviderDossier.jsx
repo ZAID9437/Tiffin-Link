@@ -69,20 +69,21 @@ export default function ProviderDossier({
   const featuredTiffin = tiffins.length > 0 ? tiffins[0] : null;
 
   return (
-    <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a]">
+    <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a] pt-20 sm:pt-24">
       {/* Minimalist Meta Header Bar & Nav Breadcrumb */}
-      <section className="w-full bg-[#fbf9f5] px-4 sm:px-6 lg:px-20 py-5 border-b border-[#ded9d1]">
+      <section className="w-full bg-[#f5f3ef] px-4 sm:px-6 lg:px-20 py-4 border-b border-[#ded9d1]">
         <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-2 bg-[#efeeea] hover:bg-[#e4e2de] px-3.5 py-1.5 transition-colors group cursor-pointer"
+              className="inline-flex items-center gap-2 bg-[#1a1a1a] hover:bg-[#4a4238] text-white px-4 py-2 transition-all group cursor-pointer shadow-sm font-bold"
             >
-              <span className="material-symbols-outlined text-[16px] text-[#1a1a1a] transition-transform group-hover:-translate-x-1">arrow_back</span>
-              <span className="font-button-text text-xs uppercase tracking-wider text-[#1a1a1a] font-semibold">Back to Providers</span>
+              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:-translate-x-1">arrow_back</span>
+              <span className="font-button-text text-xs uppercase tracking-wider">Back to Providers</span>
             </button>
-            <div className="h-4 w-px bg-[#ded9d1] hidden sm:block"></div>
-            <nav aria-label="Breadcrumb" className="hidden sm:flex items-center gap-2 font-label-caps text-xs text-[#665d52] uppercase">
+            <div className="h-5 w-px bg-[#ded9d1] hidden sm:block"></div>
+            <nav aria-label="Breadcrumb" className="hidden sm:flex items-center gap-2 font-label-caps text-xs text-[#665d52] uppercase font-semibold">
               <span className="hover:text-[#1a1a1a] cursor-pointer" onClick={() => { window.location.hash = '#home'; }}>Home</span>
               <span>/</span>
               <span className="hover:text-[#1a1a1a] cursor-pointer" onClick={onBack}>Providers</span>
@@ -176,8 +177,16 @@ export default function ProviderDossier({
             {/* Right Informational & Dossier Profile Section */}
             <div className="lg:col-span-5 flex flex-col justify-between h-full space-y-6">
               <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="font-label-caps text-xs bg-[#efeeea] px-2.5 py-0.5 text-[#1a1a1a] uppercase tracking-wider font-semibold">PROVIDER DOSSIER</span>
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="inline-flex items-center gap-1.5 bg-[#efeeea] hover:bg-[#e4e2de] px-3 py-1 text-[#1a1a1a] border border-[#ded9d1] font-label-caps text-xs uppercase tracking-wider transition-colors cursor-pointer group font-bold mr-1"
+                  >
+                    <span className="material-symbols-outlined text-[15px] transition-transform group-hover:-translate-x-1">arrow_back</span>
+                    <span>Back to Providers</span>
+                  </button>
+                  <span className="font-label-caps text-xs bg-[#efeeea] px-2.5 py-1 text-[#1a1a1a] uppercase tracking-wider font-semibold border border-[#ded9d1]">PROVIDER DOSSIER</span>
                   <span className="text-[#665d52]">•</span>
                   <span className="font-label-caps text-xs text-[#665d52] uppercase font-semibold">AHMEDABAD RESIDENTIAL DIVISION</span>
                 </div>
