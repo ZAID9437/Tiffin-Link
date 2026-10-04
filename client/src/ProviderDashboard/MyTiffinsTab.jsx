@@ -46,6 +46,7 @@ export default function MyTiffinsTab({
   const [tiffins, setTiffins] = useState([]);
   const [categories, setCategories] = useState([]);
   const [tiffinItems, setTiffinItems] = useState([]);
+  const [allItemsMap, setAllItemsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -164,10 +165,30 @@ export default function MyTiffinsTab({
     }
   }, []);
 
+  const fetchAllItems = useCallback(async () => {
+    try {
+      const res = await apiRequest('/tiffin-items');
+      if (res.success && Array.isArray(res.data)) {
+        const map = {};
+        res.data.forEach(item => {
+          const tid = String(item.tiffinId?._id || item.tiffinId || '');
+          if (tid) {
+            if (!map[tid]) map[tid] = [];
+            map[tid].push(item);
+          }
+        });
+        setAllItemsMap(map);
+      }
+    } catch (err) {
+      console.error('Error fetching all tiffin items:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchTiffins();
     fetchCategories();
-  }, [fetchTiffins, fetchCategories]);
+    fetchAllItems();
+  }, [fetchTiffins, fetchCategories, fetchAllItems]);
 
   useEffect(() => {
     if (selectedTiffinId) {
@@ -485,6 +506,8 @@ export default function MyTiffinsTab({
         if (res.success) {
           showToast(`✓ Item "${payload.name}" updated!`);
           fetchItemsForTiffin(selectedTiffinId);
+          fetchAllItems();
+          fetchTiffins();
           setShowItemModal(false);
         } else {
           showToast(`⚠️ ${res.message || 'Failed to update item'}`);
@@ -497,6 +520,8 @@ export default function MyTiffinsTab({
         if (res.success) {
           showToast(`✓ Item "${payload.name}" added to tiffin!`);
           fetchItemsForTiffin(selectedTiffinId);
+          fetchAllItems();
+          fetchTiffins();
           setShowItemModal(false);
         } else {
           showToast(`⚠️ ${res.message || 'Failed to add item'}`);
@@ -518,6 +543,8 @@ export default function MyTiffinsTab({
       if (res.success) {
         showToast(`✓ Item "${deletingItem.name}" deleted.`);
         fetchItemsForTiffin(selectedTiffinId);
+        fetchAllItems();
+        fetchTiffins();
       }
     } catch (err) {
       console.error('Error deleting item:', err);
@@ -837,7 +864,16 @@ export default function MyTiffinsTab({
                 const isActive = tiffin.status === 'Active';
                 const configuredDays = Array.isArray(tiffin.days) && tiffin.days.length > 0 ? tiffin.days : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 const daysLabel = configuredDays.length === 7 ? 'All Days (Mon – Sun)' : `${configuredDays[0]?.slice(0, 3)} – ${configuredDays[configuredDays.length - 1]?.slice(0, 3)} (${configuredDays.length} Days)`;
-                const itemsCount = Array.isArray(tiffin.items) ? tiffin.items.length : 8;
+                
+                const tiffinIdStr = String(tiffin.id || tiffin._id || '');
+                const configuredFromMap = allItemsMap[tiffinIdStr] || [];
+                const dbItems = Array.isArray(tiffin.items) && tiffin.items.length > 0 ? tiffin.items : [];
+                const effectiveItems = configuredFromMap.length > 0
+                  ? configuredFromMap.map(i => i.name || i)
+                  : dbItems;
+                const itemsCount = effectiveItems.length > 0
+                  ? effectiveItems.length
+                  : (typeof tiffin.itemsCount === 'number' ? tiffin.itemsCount : 0);
 
                 return (
                   <article
@@ -907,9 +943,9 @@ export default function MyTiffinsTab({
 
                       {/* Modular Item Chips Preview */}
                       <div className="flex flex-wrap gap-1.5">
-                        {(Array.isArray(tiffin.items) && tiffin.items.length > 0 ? tiffin.items.slice(0, 4) : ['Phulka (4)', 'Daily Shaak', 'Dal', 'Rice']).map((item, idx) => (
+                        {(effectiveItems.length > 0 ? effectiveItems.slice(0, 4) : ['Phulka (4)', 'Daily Shaak', 'Dal', 'Rice']).map((item, idx) => (
                           <span key={idx} className="px-2 py-1 bg-surface-container text-on-surface font-label-caps text-[11px] rounded">
-                            {item}
+                            {typeof item === 'string' ? item : item.name}
                           </span>
                         ))}
                         {itemsCount > 4 && (
@@ -2238,7 +2274,11 @@ export default function MyTiffinsTab({
       {subView === 'meal-builder' && (
         <MealBuilderTab
           tiffins={tiffins}
-          onToast={showToast}
+          onToast={(msg) => {
+            showToast(msg);
+            fetchAllItems();
+            fetchTiffins();
+          }}
           onNavigateTab={(view) => {
             if (view === 'categories') setSubView('categories');
             else if (view === 'add-tiffin') setSubView('add');

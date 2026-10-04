@@ -2,6 +2,20 @@ const TiffinItem = require('../models/TiffinItem');
 const Tiffin = require('../models/Tiffin');
 const { ensureConnected } = require('../config/db');
 
+// Helper to synchronize active item names onto parent Tiffin document
+const syncTiffinItems = async (tiffinId) => {
+  try {
+    if (!tiffinId) return;
+    const activeItems = await TiffinItem.find({ tiffinId, isAvailable: { $ne: false } })
+      .sort({ sortOrder: 1, createdAt: 1 })
+      .select('name')
+      .lean();
+    await Tiffin.findByIdAndUpdate(tiffinId, { items: activeItems.map(i => i.name) });
+  } catch (err) {
+    console.warn(`Failed to sync tiffin items for ${tiffinId}:`, err.message);
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/tiffin-items?tiffinId=xxx
 // Returns all items for a specific tiffin (provider-owned or public)
@@ -93,6 +107,7 @@ const createTiffinItem = async (req, res) => {
     });
 
     await item.save();
+    await syncTiffinItems(tiffinId);
     return res.status(201).json({ success: true, data: item, message: 'Item added successfully' });
   } catch (err) {
     console.error('createTiffinItem error:', err);
@@ -141,6 +156,7 @@ const updateTiffinItem = async (req, res) => {
 
     item.updatedAt = Date.now();
     await item.save();
+    await syncTiffinItems(item.tiffinId);
 
     return res.json({ success: true, data: item, message: 'Item updated successfully' });
   } catch (err) {
@@ -168,6 +184,7 @@ const deleteTiffinItem = async (req, res) => {
     item.isAvailable = false;
     item.updatedAt = Date.now();
     await item.save();
+    await syncTiffinItems(item.tiffinId);
 
     return res.json({ success: true, message: 'Item deactivated successfully' });
   } catch (err) {
@@ -225,9 +242,11 @@ const bulkSaveTiffinItems = async (req, res) => {
     // Also update tiffin's base price (sum of default items)
     const defaultItems = itemDocs.filter(i => i.isDefault);
     const calculatedPrice = defaultItems.reduce((sum, i) => sum + (i.unitPrice * i.defaultQuantity), 0);
-    if (calculatedPrice > 0) {
-      await Tiffin.findByIdAndUpdate(tiffinId, { price: calculatedPrice });
-    }
+    
+    await Tiffin.findByIdAndUpdate(tiffinId, {
+      items: savedItems.map(i => i.name),
+      ...(calculatedPrice > 0 ? { price: calculatedPrice } : {})
+    });
 
     return res.json({
       success: true,

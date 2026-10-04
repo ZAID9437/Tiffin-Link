@@ -56,6 +56,7 @@ const defaultInitialTiffins = [
 ];
 
 const Review = require('../models/Review');
+const TiffinItem = require('../models/TiffinItem');
 
 // @desc    Get tiffins from MongoDB (provider-scoped or public) with live ratings
 // @route   GET /api/tiffins
@@ -71,6 +72,24 @@ const getTiffins = async (req, res) => {
 
     if (await isDbConnected()) {
       const tiffins = await Tiffin.find(query).sort({ createdAt: -1 }).lean();
+
+      // Batch fetch configured items for these tiffins
+      const tiffinIds = tiffins.map(t => t._id);
+      const itemsMap = {};
+      try {
+        const allItems = await TiffinItem.find({
+          tiffinId: { $in: tiffinIds },
+          isAvailable: { $ne: false }
+        }).sort({ sortOrder: 1, createdAt: 1 }).lean();
+
+        allItems.forEach(item => {
+          const tid = item.tiffinId.toString();
+          if (!itemsMap[tid]) itemsMap[tid] = [];
+          itemsMap[tid].push(item.name);
+        });
+      } catch (itemErr) {
+        console.warn('Could not batch fetch configured items:', itemErr.message);
+      }
 
       // Batch fetch reviews in a single query to eliminate N+1 database queries
       const allReviews = providerId
@@ -92,15 +111,26 @@ const getTiffins = async (req, res) => {
         const keyName = t.name;
         const revData = reviewMap[keyId] || reviewMap[keyName];
 
+        const configuredList = itemsMap[keyId];
+        const finalItems = (configuredList && configuredList.length > 0)
+          ? configuredList
+          : (Array.isArray(t.items) && t.items.length > 0 ? t.items : []);
+
+        const base = {
+          ...t,
+          items: finalItems,
+          itemsCount: finalItems.length
+        };
+
         if (revData && revData.count > 0) {
           return {
-            ...t,
+            ...base,
             rating: Number((revData.sum / revData.count).toFixed(1)),
             reviewCount: revData.count
           };
         }
         return {
-          ...t,
+          ...base,
           rating: t.rating || 0,
           reviewCount: t.reviewCount || 0
         };
@@ -157,6 +187,24 @@ const getTiffinById = async (req, res) => {
           mobile: provider.mobile,
           fssaiNumber: provider.fssaiNumber
         };
+      }
+
+      // Fetch configured items
+      try {
+        const configuredItems = await TiffinItem.find({
+          tiffinId: tiffin._id,
+          isAvailable: { $ne: false }
+        }).sort({ sortOrder: 1, createdAt: 1 }).lean();
+
+        if (configuredItems.length > 0) {
+          tiffin.items = configuredItems.map(i => i.name);
+          tiffin.itemsCount = configuredItems.length;
+          tiffin.tiffinItems = configuredItems;
+        } else {
+          tiffin.itemsCount = Array.isArray(tiffin.items) ? tiffin.items.length : 0;
+        }
+      } catch (itemErr) {
+        console.warn('Could not fetch items for tiffin:', itemErr.message);
       }
 
       return res.json({ success: true, data: tiffin, source: 'database' });
