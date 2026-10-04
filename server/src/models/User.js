@@ -61,7 +61,18 @@ const userSchema = new mongoose.Schema(
         landmark: { type: String, default: '' },
         isDefault: { type: Boolean, default: false }
       }
-    ]
+    ],
+    currentLocation: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+      accuracy: { type: Number },
+      address: { type: String, default: '' },
+      city: { type: String, default: '' },
+      state: { type: String, default: '' },
+      country: { type: String, default: '' },
+      timestamp: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now }
+    }
   },
   {
     timestamps: true

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import GoogleDeliveryMap from '../components/GoogleDeliveryMap';
 import { sendDriverLocationUpdate, subscribeToDeliveryLifecycle } from '../services/socket';
 
@@ -18,6 +18,11 @@ export default function ActiveDeliveryView({
   const [loading, setLoading] = useState(!initialActiveDelivery);
   const [toastMessage, setToastMessage] = useState(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  // Recalibrate Location State (Section 8 & 9 & 14)
+  const [isRecalibrating, setIsRecalibrating] = useState(false);
+  const [recalibrateToast, setRecalibrateToast] = useState('');
+  const [currentGpsAccuracy, setCurrentGpsAccuracy] = useState(null);
 
   // OTP Modal State
   const [otpModalOpen, setOtpModalOpen] = useState(false);
@@ -132,6 +137,131 @@ export default function ActiveDeliveryView({
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
+  }, [activeDelivery]);
+
+  // Intelligent Driver Location Recalibration Handler (Section 8 & 9 & 14)
+  const handleRecalibrate = useCallback(() => {
+    if (!('geolocation' in navigator)) {
+      showToast('Unable to determine your current location.');
+      setRecalibrateToast('Unable to determine your current location.');
+      setTimeout(() => setRecalibrateToast(''), 4500);
+      return;
+    }
+
+    setIsRecalibrating(true);
+    setRecalibrateToast('Recalibrating location...');
+    showToast('Recalibrating location...');
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const rawLat = pos.coords?.latitude;
+        const rawLng = pos.coords?.longitude;
+        const accuracy = pos.coords?.accuracy || 0;
+        const speed = pos.coords?.speed || 0;
+        const heading = pos.coords?.heading || 0;
+
+        // 1. Strict coordinate validation (Section 9)
+        if (
+          typeof rawLat !== 'number' ||
+          typeof rawLng !== 'number' ||
+          isNaN(rawLat) ||
+          isNaN(rawLng) ||
+          rawLat < -90 ||
+          rawLat > 90 ||
+          rawLng < -180 ||
+          rawLng > 180
+        ) {
+          setIsRecalibrating(false);
+          showToast('Unable to determine your current location.');
+          setRecalibrateToast('Unable to determine your current location.');
+          setTimeout(() => setRecalibrateToast(''), 4500);
+          return;
+        }
+
+        const lat = Number(rawLat.toFixed(5));
+        const lng = Number(rawLng.toFixed(5));
+        setCurrentGpsAccuracy(accuracy);
+
+        // 2. Update local state for Map & UI
+        const freshLocation = {
+          lat,
+          lng,
+          accuracy: Number(accuracy || 0),
+          speed: Number(speed || 0),
+          heading: Number(heading || 0),
+          updatedAt: new Date()
+        };
+
+        setActiveDelivery((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            assignedDriver: {
+              ...(prev.assignedDriver || {}),
+              location: freshLocation
+            },
+            driverLocation: freshLocation
+          };
+        });
+
+        const deliveryId = activeDelivery?.requestId || activeDelivery?.orderId || activeDelivery?._id;
+
+        // 3. Socket.IO Broadcast (Section 8)
+        if (deliveryId) {
+          sendDriverLocationUpdate({
+            deliveryId,
+            lat,
+            lng,
+            accuracy,
+            heading,
+            speed
+          });
+        }
+
+        // 4. Update MongoDB latest location via REST API (Section 8)
+        try {
+          const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || '';
+          const headers = { 'Content-Type': 'application/json' };
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
+          await fetch('http://localhost:5000/api/delivery/location', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              requestId: deliveryId,
+              lat,
+              lng,
+              accuracy,
+              heading,
+              speed
+            })
+          });
+        } catch (apiErr) {
+          console.warn('Backend location sync warning:', apiErr);
+        }
+
+        setIsRecalibrating(false);
+
+        // 5. Accuracy message (Section 8 & 9)
+        if (accuracy > 50) {
+          const warnMsg = `Location updated successfully. (Warning: Low GPS accuracy ±${Math.round(accuracy)}m)`;
+          showToast(warnMsg);
+          setRecalibrateToast(warnMsg);
+        } else {
+          showToast('Location updated successfully.');
+          setRecalibrateToast('Location updated successfully.');
+        }
+        setTimeout(() => setRecalibrateToast(''), 4500);
+      },
+      (err) => {
+        console.warn('Geolocation recalibrate failed:', err);
+        setIsRecalibrating(false);
+        showToast('Unable to determine your current location.');
+        setRecalibrateToast('Unable to determine your current location.');
+        setTimeout(() => setRecalibrateToast(''), 4500);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
   }, [activeDelivery]);
 
   // Launch Turn-by-Turn GPS Navigation in Google Maps
@@ -401,20 +531,36 @@ export default function ActiveDeliveryView({
           </p>
         </div>
 
-        {/* Quick Vital Metrics */}
-        <div className="flex items-center gap-6 self-start md:self-end bg-surface-container-low px-5 py-3 border border-sand-neutral shadow-xs">
-          <div className="flex flex-col">
-            <span className="font-label-caps text-[10px] uppercase text-secondary tracking-wider">Trip Fare</span>
-            <span className="font-headline-md text-2xl text-onyx-black leading-none mt-1 font-serif font-bold">
-              ₹{tripFare}
+        {/* Quick Vital Metrics & Live Recalibrate Action */}
+        <div className="flex flex-wrap items-center gap-3 self-start md:self-end">
+          {/* Section 8 & 14: RECALIBRATE button */}
+          <button
+            type="button"
+            onClick={handleRecalibrate}
+            disabled={isRecalibrating}
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#1a1a1a] hover:bg-[#333333] active:scale-95 text-white font-label-caps text-[11px] uppercase tracking-wider transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 font-bold border border-black"
+            title="Recalibrate GPS Location & Synchronize Delivery Route"
+          >
+            <span className={`material-symbols-outlined text-[15px] text-[#38bdf8] ${isRecalibrating ? 'animate-spin' : ''}`}>
+              {isRecalibrating ? 'sync' : 'my_location'}
             </span>
-          </div>
-          <div className="w-px h-8 bg-sand-neutral" />
-          <div className="flex flex-col">
-            <span className="font-label-caps text-[10px] uppercase text-secondary tracking-wider">Target Handover</span>
-            <span className="font-button-text text-xs text-onyx-black mt-1 font-bold">
-              {new Date(Date.now() + etaMinutes * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
+            <span className="text-white tracking-wider">{isRecalibrating ? 'CALIBRATING...' : 'RECALIBRATE'}</span>
+          </button>
+
+          <div className="flex items-center gap-6 bg-surface-container-low px-5 py-3 border border-sand-neutral shadow-xs">
+            <div className="flex flex-col">
+              <span className="font-label-caps text-[10px] uppercase text-secondary tracking-wider">Trip Fare</span>
+              <span className="font-headline-md text-2xl text-onyx-black leading-none mt-1 font-serif font-bold">
+                ₹{tripFare}
+              </span>
+            </div>
+            <div className="w-px h-8 bg-sand-neutral" />
+            <div className="flex flex-col">
+              <span className="font-label-caps text-[10px] uppercase text-secondary tracking-wider">Target Handover</span>
+              <span className="font-button-text text-xs text-onyx-black mt-1 font-bold">
+                {new Date(Date.now() + etaMinutes * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
           </div>
         </div>
       </header>
@@ -751,6 +897,32 @@ export default function ActiveDeliveryView({
 
             </div>
 
+            {/* Live Recalibrate Status Banner / Notification (Section 8) */}
+            {recalibrateToast && (
+              <div className="absolute top-24 left-4 right-4 z-20 flex justify-center pointer-events-none">
+                <div className={`flex items-center gap-2 py-2 px-4 shadow-xl border font-mono text-xs font-semibold rounded-xs pointer-events-auto transition-all ${
+                  recalibrateToast.includes('Unable')
+                    ? 'bg-[#ffebee] border-[#ffcdd2] text-[#c62828]'
+                    : recalibrateToast.includes('Recalibrating')
+                      ? 'bg-[#e0f2fe] border-[#bae6fd] text-[#0369a1]'
+                      : recalibrateToast.includes('Low') || recalibrateToast.includes('Warning')
+                        ? 'bg-[#fffbeb] border-[#fde68a] text-[#b45309]'
+                        : 'bg-[#e8f5e9] border-[#c8e6c9] text-[#1b5e20]'
+                }`}>
+                  <span className={`material-symbols-outlined text-[16px] ${recalibrateToast.includes('Recalibrating') ? 'animate-spin' : ''}`}>
+                    {recalibrateToast.includes('Unable')
+                      ? 'error'
+                      : recalibrateToast.includes('Recalibrating')
+                        ? 'sync'
+                        : recalibrateToast.includes('Low') || recalibrateToast.includes('Warning')
+                          ? 'warning'
+                          : 'check_circle'}
+                  </span>
+                  <span>{recalibrateToast}</span>
+                </div>
+              </div>
+            )}
+
             {/* Bottom Floating Controls & Speed Overlay */}
             <div className="absolute bottom-4 left-4 right-4 z-10 flex items-end justify-between pointer-events-auto">
               
@@ -765,15 +937,29 @@ export default function ActiveDeliveryView({
                 </div>
               </div>
 
-              {/* Map Utility Controls */}
-              <div className="flex flex-col gap-2">
+              {/* Map Utility Controls: RECALIBRATE & Navigation (Section 8 & 14) */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRecalibrate}
+                  disabled={isRecalibrating}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-[#1a1a1a] hover:bg-[#333333] active:scale-95 text-white font-label-caps text-[11px] uppercase tracking-wider transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 font-bold border border-black"
+                  title="Calibrate GPS Location & Synchronize Delivery Route"
+                >
+                  <span className={`material-symbols-outlined text-[15px] text-[#38bdf8] ${isRecalibrating ? 'animate-spin' : ''}`}>
+                    {isRecalibrating ? 'sync' : 'my_location'}
+                  </span>
+                  <span className="text-white tracking-wider">{isRecalibrating ? 'CALIBRATING...' : 'RECALIBRATE'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => handleOpenGoogleMapsNavigation(customerAddress)}
-                  className="w-10 h-10 bg-surface-container-lowest hover:bg-onyx-black hover:text-on-primary text-onyx-black shadow-md flex items-center justify-center transition-all border border-sand-neutral cursor-pointer"
+                  className="h-9 px-3 bg-surface-container-lowest hover:bg-onyx-black hover:text-on-primary text-onyx-black shadow-md flex items-center gap-1.5 transition-all border border-sand-neutral cursor-pointer font-button-text text-xs uppercase font-bold"
                   title="Open Google Navigation"
                 >
-                  <span className="material-symbols-outlined text-[20px]">near_me</span>
+                  <span className="material-symbols-outlined text-[18px]">near_me</span>
+                  <span className="hidden sm:inline">Navigate</span>
                 </button>
               </div>
 

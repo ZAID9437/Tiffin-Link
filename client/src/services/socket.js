@@ -154,9 +154,11 @@ export const subscribeToLocationUpdates = (callback) => {
   };
   s.on('driver:location:updated', handler);
   s.on('delivery:location:changed', handler);
+  s.on('driver:location:update', handler);
   return () => {
     s.off('driver:location:updated', handler);
     s.off('delivery:location:changed', handler);
+    s.off('driver:location:update', handler);
   };
 };
 

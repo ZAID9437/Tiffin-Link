@@ -47,6 +47,8 @@ export default function RouteNavigationView({ currentUser, onNavigateTab }) {
   const [rerouting, setRerouting] = useState(false);
   const [rerouteLocked, setRerouteLocked] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [isRecalibrating, setIsRecalibrating] = useState(false);
+  const [recalibrateToast, setRecalibrateToast] = useState('');
 
   // Auth Session Credentials
   const savedUserStr = typeof window !== 'undefined' ? (localStorage.getItem('user') || localStorage.getItem('tiffinlink_user')) : null;
@@ -188,7 +190,121 @@ export default function RouteNavigationView({ currentUser, onNavigateTab }) {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
     };
-  }, [driverId, token]);
+  }, [driverId, token, activeDelivery]);
+
+  // Recalibrate GPS Location (Section 8 & 9 & 14)
+  const handleRecalibrate = useCallback(() => {
+    if (!('geolocation' in navigator)) {
+      showToast('Unable to determine your current location.');
+      setRecalibrateToast('Unable to determine your current location.');
+      setTimeout(() => setRecalibrateToast(''), 4500);
+      return;
+    }
+
+    setIsRecalibrating(true);
+    showToast('Recalibrating location...');
+    setRecalibrateToast('Recalibrating location...');
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const rawLat = pos.coords?.latitude;
+        const rawLng = pos.coords?.longitude;
+        const accuracy = pos.coords?.accuracy || 0;
+        const speed = pos.coords?.speed || 0;
+        const heading = pos.coords?.heading || 0;
+
+        // Section 9: Validate coordinates
+        if (
+          typeof rawLat !== 'number' ||
+          typeof rawLng !== 'number' ||
+          isNaN(rawLat) ||
+          isNaN(rawLng) ||
+          rawLat < -90 ||
+          rawLat > 90 ||
+          rawLng < -180 ||
+          rawLng > 180
+        ) {
+          setIsRecalibrating(false);
+          showToast('Unable to determine your current location.');
+          setRecalibrateToast('Unable to determine your current location.');
+          setTimeout(() => setRecalibrateToast(''), 4500);
+          return;
+        }
+
+        const lat = Number(rawLat.toFixed(5));
+        const lng = Number(rawLng.toFixed(5));
+        const newCoords = { lat, lng, accuracy, heading, speed, timestamp: pos.timestamp };
+
+        setDriverGps(newCoords);
+        setGpsStatus('READY');
+        setLastGpsUpdate(new Date());
+
+        // Update driver marker & center map
+        if (driverMarkerRef.current) {
+          driverMarkerRef.current.setPosition({ lat, lng });
+        }
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.panTo({ lat, lng });
+        }
+
+        // Socket.IO Broadcast
+        const targetReqId = activeDelivery?.requestId || activeDelivery?.orderId || activeDelivery?._id;
+        if (targetReqId) {
+          sendDriverLocationUpdate({
+            deliveryId: targetReqId,
+            lat,
+            lng,
+            accuracy,
+            heading,
+            speed
+          });
+        }
+
+        // Update MongoDB via REST API
+        try {
+          const activeToken = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || token;
+          const headers = { 'Content-Type': 'application/json' };
+          if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
+
+          await fetch('http://localhost:5000/api/delivery/location', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              requestId: targetReqId,
+              lat,
+              lng,
+              accuracy,
+              heading,
+              speed,
+              driverId
+            })
+          });
+        } catch (apiErr) {
+          console.warn('API sync error:', apiErr);
+        }
+
+        setIsRecalibrating(false);
+
+        if (accuracy > 50) {
+          const msg = `Location updated successfully. (Warning: Low GPS accuracy ±${Math.round(accuracy)}m)`;
+          showToast(msg);
+          setRecalibrateToast(msg);
+        } else {
+          showToast('Location updated successfully.');
+          setRecalibrateToast('Location updated successfully.');
+        }
+        setTimeout(() => setRecalibrateToast(''), 4500);
+      },
+      (err) => {
+        console.warn('Recalibration error:', err);
+        setIsRecalibrating(false);
+        showToast('Unable to determine your current location.');
+        setRecalibrateToast('Unable to determine your current location.');
+        setTimeout(() => setRecalibrateToast(''), 4500);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  }, [activeDelivery, driverId, token]);
 
   // 3. Load Google Maps JS SDK
   useEffect(() => {
@@ -423,8 +539,22 @@ export default function RouteNavigationView({ currentUser, onNavigateTab }) {
           </p>
         </div>
 
-        {/* Quick Audio & Highway Utilities */}
+        {/* Quick Audio, Recalibrate & Highway Utilities */}
         <div className="flex items-center gap-2 flex-wrap self-start md:self-auto">
+          {/* Section 8 & 14: RECALIBRATE button */}
+          <button
+            type="button"
+            onClick={handleRecalibrate}
+            disabled={isRecalibrating}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#1a1a1a] hover:bg-[#333333] active:scale-95 text-white font-label-caps text-[11px] uppercase tracking-wider transition-all shadow-sm cursor-pointer disabled:opacity-60 shrink-0 font-bold border border-black"
+            title="Recalibrate GPS Location & Synchronize Route"
+          >
+            <span className={`material-symbols-outlined text-[15px] text-[#38bdf8] ${isRecalibrating ? 'animate-spin' : ''}`}>
+              {isRecalibrating ? 'sync' : 'my_location'}
+            </span>
+            <span className="text-white tracking-wider">{isRecalibrating ? 'CALIBRATING...' : 'RECALIBRATE'}</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setVoiceMuted(!voiceMuted)}
@@ -794,8 +924,48 @@ export default function RouteNavigationView({ currentUser, onNavigateTab }) {
               </span>
             </div>
 
-            {/* Bottom Right Reroute & Fit Route Prompt */}
-            <div className="absolute bottom-5 right-5 flex items-center gap-2 z-20">
+            {/* Live Recalibrate Status Banner / Notification (Section 8) */}
+            {recalibrateToast && (
+              <div className="absolute top-24 left-5 right-5 z-20 flex justify-center pointer-events-none">
+                <div className={`flex items-center gap-2 py-2 px-4 shadow-xl border font-mono text-xs font-semibold rounded-xs pointer-events-auto transition-all ${
+                  recalibrateToast.includes('Unable')
+                    ? 'bg-[#ffebee] border-[#ffcdd2] text-[#c62828]'
+                    : recalibrateToast.includes('Recalibrating')
+                      ? 'bg-[#e0f2fe] border-[#bae6fd] text-[#0369a1]'
+                      : recalibrateToast.includes('Low') || recalibrateToast.includes('Warning')
+                        ? 'bg-[#fffbeb] border-[#fde68a] text-[#b45309]'
+                        : 'bg-[#e8f5e9] border-[#c8e6c9] text-[#1b5e20]'
+                }`}>
+                  <span className={`material-symbols-outlined text-[16px] ${recalibrateToast.includes('Recalibrating') ? 'animate-spin' : ''}`}>
+                    {recalibrateToast.includes('Unable')
+                      ? 'error'
+                      : recalibrateToast.includes('Recalibrating')
+                        ? 'sync'
+                        : recalibrateToast.includes('Low') || recalibrateToast.includes('Warning')
+                          ? 'warning'
+                          : 'check_circle'}
+                  </span>
+                  <span>{recalibrateToast}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Bottom Right Reroute, Recalibrate & Fit Route Prompt */}
+            <div className="absolute bottom-5 right-5 flex items-center gap-2 z-20 flex-wrap">
+              {/* Section 8 & 14: RECALIBRATE button */}
+              <button
+                type="button"
+                onClick={handleRecalibrate}
+                disabled={isRecalibrating}
+                className="flex items-center gap-1.5 px-3 py-2.5 bg-[#1a1a1a] hover:bg-[#333333] active:scale-95 text-white font-label-caps text-[11px] uppercase tracking-wider transition-all shadow-md cursor-pointer disabled:opacity-60 shrink-0 font-bold border border-black"
+                title="Recalibrate GPS Location & Synchronize Route"
+              >
+                <span className={`material-symbols-outlined text-[15px] text-[#38bdf8] ${isRecalibrating ? 'animate-spin' : ''}`}>
+                  {isRecalibrating ? 'sync' : 'my_location'}
+                </span>
+                <span className="text-white tracking-wider">{isRecalibrating ? 'CALIBRATING...' : 'RECALIBRATE'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleFitRoute}

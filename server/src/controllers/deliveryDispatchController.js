@@ -1022,31 +1022,100 @@ const updateDeliveryStatus = async (req, res) => {
   }
 };
 
-// @desc    Update driver real-time GPS location
+// @desc    Update driver real-time GPS location (Recalibrate & periodic watchPosition)
 // @route   POST /api/delivery/location
 const updateDriverLocation = async (req, res) => {
   try {
-    const { requestId, lat, lng, accuracy } = req.body;
+    const { requestId, lat, lng, accuracy, speed, heading } = req.body;
+
+    // 1. Strict coordinate validation (Section 9)
+    const numLat = Number(lat);
+    const numLng = Number(lng);
+    const numAcc = Number(accuracy || 0);
+    const numSpeed = Number(speed || 0);
+    const numHeading = Number(heading || 0);
+
+    if (isNaN(numLat) || isNaN(numLng) || numLat < -90 || numLat > 90 || numLng < -180 || numLng > 180) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid coordinates: Latitude must be between -90 and 90, Longitude between -180 and 180.'
+      });
+    }
+
+    const isLowAccuracy = numAcc > 50;
+    const now = new Date();
+
+    const locationObj = {
+      lat: numLat,
+      lng: numLng,
+      accuracy: numAcc,
+      speed: numSpeed,
+      heading: numHeading,
+      updatedAt: now
+    };
 
     if (await isDbConnected()) {
+      const cleanReqId = requestId ? String(requestId).trim().replace(/^#+/, '') : '';
       const request = await DeliveryRequest.findOneAndUpdate(
-        { $or: [{ requestId }, { orderId: requestId }, { _id: requestId }] },
-        { $set: { 
-            'assignedDriver.location': { lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy || 0), updatedAt: new Date() },
-            driverLocation: { lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy || 0), updatedAt: new Date() }
+        { $or: [
+          { requestId },
+          { requestId: `#${cleanReqId}` },
+          { requestId: cleanReqId },
+          { orderId: requestId },
+          { orderId: `#${cleanReqId}` },
+          { orderId: cleanReqId },
+          { _id: (requestId && requestId.match(/^[0-9a-fA-F]{24}$/)) ? requestId : undefined }
+        ].filter(Boolean) },
+        { 
+          $set: { 
+            'assignedDriver.location': locationObj,
+            driverLocation: locationObj
           }
         },
         { new: true }
       );
 
+      // Sync driver profile collection location if assigned
+      const driverIdentifier = request?.assignedDriver?.driverId || req.user?.id || req.user?._id;
+      if (driverIdentifier) {
+        await Driver.updateOne(
+          { $or: [{ driverId: driverIdentifier }, { _id: driverIdentifier }, { userId: req.user?._id }].filter(Boolean) },
+          { $set: { 'currentLocation.lat': numLat, 'currentLocation.lng': numLng } }
+        ).catch(() => {});
+      }
+
+      // Socket.IO Broadcast to delivery rooms
       try {
         const { getIO } = require('../services/socketService');
         const io = getIO();
-        const targetId = request?.requestId || request?.orderId || requestId;
-        io.to(`delivery:${targetId}`).emit('delivery:location:changed', {
-          deliveryId: targetId,
-          location: { lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy || 0), updatedAt: new Date() },
-          status: request?.status
+        const targetReqId = request?.requestId ? String(request.requestId).trim().replace(/^#+/, '') : cleanReqId;
+        const targetOrdId = request?.orderId ? String(request.orderId).trim().replace(/^#+/, '') : '';
+
+        const locationPayload = {
+          deliveryId: targetReqId || targetOrdId || requestId,
+          orderId: targetOrdId || request?.orderId,
+          location: locationObj,
+          status: request?.status,
+          accuracy: numAcc,
+          isLowAccuracy
+        };
+
+        const roomsToNotify = new Set();
+        if (targetReqId) {
+          roomsToNotify.add(`delivery:${targetReqId}`);
+          roomsToNotify.add(`delivery:#${targetReqId}`);
+        }
+        if (targetOrdId) {
+          roomsToNotify.add(`delivery:${targetOrdId}`);
+          roomsToNotify.add(`delivery:#${targetOrdId}`);
+        }
+        if (request?._id) roomsToNotify.add(`delivery:${request._id.toString()}`);
+        if (requestId) roomsToNotify.add(`delivery:${requestId}`);
+        if (request?.providerId) roomsToNotify.add(`provider:${request.providerId}`);
+
+        roomsToNotify.forEach(room => {
+          io.to(room).emit('delivery:location:changed', locationPayload);
+          io.to(room).emit('driver:location:updated', locationPayload);
         });
       } catch (socketErr) {
         // Socket broadcast optional fallback
@@ -1054,15 +1123,21 @@ const updateDriverLocation = async (req, res) => {
 
       return res.json({
         success: true,
-        message: 'Driver location updated in real-time!',
-        location: { lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy || 0) }
+        message: isLowAccuracy 
+          ? 'Location updated, but GPS accuracy is low (> 50m).' 
+          : 'Location updated successfully.',
+        location: locationObj,
+        isLowAccuracy
       });
     }
 
     return res.json({
       success: true,
-      message: 'Driver location updated in real-time!',
-      location: { lat: Number(lat), lng: Number(lng), accuracy: Number(accuracy || 0) }
+      message: isLowAccuracy 
+        ? 'Location updated, but GPS accuracy is low (> 50m).' 
+        : 'Location updated successfully.',
+      location: locationObj,
+      isLowAccuracy
     });
   } catch (error) {
     console.error('Error updating driver location:', error);

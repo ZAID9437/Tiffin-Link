@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useLocation } from '../context/LocationContext';
 
 export default function CustomerHome({ onNavigate }) {
+  const { location } = useLocation();
   const [activeDiet, setActiveDiet] = useState('veg');
   const [activeMealCat, setActiveMealCat] = useState('full');
   const [activeDate, setActiveDate] = useState('today');
@@ -106,11 +108,21 @@ export default function CustomerHome({ onNavigate }) {
                       </div>
                       <div>
                         <div className="text-xs font-bold uppercase text-[#665d52]">Delivering To</div>
-                        <div className="text-lg font-semibold text-[#1a1a1a]">Satellite, Ahmedabad <span className="text-xs text-[#665d52] font-normal">(380015)</span></div>
-                        <div className="text-[11px] text-[#1b5e20] mt-0.5 font-semibold uppercase">✓ GPS location active • Hyperlocal radius active</div>
+                        <div className="text-lg font-semibold text-[#1a1a1a]">
+                          {location?.address || 'Satellite, Ahmedabad'}
+                        </div>
+                        <div className="text-[11px] text-[#1b5e20] mt-0.5 font-semibold uppercase">
+                          {location?.isCalibrated ? '✓ Real-time GPS location active • Hyperlocal radius active' : 'GPS location active • Hyperlocal radius active'}
+                        </div>
                       </div>
                     </div>
-                    <button className="text-xs font-semibold uppercase underline text-[#1a1a1a] hover:text-[#4a4238] transition-colors self-start sm:self-center" type="button">Change Location</button>
+                    <button
+                      onClick={() => onNavigate && onNavigate('nearby-tiffin-services')}
+                      className="text-xs font-semibold uppercase underline text-[#1a1a1a] hover:text-[#4a4238] transition-colors self-start sm:self-center cursor-pointer"
+                      type="button"
+                    >
+                      Change Location
+                    </button>
                   </div>
 
                   {/* Diet */}

@@ -7,6 +7,8 @@ export default function TiffinCustomizer({
   onBack,
   onCheckout,
   currentUser,
+  customerCoordinates,
+  customerAddress,
   onOpenLogin
 }) {
   const [dbItems, setDbItems] = useState([]);
@@ -18,7 +20,7 @@ export default function TiffinCustomizer({
   const [quantities, setQuantities] = useState({});
   const [instructions, setInstructions] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState(
-    currentUser?.address || 'Satellite, Ahmedabad'
+    customerAddress || currentUser?.currentLocation?.address || currentUser?.address || ''
   );
 
   // Order submission & status
@@ -151,12 +153,36 @@ export default function TiffinCustomizer({
     }));
   };
 
-  // Distance & Delivery Fee Calculation
+  // Haversine formula to compute great-circle distance in kilometers
+  const calculateHaversineKm = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Number((R * c).toFixed(1));
+  };
+
+  // Distance & Delivery Fee Calculation (dynamic based on real GPS coordinates)
   const distanceKm = useMemo(() => {
     const p = dbProvider || provider;
+    const pLat = p?.address?.lat || p?.location?.lat;
+    const pLng = p?.address?.lng || p?.location?.lng;
+
+    const uLat = customerCoordinates?.lat || currentUser?.currentLocation?.latitude;
+    const uLng = customerCoordinates?.lng || currentUser?.currentLocation?.longitude;
+
+    if (uLat && uLng && pLat && pLng) {
+      const realDist = calculateHaversineKm(uLat, uLng, pLat, pLng);
+      if (realDist !== null) return realDist;
+    }
+
     if (p?.distanceKm) return Number(p.distanceKm);
     return 1.8;
-  }, [dbProvider, provider]);
+  }, [dbProvider, provider, customerCoordinates, currentUser]);
 
   // delivery fee formula: ₹25 base + ₹8/km
   const deliveryFee = useMemo(() => {
@@ -243,7 +269,9 @@ export default function TiffinCustomizer({
         customerEmail: currentUser.email || '',
         customerPhone: currentUser.phone || currentUser.mobile || '+91 98765 43210',
         customerAddress: deliveryAddress,
-        deliveryCoordinates: { lat: 23.0300, lng: 72.5178 },
+        deliveryCoordinates: customerCoordinates?.lat && customerCoordinates?.lng
+          ? { lat: Number(customerCoordinates.lat), lng: Number(customerCoordinates.lng) }
+          : (currentUser?.currentLocation?.latitude ? { lat: Number(currentUser.currentLocation.latitude), lng: Number(currentUser.currentLocation.longitude) } : null),
         items: selectedItemsList,
         instructions: instructions,
         paymentMethod: 'Online Payment'

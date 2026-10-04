@@ -5,20 +5,11 @@ const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
 
-// Helper to format/enrich request object with live dynamic remaining seconds (max 2 minutes = 120s)
+// Helper to format/enrich request object with live dynamic remaining seconds
 const enrichRequestWithLiveTimer = (reqObj) => {
   const now = Date.now();
-  let expiresAtMs;
-
-  if (reqObj.expiresAt && new Date(reqObj.expiresAt).getTime() > now) {
-    expiresAtMs = new Date(reqObj.expiresAt).getTime();
-  } else {
-    // If pending request expired or has no active expiresAt, refresh to 2 minutes from now
-    expiresAtMs = now + 120 * 1000;
-  }
-
-  let calcSec = Math.floor((expiresAtMs - now) / 1000);
-  let secondsLeft = Math.max(15, Math.min(120, calcSec));
+  let expiresAtMs = reqObj.expiresAt ? new Date(reqObj.expiresAt).getTime() : (now + 120 * 1000);
+  let secondsLeft = Math.max(0, Math.floor((expiresAtMs - now) / 1000));
 
   const plain = typeof reqObj.toObject === 'function' ? reqObj.toObject() : { ...reqObj };
   
@@ -30,23 +21,45 @@ const enrichRequestWithLiveTimer = (reqObj) => {
   };
 };
 
-// @desc    Get all pending live meal requests
+// @desc    Get all pending live meal requests (auto-cleans expired and deduplicates)
 // @route   GET /api/requests
 const getRequests = async (req, res) => {
   try {
     if (await isDbConnected()) {
-      let requests = await MealRequest.find({ status: 'pending' }).sort({ createdAt: -1 });
+      const now = new Date();
 
-      // Refresh expiresAt for pending requests in DB if expired
-      const now = Date.now();
+      // 1. Mark expired requests so they are permanently removed from live dispatch
+      await MealRequest.updateMany(
+        { status: 'pending', expiresAt: { $lte: now } },
+        { $set: { status: 'expired' } }
+      );
+
+      // 2. Fetch only strictly active pending requests
+      let requests = await MealRequest.find({
+        status: 'pending',
+        expiresAt: { $gt: now }
+      }).sort({ createdAt: -1 });
+
+      // 3. Deduplicate multiple submissions from same customer for same meal within short window
+      const seenCustomerMap = new Map();
+      const uniqueRequests = [];
+
       for (const r of requests) {
-        if (!r.expiresAt || new Date(r.expiresAt).getTime() <= now) {
-          r.expiresAt = new Date(now + 120 * 1000);
-          await r.save();
+        const phone = (r.customerPhone || '').replace(/\D/g, '');
+        const name = (r.customerName || '').trim().toLowerCase();
+        const meal = (r.mealType || '').trim().toLowerCase();
+        const dedupeKey = `${phone || name}_${meal}`;
+
+        if (!seenCustomerMap.has(dedupeKey)) {
+          seenCustomerMap.set(dedupeKey, r);
+          uniqueRequests.push(r);
+        } else {
+          // Mark superseded duplicate as expired
+          MealRequest.findByIdAndUpdate(r._id, { status: 'expired' }).catch(() => {});
         }
       }
 
-      const enriched = requests.map(enrichRequestWithLiveTimer);
+      const enriched = uniqueRequests.map(enrichRequestWithLiveTimer);
       return res.json({ success: true, count: enriched.length, data: enriched, source: 'database' });
     }
     return res.status(500).json({ success: false, message: 'Database connection error' });
@@ -56,7 +69,7 @@ const getRequests = async (req, res) => {
   }
 };
 
-// @desc    Create a new live meal request
+// @desc    Create a new live meal request (with duplicate prevention guard)
 // @route   POST /api/requests
 const createRequest = async (req, res) => {
   try {
@@ -87,34 +100,61 @@ const createRequest = async (req, res) => {
     const itemBudget = Number(budget) || (items && items[0] ? items[0].price : 120);
     const calculatedTotal = totalAmount ? Number(totalAmount) : (qty * itemBudget);
     const durationMin = Number(validMinutes) || 2;
-    const expiresAt = new Date(Date.now() + durationMin * 60 * 1000);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + durationMin * 60 * 1000);
 
     const formattedItems = Array.isArray(items) && items.length > 0
       ? items.map(it => ({ name: it.name, qty: Number(it.qty) || 1, price: Number(it.price) || itemBudget }))
       : [{ name: mealType || 'Veg Special Thali', qty, price: itemBudget }];
 
-    const reqData = {
-      customerName: customerName || 'Rahul Shah',
-      customerPhone: customerPhone || '+91 98765 12345',
-      customerAddress: customerAddress || location || 'Satellite, Ahmedabad',
-      mealType: mealType || formattedItems[0].name,
-      category: category || 'Gujarati',
-      items: formattedItems,
-      quantity: qty,
-      date: date || 'Today',
-      time: time || '1:30 PM',
-      deliveryType: deliveryType || 'Delivery',
-      location: location || customerAddress || 'Satellite, Ahmedabad',
-      distance: distance || '1.8 km',
-      budget: itemBudget,
-      totalAmount: calculatedTotal,
-      specialInstructions: specialInstructions || '',
-      status: 'pending',
-      expiresAt,
-      createdAt: new Date()
-    };
+    const cleanCustomerName = customerName || 'Rahul Shah';
+    const cleanCustomerPhone = customerPhone || '+91 98765 12345';
+    const cleanMealType = mealType || formattedItems[0].name;
 
     if (await isDbConnected()) {
+      // Duplicate prevention: If this customer already has an active pending request in last 60s for same meal, reuse it
+      const existingRecent = await MealRequest.findOne({
+        status: 'pending',
+        $or: [
+          { customerPhone: cleanCustomerPhone },
+          { customerName: cleanCustomerName }
+        ],
+        mealType: cleanMealType,
+        expiresAt: { $gt: now },
+        createdAt: { $gte: new Date(now.getTime() - 60 * 1000) }
+      });
+
+      if (existingRecent) {
+        const enriched = enrichRequestWithLiveTimer(existingRecent);
+        return res.status(200).json({
+          success: true,
+          data: enriched,
+          message: 'Active request already placed in provider queue',
+          source: 'database'
+        });
+      }
+
+      const reqData = {
+        customerName: cleanCustomerName,
+        customerPhone: cleanCustomerPhone,
+        customerAddress: customerAddress || location || 'Satellite, Ahmedabad',
+        mealType: cleanMealType,
+        category: category || 'Gujarati',
+        items: formattedItems,
+        quantity: qty,
+        date: date || 'Today',
+        time: time || '1:30 PM',
+        deliveryType: deliveryType || 'Delivery',
+        location: location || customerAddress || 'Satellite, Ahmedabad',
+        distance: distance || '1.8 km',
+        budget: itemBudget,
+        totalAmount: calculatedTotal,
+        specialInstructions: specialInstructions || '',
+        status: 'pending',
+        expiresAt,
+        createdAt: now
+      };
+
       const newRequest = new MealRequest(reqData);
       await newRequest.save();
       const enriched = enrichRequestWithLiveTimer(newRequest);

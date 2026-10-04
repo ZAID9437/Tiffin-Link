@@ -23,7 +23,9 @@ const serviceAreaRoutes = require('./serviceAreaRoutes');
 const scheduleRoutes = require('./scheduleRoutes');
 const safetyRoutes = require('./safetyRoutes');
 const adminRoutes = require('./adminRoutes');
+const locationRoutes = require('./locationRoutes');
 
+router.use('/location', locationRoutes);
 router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);
 router.use('/providers', providerRoutes);

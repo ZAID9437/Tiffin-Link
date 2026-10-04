@@ -94,7 +94,7 @@ export default function LoginModal({
       setSubmitStatus('idle');
       setResendCooldown(0);
     }
-  }, [isOpen, initialRole]);
+  }, [isOpen, initialRole, initialMode]);
 
   // Handle switching role tabs
   const handleRoleTabChange = (role) => {
@@ -218,8 +218,24 @@ export default function LoginModal({
             ...rawUser,
             id: userId,
             _id: userId,
-            role: activeRole || rawUser.role || 'customer'
+            role: rawUser.role || activeRole || 'customer'
           };
+
+          // Fetch fresh user profile from DB to enforce authoritative role and details
+          if (data.accessToken) {
+            try {
+              const meRes = await fetch('http://localhost:5000/api/auth/me', {
+                headers: { 'Authorization': `Bearer ${data.accessToken}` }
+              });
+              const meData = await meRes.json();
+              if (meData.success && meData.user) {
+                const freshId = String(meData.user._id || meData.user.id || userId);
+                authenticatedUser = { ...meData.user, id: freshId, _id: freshId };
+              }
+            } catch (meErr) {
+              console.warn('Profile sync fetch error:', meErr);
+            }
+          }
 
           saveUserSession(authenticatedUser, data.accessToken, data.refreshToken);
 
@@ -317,7 +333,7 @@ export default function LoginModal({
           ...rawUser,
           id: userId,
           _id: userId,
-          role: activeRole || rawUser.role || 'customer',
+          role: rawUser.role || activeRole || 'customer',
           isVerified: true,
           emailVerified: true
         };

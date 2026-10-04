@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 // Shared UI & Layout Components
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -50,35 +50,32 @@ import { CheckCircle2 } from 'lucide-react';
 
 export default function App() {
   const { currentUser, loading: authLoading, loginUser, logoutUser, updateUser } = useAuth();
-  const [loginModalMode, setLoginModalMode] = useState('login');
 
-  const handleLoginSuccess = async (userObj, accessToken, refreshToken) => {
-    await loginUser(userObj, accessToken, refreshToken);
-    setIsLoginModalOpen(false);
+  // Toast Notification state
+  const [toast, setToast] = useState({
+    show: false,
+    message: '',
+    type: 'success'
+  });
+  const toastTimeoutRef = useRef(null);
 
-    const pendingCheckout = localStorage.getItem('tiffinlink_pending_checkout');
-    if (pendingCheckout) {
-      setView('find-tiffin');
-      window.location.hash = '#find-tiffin?checkout=true';
-      showToastNotification(`Welcome back, ${userObj.name || userObj.email}! Signed in successfully. Resuming your checkout.`);
-      return;
-    }
-    if (userObj.role === 'admin') {
-      window.location.hash = '#admin';
-    } else if (userObj.role === 'delivery' || userObj.role === 'driver') {
-      window.location.hash = '#delivery';
-    } else if (userObj.role === 'provider') {
-      window.location.hash = '#provider';
-    }
-    showToastNotification(`Welcome back, ${userObj.name || userObj.email}! Signed in successfully.`);
-  };
+  const showToastNotification = useCallback((message, type = 'success') => {
+    if (!message) return;
+    setToast({
+      show: true,
+      message,
+      type
+    });
 
-  const handleLogout = () => {
-    logoutUser();
-    showToastNotification('You have been signed out.');
-  };
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 4500);
+  }, []);
 
   // Modal states
+  const [loginModalMode, setLoginModalMode] = useState('login');
+  const [loginModalRole, setLoginModalRole] = useState('customer');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isBecomeProviderModalOpen, setIsBecomeProviderModalOpen] = useState(false);
   const [isBecomeDeliveryPartnerModalOpen, setIsBecomeDeliveryPartnerModalOpen] = useState(false);
@@ -89,52 +86,199 @@ export default function App() {
   const [profileModalTab, setProfileModalTab] = useState('profile');
   const [hasActiveOrder, setHasActiveOrder] = useState(false);
   const [activeCustomerOrderId, setActiveCustomerOrderId] = useState('');
-  const [preloaderFinished, setPreloaderFinished] = useState(true);
+  const [preloaderFinished, setPreloaderFinished] = useState(false);
 
   const [searchFilters, setSearchFilters] = useState({});
 
-  // State-based router with session & cookies persistence
-  const [view, setView] = useState(() => {
-    const hash = window.location.hash || '';
-    if (hash.startsWith('#/admin') || hash.startsWith('#admin') || currentUser?.role === 'admin') return 'admin';
-    if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || currentUser?.role === 'delivery' || currentUser?.role === 'driver') return 'delivery';
-    if (hash.startsWith('#/provider') || hash.startsWith('#provider') || currentUser?.role === 'provider') return 'provider';
+  const openLoginModal = useCallback((mode = 'login', role = 'customer') => {
+    setLoginModalMode(mode);
+    setLoginModalRole(role);
+    setIsLoginModalOpen(true);
+  }, []);
+
+  // Centralized Route Resolution & Route Protection Guard (Requirement 1, 5 & 6)
+  const resolveRoute = useCallback((hash, user) => {
+    const rawRole = (user?.role || '').toLowerCase();
+    const cleanHash = (hash || (typeof window !== 'undefined' ? window.location.hash : '') || '').toLowerCase();
+
+    // 1. BEFORE LOGIN (Logged Out State - Requirement 1)
+    if (!user) {
+      // Guard Protected URLs: Directly entering protected URLs must NOT expose private panels
+      if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin')) {
+        if (typeof window !== 'undefined') window.history.replaceState(null, '', window.location.pathname);
+        openLoginModal('login', 'admin');
+        showToastNotification('Administrator authentication required to access Super Admin dashboard.');
+        return 'home';
+      }
+      if (
+        cleanHash.startsWith('#/provider') || 
+        cleanHash.startsWith('#provider') || 
+        cleanHash.startsWith('#my-tiffins') || 
+        cleanHash.startsWith('#provider-orders') || 
+        cleanHash.startsWith('#provider-earnings')
+      ) {
+        if (typeof window !== 'undefined') window.history.replaceState(null, '', '#for-providers');
+        openLoginModal('login', 'provider');
+        showToastNotification('Please log in to your provider account to access the Provider Dashboard.');
+        return 'provider'; // Renders ProviderLanding (public)
+      }
+      if (
+        cleanHash.startsWith('#/delivery') || 
+        cleanHash.startsWith('#delivery') || 
+        cleanHash.startsWith('#my-deliveries') || 
+        cleanHash.startsWith('#delivery-earnings')
+      ) {
+        if (typeof window !== 'undefined') window.history.replaceState(null, '', '#for-deliverers');
+        openLoginModal('login', 'delivery');
+        showToastNotification('Please log in to your delivery partner account to access the Delivery Dashboard.');
+        return 'delivery'; // Renders DeliveryLanding (public)
+      }
+      if (
+        cleanHash.startsWith('#orders') || 
+        cleanHash.startsWith('#my-orders') || 
+        cleanHash.startsWith('#active-orders') || 
+        cleanHash.startsWith('#track-order') || 
+        cleanHash.startsWith('#upcoming-tiffins') || 
+        cleanHash.startsWith('#order-history') || 
+        cleanHash.startsWith('#cancelled-orders')
+      ) {
+        if (typeof window !== 'undefined') window.history.replaceState(null, '', '#find-tiffin');
+        openLoginModal('login', 'customer');
+        showToastNotification('Please log in to view your orders and dispatch tracker.');
+        return 'find-tiffin';
+      }
+
+      // Allowed Public Routes
+      if (cleanHash.startsWith('#for-providers') || cleanHash.startsWith('#provider-landing')) return 'provider';
+      if (cleanHash.startsWith('#for-deliverers') || cleanHash.startsWith('#delivery-landing')) return 'delivery';
+      if (cleanHash.startsWith('#find-tiffin') || cleanHash.startsWith('#order-tiffin') || cleanHash.startsWith('#for-diners')) return 'find-tiffin';
+      return 'home';
+    }
+
+    // 2. ADMIN ROLE (Requirement 3 & 5)
+    if (rawRole === 'admin' || rawRole === 'superadmin' || rawRole === 'super_admin') {
+      return 'admin';
+    }
+
+    // 3. PROVIDER ROLE (Requirement 3 & 5)
+    if (rawRole === 'provider') {
+      if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin') || cleanHash.startsWith('#delivery') || cleanHash.startsWith('#orders')) {
+        if (typeof window !== 'undefined') window.history.replaceState(null, '', '#provider');
+        showToastNotification('Access restricted: Your account is authorized as a Kitchen Provider.');
+      }
+      return 'provider';
+    }
+
+    // 4. DELIVERY PARTNER / DRIVER ROLE (Requirement 3 & 5)
+    if (rawRole === 'delivery' || rawRole === 'driver' || rawRole === 'deliverer' || rawRole === 'delivery_partner') {
+      if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin') || cleanHash.startsWith('#provider') || cleanHash.startsWith('#orders')) {
+        if (typeof window !== 'undefined') window.history.replaceState(null, '', '#delivery');
+        showToastNotification('Access restricted: Your account is authorized as a Delivery Partner.');
+      }
+      return 'delivery';
+    }
+
+    // 5. CUSTOMER / DINER ROLE (Requirement 3 & 5)
+    if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin')) {
+      if (typeof window !== 'undefined') window.history.replaceState(null, '', '#find-tiffin');
+      showToastNotification('Access denied: Administrator privileges required.');
+      return 'find-tiffin';
+    }
+    if (cleanHash.startsWith('#/provider') || cleanHash.startsWith('#provider')) {
+      if (typeof window !== 'undefined') window.history.replaceState(null, '', '#find-tiffin');
+      showToastNotification('Access denied: Kitchen Provider account required.');
+      return 'find-tiffin';
+    }
+    if (cleanHash.startsWith('#/delivery') || cleanHash.startsWith('#delivery')) {
+      if (typeof window !== 'undefined') window.history.replaceState(null, '', '#find-tiffin');
+      showToastNotification('Access denied: Delivery Partner account required.');
+      return 'find-tiffin';
+    }
+
     if (
-      hash.startsWith('#orders') || 
-      hash.startsWith('#my-orders') || 
-      hash.startsWith('#active-orders') || 
-      hash.startsWith('#track-order') || 
-      hash.startsWith('#upcoming-tiffins') || 
-      hash.startsWith('#order-history') || 
-      hash.startsWith('#cancelled-orders')
-    ) return 'orders';
-    if (hash.startsWith('#find-tiffin') || hash.startsWith('#order-tiffin')) return 'find-tiffin';
+      cleanHash.startsWith('#orders') || 
+      cleanHash.startsWith('#my-orders') || 
+      cleanHash.startsWith('#active-orders') || 
+      cleanHash.startsWith('#track-order') || 
+      cleanHash.startsWith('#upcoming-tiffins') || 
+      cleanHash.startsWith('#order-history') || 
+      cleanHash.startsWith('#cancelled-orders')
+    ) {
+      return 'orders';
+    }
+
+    if (cleanHash.startsWith('#find-tiffin') || cleanHash.startsWith('#order-tiffin') || cleanHash.startsWith('#for-diners')) {
+      return 'find-tiffin';
+    }
+
     return 'home';
-  });
+  }, [openLoginModal, showToastNotification]);
+
+  // State-based router with security enforcement
+  const [view, setView] = useState(() => resolveRoute(typeof window !== 'undefined' ? window.location.hash : '', currentUser));
+
+  // Sync route whenever user session or hash changes
+  useEffect(() => {
+    if (!authLoading) {
+      const targetView = resolveRoute(window.location.hash, currentUser);
+      setView(targetView);
+    }
+  }, [currentUser, authLoading, resolveRoute]);
 
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash || '';
-      const activeRole = localStorage.getItem('tiffinlink_user_role') || getCookie('tiffinlink_role') || currentUser?.role;
-      let currentView = 'home';
-      if (hash.startsWith('#/admin') || hash.startsWith('#admin') || activeRole === 'admin') currentView = 'admin';
-      else if (hash.startsWith('#/delivery') || hash.startsWith('#delivery') || activeRole === 'delivery' || activeRole === 'driver') currentView = 'delivery';
-      else if (hash.startsWith('#/provider') || hash.startsWith('#provider') || activeRole === 'provider') currentView = 'provider';
-      else if (
-        hash.startsWith('#orders') || 
-        hash.startsWith('#my-orders') || 
-        hash.startsWith('#active-orders') || 
-        hash.startsWith('#track-order') || 
-        hash.startsWith('#upcoming-tiffins') || 
-        hash.startsWith('#order-history') || 
-        hash.startsWith('#cancelled-orders')
-      ) currentView = 'orders';
-      else if (hash.startsWith('#find-tiffin') || hash.startsWith('#order-tiffin')) currentView = 'find-tiffin';
-      setView(currentView);
+      if (!authLoading) {
+        const targetView = resolveRoute(window.location.hash, currentUser);
+        setView(targetView);
+      }
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [currentUser]);
+  }, [currentUser, authLoading, resolveRoute]);
+
+  // Handle Login Success: Authoritative Database Role Redirection (Requirement 2 & 3)
+  const handleLoginSuccess = async (userObj, accessToken, refreshToken) => {
+    const authoritative = await loginUser(userObj, accessToken, refreshToken);
+    const resolvedUser = authoritative || userObj;
+    setIsLoginModalOpen(false);
+
+    const role = (resolvedUser.role || 'customer').toLowerCase();
+
+    // Check for pending checkout (only for diners)
+    const pendingCheckout = localStorage.getItem('tiffinlink_pending_checkout');
+    if (pendingCheckout && (role === 'customer' || role === 'diner')) {
+      setView('find-tiffin');
+      window.location.hash = '#find-tiffin?checkout=true';
+      showToastNotification(`Welcome back, ${resolvedUser.name || resolvedUser.email}! Resuming your checkout.`);
+      return;
+    }
+
+    // Role-based redirection according to specification
+    if (role === 'admin' || role === 'superadmin' || role === 'super_admin') {
+      setView('admin');
+      window.location.hash = '#admin';
+    } else if (role === 'provider') {
+      setView('provider');
+      window.location.hash = '#provider';
+    } else if (role === 'delivery' || role === 'driver' || role === 'deliverer' || role === 'delivery_partner') {
+      setView('delivery');
+      window.location.hash = '#delivery';
+    } else {
+      // Customer / Diner
+      setView('find-tiffin');
+      window.location.hash = '#find-tiffin';
+    }
+    showToastNotification(`Welcome back, ${resolvedUser.name || resolvedUser.email}! Signed in successfully.`);
+  };
+
+  // Handle Logout: Invalidate session, clear tokens, redirect to public landing (Requirement 7)
+  const handleLogout = async () => {
+    await logoutUser();
+    setView('home');
+    window.location.hash = '';
+    showToastNotification('You have been signed out.');
+  };
+
 
   // Sync active order for logged-in Diner/Customer from MongoDB
   useEffect(() => {
@@ -189,24 +333,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [currentUser]);
 
-  // Toast Notification state
-  const [toast, setToast] = useState({
-    show: false,
-    message: '',
-    type: 'success'
-  });
 
-  const showToastNotification = (message, type = 'success') => {
-    setToast({
-      show: true,
-      message,
-      type
-    });
-
-    setTimeout(() => {
-      setToast(prev => ({ ...prev, show: false }));
-    }, 4000);
-  };
 
   const handleRequestSubmitSuccess = (formData) => {
     if (formData && typeof formData === 'object') {
@@ -475,8 +602,8 @@ export default function App() {
 
 
 
-  // If user is authenticated as Super Admin or hash is #admin, render Admin Dashboard Control Center
-  if (currentUser?.role === 'admin' || view === 'admin') {
+  // Only authenticated Super Admin can access Admin Dashboard Control Center
+  if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin' || currentUser.role === 'super_admin')) {
     return (
       <div className="app-layout">
         <AdminDashboard currentUser={currentUser} onLogout={handleLogout} />
@@ -484,12 +611,17 @@ export default function App() {
           isOpenOverride={isCookieConsentModalOpen}
           onCloseOverride={() => setIsCookieConsentModalOpen(false)}
         />
+        {/* Toast Alerts */}
+        <div className={`toast toast-success ${toast.show ? 'show' : ''}`}>
+          <CheckCircle2 className="text-emerald" size={20} />
+          <span>{toast.message}</span>
+        </div>
       </div>
     );
   }
 
-  // If user is authenticated as a Provider, render the Provider Kitchen Portal Dashboard directly
-  if (currentUser?.role === 'provider') {
+  // Only authenticated Provider can access Provider Kitchen Portal Dashboard
+  if (currentUser && currentUser.role === 'provider') {
     return (
       <div className="app-layout">
         <ProviderDashboard 
@@ -501,12 +633,17 @@ export default function App() {
           isOpenOverride={isCookieConsentModalOpen}
           onCloseOverride={() => setIsCookieConsentModalOpen(false)}
         />
+        {/* Toast Alerts */}
+        <div className={`toast toast-success ${toast.show ? 'show' : ''}`}>
+          <CheckCircle2 className="text-emerald" size={20} />
+          <span>{toast.message}</span>
+        </div>
       </div>
     );
   }
 
-  // If user is authenticated as a Delivery Partner, render the Delivery Dashboard directly
-  if (currentUser?.role === 'delivery' || currentUser?.role === 'driver') {
+  // Only authenticated Delivery Partner can access Delivery Dashboard
+  if (currentUser && (currentUser.role === 'delivery' || currentUser.role === 'driver' || currentUser.role === 'deliverer' || currentUser.role === 'delivery_partner')) {
     return (
       <div className="app-layout">
         <DeliveryDashboard currentUser={currentUser} onLogout={handleLogout} />
@@ -514,6 +651,11 @@ export default function App() {
           isOpenOverride={isCookieConsentModalOpen}
           onCloseOverride={() => setIsCookieConsentModalOpen(false)}
         />
+        {/* Toast Alerts */}
+        <div className={`toast toast-success ${toast.show ? 'show' : ''}`}>
+          <CheckCircle2 className="text-emerald" size={20} />
+          <span>{toast.message}</span>
+        </div>
       </div>
     );
   }
@@ -521,6 +663,8 @@ export default function App() {
   return (
     <div className="app-layout">
 
+      {/* Original TiffinLink Cinematic Preloader Animation */}
+      <Preloader onComplete={handlePreloaderComplete} />
 
       {/* Floating Spice Canvas Background */}
       <ParticleBackground />
@@ -532,9 +676,8 @@ export default function App() {
       <Navbar 
         onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)} 
         onOpenBecomeDeliveryPartnerModal={() => setIsBecomeDeliveryPartnerModalOpen(true)}
-        onOpenLogin={(mode) => {
-          setLoginModalMode(mode || 'login');
-          setIsLoginModalOpen(true);
+        onOpenLogin={(mode, role) => {
+          openLoginModal(mode || 'login', role || 'customer');
         }}
         onOpenTrackingModal={() => setIsCustomerTrackingModalOpen(true)}
         onOpenProfileModal={(tab) => {
@@ -633,10 +776,10 @@ export default function App() {
       <LoginModal 
         isOpen={isLoginModalOpen} 
         onClose={() => setIsLoginModalOpen(false)}
-        initialRole={view === 'provider' ? 'provider' : (view === 'delivery' ? 'delivery' : 'customer')}
+        initialRole={loginModalRole || (view === 'provider' ? 'provider' : (view === 'delivery' ? 'delivery' : 'customer'))}
         initialMode={loginModalMode}
-        onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)}
-        onOpenBecomeDeliveryPartnerModal={() => setIsBecomeDeliveryPartnerModalOpen(true)}
+        onOpenBecomeProviderModal={() => { setIsLoginModalOpen(false); setIsBecomeProviderModalOpen(true); }}
+        onOpenBecomeDeliveryPartnerModal={() => { setIsLoginModalOpen(false); setIsBecomeDeliveryPartnerModalOpen(true); }}
         onLoginSuccess={handleLoginSuccess}
       />
 

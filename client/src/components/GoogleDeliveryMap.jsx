@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Navigation, MapPin, ExternalLink, Clock, ShieldCheck, RefreshCw, AlertTriangle, Radio, Compass, Target } from 'lucide-react';
-import { joinDeliveryRoom, leaveDeliveryRoom, subscribeToLocationUpdates, subscribeToConnectionStatus } from '../services/socket';
+import { joinDeliveryRoom, leaveDeliveryRoom, subscribeToLocationUpdates, subscribeToConnectionStatus, sendDriverLocationUpdate } from '../services/socket';
 
 // Utility helper to calculate Haversine distance in meters between two lat/lng pairs
 function getDistanceInMeters(lat1, lon1, lat2, lon2) {
@@ -35,6 +35,8 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   const [routeError, setRouteError] = useState(null);
   const [routeMode, setRouteMode] = useState('road'); // 'road' | 'live'
+  const [isRecalibrating, setIsRecalibrating] = useState(false);
+  const [recalibrateToast, setRecalibrateToast] = useState('');
 
   // Route Throttling state
   const lastRouteCalcPosRef = useRef(null);
@@ -372,6 +374,113 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
     mapInstanceRef.current.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
   };
 
+  // Intelligent Recalibrate Handler (Section 8 & 9 & 14)
+  const handleRecalibrate = useCallback(() => {
+    if (!('geolocation' in navigator)) {
+      setRecalibrateToast('Unable to determine your current location.');
+      setTimeout(() => setRecalibrateToast(''), 4500);
+      return;
+    }
+
+    setIsRecalibrating(true);
+    setRecalibrateToast('Recalibrating location...');
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const rawLat = pos.coords?.latitude;
+        const rawLng = pos.coords?.longitude;
+        const accuracy = pos.coords?.accuracy || 0;
+        const speed = pos.coords?.speed || 0;
+        const heading = pos.coords?.heading || 0;
+
+        // Section 9: Validate coordinates
+        if (
+          typeof rawLat !== 'number' ||
+          typeof rawLng !== 'number' ||
+          isNaN(rawLat) ||
+          isNaN(rawLng) ||
+          rawLat < -90 ||
+          rawLat > 90 ||
+          rawLng < -180 ||
+          rawLng > 180
+        ) {
+          setIsRecalibrating(false);
+          setRecalibrateToast('Unable to determine your current location.');
+          setTimeout(() => setRecalibrateToast(''), 4500);
+          return;
+        }
+
+        const lat = Number(rawLat.toFixed(5));
+        const lng = Number(rawLng.toFixed(5));
+
+        // Update live driver location state
+        setLiveDriverLoc({
+          lat,
+          lng,
+          accuracy,
+          speed,
+          heading,
+          updatedAt: new Date()
+        });
+
+        // Pan map smoothly to the fresh GPS coordinates
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.panTo({ lat, lng });
+        }
+
+        // Socket.IO Broadcast (Section 8)
+        if (deliveryId) {
+          sendDriverLocationUpdate({
+            deliveryId,
+            lat,
+            lng,
+            accuracy,
+            heading,
+            speed
+          });
+
+          // Sync to MongoDB backend (Section 8)
+          try {
+            const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || '';
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            await fetch('http://localhost:5000/api/delivery/location', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                requestId: deliveryId,
+                lat,
+                lng,
+                accuracy,
+                heading,
+                speed
+              })
+            });
+          } catch (syncErr) {
+            console.warn('Recalibrate location sync warning:', syncErr);
+          }
+        }
+
+        setIsRecalibrating(false);
+
+        if (accuracy > 50) {
+          setRecalibrateToast(`Location updated successfully. (Warning: Low GPS accuracy ±${Math.round(accuracy)}m)`);
+        } else {
+          setRecalibrateToast('Location updated successfully.');
+        }
+        setTimeout(() => setRecalibrateToast(''), 4500);
+      },
+      (err) => {
+        console.warn('Recalibration error in GoogleDeliveryMap:', err);
+        setIsRecalibrating(false);
+        setRecalibrateToast('Unable to determine your current location.');
+        setTimeout(() => setRecalibrateToast(''), 4500);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  }, [deliveryId]);
+
   // Open in Google Maps dynamic directions link
   const googleNavUrl = useMemo(() => {
     if (!currentDriverCoords || !targetDestination) return '#';
@@ -447,7 +556,21 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Section 8: RECALIBRATE button */}
+          <button
+            type="button"
+            onClick={handleRecalibrate}
+            disabled={isRecalibrating}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1a1a] hover:bg-[#333333] active:scale-95 text-white font-label-caps text-[11px] uppercase tracking-wider transition-all shadow-xs cursor-pointer disabled:opacity-60 shrink-0 font-bold border border-black rounded-xl"
+            title="Recalibrate GPS Location & Recalculate Distance"
+          >
+            <span className={`material-symbols-outlined text-[14px] text-[#38bdf8] ${isRecalibrating ? 'animate-spin' : ''}`}>
+              {isRecalibrating ? 'sync' : 'my_location'}
+            </span>
+            <span className="text-white tracking-wider">{isRecalibrating ? 'CALIBRATING...' : 'RECALIBRATE'}</span>
+          </button>
+
           {/* Recenter Button */}
           <button
             type="button"
@@ -515,6 +638,32 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
           <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-3 py-1.5 rounded-lg border border-[#E5ECE8] text-[10px] font-black text-[#0A8B5F] flex items-center gap-1.5 shadow-md z-10">
             <RefreshCw size={12} className="animate-spin text-[#0A8B5F]" />
             <span>Calculating navigation route...</span>
+          </div>
+        )}
+
+        {/* Live Recalibrate Status Banner (Section 8) */}
+        {recalibrateToast && (
+          <div className="absolute top-12 left-3 right-3 z-20 flex justify-center pointer-events-none">
+            <div className={`flex items-center gap-1.5 py-1.5 px-3 border font-mono text-xs font-semibold rounded-lg shadow-md pointer-events-auto transition-all ${
+              recalibrateToast.includes('Unable')
+                ? 'bg-[#ffebee] border-[#ffcdd2] text-[#c62828]'
+                : recalibrateToast.includes('Recalibrating')
+                  ? 'bg-[#e0f2fe] border-[#bae6fd] text-[#0369a1]'
+                  : recalibrateToast.includes('Low') || recalibrateToast.includes('Warning')
+                    ? 'bg-[#fffbeb] border-[#fde68a] text-[#b45309]'
+                    : 'bg-[#e8f5e9] border-[#c8e6c9] text-[#1b5e20]'
+            }`}>
+              <span className={`material-symbols-outlined text-[15px] ${recalibrateToast.includes('Recalibrating') ? 'animate-spin' : ''}`}>
+                {recalibrateToast.includes('Unable')
+                  ? 'error'
+                  : recalibrateToast.includes('Recalibrating')
+                    ? 'sync'
+                    : recalibrateToast.includes('Low') || recalibrateToast.includes('Warning')
+                      ? 'warning'
+                      : 'check_circle'}
+              </span>
+              <span>{recalibrateToast}</span>
+            </div>
           </div>
         )}
 

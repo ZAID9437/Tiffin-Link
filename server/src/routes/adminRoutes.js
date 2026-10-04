@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const { protect, requireAdmin } = require('../middleware/authMiddleware');
+
+// Enforce authentication & Super Admin role authorization on all admin routes
+router.use(protect, requireAdmin);
 
 // Platform Overview KPIs & Live Operations
 router.get('/overview', adminController.getPlatformOverview);

@@ -194,8 +194,8 @@ const initSocket = (server) => {
       try {
         const { deliveryId, lat, lng, accuracy, heading, speed } = payload || {};
 
-        if (!deliveryId || typeof lat !== 'number' || typeof lng !== 'number') {
-          return socket.emit('error', { message: 'Invalid location payload format.' });
+        if (!deliveryId || typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          return socket.emit('error', { message: 'Invalid coordinates provided.' });
         }
 
         const delivery = await DeliveryRequest.findOne({
@@ -236,7 +236,9 @@ const initSocket = (server) => {
           location: updatedLocation,
           status: delivery.status,
           etaMinutes: delivery.etaMinutes,
-          distanceKm: delivery.distanceKm
+          distanceKm: delivery.distanceKm,
+          accuracy: Number(accuracy || 0),
+          isLowAccuracy: Number(accuracy || 0) > 50
         };
 
         const targetRooms = new Set();
@@ -253,11 +255,13 @@ const initSocket = (server) => {
         targetRooms.forEach(room => {
           io.to(room).emit('driver:location:updated', locationPayload);
           io.to(room).emit('delivery:location:changed', locationPayload);
+          io.to(room).emit('driver:location:update', locationPayload);
         });
 
         // Also broadcast to Provider room
         if (delivery.providerId) {
           io.to(`provider:${delivery.providerId}`).emit('driver:location:updated', locationPayload);
+          io.to(`provider:${delivery.providerId}`).emit('driver:location:update', locationPayload);
         }
 
       } catch (err) {

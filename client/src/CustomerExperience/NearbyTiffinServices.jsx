@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useLocation } from '../context/LocationContext';
 import TiffinCustomizer from './TiffinCustomizer';
 import ProviderDossier from './ProviderDossier';
 
@@ -28,6 +29,9 @@ const AHMEDABAD_LOCALITIES = {
 };
 
 export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, onOpenLogin }) {
+  // Centralized real-time location context
+  const { location, isRecalibrating, recalibrateToast, recalibrate, setCustomLocation } = useLocation();
+
   // Navigation View: 'listing' | 'dossier' | 'customizer'
   const [activeView, setActiveView] = useState('listing');
   const [selectedDossierProvider, setSelectedDossierProvider] = useState(null);
@@ -39,13 +43,21 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
   const [orderDate, setOrderDate] = useState(initialFilters.date || '2026-10-04');
   const [timeSlot, setTimeSlot] = useState(initialFilters.time || '01:00 PM - Lunch');
   const [fulfillment, setFulfillment] = useState(initialFilters.deliveryType || 'Delivery');
-  const [locationAddress, setLocationAddress] = useState(initialFilters.location || 'Satellite, Ahmedabad');
+  const [locationAddress, setLocationAddress] = useState(() => {
+    return initialFilters.location || location.address || '';
+  });
   const [budget, setBudget] = useState(Number(initialFilters.budget) || 150);
   const [radiusKm, setRadiusKm] = useState(5.0); // 5km to 10km supported
-  const [coordinates, setCoordinates] = useState({ lat: 23.0300, lng: 72.5178 });
+  const [coordinates, setCoordinates] = useState(() => {
+    if (location.isCalibrated && location.latitude && location.longitude) {
+      return { lat: location.latitude, lng: location.longitude };
+    }
+    if (initialFilters.lat && initialFilters.lng) {
+      return { lat: Number(initialFilters.lat), lng: Number(initialFilters.lng) };
+    }
+    return { lat: 23.0300, lng: 72.5178 };
+  });
   const [sortBy, setSortBy] = useState('distance');
-  const [isRecalibrating, setIsRecalibrating] = useState(false);
-  const [recalibrateToast, setRecalibrateToast] = useState('');
 
   // Atelier cooking standard mandates (checkboxes)
   const [mandates, setMandates] = useState({
@@ -225,103 +237,40 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
     return null;
   };
 
+  // Synchronize with calibrated location from context
+  useEffect(() => {
+    if (location.isCalibrated && location.latitude && location.longitude) {
+      const nextCoords = { lat: location.latitude, lng: location.longitude };
+      setCoordinates(nextCoords);
+      if (location.address) {
+        setLocationAddress(location.address);
+      }
+    }
+  }, [location.isCalibrated, location.latitude, location.longitude, location.address]);
+
   // Quick Zone selection handler
   const handleSelectQuickZone = (zoneName) => {
     const resolved = resolveAddressToCoords(zoneName);
     if (resolved) {
-      setIsRecalibrating(true);
       setCoordinates(resolved.coords);
       setLocationAddress(resolved.formattedName);
+      setCustomLocation({
+        latitude: resolved.coords.lat,
+        longitude: resolved.coords.lng,
+        address: resolved.formattedName
+      });
       fetchProviders(resolved.coords);
-      setTimeout(() => {
-        setIsRecalibrating(false);
-        setRecalibrateToast(`✓ Calibrated to ${resolved.formattedName} (${resolved.coords.lat}° N, ${resolved.coords.lng}° E)`);
-        setTimeout(() => setRecalibrateToast(''), 4500);
-      }, 350);
     }
   };
 
-  // Browser Geolocation Detection & Intelligent Recalibration
-  const handleDetectLocation = () => {
-    setIsRecalibrating(true);
-    setRecalibrateToast('Calibrating coordinates...');
-
-    // 1. Check if user typed a specific locality in the input
-    const typedMatch = resolveAddressToCoords(locationAddress);
-
-    // 2. Query browser GPS if available
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const lat = Number(pos.coords.latitude.toFixed(4));
-          const lng = Number(pos.coords.longitude.toFixed(4));
-          const newCoords = { lat, lng };
-
-          let resolved = '';
-          try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 2000);
-            const geoRes = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-              { signal: controller.signal }
-            );
-            clearTimeout(timer);
-            const geoData = await geoRes.json();
-            if (geoData?.address) {
-              const sub = geoData.address.suburb || geoData.address.neighbourhood || geoData.address.residential || geoData.address.city_district || 'Satellite';
-              resolved = `${sub}, Ahmedabad`;
-            }
-          } catch (e) {}
-
-          if (!resolved) {
-            resolved = typedMatch ? typedMatch.formattedName : `Satellite, Ahmedabad (${lat}° N, ${lng}° E)`;
-          }
-
-          setCoordinates(newCoords);
-          setLocationAddress(resolved);
-          fetchProviders(newCoords);
-          setIsRecalibrating(false);
-          setRecalibrateToast(`✓ GPS Locked: ${lat}° N, ${lng}° E (${resolved.split(',')[0]})`);
-          setTimeout(() => setRecalibrateToast(''), 4500);
-        },
-        (err) => {
-          console.warn('Geolocation denied or timed out, calibrating to known sector:', err);
-          let newCoords = { lat: 23.0300, lng: 72.5178 };
-          let resolved = 'Satellite, Ahmedabad';
-
-          if (typedMatch) {
-            newCoords = typedMatch.coords;
-            resolved = typedMatch.formattedName;
-          }
-
-          setCoordinates(newCoords);
-          setLocationAddress(resolved);
-          fetchProviders(newCoords);
-          setTimeout(() => {
-            setIsRecalibrating(false);
-            setRecalibrateToast(`✓ Calibrated to ${resolved} (${newCoords.lat}° N, ${newCoords.lng}° E)`);
-            setTimeout(() => setRecalibrateToast(''), 4500);
-          }, 350);
-        },
-        { enableHighAccuracy: true, timeout: 2500, maximumAge: 0 }
-      );
-    } else {
-      let newCoords = { lat: 23.0300, lng: 72.5178 };
-      let resolved = 'Satellite, Ahmedabad';
-
-      if (typedMatch) {
-        newCoords = typedMatch.coords;
-        resolved = typedMatch.formattedName;
-      }
-
+  // Browser Geolocation Detection & Intelligent Recalibration (Section 8 & 9)
+  const handleDetectLocation = async () => {
+    const updated = await recalibrate();
+    if (updated && updated.latitude && updated.longitude) {
+      const newCoords = { lat: updated.latitude, lng: updated.longitude };
       setCoordinates(newCoords);
-      setLocationAddress(resolved);
+      setLocationAddress(updated.address);
       fetchProviders(newCoords);
-      setTimeout(() => {
-        setIsRecalibrating(false);
-        setRecalibrateToast(`✓ Calibrated to ${resolved} (${newCoords.lat}° N, ${newCoords.lng}° E)`);
-        setTimeout(() => setRecalibrateToast(''), 4500);
-      }, 350);
     }
   };
 
@@ -339,6 +288,8 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
         tiffin={selectedCustomizerTiffin.tiffin}
         provider={selectedCustomizerTiffin.provider}
         currentUser={currentUser}
+        customerCoordinates={coordinates}
+        customerAddress={locationAddress}
         onBack={() => {
           if (selectedDossierProvider) {
             setActiveView('dossier');
@@ -580,21 +531,28 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
                       <label className="block font-label-caps text-xs uppercase tracking-wider text-[#1b1c1a] font-bold">
                         05 // Delivery Checkpoint
                       </label>
-                      <span className="font-mono text-[10px] text-[#4a4238]">GEO: {coordinates.lat.toFixed(4)}° N, {coordinates.lng.toFixed(4)}° E</span>
+                      <span className="font-mono text-[10px] text-[#4a4238]">
+                        {coordinates?.lat && coordinates?.lng
+                          ? `GEO: ${Number(coordinates.lat).toFixed(4)}° N, ${Number(coordinates.lng).toFixed(4)}° E`
+                          : 'GEO: Not calibrated (Click RECALIBRATE)'}
+                      </span>
                     </div>
                     <div className="flex items-center bg-[#fbf9f5] px-3.5 py-2.5 gap-2 border border-[#ded9d1]">
                       <span className="material-symbols-outlined text-[#1a1a1a] text-[18px]">explore</span>
                       <input
                         type="text"
                         value={locationAddress}
-                        onChange={(e) => setLocationAddress(e.target.value)}
+                        onChange={(e) => {
+                          setLocationAddress(e.target.value);
+                          setCustomLocation({ address: e.target.value });
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             handleDetectLocation();
                           }
                         }}
-                        placeholder="e.g. Satellite, Vastrapur, Bodakdev, Ahmedabad"
+                        placeholder="Enter current address or click RECALIBRATE to detect GPS"
                         className="w-full bg-transparent font-button-text text-xs text-[#1a1a1a] outline-none"
                       />
                       <button
@@ -611,10 +569,26 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
                       </button>
                     </div>
 
-                    {/* Live Recalibrate Status Toast / Confirmation Badge */}
+                    {/* Live Recalibrate Status Toast / Confirmation Badge (Section 8) */}
                     {recalibrateToast && (
-                      <div className="flex items-center gap-1.5 py-1.5 px-3 bg-[#e8f5e9] border border-[#c8e6c9] text-[#1b5e20] font-mono text-[11px] font-medium rounded-xs transition-all">
-                        <span className="material-symbols-outlined text-[14px] text-[#2e7d32]">check_circle</span>
+                      <div className={`flex items-center gap-1.5 py-1.5 px-3 border font-mono text-[11px] font-medium rounded-xs transition-all ${
+                        recalibrateToast.includes('Unable') || recalibrateToast.includes('permission') || recalibrateToast.includes('timed out') || recalibrateToast.includes('Invalid') || recalibrateToast.includes('requires')
+                          ? 'bg-[#ffebee] border-[#ffcdd2] text-[#c62828]'
+                          : recalibrateToast.includes('LOCATING') || recalibrateToast.includes('Recalibrating')
+                            ? 'bg-[#e0f2fe] border-[#bae6fd] text-[#0369a1]'
+                            : recalibrateToast.includes('Low') || recalibrateToast.includes('Warning') || recalibrateToast.includes('low')
+                              ? 'bg-[#fffbeb] border-[#fde68a] text-[#b45309]'
+                              : 'bg-[#e8f5e9] border-[#c8e6c9] text-[#1b5e20]'
+                      }`}>
+                        <span className={`material-symbols-outlined text-[14px] ${recalibrateToast.includes('LOCATING') || recalibrateToast.includes('Recalibrating') ? 'animate-spin' : ''}`}>
+                          {recalibrateToast.includes('Unable') || recalibrateToast.includes('permission') || recalibrateToast.includes('timed out') || recalibrateToast.includes('Invalid') || recalibrateToast.includes('requires')
+                            ? 'error'
+                            : recalibrateToast.includes('LOCATING') || recalibrateToast.includes('Recalibrating')
+                              ? 'sync'
+                              : recalibrateToast.includes('Low') || recalibrateToast.includes('Warning') || recalibrateToast.includes('low')
+                                ? 'warning'
+                                : 'check_circle'}
+                        </span>
                         <span>{recalibrateToast}</span>
                       </div>
                     )}

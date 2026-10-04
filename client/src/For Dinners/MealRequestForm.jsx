@@ -46,6 +46,8 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -55,12 +57,16 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       handleSubmit(e);
     }
   };
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
     
     const submissionData = {
       customerName: formData.customerName || 'Customer Diner',
@@ -88,9 +94,9 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
       onSubmitRequestSuccess(submissionData);
     }
 
-    // Persist request in background
+    // Persist request in background with single flight
     try {
-      fetch('http://localhost:5000/api/requests', {
+      await fetch('http://localhost:5000/api/requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,9 +112,11 @@ export default function MealRequestForm({ onSubmitRequestSuccess }) {
           budget: Number(submissionData.budget) || 140,
           category: submissionData.mealType.includes('Jain') ? 'Jain' : (submissionData.mealType.includes('Non-Veg') ? 'Non-Veg' : 'Gujarati')
         }),
-      }).catch(err => console.warn('Background request save:', err));
+      });
     } catch (error) {
       console.warn('Request submission failed:', error);
+    } finally {
+      setTimeout(() => setIsSubmitting(false), 2000);
     }
   };
 

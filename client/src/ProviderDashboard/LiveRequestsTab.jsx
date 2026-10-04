@@ -67,14 +67,37 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
 
       if (json && json.success && Array.isArray(json.data)) {
         const now = Date.now();
-        // Deduplicate incoming raw data from server
-        const seenReqIds = new Set();
-        const uniqueRawData = json.data.filter(r => {
-          const key = String(r._id || r.id || r.requestId || r.orderId || '').trim();
-          if (key && seenReqIds.has(key)) return false;
-          if (key) seenReqIds.add(key);
+        // 1. Filter out expired or non-pending items from incoming payload
+        const activeRawData = json.data.filter(r => {
+          if (r.status && r.status !== 'pending') return false;
+          if (r.expiresAt && new Date(r.expiresAt).getTime() <= now) return false;
+          if (r.secondsLeft !== undefined && r.secondsLeft <= 0) return false;
           return true;
         });
+
+        // 2. Deduplicate incoming raw data by unique ID and by Customer + Meal combo
+        const seenReqIds = new Set();
+        const seenCustomerMeal = new Set();
+        const uniqueRawData = [];
+
+        for (const r of activeRawData) {
+          const key = String(r._id || r.id || r.requestId || r.orderId || '').trim();
+          if (key && seenReqIds.has(key)) continue;
+          if (key) seenReqIds.add(key);
+
+          // Deduplicate multiple rapid orders from same customer for same meal
+          const phone = (r.customerPhone || '').replace(/\D/g, '');
+          const name = (r.customerName || '').trim().toLowerCase();
+          const meal = (r.mealType || '').trim().toLowerCase();
+          const custKey = `${phone || name}_${meal}`;
+
+          if (custKey && custKey !== '_') {
+            if (seenCustomerMeal.has(custKey)) continue;
+            seenCustomerMeal.add(custKey);
+          }
+
+          uniqueRawData.push(r);
+        }
 
         setRequests(prev => {
           const previousIds = new Set(prev.map(p => p.dbId || p.id));
@@ -86,9 +109,12 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
               hasNewItem = true;
             }
 
-            let secondsLeft = r.secondsLeft !== undefined && r.secondsLeft > 0 ? Math.min(180, r.secondsLeft) : 165;
-            if (r.expiresAt && new Date(r.expiresAt).getTime() > now) {
-              secondsLeft = Math.max(10, Math.min(180, Math.floor((new Date(r.expiresAt).getTime() - now) / 1000)));
+            let secondsLeft = 120;
+            if (r.expiresAt) {
+              const diff = Math.floor((new Date(r.expiresAt).getTime() - now) / 1000);
+              secondsLeft = Math.max(0, Math.min(180, diff));
+            } else if (r.secondsLeft !== undefined) {
+              secondsLeft = Math.max(0, Math.min(180, r.secondsLeft));
             } else if (existing && existing.secondsLeft > 0) {
               secondsLeft = Math.min(180, existing.secondsLeft);
             }
@@ -103,7 +129,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
             const estimatedPayout = subtotal - platformFee;
 
             return {
-              id: r.id || (r._id ? `ORD-${r._id.toString().slice(-4).toUpperCase()}` : `ORD-${8419 + i}`),
+              id: r.id || (r._id ? `REQ-${r._id.toString().slice(-4).toUpperCase()}` : `REQ-${8419 + i}`),
               dbId: r._id,
               customerName: r.customerName || 'Customer',
               customerPhone: r.customerPhone || '+91 98201 44321',
@@ -126,8 +152,9 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
             };
           });
 
-          if (hasNewItem) playNotificationChime();
-          return updatedList;
+          const finalList = updatedList.filter(item => item.secondsLeft > 0 && item.status === 'pending');
+          if (hasNewItem && finalList.length > 0) playNotificationChime();
+          return finalList;
         });
       }
     } catch (err) {
@@ -219,6 +246,9 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
 
   // Filtering & Search
   const filteredRequests = requests.filter(req => {
+    if (req.status && req.status !== 'pending') return false;
+    if (req.secondsLeft !== undefined && req.secondsLeft <= 0) return false;
+
     const matchesSearch =
       req.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       req.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -239,7 +269,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
     return true;
   });
 
-  const pendingReviewCount = Math.max(0, requests.length - 1);
+  const pendingReviewCount = Math.max(0, filteredRequests.length - 1);
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto w-full font-body-md text-on-surface">
@@ -342,7 +372,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
                 <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest font-bold">LIVE REQUESTS</span>
               </div>
               <div className="font-display-lg text-[56px] leading-tight text-on-surface mt-1 font-normal">
-                {requests.length < 10 ? `0${requests.length}` : requests.length}
+                {filteredRequests.length < 10 ? `0${filteredRequests.length}` : filteredRequests.length}
               </div>
             </div>
             <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center">
