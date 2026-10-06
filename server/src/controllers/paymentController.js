@@ -416,7 +416,7 @@ const createPaymentOrder = async (req, res) => {
       selectedShaak: selectedShaak || '',
       instructions: instructions || '',
       status: 'New',
-      deliveryStatus: 'Not Requested',
+      deliveryStatus: 'Unassigned',
       pickupAddress: pricing.providerDoc?.address?.street
         ? `${pricing.providerDoc.address.street}, ${pricing.providerDoc.address.locality || ''}, ${pricing.providerDoc.address.city || 'Ahmedabad'}`
         : 'Kitchen Hub, Ahmedabad'

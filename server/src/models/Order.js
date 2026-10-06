@@ -215,7 +215,7 @@ const orderSchema = new mongoose.Schema({
   deliveryStatus: {
     type: String,
     enum: [
-      'Unassigned', 'Searching', 'SEARCHING_DRIVERS',
+      'Unassigned', 'Not Requested', 'Searching', 'SEARCHING_DRIVERS',
       'Assigned', 'ASSIGNED', 'Accepted',
       'Arrived at Pickup', 'Arrived at Provider', 'ARRIVED_PROVIDER', 'At Kitchen',
       'Picked Up', 'PICKED_UP',

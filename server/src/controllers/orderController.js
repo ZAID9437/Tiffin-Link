@@ -312,7 +312,7 @@ const createOrder = async (req, res) => {
       ...bill,
       paymentStatus: paymentStatus || 'Paid',
       status: status || 'New',
-      deliveryStatus: 'Not Requested'
+      deliveryStatus: 'Unassigned'
     };
 
     if (await isDbConnected()) {
@@ -955,7 +955,7 @@ const createCustomerOrder = async (req, res) => {
       instructions: instructions || '',
       paymentStatus: (paymentMethod || '').toLowerCase().includes('cash') ? 'Cash on Delivery' : 'Paid',
       status: 'New',
-      deliveryStatus: 'Not Requested',
+      deliveryStatus: 'Unassigned',
       pickupAddress: providerDoc?.address?.street 
         ? `${providerDoc.address.street}, ${providerDoc.address.locality || ''}, ${providerDoc.address.city || 'Ahmedabad'}`
         : 'Kitchen Hub, Ahmedabad'
