@@ -416,7 +416,7 @@ const createPaymentOrder = async (req, res) => {
       selectedShaak: selectedShaak || '',
       instructions: instructions || '',
       status: 'New',
-      deliveryStatus: 'Searching',
+      deliveryStatus: 'Not Requested',
       pickupAddress: pricing.providerDoc?.address?.street
         ? `${pricing.providerDoc.address.street}, ${pricing.providerDoc.address.locality || ''}, ${pricing.providerDoc.address.city || 'Ahmedabad'}`
         : 'Kitchen Hub, Ahmedabad'
@@ -584,13 +584,6 @@ const verifyPayment = async (req, res) => {
 
     const newOrder = new Order(finalOrderData);
     await newOrder.save();
-
-    // Trigger existing delivery dispatch workflow
-    try {
-      await reconcileMissingDeliveryRequests();
-    } catch (rErr) {
-      console.warn('Dispatch reconcile error post-payment:', rErr.message);
-    }
 
     return res.json({
       success: true,

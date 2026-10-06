@@ -184,6 +184,30 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
     return dateObj.toDateString() === todayStr;
   }).length;
 
+  // Explicit Provider Dispatch Trigger: Broadcasts Delivery Request to Available Drivers
+  const handleDispatchCourier = async (order) => {
+    try {
+      const cleanDbId = String(order.orderId || order._id).replace(/^#/, '').trim();
+      showToast(`Dispatching Order #${order.orderId || order._id} to courier network...`);
+      const res = await apiRequest(`/orders/${encodeURIComponent(cleanDbId)}/confirm-pickup`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+      if (json && json.success) {
+        showToast(`✓ Order #${order.orderId || order._id} dispatched to courier network! Delivery broadcast active.`);
+        fetchDeliveryData(false);
+      } else {
+        showToast(`⚠️ ${json?.message || 'Dispatch could not be completed'}`);
+        fetchDeliveryData(false);
+      }
+    } catch (err) {
+      console.error('Error dispatching courier:', err);
+      showToast('⚠️ Failed to communicate with dispatch service');
+      fetchDeliveryData(false);
+    }
+  };
+
   // Manual Driver Assignment Action
   const handleAssignDriver = async (driverId, driverName) => {
     if (!assignTargetOrder || isAssigning) return;
@@ -479,11 +503,11 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-label-caps text-[11px] font-bold text-on-surface uppercase tracking-wider">Orders Ready for Assignment ({readyOrders.length})</span>
+                <span className="font-label-caps text-[11px] font-bold text-on-surface uppercase tracking-wider">Orders Ready for Courier ({readyOrders.length})</span>
                 <span className="font-label-caps text-[10px] px-1.5 py-0.5 rounded bg-surface-container text-clay-earth font-semibold uppercase">Action Required</span>
               </div>
               <p className="font-body-md text-xs text-secondary mt-0.5">
-                Food preparation is complete. Assign available delivery partners for immediate pickup.
+                Food preparation is complete. Click Courier to broadcast delivery requests to nearby partners.
               </p>
             </div>
           </div>
@@ -492,14 +516,11 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
               <button
                 key={order._id || order.orderId}
                 type="button"
-                onClick={() => {
-                  setAssignTargetOrder(order);
-                  setIsAssignModalOpen(true);
-                }}
-                className="px-3.5 py-2 bg-onyx-black text-on-primary hover:bg-clay-earth font-button-text text-button-text rounded transition-all flex items-center gap-1.5"
+                onClick={() => handleDispatchCourier(order)}
+                className="px-3.5 py-2 bg-onyx-black text-on-primary hover:bg-clay-earth font-button-text text-button-text rounded transition-all flex items-center gap-1.5 cursor-pointer font-bold"
               >
-                <span className="material-symbols-outlined text-[16px]">person_add</span>
-                <span>Assign Driver for #{order.orderId || order._id}</span>
+                <span className="material-symbols-outlined text-[16px] text-amber-400">send</span>
+                <span>Courier for #{order.orderId || order._id}</span>
               </button>
             ))}
           </div>
@@ -673,17 +694,10 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                             )}
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAssignTargetOrder(item);
-                              setIsAssignModalOpen(true);
-                            }}
-                            className="px-2.5 py-1.5 rounded bg-onyx-black text-on-primary font-button-text text-[12px] hover:bg-clay-earth transition-colors flex items-center gap-1"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">person_add</span>
-                            <span>+ Assign Driver</span>
-                          </button>
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-50 text-amber-900 border border-amber-200/80 text-xs font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
+                            <span>Searching Courier...</span>
+                          </div>
                         )}
                       </td>
 

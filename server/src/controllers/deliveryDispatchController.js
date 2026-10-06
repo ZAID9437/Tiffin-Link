@@ -144,34 +144,34 @@ const reconcileMissingDeliveryRequests = async () => {
           continue;
         }
         const cleanId = String(req.orderId).replace(/^#+/, '');
-        const orderExists = await Order.exists({
+        const parentOrder = await Order.findOne({
           $or: [
             { orderId: cleanId },
             { orderId: `#${cleanId}` },
             { orderId: req.orderId }
           ]
-        });
-        if (!orderExists) {
+        }).select('status deliveryRequestedAt');
+
+        // If order doesn't exist, OR if order has NOT yet been dispatched via "COURIER" (e.g. New/Accepted/Preparing/Ready), prune premature request
+        if (!parentOrder || (['New', 'Pending', 'Accepted', 'Preparing', 'Ready'].includes(parentOrder.status) && !parentOrder.deliveryRequestedAt)) {
           orphanIds.push(req._id);
         }
       }
 
       if (orphanIds.length > 0) {
         await DeliveryRequest.deleteMany({ _id: { $in: orphanIds } });
-        console.log(`[Reconcile] Cleaned ${orphanIds.length} orphaned delivery request(s) with no matching parent order.`);
+        console.log(`[Reconcile] Cleaned ${orphanIds.length} orphaned/premature delivery request(s).`);
       }
     } catch (cleanErr) {
       console.warn('[Reconcile] Orphan cleanup warning:', cleanErr.message);
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    // Find orders that are in delivery or searching for couriers that need reconciliation
+    // Find ONLY orders that have been explicitly dispatched by Provider clicking "COURIER"
+    // (i.e. status is 'Delivery' or 'Out for Delivery', and deliveryRequestedAt exists)
     const unassignedOrders = await Order.find({
-      $or: [
-        { status: { $in: ['Delivery', 'Out for Delivery'] } },
-        { deliveryStatus: 'Searching' }
-      ],
-      status: { $nin: ['Cancelled', 'Completed', 'Delivered'] }
+      status: { $in: ['Delivery', 'Out for Delivery'] },
+      deliveryRequestedAt: { $exists: true, $ne: null }
     });
 
     for (const ord of unassignedOrders) {
@@ -2106,21 +2106,26 @@ const getEligibleRequestsForDriver = async (req, res) => {
       let rawRequests = await DeliveryRequest.find(queryFilter)
         .sort({ requestedAt: -1 });
 
-      // Filter out orphaned requests whose parent order no longer exists
+      // Filter out orphaned requests whose parent order no longer exists OR has not been dispatched yet
       const validRaw = [];
       for (const r of rawRequests) {
         if (!r.orderId) continue;
         const cleanId = String(r.orderId).replace(/^#+/, '');
-        const orderExists = await Order.exists({
+        const parentOrder = await Order.findOne({
           $or: [
             { orderId: cleanId },
             { orderId: `#${cleanId}` },
             { orderId: r.orderId }
           ]
-        });
-        if (orderExists) {
+        }).select('status deliveryRequestedAt');
+
+        // Order MUST exist AND must be in Delivery stage dispatched via Provider "COURIER" action
+        if (parentOrder && ['Delivery', 'Out for Delivery'].includes(parentOrder.status) && parentOrder.deliveryRequestedAt) {
           validRaw.push(r);
-        } else {
+        } else if (parentOrder && ['New', 'Pending', 'Accepted', 'Preparing', 'Ready'].includes(parentOrder.status) && !parentOrder.deliveryRequestedAt) {
+          // Parent order has not been dispatched via "COURIER" yet! Prune premature request so drivers cannot see it.
+          DeliveryRequest.deleteOne({ _id: r._id }).catch(() => {});
+        } else if (!parentOrder) {
           // Self-heal: delete the orphaned request so it never shows up again
           DeliveryRequest.deleteOne({ _id: r._id }).catch(() => {});
         }

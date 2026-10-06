@@ -312,18 +312,12 @@ const createOrder = async (req, res) => {
       ...bill,
       paymentStatus: paymentStatus || 'Paid',
       status: status || 'New',
-      deliveryStatus: 'Searching'
+      deliveryStatus: 'Not Requested'
     };
 
     if (await isDbConnected()) {
       const newOrder = new Order(orderData);
       await newOrder.save();
-      try {
-        const { reconcileMissingDeliveryRequests } = require('./deliveryDispatchController');
-        await reconcileMissingDeliveryRequests();
-      } catch (rErr) {
-        console.warn('Reconciliation error in createOrder:', rErr.message);
-      }
       const refreshedOrder = await Order.findById(newOrder._id);
       return res.status(201).json({ 
         success: true, 
@@ -374,8 +368,11 @@ const updateOrder = async (req, res) => {
     const providerId = req.providerId;
     const updateData = { ...req.body };
 
-    if ((updateData.status === 'Delivery' || updateData.status === 'Ready') && (!updateData.deliveryStatus || updateData.deliveryStatus === 'Unassigned')) {
+    if (updateData.status === 'Delivery' && (!updateData.deliveryStatus || updateData.deliveryStatus === 'Unassigned' || updateData.deliveryStatus === 'Not Requested')) {
       updateData.deliveryStatus = 'Searching';
+      if (!updateData.deliveryRequestedAt) {
+        updateData.deliveryRequestedAt = new Date();
+      }
     }
 
     if (await isDbConnected()) {
@@ -958,7 +955,7 @@ const createCustomerOrder = async (req, res) => {
       instructions: instructions || '',
       paymentStatus: (paymentMethod || '').toLowerCase().includes('cash') ? 'Cash on Delivery' : 'Paid',
       status: 'New',
-      deliveryStatus: 'Searching',
+      deliveryStatus: 'Not Requested',
       pickupAddress: providerDoc?.address?.street 
         ? `${providerDoc.address.street}, ${providerDoc.address.locality || ''}, ${providerDoc.address.city || 'Ahmedabad'}`
         : 'Kitchen Hub, Ahmedabad'
@@ -967,13 +964,6 @@ const createCustomerOrder = async (req, res) => {
     if (await isDbConnected()) {
       const newOrder = new Order(orderData);
       await newOrder.save();
-
-      try {
-        const { reconcileMissingDeliveryRequests } = require('./deliveryDispatchController');
-        await reconcileMissingDeliveryRequests();
-      } catch (rErr) {
-        console.warn('Reconciliation error in createCustomerOrder:', rErr.message);
-      }
 
       const savedOrder = await Order.findById(newOrder._id);
       const enriched = enrichOrderFinancials(savedOrder || newOrder);

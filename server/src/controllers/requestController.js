@@ -218,7 +218,7 @@ const acceptRequest = async (req, res) => {
         totalAmount: finalTotal,
         paymentStatus: 'Paid',
         status: 'Preparing',
-        deliveryStatus: 'Searching',
+        deliveryStatus: 'Not Requested',
         pickupAddress: 'Kitchen Hub'
       });
 
