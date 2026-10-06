@@ -72,6 +72,9 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
         socket.on('delivery:delivered', handleRealtimeDeliveryEvent);
         socket.on('delivery:cancelled', handleRealtimeDeliveryEvent);
         socket.on('delivery:status:updated', handleRealtimeDeliveryEvent);
+        socket.on('kitchen_pickup_otp_created', handleRealtimeDeliveryEvent);
+        socket.on('delivery:pickup:verified', handleRealtimeDeliveryEvent);
+        socket.on('delivery:otp:sent', handleRealtimeDeliveryEvent);
 
         return () => {
           socket.off('connect', handleConnect);
@@ -84,6 +87,9 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
           socket.off('delivery:delivered', handleRealtimeDeliveryEvent);
           socket.off('delivery:cancelled', handleRealtimeDeliveryEvent);
           socket.off('delivery:status:updated', handleRealtimeDeliveryEvent);
+          socket.off('kitchen_pickup_otp_created', handleRealtimeDeliveryEvent);
+          socket.off('delivery:pickup:verified', handleRealtimeDeliveryEvent);
+          socket.off('delivery:otp:sent', handleRealtimeDeliveryEvent);
         };
       }
     } catch (e) {
@@ -253,13 +259,14 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
       return;
     }
 
-    const headers = ['Order ID', 'Customer Name', 'Customer Phone', 'Pickup Address', 'Delivery Address', 'Amount (INR)', 'Delivery Fee', 'Payment Status', 'Delivery Status', 'Driver Name', 'Requested At'];
+    const headers = ['Order ID', 'Customer Name', 'Customer Phone', 'Pickup Address', 'Delivery Address', 'Pickup OTP', 'Amount (INR)', 'Delivery Fee', 'Payment Status', 'Delivery Status', 'Driver Name', 'Requested At'];
     const rows = filteredDeliveries.map(d => [
       `"${d.orderId || d.requestId || d._id}"`,
       `"${d.customerName || 'N/A'}"`,
       `"${d.customerPhone || 'N/A'}"`,
       `"${formatAddrStr(d.pickupAddress, 'Kitchen Staging Bay')}"`,
       `"${formatAddrStr(d.deliveryAddress, 'Ahmedabad')}"`,
+      `"${d.pickupOtp || 'N/A'}"`,
       d.amount || d.totalAmount || 0,
       d.pricing?.deliveryCharge || d.deliveryFee || 51,
       `"${d.paymentStatus || 'PAID'}"`,
@@ -613,6 +620,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                   <th className="py-3 px-4">Delivery Partner</th>
                   <th className="py-3 px-4">Pickup Location</th>
                   <th className="py-3 px-4">Delivery Location</th>
+                  <th className="py-3 px-3 text-center">Pickup OTP</th>
                   <th className="py-3 px-3">Amount</th>
                   <th className="py-3 px-3">Delivery Fee</th>
                   <th className="py-3 px-3">Payment</th>
@@ -693,6 +701,43 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                           <span className="material-symbols-outlined text-[14px]">pin_drop</span>
                           <span>{formatAddrStr(item.deliveryAddress, 'Ahmedabad')}</span>
                         </div>
+                      </td>
+
+                      {/* Pickup OTP */}
+                      <td className="py-4 px-3 align-top text-center">
+                        {(() => {
+                          const matchedReadyOrder = readyOrders.find(ro => ro._id === item.orderId || ro.orderId === item.orderId || ro._id === item._id);
+                          const otp = item.pickupOtp || item.kitchenPickupOtp || item.order?.pickupOtp || matchedReadyOrder?.pickupOtp;
+                          const isVerified = !!(item.pickupOtpVerified || item.isOtpVerified || item.order?.pickupOtpVerified || matchedReadyOrder?.pickupOtpVerified || normStatus === 'PICKED_UP' || normStatus === 'OUT_FOR_DELIVERY' || normStatus === 'DELIVERED');
+
+                          if (isVerified) {
+                            return (
+                              <div className="inline-flex flex-col items-center">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-bold">
+                                  <span className="material-symbols-outlined text-[13px] text-emerald-600">verified</span>
+                                  <span>{otp || '••••'}</span>
+                                </span>
+                                <span className="text-[10px] text-emerald-600 font-medium mt-0.5">Verified</span>
+                              </div>
+                            );
+                          }
+
+                          if (otp) {
+                            return (
+                              <div className="inline-flex flex-col items-center">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-amber-50 text-amber-900 border border-amber-300 font-mono text-sm font-extrabold tracking-widest shadow-sm">
+                                  <span className="material-symbols-outlined text-[14px] text-amber-600">key</span>
+                                  <span>{otp}</span>
+                                </span>
+                                <span className="text-[10px] text-amber-800/80 font-medium mt-0.5 uppercase tracking-wide">Pickup Code</span>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <span className="text-secondary/50 font-mono text-xs">—</span>
+                          );
+                        })()}
                       </td>
 
                       {/* Amount */}
@@ -960,6 +1005,14 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                   <span className="text-secondary font-label-caps uppercase">Customer:</span>
                   <span className="font-bold text-on-surface">{selectedDelivery.customerName || 'Customer'}</span>
                 </div>
+                {selectedDelivery.pickupOtp && (
+                  <div className="flex justify-between items-center text-xs pt-1.5 border-t border-sand-neutral/50">
+                    <span className="text-secondary font-label-caps uppercase">Kitchen Pickup OTP:</span>
+                    <span className="font-mono font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-300 text-xs tracking-wider">
+                      {selectedDelivery.pickupOtpVerified ? `${selectedDelivery.pickupOtp} (Verified)` : selectedDelivery.pickupOtp}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <GoogleDeliveryMap delivery={selectedDelivery} height="20rem" />
@@ -1033,6 +1086,35 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
                   {selectedDelivery.assignedDriver?.phone ? ` (${selectedDelivery.assignedDriver.phone})` : ''}
                 </p>
               </div>
+
+              {/* Kitchen Pickup OTP Dossier */}
+              {(() => {
+                const otp = selectedDelivery.pickupOtp || selectedDelivery.kitchenPickupOtp || selectedDelivery.order?.pickupOtp;
+                const isVerified = !!(selectedDelivery.pickupOtpVerified || selectedDelivery.isOtpVerified || selectedDelivery.order?.pickupOtpVerified || ['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(getNormalizedStatus(selectedDelivery)));
+                return (
+                  <div className="p-4 bg-surface-container-low rounded-lg border border-sand-neutral space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-label-caps text-clay-earth uppercase tracking-wider font-bold flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-amber-600">key</span>
+                        Kitchen Pickup OTP
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase border ${
+                        isVerified
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-amber-100 text-amber-800 border-amber-300'
+                      }`}>
+                        {isVerified ? 'PICKUP VERIFIED' : 'PENDING DRIVER PICKUP'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-secondary font-medium">4-Digit Verification Code:</span>
+                      <span className="font-mono text-base font-bold tracking-widest text-amber-950 bg-amber-50 px-3 py-1 rounded border border-amber-300 shadow-sm">
+                        {isVerified ? (otp || '••••') : (otp || '----')}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="p-4 bg-surface-container-low border-t border-sand-neutral flex justify-end">
