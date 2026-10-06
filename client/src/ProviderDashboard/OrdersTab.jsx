@@ -72,6 +72,9 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         socket.on('delivery:assigned', handleRealtimeOrderEvent);
         socket.on('delivery:accepted', handleRealtimeOrderEvent);
         socket.on('delivery:request:new', handleRealtimeOrderEvent);
+        socket.on('kitchen_pickup_otp_created', handleRealtimeOrderEvent);
+        socket.on('delivery:pickup:verified', handleRealtimeOrderEvent);
+        socket.on('delivery:otp:sent', handleRealtimeOrderEvent);
 
         return () => {
           socket.off('order:created', handleRealtimeOrderEvent);
@@ -81,6 +84,9 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
           socket.off('delivery:assigned', handleRealtimeOrderEvent);
           socket.off('delivery:accepted', handleRealtimeOrderEvent);
           socket.off('delivery:request:new', handleRealtimeOrderEvent);
+          socket.off('kitchen_pickup_otp_created', handleRealtimeOrderEvent);
+          socket.off('delivery:pickup:verified', handleRealtimeOrderEvent);
+          socket.off('delivery:otp:sent', handleRealtimeOrderEvent);
         };
       }
     } catch (err) {
@@ -178,6 +184,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             driverVehicle: o.driverVehicle || o.driver?.vehicle || '—',
             deliveryStatus: o.deliveryStatus || (o.status === 'Ready' ? 'Awaiting Pickup' : o.status === 'Delivery' ? 'Searching' : o.status === 'Completed' ? 'Delivered' : 'Unassigned'),
             pickupOtp: o.pickupOtp || '',
+            pickupOtpVerified: !!(o.pickupOtpVerified || o.deliveryStatus === 'Picked Up' || o.pickedUpAt),
             deliveryOtp: o.deliveryOtp || '',
             cancelledBy: o.cancelledBy || 'Customer',
             cancellationReason: o.cancellationReason || 'Order cancelled.',
@@ -2092,6 +2099,34 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                 </div>
               </div>
 
+              {/* Kitchen Pickup OTP Dossier */}
+              {(selectedOrder.status === 'Delivery' || selectedOrder.status === 'Ready' || selectedOrder.status === 'Out for Delivery' || selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtp) && (
+                <div className="p-4 bg-surface-container-low rounded-xl border border-sand-neutral/30 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-label-caps text-clay-earth uppercase tracking-wider font-bold">
+                      KITCHEN PICKUP OTP
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                      (selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified)
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}>
+                      {(selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified)
+                        ? 'PICKUP VERIFIED'
+                        : 'PENDING PICKUP'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-secondary font-medium">4-Digit Verification Code:</span>
+                    <span className="font-mono text-base font-bold tracking-widest text-onyx-black bg-white px-3 py-1 rounded border border-sand-neutral/60">
+                      {(selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified)
+                        ? '••••'
+                        : (selectedOrder.pickupOtp || '----')}
+                    </span>
+                  </div>
+                </div>
+              )}
+
             </div>
 
             {/* Action Footer */}
@@ -2131,11 +2166,15 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                           Courier Assigned: {selectedOrder.driverName || selectedOrder.deliveryPartnerName || 'Partner'}
                         </span>
-                        {selectedOrder.pickupOtp && (
+                        {selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified ? (
+                          <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300 font-bold text-emerald-900">
+                            PICKUP VERIFIED ••••
+                          </span>
+                        ) : selectedOrder.pickupOtp ? (
                           <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300 font-bold text-emerald-900">
                             Pickup OTP: {selectedOrder.pickupOtp}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                       <div className="text-[11px] text-emerald-800">Phone: {selectedOrder.driverPhone || selectedOrder.deliveryPartnerPhone || 'Contacting...'}</div>
                     </div>
@@ -2193,11 +2232,15 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                             Courier Assigned: {selectedOrder.driverName || 'Partner'}
                           </span>
-                          {selectedOrder.pickupOtp && (
+                          {selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified ? (
+                            <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300 font-bold text-emerald-900">
+                              PICKUP VERIFIED ••••
+                            </span>
+                          ) : selectedOrder.pickupOtp ? (
                             <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300 font-bold text-emerald-900">
                               Pickup OTP: {selectedOrder.pickupOtp}
                             </span>
-                          )}
+                          ) : null}
                         </div>
                         <div className="text-[11px] text-emerald-800">Phone: {selectedOrder.driverPhone || 'Contacting...'}</div>
                       </div>

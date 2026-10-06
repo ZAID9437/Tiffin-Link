@@ -372,8 +372,9 @@ export default function ActiveDeliveryView({
   // OTP Verification Submission
   const handleVerifyOtp = async () => {
     const cleanOtp = (otpInput || '').trim();
-    if (!cleanOtp || cleanOtp.length < 4 || cleanOtp.length > 6 || !/^\d+$/.test(cleanOtp)) {
-      setOtpError('Please enter a valid numeric verification code');
+    const requiredLength = otpType === 'delivery' ? 6 : 4;
+    if (!cleanOtp || cleanOtp.length !== requiredLength || !/^\d+$/.test(cleanOtp)) {
+      setOtpError(`Please enter a valid ${requiredLength}-digit numeric verification code`);
       return;
     }
 
@@ -1089,17 +1090,19 @@ export default function ActiveDeliveryView({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="font-label-caps text-[10px] uppercase text-secondary font-bold">ENTER VERIFICATION CODE</label>
-                <span className="text-[10px] text-secondary font-semibold">4–6 Digit Code</span>
+                <span className="text-[10px] text-secondary font-semibold">
+                  {otpType === 'delivery' ? '6-Digit Code' : '4-Digit Code'}
+                </span>
               </div>
               <input
                 type="text"
-                maxLength={6}
+                maxLength={otpType === 'delivery' ? 6 : 4}
                 value={otpInput}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^\d]/g, '');
                   setOtpInput(val);
                 }}
-                placeholder="Enter 4-6 digit code"
+                placeholder={otpType === 'delivery' ? 'Enter 6-digit code' : 'Enter 4-digit code'}
                 autoFocus
                 className="w-full p-3 bg-bone-white border border-sand-neutral text-center text-2xl font-bold tracking-widest text-onyx-black focus:outline-none focus:border-onyx-black font-mono"
               />
@@ -1119,7 +1122,7 @@ export default function ActiveDeliveryView({
               </button>
               <button
                 type="button"
-                disabled={isUpdatingStatus || !otpInput || otpInput.trim().length < 4}
+                disabled={isUpdatingStatus || !otpInput || (otpType === 'delivery' ? otpInput.trim().length !== 6 : otpInput.trim().length !== 4)}
                 onClick={handleVerifyOtp}
                 className="px-6 py-2 bg-onyx-black text-on-primary font-button-text text-xs uppercase font-bold hover:bg-stone-800 cursor-pointer disabled:opacity-50 flex items-center gap-2"
               >

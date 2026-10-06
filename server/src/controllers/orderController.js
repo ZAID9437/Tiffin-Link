@@ -1129,9 +1129,10 @@ const confirmOrderPickup = async (req, res) => {
       });
     }
 
-    // Generate random 4-digit pickup & delivery OTPs if not already present
-    const pickupOtp = order.pickupOtp || String(Math.floor(1000 + Math.random() * 9000));
-    const deliveryOtp = order.deliveryOtp || String(Math.floor(1000 + Math.random() * 9000));
+    // Generate 4-digit Kitchen Pickup OTP & 6-digit Customer Handover OTP if not already present
+    const isValid4Digit = (c) => c && /^\d{4}$/.test(String(c).trim());
+    const pickupOtp = isValid4Digit(order.pickupOtp) ? String(order.pickupOtp).trim() : String(Math.floor(1000 + Math.random() * 9000));
+    const deliveryOtp = order.deliveryOtp || String(Math.floor(100000 + Math.random() * 900000));
 
     // Update order status to Delivery and searching for couriers
     order.status = 'Delivery';

@@ -15,7 +15,7 @@ const PayoutMethod = require('../models/PayoutMethod');
 const Review = require('../models/Review');
 const { ensureConnected } = require('../config/db');
 
-const { sendOtpEmail } = require('../services/emailService');
+const { sendOtpEmail, sendKitchenPickupOtpEmail } = require('../services/emailService');
 
 const maskEmail = (email) => {
   if (!email || typeof email !== 'string') return 'm******@gmail.com';
@@ -203,7 +203,14 @@ const reconcileMissingDeliveryRequests = async () => {
         !ord.deliveryPartnerName.toLowerCase().includes('searching')
       );
 
+      const isValid4Digit = (c) => c && /^\d{4}$/.test(String(c).trim());
+      let canonicalPickupOtp = isValid4Digit(ord.pickupOtp) ? String(ord.pickupOtp).trim() : null;
+
       if (!existingReq) {
+        if (!canonicalPickupOtp) {
+          canonicalPickupOtp = String(Math.floor(1000 + Math.random() * 9000));
+        }
+
         const newReq = await DeliveryRequest.create({
           requestId: `#DEL-${Math.floor(1000 + Math.random() * 9000)}`,
           orderId: ord.orderId || hashedOrdId,
@@ -240,6 +247,7 @@ const reconcileMissingDeliveryRequests = async () => {
           amount: ord.totalAmount || 220,
           itemCount: ord.quantity || 1,
           candidateDrivers: [],
+          pickupOtp: canonicalPickupOtp,
           requestedAt: ord.createdAt ? new Date(ord.createdAt) : new Date()
         });
 
@@ -259,9 +267,20 @@ const reconcileMissingDeliveryRequests = async () => {
 
         await Order.updateOne(
           { _id: ord._id },
-          { $set: { deliveryStatus: hasAssignedDriverOnOrd ? 'Assigned' : 'Searching' } }
+          { $set: { deliveryStatus: hasAssignedDriverOnOrd ? 'Assigned' : 'Searching', pickupOtp: canonicalPickupOtp } }
         );
       } else {
+        // Sync 4-Digit Pickup OTP between existing DeliveryRequest & Order
+        let syncPickupOtp = isValid4Digit(existingReq.pickupOtp) ? String(existingReq.pickupOtp).trim() : (canonicalPickupOtp || null);
+        if (!syncPickupOtp) {
+          syncPickupOtp = String(Math.floor(1000 + Math.random() * 9000));
+        }
+
+        if (existingReq.pickupOtp !== syncPickupOtp) {
+          await DeliveryRequest.updateOne({ _id: existingReq._id }, { $set: { pickupOtp: syncPickupOtp } });
+          existingReq.pickupOtp = syncPickupOtp;
+        }
+
         // Sync Order with existing DeliveryRequest status & assigned driver
         if (hasAssignedDriverOnOrd && (!existingReq.assignedDriver?.name || existingReq.status === 'Searching Drivers')) {
           const assignedName = ord.deliveryPartnerName || ord.driverName;
@@ -316,6 +335,10 @@ const reconcileMissingDeliveryRequests = async () => {
           status: syncStatus,
           deliveryStatus: syncDelStatus
         };
+
+        if (ord.pickupOtp !== syncPickupOtp) {
+          updateFields.pickupOtp = syncPickupOtp;
+        }
 
         if (driverName) {
           updateFields.deliveryPartnerName = driverName;
@@ -479,9 +502,10 @@ const createDeliveryRequest = async (req, res) => {
       if (orderId) {
         const ordFilter = isValidObjectId(orderId) ? { $or: [{ orderId }, { _id: orderId }] } : { orderId };
         if (providerId) ordFilter.providerId = providerId;
+        const currentPickupOtp = request?.pickupOtp || pickupOtp;
         await Order.findOneAndUpdate(
           ordFilter,
-          { $set: { status: 'Delivery', deliveryStatus: 'Searching', deliveryPartnerName: '' } }
+          { $set: { status: 'Delivery', deliveryStatus: 'Searching', deliveryPartnerName: '', pickupOtp: currentPickupOtp } }
         );
       }
 
@@ -670,18 +694,16 @@ const isAuthorizedForDelivery = async (req, delivery) => {
   return true;
 };
 
-// @desc    Verify Kitchen Pickup Email OTP
+// @desc    Verify Kitchen Pickup Email OTP (Strictly 4-Digit Synchronized OTP)
 // @route   POST /api/delivery/verify-otp or /api/delivery/:deliveryId/pickup-otp/verify
 const verifyOtp = async (req, res) => {
   try {
     const deliveryId = req.params.deliveryId || req.body.requestId || req.body.orderId || req.body.deliveryId;
-    const inputCode = req.body.otp || req.body.code;
+    const inputCode = String(req.body.otp || req.body.code || '').trim();
 
-    const driverEmail = (req.user?.email || req.body.driverEmail || '').toLowerCase().trim();
-    const driverId = (req.user?.id || req.user?._id || req.body.driverId || '').trim();
-
-    if (!inputCode || String(inputCode).trim() === '' || String(inputCode).trim().length < 4) {
-      return res.status(400).json({ success: false, message: 'Please enter a valid verification code.' });
+    // 1. Strict 4-digit numeric validation for Kitchen Pickup OTP
+    if (!inputCode || !/^\d{4}$/.test(inputCode)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid 4-digit verification code.' });
     }
 
     if (!(await isDbConnected())) {
@@ -695,64 +717,82 @@ const verifyOtp = async (req, res) => {
       return res.status(404).json({ success: false, message: 'This delivery is no longer eligible for kitchen pickup verification.' });
     }
 
-    // 1. Authorization Check: Verify driver is assigned to this delivery
+    // 2. Authorization Check: Verify driver is assigned to this delivery
     const isAuthorized = await isAuthorizedForDelivery(req, delivery);
     if (!isAuthorized) {
       return res.status(403).json({ success: false, message: 'You are not authorized to verify this delivery.' });
     }
 
-    const cleanIdStr = String(delivery.requestId || delivery.orderId || delivery._id);
-
-    // 2. Find active KITCHEN_PICKUP OTP document in MongoDB
-    let otpDoc = await Otp.findOne({ deliveryId: cleanIdStr, purpose: 'KITCHEN_PICKUP' }).sort({ createdAt: -1 });
-
-    if (!otpDoc) {
-      otpDoc = await Otp.findOne({ purpose: 'KITCHEN_PICKUP' }).sort({ createdAt: -1 });
+    // 3. Status check: Verify delivery is in an active pending pickup state
+    if (delivery.pickupOtpVerified || delivery.status === 'Picked Up') {
+      return res.json({
+        success: true,
+        message: 'Kitchen pickup already verified.',
+        delivery
+      });
     }
 
-    const cleanCode = String(inputCode).trim();
+    if (delivery.status === 'Cancelled' || delivery.status === 'Delivered') {
+      return res.status(400).json({
+        success: false,
+        message: `Delivery is currently ${delivery.status} and cannot be verified for pickup.`
+      });
+    }
+
+    const cleanIdStr = String(delivery.requestId || delivery.orderId || delivery._id);
+
+    // 4. Find active KITCHEN_PICKUP OTP document strictly belonging to this delivery
+    const otpDoc = await Otp.findOne({
+      $or: [
+        { deliveryId: cleanIdStr },
+        { orderId: delivery.orderId }
+      ],
+      purpose: 'KITCHEN_PICKUP'
+    }).sort({ createdAt: -1 });
+
+    const cleanCode = inputCode;
     const hashedInput = crypto.createHash('sha256').update(cleanCode).digest('hex');
 
-    if (!otpDoc) {
-      if (delivery.pickupOtp && String(delivery.pickupOtp).trim() === cleanCode) {
-        // Fallback match
-      } else {
-        return res.status(400).json({ success: false, message: 'No active verification code found. Please request a new code.' });
-      }
-    } else {
-      // 3. Check expiration (5 minutes)
-      if (otpDoc.expiresAt && Date.now() > new Date(otpDoc.expiresAt).getTime()) {
-        return res.status(400).json({ success: false, message: 'This verification code has expired. Please request a new code.' });
-      }
+    // 5. Check expiration
+    if (otpDoc && otpDoc.expiresAt && Date.now() > new Date(otpDoc.expiresAt).getTime()) {
+      return res.status(400).json({ success: false, message: 'This verification code has expired. Please request a new code.' });
+    }
 
-      // 4. Check max attempts (5)
-      if (otpDoc.attempts >= 5) {
-        await Otp.deleteOne({ _id: otpDoc._id });
-        return res.status(400).json({ success: false, message: 'Too many incorrect attempts. Please request a new code.' });
+    // 6. Check max attempts (5)
+    if (otpDoc && otpDoc.attempts >= 5) {
+      return res.status(400).json({ success: false, message: 'Too many incorrect attempts. Please request a new code.' });
+    }
+
+    // 7. Synchronized comparison: check against stored hashed/plain OTP, DeliveryRequest.pickupOtp, and Order.pickupOtp
+    let isMatch = (otpDoc && (otpDoc.hashedOtp === hashedInput || String(otpDoc.otp).trim() === cleanCode)) ||
+                  (delivery.pickupOtp && String(delivery.pickupOtp).trim() === cleanCode);
+
+    if (!isMatch && delivery.orderId) {
+      const ordDoc = await Order.findOne(buildIdQuery(delivery.orderId)).select('pickupOtp');
+      if (ordDoc && ordDoc.pickupOtp && String(ordDoc.pickupOtp).trim() === cleanCode) {
+        isMatch = true;
       }
+    }
 
-      // 5. Compare submitted OTP against stored hashed OTP or plain OTP
-      const isMatch = (otpDoc.hashedOtp && otpDoc.hashedOtp === hashedInput) ||
-                      (otpDoc.otp && String(otpDoc.otp).trim() === cleanCode) ||
-                      (delivery.pickupOtp && String(delivery.pickupOtp).trim() === cleanCode);
-
-      if (!isMatch) {
+    if (!isMatch) {
+      if (otpDoc) {
         otpDoc.attempts = (otpDoc.attempts || 0) + 1;
         await otpDoc.save();
 
         if (otpDoc.attempts >= 5) {
-          await Otp.deleteOne({ _id: otpDoc._id });
           return res.status(400).json({ success: false, message: 'Too many incorrect attempts. Please request a new code.' });
         }
-
-        return res.status(400).json({ success: false, message: 'Invalid verification code. Please try again.' });
       }
 
+      return res.status(400).json({ success: false, message: 'Invalid verification code. Please try again.' });
+    }
+
+    if (otpDoc) {
       otpDoc.verifiedAt = new Date();
       await otpDoc.save();
     }
 
-    // 6. Success Flow: Update MongoDB Delivery & Order Status
+    // 8. Success Flow: Update MongoDB Delivery & Order Status
     delivery.pickupOtpVerified = true;
     delivery.status = 'Picked Up';
     delivery.pickedUpAt = new Date();
@@ -761,33 +801,49 @@ const verifyOtp = async (req, res) => {
     if (delivery.orderId) {
       await Order.updateMany(
         buildIdQuery(delivery.orderId),
-        { $set: { status: 'Out for Delivery', deliveryStatus: 'Picked Up', pickedUpAt: new Date() } }
+        { 
+          $set: { 
+            status: 'Out for Delivery', 
+            deliveryStatus: 'Picked Up', 
+            pickupOtpVerified: true,
+            pickedUpAt: delivery.pickedUpAt 
+          } 
+        }
       );
     }
 
-    // 7. Socket.IO Real-time Events
+    // 9. Socket.IO Real-time Events
     try {
       const { emitToDelivery, emitToProvider, emitToDriver, emitToCustomer, getIO } = require('../services/socketService');
       const payload = {
         deliveryId: cleanIdStr,
+        requestId: cleanIdStr,
         orderId: delivery.orderId,
         status: 'Out for Delivery',
         deliveryStatus: 'Picked Up',
+        pickupOtpVerified: true,
         pickedUpAt: delivery.pickedUpAt
       };
       emitToDelivery(cleanIdStr, 'delivery:pickup:verified', payload);
       emitToDelivery(cleanIdStr, 'delivery:status:updated', payload);
-      if (delivery.providerId) emitToProvider(delivery.providerId, 'delivery:status:updated', payload);
+      if (delivery.providerId) {
+        emitToProvider(delivery.providerId, 'delivery:pickup:verified', payload);
+        emitToProvider(delivery.providerId, 'delivery:status:updated', payload);
+        emitToProvider(delivery.providerId, 'order:status:updated', payload);
+        emitToProvider(delivery.providerId, 'order:updated', payload);
+      }
       if (delivery.assignedDriver?.driverId) emitToDriver(delivery.assignedDriver.driverId, 'delivery:status:updated', payload);
       if (delivery.customerId) {
         emitToCustomer(delivery.customerId, 'order:status:updated', payload);
         emitToCustomer(delivery.customerId, 'order:updated', payload);
+        emitToCustomer(delivery.customerId, 'delivery:status:updated', payload);
       }
       const io = getIO();
       if (io) {
         io.emit('order:status:updated', payload);
         io.emit('order:updated', payload);
         io.emit('delivery:status:updated', payload);
+        io.emit('delivery:pickup:verified', payload);
       }
     } catch (sErr) {
       console.warn('Socket broadcast error in verifyOtp pickup:', sErr.message);
@@ -860,42 +916,95 @@ const sendPickupOtpSms = async (req, res) => {
       });
     }
 
-    // 3. Generate cryptographically secure 6-digit OTP
-    const rawOtp = String(crypto.randomInt(100000, 999999));
+    const cleanIdStr = String(delivery.requestId || delivery.orderId || delivery._id);
+
+    // 3. READ EXISTING ACTIVE 4-DIGIT KITCHEN PICKUP OTP — DO NOT GENERATE A SECOND OTP!
+    const isValid4Digit = (code) => code && /^\d{4}$/.test(String(code).trim());
+    let rawOtp = isValid4Digit(delivery.pickupOtp) ? String(delivery.pickupOtp).trim() : null;
+
+    if (!rawOtp && delivery.orderId) {
+      const ord = await Order.findOne(buildIdQuery(delivery.orderId)).select('pickupOtp');
+      if (ord && isValid4Digit(ord.pickupOtp)) {
+        rawOtp = String(ord.pickupOtp).trim();
+      }
+    }
+
+    if (!rawOtp) {
+      const existingOtpDoc = await Otp.findOne({
+        $or: [{ deliveryId: cleanIdStr }, { orderId: delivery.orderId }],
+        purpose: 'KITCHEN_PICKUP',
+        expiresAt: { $gt: new Date() }
+      }).sort({ createdAt: -1 });
+
+      if (existingOtpDoc && isValid4Digit(existingOtpDoc.otp)) {
+        rawOtp = String(existingOtpDoc.otp).trim();
+      }
+    }
+
+    // Only generate if no valid 4-digit OTP exists anywhere
+    if (!rawOtp) {
+      rawOtp = String(crypto.randomInt(1000, 10000));
+    }
+
     const hashedOtp = crypto.createHash('sha256').update(rawOtp).digest('hex');
 
-    // 4. Invalidate any active previous OTPs for this deliveryId and purpose
-    const cleanIdStr = String(delivery.requestId || delivery.orderId || delivery._id);
-    await Otp.deleteMany({ deliveryId: cleanIdStr, purpose: 'KITCHEN_PICKUP' });
-
-    // 5. Store OTP securely in MongoDB with 5-minute expiration & 0 attempts
-    await Otp.create({
-      deliveryId: cleanIdStr,
-      orderId: delivery.orderId || '',
-      providerId: delivery.providerId || '',
-      email: providerEmail,
-      purpose: 'KITCHEN_PICKUP',
-      otp: rawOtp,
-      hashedOtp,
-      attempts: 0,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes expiration
-      createdAt: new Date()
-    });
-
+    // 4. Ensure same 4-digit OTP is persisted to DeliveryRequest & Order
     delivery.pickupOtp = rawOtp;
+    if (providerEmail && !delivery.providerEmail) {
+      delivery.providerEmail = providerEmail;
+    }
     await delivery.save();
 
-    // 6. Dispatch Email using Nodemailer email service
+    if (delivery.orderId) {
+      await Order.updateMany(
+        buildIdQuery(delivery.orderId),
+        { $set: { pickupOtp: rawOtp } }
+      );
+    }
+
+    // 5. Store / Upsert OTP record in Otp collection with purpose: 'KITCHEN_PICKUP'
+    await Otp.findOneAndUpdate(
+      {
+        $or: [{ deliveryId: cleanIdStr }, { orderId: delivery.orderId }],
+        purpose: 'KITCHEN_PICKUP'
+      },
+      {
+        $setOnInsert: {
+          deliveryId: cleanIdStr,
+          orderId: delivery.orderId || '',
+          providerId: delivery.providerId || '',
+          email: providerEmail,
+          purpose: 'KITCHEN_PICKUP',
+          createdAt: new Date()
+        },
+        $set: {
+          otp: rawOtp,
+          hashedOtp,
+          attempts: 0,
+          expiresAt: new Date(Date.now() + 30 * 60 * 1000)
+        }
+      },
+      { upsert: true, new: true }
+    );
+
+    // 6. Dispatch Email using dedicated Kitchen Pickup Email template
     try {
       const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
       const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
-      await sendOtpEmail(providerEmail, rawOtp, smtpUser, smtpPass);
-      console.log(`[Kitchen Pickup OTP] Sent 6-digit email OTP to ${providerEmail} for delivery ${cleanIdStr}`);
+      await sendKitchenPickupOtpEmail({
+        email: providerEmail,
+        otp: rawOtp,
+        orderRef: delivery.orderId || cleanIdStr,
+        providerName: delivery.providerName || 'Kitchen Partner',
+        user: smtpUser,
+        pass: smtpPass
+      });
+      console.log(`[Kitchen Pickup OTP] Sent 4-digit email OTP to ${providerEmail} for delivery ${cleanIdStr}`);
     } catch (mailErr) {
       console.warn(`[Kitchen Pickup OTP Mail Notice] Email dispatch notice for ${providerEmail}:`, mailErr.message);
     }
 
-    // 7. Broadcast Socket.IO event to provider room & global listeners
+    // 7. Broadcast Socket.IO event to provider room
     try {
       const { emitToProvider, getIO } = require('../services/socketService');
       const payload = {
@@ -903,33 +1012,29 @@ const sendPickupOtpSms = async (req, res) => {
         requestId: cleanIdStr,
         orderId: delivery.orderId,
         otp: rawOtp,
+        pickupOtp: rawOtp,
         channel: 'email',
         maskedEmail: maskEmail(providerEmail),
         message: `🔑 Kitchen Pickup Verification OTP for Order ${delivery.orderId || cleanIdStr}: ${rawOtp}`
       };
 
       if (delivery.providerId) {
+        emitToProvider(delivery.providerId, 'kitchen_pickup_otp_created', payload);
         emitToProvider(delivery.providerId, 'delivery:otp:sent', payload);
       }
 
       const io = getIO();
       if (io) {
-        io.emit('delivery:otp:sent', payload);
+        io.emit('kitchen_pickup_otp_created', payload);
       }
     } catch (sErr) {}
 
     const maskedEmail = maskEmail(providerEmail);
 
-    console.log(`\n======================================================`);
-    console.log(`✉️ [TESTING KITCHEN OTP] Email: ${providerEmail} | OTP Code: ${rawOtp}`);
-    console.log(`======================================================\n`);
-
     return res.json({
       success: true,
-      message: `Verification code sent to kitchen provider email (${maskedEmail})`,
-      maskedEmail,
-      testOtp: rawOtp,
-      expiresIn: 300
+      message: 'Verification code sent to registered email.',
+      maskedEmail
     });
   } catch (error) {
     console.error('Error sending kitchen pickup email OTP:', error);
@@ -2175,6 +2280,58 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
         });
       }
 
+      // Ensure ONE unique 4-digit Kitchen Pickup OTP exists for this delivery
+      const isValid4Digit = (c) => c && /^\d{4}$/.test(String(c).trim());
+      let canonicalPickupOtp = isValid4Digit(acceptedReq.pickupOtp) ? String(acceptedReq.pickupOtp).trim() : null;
+
+      if (!canonicalPickupOtp && acceptedReq.orderId) {
+        const ordCheck = await Order.findOne(buildIdQuery(acceptedReq.orderId)).select('pickupOtp');
+        if (ordCheck && isValid4Digit(ordCheck.pickupOtp)) {
+          canonicalPickupOtp = String(ordCheck.pickupOtp).trim();
+        }
+      }
+
+      if (!canonicalPickupOtp) {
+        canonicalPickupOtp = String(crypto.randomInt(1000, 10000));
+      }
+
+      acceptedReq.pickupOtp = canonicalPickupOtp;
+      await acceptedReq.save();
+
+      // Ensure Provider email is resolved
+      let providerEmail = (acceptedReq.providerEmail || '').trim().toLowerCase();
+      if (!providerEmail && acceptedReq.providerId && isValidObjectId(acceptedReq.providerId)) {
+        const prov = await Provider.findById(acceptedReq.providerId);
+        if (prov) providerEmail = (prov.email || '').trim().toLowerCase();
+      }
+
+      // Store/Upsert in Otp collection
+      const cleanIdStr = String(acceptedReq.requestId || acceptedReq.orderId || acceptedReq._id);
+      const hashedOtp = crypto.createHash('sha256').update(canonicalPickupOtp).digest('hex');
+      await Otp.findOneAndUpdate(
+        {
+          $or: [{ deliveryId: cleanIdStr }, { orderId: acceptedReq.orderId }],
+          purpose: 'KITCHEN_PICKUP'
+        },
+        {
+          $setOnInsert: {
+            deliveryId: cleanIdStr,
+            orderId: acceptedReq.orderId || '',
+            providerId: acceptedReq.providerId || '',
+            email: providerEmail,
+            purpose: 'KITCHEN_PICKUP',
+            createdAt: new Date()
+          },
+          $set: {
+            otp: canonicalPickupOtp,
+            hashedOtp,
+            attempts: 0,
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000)
+          }
+        },
+        { upsert: true, new: true }
+      );
+
       if (acceptedReq.orderId) {
         const orderQuery = buildIdQuery(acceptedReq.orderId);
         await Order.updateMany(
@@ -2186,6 +2343,7 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
               driverId: String(driverId), 
               deliveryPartnerName: driverName, 
               deliveryPartnerPhone: driverPhone,
+              pickupOtp: canonicalPickupOtp,
               assignedAt: new Date()
             } 
           }
@@ -2203,6 +2361,7 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
             requestId: targetId,
             status: 'Delivery',
             deliveryStatus: 'Assigned',
+            pickupOtp: canonicalPickupOtp,
             driverId,
             driverName,
             driverPhone,
@@ -2214,6 +2373,11 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
             emitToProvider(acceptedReq.providerId, 'delivery:assigned', assignedPayload);
             emitToProvider(acceptedReq.providerId, 'order:updated', assignedPayload);
             emitToProvider(acceptedReq.providerId, 'order:status:updated', assignedPayload);
+            emitToProvider(acceptedReq.providerId, 'kitchen_pickup_otp_created', {
+              orderId: acceptedReq.orderId,
+              requestId: targetId,
+              pickupOtp: canonicalPickupOtp
+            });
           }
           if (acceptedReq.customerId) {
             emitToCustomer(acceptedReq.customerId, 'delivery:assigned', assignedPayload);

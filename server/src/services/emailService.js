@@ -243,8 +243,81 @@ const sendDeliveryDocumentRejectionEmail = async ({ email, fullName, application
   }
 };
 
+// Send Dedicated 4-Digit Kitchen Pickup OTP Email to Provider
+const sendKitchenPickupOtpEmail = async ({ email, otp, orderRef, providerName, user, pass }) => {
+  const emailUser = user || process.env.SMTP_USER || process.env.EMAIL_USER;
+  const emailPass = pass ? pass.replace(/\s+/g, '') : (process.env.SMTP_PASS || process.env.EMAIL_PASS || '');
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = process.env.SMTP_PORT;
+  const smtpFrom = process.env.SMTP_FROM || `"TiffinLink Logistics" <${emailUser || 'no-reply@tiffinlink.com'}>`;
+  const nameDisplay = providerName || 'Kitchen Partner';
+  const refDisplay = orderRef || 'TL-ORDER';
+
+  const mailOptions = {
+    from: smtpFrom,
+    to: email,
+    subject: `TiffinLink Kitchen Pickup Verification Code: ${otp} (Order ${refDisplay})`,
+    html: `
+      <div style="font-family: 'Hanken Grotesk', Helvetica, Arial, sans-serif; background-color: #fbf9f5; color: #1b1c1a; padding: 40px; border-radius: 8px; max-width: 600px; margin: auto; border: 1px solid #d6d0c2;">
+        <h2 style="font-family: 'EB Garamond', serif; font-size: 28px; color: #4a4238; margin-bottom: 20px; text-align: center; border-bottom: 1px solid #d6d0c2; padding-bottom: 15px;">TiffinLink</h2>
+        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 10px;">Hello <strong>${nameDisplay}</strong>,</p>
+        <p style="font-size: 15px; line-height: 1.6; margin-bottom: 15px; color: #4a4238;">
+          Your assigned delivery partner has arrived at your kitchen for pickup of order <strong>${refDisplay}</strong>.
+        </p>
+        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+          Your TiffinLink Kitchen Pickup verification code is:
+        </p>
+        <div style="background-color: #f5f3ef; border: 2px dashed #4a4238; padding: 20px; text-align: center; font-size: 38px; font-weight: bold; letter-spacing: 8px; color: #1b1c1a; margin: 25px 0; border-radius: 6px; font-family: monospace;">
+          ${otp}
+        </div>
+        <p style="font-size: 14px; color: #4a4238; line-height: 1.5; margin-bottom: 20px;">
+          Please provide this 4-digit code to the delivery partner to verify kitchen handover.
+        </p>
+        <p style="font-size: 13px; color: #665d52; line-height: 1.4; border-top: 1px solid #d6d0c2; padding-top: 15px; margin-top: 25px;">
+          If you did not request this verification, please contact TiffinLink Partner Support.
+        </p>
+        <p style="font-size: 13px; color: #4a4238; margin-top: 15px; font-weight: 600;">
+          Regards,<br/>TiffinLink Dispatch & Logistics
+        </p>
+      </div>
+    `
+  };
+
+  let transporter = null;
+  if (smtpHost && smtpPort) {
+    transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: Number(smtpPort),
+      secure: Number(smtpPort) === 465,
+      auth: (emailUser && emailPass) ? { user: emailUser, pass: emailPass } : undefined,
+      tls: { rejectUnauthorized: false }
+    });
+  } else if (emailUser && emailPass) {
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: emailUser, pass: emailPass },
+      tls: { rejectUnauthorized: false }
+    });
+  }
+
+  if (transporter) {
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`[EmailService] Kitchen pickup OTP (${otp}) sent successfully to ${email}`);
+      return { success: true };
+    } catch (err) {
+      console.warn(`[EmailService] Failed to send kitchen pickup OTP to ${email}:`, err.message);
+      return { success: false, error: err.message };
+    }
+  } else {
+    console.log(`[EmailService Mock] Kitchen pickup OTP email to ${email} (Code: ${otp}, Order: ${refDisplay})`);
+    return { success: true };
+  }
+};
+
 module.exports = {
   sendOtpEmail,
+  sendKitchenPickupOtpEmail,
   sendDeliveryVerificationSuccessEmail,
   sendDeliveryDocumentRejectionEmail
 };
