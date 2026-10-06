@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getSocket, joinDeliveryRoom, leaveDeliveryRoom } from '../services/socket';
 
 export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }) {
   // Hash-aware active tab: 'active', 'track', 'upcoming', 'history', 'cancelled'
@@ -142,11 +143,14 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
           canisterId: o.canisterId || '#TK-9021',
           canisterTemp: o.canisterTemp || '68.2 °C',
           date: o.date || (o.createdAt ? new Date(o.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent'),
-          driver: o.driver || {
-            name: o.deliveryPartnerName || o.deliveryPartner?.name || 'Assigned Courier',
-            phone: o.deliveryPartnerPhone || o.deliveryPartner?.phone || '—',
-            vehicle: o.deliveryPartner?.vehicleNumber || 'Courier Partner',
-            rating: o.deliveryPartner?.rating ? String(o.deliveryPartner.rating) : '—',
+          driverId: o.driverId || o.assignedDriver?.driverId || '',
+          deliveryPartnerName: o.deliveryPartnerName || o.driverName || o.assignedDriver?.name || '',
+          deliveryPartnerPhone: o.deliveryPartnerPhone || o.driverPhone || o.assignedDriver?.phone || '',
+          driver: {
+            name: o.deliveryPartnerName || o.driverName || o.assignedDriver?.name || (o.driver && o.driver.name) || '',
+            phone: o.deliveryPartnerPhone || o.driverPhone || o.assignedDriver?.phone || (o.driver && o.driver.phone) || '',
+            vehicle: o.deliveryPartner?.vehicleNumber || o.deliveryPartner?.vehicleNo || o.vehicleNo || 'Delivery Courier',
+            rating: o.deliveryPartner?.rating ? String(o.deliveryPartner.rating) : '4.9',
             deliveries: o.deliveryPartner?.totalDeliveries ? `${o.deliveryPartner.totalDeliveries} Deliveries` : ''
           }
         }));
@@ -182,36 +186,65 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
   useEffect(() => {
     fetchOrders();
     const interval = setInterval(fetchOrders, 4000);
-    return () => clearInterval(interval);
+
+    // Real-time synchronization with Socket.IO
+    let cleanupSocket = () => {};
+    try {
+      const s = getSocket();
+      const handleRealtimeUpdate = () => {
+        fetchOrders();
+      };
+
+      s.on('order:status:updated', handleRealtimeUpdate);
+      s.on('order:updated', handleRealtimeUpdate);
+      s.on('delivery:assigned', handleRealtimeUpdate);
+      s.on('delivery:status:updated', handleRealtimeUpdate);
+      s.on('delivery:delivered', handleRealtimeUpdate);
+      s.on('delivery:request:accepted', handleRealtimeUpdate);
+
+      cleanupSocket = () => {
+        s.off('order:status:updated', handleRealtimeUpdate);
+        s.off('order:updated', handleRealtimeUpdate);
+        s.off('delivery:assigned', handleRealtimeUpdate);
+        s.off('delivery:status:updated', handleRealtimeUpdate);
+        s.off('delivery:delivered', handleRealtimeUpdate);
+        s.off('delivery:request:accepted', handleRealtimeUpdate);
+      };
+    } catch (sockErr) {
+      console.warn('Socket registration warning in MyOrdersView:', sockErr);
+    }
+
+    return () => {
+      clearInterval(interval);
+      cleanupSocket();
+    };
   }, [currentUser]);
 
-  // Derived filtered order sets
+  // Canonical terminal order statuses according to TiffinLink business rules
+  const TERMINAL_ORDER_STATUSES = [
+    'delivered',
+    'completed',
+    'cancelled',
+    'rejected',
+    'failed',
+    'payment_failed',
+    'delivery_failed'
+  ];
+
+  // Active Orders: EVERY non-terminal order belongs in Active Orders!
+  // This guarantees orders in 'Delivery', 'Searching', 'Ready', 'Preparing', etc. never vanish.
   const activeOrders = orders.filter((o) => {
-    const s = String(o.rawStatus || o.status || '').toLowerCase();
-    return [
-      'new',
-      'pending',
-      'confirmed',
-      'accepted',
-      'preparing',
-      'ready',
-      'ready_for_pickup',
-      'delivery_requested',
-      'driver_assigned',
-      'picked_up',
-      'out for delivery',
-      'out_for_delivery',
-      'arrived'
-    ].includes(s);
+    const s = String(o.rawStatus || o.status || '').toLowerCase().trim();
+    return !TERMINAL_ORDER_STATUSES.includes(s);
   });
 
   const historyOrders = orders.filter((o) => {
-    const s = String(o.rawStatus || o.status || '').toLowerCase();
+    const s = String(o.rawStatus || o.status || '').toLowerCase().trim();
     return ['delivered', 'completed'].includes(s);
   });
 
   const cancelledOrders = orders.filter((o) => {
-    const s = String(o.rawStatus || o.status || '').toLowerCase();
+    const s = String(o.rawStatus || o.status || '').toLowerCase().trim();
     return ['cancelled', 'rejected', 'failed', 'payment_failed', 'delivery_failed'].includes(s);
   });
 
@@ -263,8 +296,20 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
     }))
   ];
 
-  // Primary active consignment for detailed telemetry & live tracking
-  const activeConsignment = activeOrders[0] || null;
+  // Primary active consignment for detailed telemetry & live tracking (supports multi-order selection)
+  const [selectedActiveOrderId, setSelectedActiveOrderId] = useState(null);
+  const activeConsignment = (selectedActiveOrderId && activeOrders.find(o => (o.orderId || o._id) === selectedActiveOrderId)) || activeOrders[0] || null;
+
+  // Real-time room joining for active consignment tracking
+  useEffect(() => {
+    if (activeConsignment) {
+      const deliveryId = activeConsignment.orderId || activeConsignment._id;
+      joinDeliveryRoom(deliveryId);
+      return () => {
+        leaveDeliveryRoom(deliveryId);
+      };
+    }
+  }, [activeConsignment?.orderId, activeConsignment?._id]);
 
   // Formatted countdown time
   const formatCountdown = (totalSecs) => {
@@ -928,7 +973,23 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-50 text-emerald-900 border border-emerald-200/80">
                           <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
                           <span className="font-label-caps text-label-caps uppercase tracking-wider">
-                            {activeConsignment.status || 'Active Dispatch'}
+                            {(() => {
+                              const s = String(activeConsignment.status || '').trim();
+                              const ds = String(activeConsignment.deliveryStatus || '').trim().toLowerCase();
+                              if (s.toLowerCase() === 'delivery') {
+                                if (!ds || ds === 'searching' || ds === 'unassigned' || ds === 'not requested' || ds === 'searching drivers') {
+                                  return 'Delivery • Searching for courier';
+                                }
+                                if (ds === 'assigned') {
+                                  return 'Delivery • Courier Assigned';
+                                }
+                                if (ds === 'picked up' || ds === 'out for delivery') {
+                                  return 'Out for Delivery';
+                                }
+                                return `Delivery • ${activeConsignment.deliveryStatus}`;
+                              }
+                              return activeConsignment.status || 'Active Dispatch';
+                            })()}
                           </span>
                         </div>
                         <span className="hidden sm:inline-block font-label-caps text-label-caps text-secondary uppercase tracking-widest px-2 py-0.5 rounded bg-surface-container">
@@ -1000,12 +1061,20 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
 
                 {/* Telemetry Progression Strip (Legs 1 to 5) */}
                 {(() => {
-                  const s = String(activeConsignment.rawStatus || activeConsignment.status || '').toLowerCase();
+                  const s = String(activeConsignment.rawStatus || activeConsignment.status || '').toLowerCase().trim();
+                  const ds = String(activeConsignment.deliveryStatus || '').toLowerCase().trim();
                   let currentLeg = 1;
-                  if (['preparing', 'kitchen_prep'].includes(s)) currentLeg = 2;
-                  else if (['ready', 'ready_for_pickup', 'packing', 'sealed'].includes(s)) currentLeg = 3;
-                  else if (['out for delivery', 'out_for_delivery', 'picked_up', 'in_transit'].includes(s)) currentLeg = 4;
-                  else if (['arrived', 'delivered', 'doorstep'].includes(s)) currentLeg = 5;
+                  if (['preparing', 'kitchen_prep'].includes(s)) {
+                    currentLeg = 2;
+                  } else if (['ready', 'ready_for_pickup', 'packing', 'sealed'].includes(s) && !['assigned', 'heading to provider', 'picked up', 'out for delivery', 'delivered'].includes(ds)) {
+                    currentLeg = 3;
+                  } else if (['delivery', 'in_delivery', 'delivery_requested'].includes(s) && ['searching', 'not requested', 'searching drivers', 'unassigned', ''].includes(ds)) {
+                    currentLeg = 3;
+                  } else if (['out for delivery', 'out_for_delivery', 'picked_up', 'in_transit'].includes(s) || ['assigned', 'heading to provider', 'arrived at pickup', 'arrived at provider', 'picked up', 'out for delivery', 'in_transit'].includes(ds)) {
+                    currentLeg = 4;
+                  } else if (['arrived', 'delivered', 'completed', 'doorstep'].includes(s) || ['delivered', 'arrived at customer', 'completed'].includes(ds)) {
+                    currentLeg = 5;
+                  }
 
                   const orderTime = activeConsignment.date || 'Recent';
 
@@ -1064,7 +1133,9 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                               )}
                             </div>
                             <span className={`font-button-text text-button-text ${currentLeg === 3 ? 'text-white' : 'text-onyx-black'}`}>Sealed &amp; Insulated</span>
-                            <span className={`font-label-caps text-[10px] ${currentLeg === 3 ? 'text-surface-variant' : 'text-secondary'}`}>{currentLeg >= 3 ? '304-SS Locked' : 'Pending Pack'}</span>
+                            <span className={`font-label-caps text-[10px] ${currentLeg === 3 ? 'text-surface-variant' : 'text-secondary'}`}>
+                              {ds === 'searching' ? 'Searching Courier' : currentLeg >= 3 ? '304-SS Locked' : 'Pending Pack'}
+                            </span>
                           </div>
 
                           <div className={`flex flex-col gap-1.5 p-3 rounded ${currentLeg === 4 ? 'bg-onyx-black text-white shadow-sm ring-1 ring-onyx-black' : currentLeg > 4 ? 'bg-surface-container-low border border-sand-neutral/30' : 'bg-bone-white/60 border border-sand-neutral/40 opacity-70'}`}>
@@ -1078,8 +1149,12 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                                 <span className="material-symbols-outlined text-[16px] text-secondary">radio_button_unchecked</span>
                               )}
                             </div>
-                            <span className={`font-button-text text-button-text ${currentLeg === 4 ? 'text-white' : 'text-onyx-black'}`}>Out for Delivery</span>
-                            <span className={`font-label-caps text-[10px] ${currentLeg === 4 ? 'text-surface-variant' : 'text-secondary'}`}>{currentLeg >= 4 ? `${activeConsignment.etaMinutes || 15}m ETA` : 'Awaiting Courier'}</span>
+                            <span className={`font-button-text text-button-text ${currentLeg === 4 ? 'text-white' : 'text-onyx-black'}`}>
+                              {['assigned', 'heading to provider'].includes(ds) ? 'Courier Assigned' : 'Out for Delivery'}
+                            </span>
+                            <span className={`font-label-caps text-[10px] ${currentLeg === 4 ? 'text-surface-variant' : 'text-secondary'}`}>
+                              {currentLeg >= 4 ? `${activeConsignment.etaMinutes || 15}m ETA` : ds === 'searching' ? 'Searching Courier' : 'Awaiting Courier'}
+                            </span>
                           </div>
 
                           <div className={`flex flex-col gap-1.5 p-3 rounded ${currentLeg === 5 ? 'bg-onyx-black text-white shadow-sm ring-1 ring-onyx-black' : 'bg-bone-white/60 border border-sand-neutral/40 col-span-2 md:col-span-1 opacity-70'}`}>
@@ -1154,36 +1229,64 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 rounded-lg bg-surface-container-low border border-sand-neutral/60">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-10 h-10 rounded-full bg-onyx-black text-white flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-[20px]">two_wheeler</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="font-button-text text-button-text text-onyx-black">
-                              {activeConsignment.driver?.name || 'Assigned Courier Partner'}
-                            </span>
-                            <span className="flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 bg-bone-white rounded border border-sand-neutral text-onyx-black">
-                              {activeConsignment.driver?.rating || '4.9'} <span className="material-symbols-outlined text-[12px] text-amber-600">star</span>
-                            </span>
-                          </div>
-                          <span className="font-label-caps text-[11px] text-secondary">
-                            {activeConsignment.driver?.vehicle || 'Delivery Courier Partner'}
-                          </span>
-                        </div>
-                      </div>
+                    {/* Assigned Courier or Searching Driver Card */}
+                    {(() => {
+                      const ds = String(activeConsignment.deliveryStatus || '').toLowerCase().trim();
+                      const hasAssignedDriver = Boolean(
+                        (activeConsignment.driverName || activeConsignment.deliveryPartnerName || (activeConsignment.driver && activeConsignment.driver.name)) &&
+                        !['searching', 'unassigned', 'not requested', 'searching drivers', ''].includes(ds)
+                      );
+                      const dName = activeConsignment.driverName || activeConsignment.deliveryPartnerName || activeConsignment.driver?.name || 'Assigned Courier';
+                      const dPhone = activeConsignment.driverPhone || activeConsignment.deliveryPartnerPhone || activeConsignment.driver?.phone || '';
+                      const dVehicle = activeConsignment.driver?.vehicle || 'Delivery Courier Partner';
+                      const dRating = activeConsignment.driver?.rating || '4.9';
 
-                      <div className="flex items-center gap-2">
-                        <a
-                          className="px-4 py-2 bg-onyx-black text-white rounded font-button-text text-button-text flex items-center gap-2 hover:bg-clay-earth transition-colors"
-                          href={`tel:${activeConsignment.driver?.phone || '+919825144102'}`}
-                        >
-                          <span className="material-symbols-outlined text-[16px]">call</span>
-                          <span>Call Courier</span>
-                        </a>
-                      </div>
-                    </div>
+                      return (
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 rounded-lg bg-surface-container-low border border-sand-neutral/60">
+                          <div className="flex items-center gap-3.5">
+                            <div className="w-10 h-10 rounded-full bg-onyx-black text-white flex items-center justify-center shrink-0">
+                              <span className="material-symbols-outlined text-[20px]">{hasAssignedDriver ? 'two_wheeler' : 'radar'}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                <span className="font-button-text text-button-text text-onyx-black font-semibold">
+                                  {hasAssignedDriver ? dName : 'Searching for Delivery Partner'}
+                                </span>
+                                {hasAssignedDriver ? (
+                                  <span className="flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 bg-bone-white rounded border border-sand-neutral text-onyx-black">
+                                    {dRating} <span className="material-symbols-outlined text-[12px] text-amber-600">star</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-semibold px-1.5 py-0.5 bg-amber-100 text-amber-900 rounded border border-amber-200 animate-pulse">
+                                    Broadcast Active
+                                  </span>
+                                )}
+                              </div>
+                              <span className="font-label-caps text-[11px] text-secondary">
+                                {hasAssignedDriver ? dVehicle : 'Notifying nearby couriers in Satellite cluster...'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {hasAssignedDriver && dPhone ? (
+                              <a
+                                className="px-4 py-2 bg-onyx-black text-white rounded font-button-text text-button-text flex items-center gap-2 hover:bg-clay-earth transition-colors"
+                                href={`tel:${dPhone}`}
+                              >
+                                <span className="material-symbols-outlined text-[16px]">call</span>
+                                <span>Call Courier</span>
+                              </a>
+                            ) : (
+                              <div className="px-3 py-1.5 bg-amber-50 text-amber-800 rounded border border-amber-200/70 font-label-caps text-[11px] flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                                <span>Awaiting Driver Accept</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Right Column: Hardware Telemetry & Quick Live Track Action */}
@@ -1432,12 +1535,20 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
 
             {/* State Vector Progress Banner */}
             {(() => {
-              const s = String(activeConsignment.rawStatus || activeConsignment.status || '').toLowerCase();
+              const s = String(activeConsignment.rawStatus || activeConsignment.status || '').toLowerCase().trim();
+              const ds = String(activeConsignment.deliveryStatus || '').toLowerCase().trim();
               let currentLeg = 1;
-              if (['preparing', 'kitchen_prep'].includes(s)) currentLeg = 2;
-              else if (['ready', 'ready_for_pickup', 'packing', 'sealed'].includes(s)) currentLeg = 3;
-              else if (['out for delivery', 'out_for_delivery', 'picked_up', 'in_transit'].includes(s)) currentLeg = 4;
-              else if (['arrived', 'delivered', 'doorstep'].includes(s)) currentLeg = 5;
+              if (['preparing', 'kitchen_prep'].includes(s)) {
+                currentLeg = 2;
+              } else if (['ready', 'ready_for_pickup', 'packing', 'sealed'].includes(s) && !['assigned', 'heading to provider', 'picked up', 'out for delivery', 'delivered'].includes(ds)) {
+                currentLeg = 3;
+              } else if (['delivery', 'in_delivery', 'delivery_requested'].includes(s) && ['searching', 'not requested', 'searching drivers', 'unassigned', ''].includes(ds)) {
+                currentLeg = 3;
+              } else if (['out for delivery', 'out_for_delivery', 'picked_up', 'in_transit'].includes(s) || ['assigned', 'heading to provider', 'arrived at pickup', 'arrived at provider', 'picked up', 'out for delivery', 'in_transit'].includes(ds)) {
+                currentLeg = 4;
+              } else if (['arrived', 'delivered', 'completed', 'doorstep'].includes(s) || ['delivered', 'arrived at customer', 'completed'].includes(ds)) {
+                currentLeg = 5;
+              }
 
               const targetArrival = activeConsignment.etaMinutes ? `${activeConsignment.etaMinutes} mins` : '15 mins';
 
@@ -1489,8 +1600,12 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                         <div className="w-0.5 h-6 bg-onyx-black md:hidden" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-button-text text-button-text text-onyx-black font-semibold">Canister Sealed</span>
-                        <span className="font-label-caps text-label-caps text-secondary">{currentLeg >= 3 ? '304-SS Clamped' : 'Pending Pack'}</span>
+                        <span className="font-button-text text-button-text text-onyx-black font-semibold">
+                          {ds === 'searching' ? 'Searching Courier' : 'Canister Sealed'}
+                        </span>
+                        <span className="font-label-caps text-label-caps text-secondary">
+                          {ds === 'searching' ? 'Broadcast Active' : currentLeg >= 3 ? '304-SS Clamped' : 'Pending Pack'}
+                        </span>
                       </div>
                     </div>
 
@@ -1503,10 +1618,14 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                       </div>
                       <div className="flex flex-col">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-button-text text-button-text text-onyx-black font-semibold">In Transit</span>
+                          <span className="font-button-text text-button-text text-onyx-black font-semibold">
+                            {['assigned', 'heading to provider'].includes(ds) ? 'Courier Assigned' : 'In Transit'}
+                          </span>
                           {currentLeg === 4 && <span className="px-1.5 py-0.2 bg-onyx-black text-surface font-label-caps text-[10px] rounded">ACTIVE</span>}
                         </div>
-                        <span className="font-label-caps text-label-caps text-secondary">{currentLeg >= 4 ? `${activeConsignment.etaMinutes || 15}m ETA` : 'Awaiting Dispatch'}</span>
+                        <span className="font-label-caps text-label-caps text-secondary">
+                          {currentLeg >= 4 ? `${activeConsignment.etaMinutes || 15}m ETA` : ds === 'searching' ? 'Searching Courier' : 'Awaiting Dispatch'}
+                        </span>
                       </div>
                     </div>
 
@@ -1650,30 +1769,46 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                   </div>
 
                   {/* Bottom Courier Overlay Card */}
-                  <div className="absolute bottom-4 left-4 right-4 bg-surface/95 backdrop-blur-md p-4 rounded-xl shadow-lg border border-sand-neutral/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-onyx-black text-on-primary flex items-center justify-center">
-                        <span className="material-symbols-outlined text-[20px]">two_wheeler</span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-button-text text-button-text font-bold text-onyx-black">
-                            {activeConsignment.driver?.name || 'Assigned Courier Partner'}
-                          </span>
-                          <span className="px-2 py-0.5 rounded bg-surface-container text-onyx-black font-label-caps text-label-caps font-semibold">
-                            {activeConsignment.driver?.vehicle || 'Delivery Vehicle'}
-                          </span>
+                  {(() => {
+                    const ds = String(activeConsignment.deliveryStatus || '').toLowerCase().trim();
+                    const hasAssignedDriver = Boolean(
+                      (activeConsignment.driverName || activeConsignment.deliveryPartnerName || (activeConsignment.driver && activeConsignment.driver.name)) &&
+                      !['searching', 'unassigned', 'not requested', 'searching drivers', ''].includes(ds)
+                    );
+                    const dName = activeConsignment.driverName || activeConsignment.deliveryPartnerName || activeConsignment.driver?.name || 'Assigned Courier';
+                    const dVehicle = activeConsignment.driver?.vehicle || 'Delivery Vehicle';
+
+                    return (
+                      <div className="absolute bottom-4 left-4 right-4 bg-surface/95 backdrop-blur-md p-4 rounded-xl shadow-lg border border-sand-neutral/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-onyx-black text-on-primary flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-[20px]">{hasAssignedDriver ? 'two_wheeler' : 'radar'}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-button-text text-button-text font-bold text-onyx-black">
+                                {hasAssignedDriver ? dName : 'Searching for Delivery Partner'}
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-surface-container text-onyx-black font-label-caps text-label-caps font-semibold">
+                                {hasAssignedDriver ? dVehicle : 'Broadcast Active'}
+                              </span>
+                            </div>
+                            <p className="font-body-md text-[13px] text-secondary">
+                              {hasAssignedDriver
+                                ? `Transit in progress • ${activeConsignment.deliveryStatus || activeConsignment.status || 'Active Delivery'}`
+                                : 'Connecting with nearest available courier in Satellite cluster...'}
+                            </p>
+                          </div>
                         </div>
-                        <p className="font-body-md text-[13px] text-secondary">Transit in progress • {activeConsignment.status || 'Active Delivery'}</p>
+                        <div className="flex items-center gap-3 text-right">
+                          <div>
+                            <span className="font-label-caps text-label-caps uppercase text-secondary block">Remaining</span>
+                            <span className="font-button-text text-button-text font-bold text-onyx-black">{activeConsignment.etaMinutes || 15} mins</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 text-right">
-                      <div>
-                        <span className="font-label-caps text-label-caps uppercase text-secondary block">Remaining</span>
-                        <span className="font-button-text text-button-text font-bold text-onyx-black">{activeConsignment.etaMinutes || 15} mins</span>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="bg-surface-container-high rounded p-3.5 flex items-center gap-3 text-on-surface-variant text-body-md text-[14px]">
@@ -1732,43 +1867,75 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                 </div>
 
                 {/* Driver Profile */}
-                <div className="bg-surface-container-low rounded-xl p-6 shadow-sm border border-sand-neutral/60">
-                  <div className="flex items-start justify-between gap-4 mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center font-headline-md text-[20px] text-onyx-black uppercase font-serif">
-                        {(activeConsignment.driver?.name || 'CP').split(' ').map(n=>n[0]).join('').slice(0,2)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="font-button-text text-button-text font-bold text-onyx-black">{activeConsignment.driver?.name || 'Assigned Courier Partner'}</h4>
-                          <span className="font-label-caps text-[11px] text-secondary bg-surface-container px-1.5 py-0.5 rounded">
-                            {activeConsignment.driver?.rating || '4.9'} ★
-                          </span>
+                {(() => {
+                  const ds = String(activeConsignment.deliveryStatus || '').toLowerCase().trim();
+                  const hasAssignedDriver = Boolean(
+                    (activeConsignment.driverName || activeConsignment.deliveryPartnerName || (activeConsignment.driver && activeConsignment.driver.name)) &&
+                    !['searching', 'unassigned', 'not requested', 'searching drivers', ''].includes(ds)
+                  );
+                  const dName = activeConsignment.driverName || activeConsignment.deliveryPartnerName || activeConsignment.driver?.name || 'Assigned Courier';
+                  const dPhone = activeConsignment.driverPhone || activeConsignment.deliveryPartnerPhone || activeConsignment.driver?.phone || '';
+                  const dVehicle = activeConsignment.driver?.vehicle || 'Delivery Partner';
+                  const dRating = activeConsignment.driver?.rating || '4.9';
+                  const dDeliveries = activeConsignment.driver?.deliveries || '350+ Deliveries';
+
+                  return (
+                    <div className="bg-surface-container-low rounded-xl p-6 shadow-sm border border-sand-neutral/60">
+                      <div className="flex items-start justify-between gap-4 mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center font-headline-md text-[20px] text-onyx-black uppercase font-serif">
+                            {hasAssignedDriver ? dName.split(' ').map(n=>n[0]).join('').slice(0,2) : (
+                              <span className="material-symbols-outlined text-[24px] text-amber-700 animate-pulse">radar</span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <h4 className="font-button-text text-button-text font-bold text-onyx-black">
+                                {hasAssignedDriver ? dName : 'Searching for Delivery Partner'}
+                              </h4>
+                              {hasAssignedDriver ? (
+                                <span className="font-label-caps text-[11px] text-secondary bg-surface-container px-1.5 py-0.5 rounded">
+                                  {dRating} ★
+                                </span>
+                              ) : (
+                                <span className="font-label-caps text-[11px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded animate-pulse">
+                                  Searching
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-label-caps text-[11px] text-secondary">
+                              {hasAssignedDriver ? `${dDeliveries} • ${dVehicle}` : 'Dispatch broadcast active to nearby partners...'}
+                            </span>
+                          </div>
                         </div>
-                        <span className="font-label-caps text-[11px] text-secondary">
-                          {activeConsignment.driver?.deliveries || '350+ Deliveries'} • {activeConsignment.driver?.vehicle || 'Delivery Partner'}
-                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-4">
+                        {hasAssignedDriver && dPhone ? (
+                          <a
+                            className="flex items-center justify-center gap-2 py-2.5 px-3 bg-onyx-black text-on-primary rounded font-button-text text-button-text hover:bg-neutral-800 transition-colors"
+                            href={`tel:${dPhone}`}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">call</span>
+                            <span>Call Driver</span>
+                          </a>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2 py-2.5 px-3 bg-surface-container text-secondary rounded font-button-text text-button-text cursor-not-allowed">
+                            <span className="material-symbols-outlined text-[18px]">hourglass_empty</span>
+                            <span>Awaiting Driver</span>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => triggerToast(hasAssignedDriver ? `Masked relay connected to courier ${dName}.` : 'Connecting when courier is assigned.')}
+                          className="flex items-center justify-center gap-2 py-2.5 px-3 bg-surface-container hover:bg-surface-container-high text-onyx-black rounded font-button-text text-button-text transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">chat</span>
+                          <span>Masked Chat</span>
+                        </button>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mt-4">
-                    <a
-                      className="flex items-center justify-center gap-2 py-2.5 px-3 bg-onyx-black text-on-primary rounded font-button-text text-button-text hover:bg-neutral-800 transition-colors"
-                      href={`tel:${activeConsignment.driver?.phone || '+919825144102'}`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">call</span>
-                      <span>Call Driver</span>
-                    </a>
-                    <button
-                      onClick={() => triggerToast(`Masked relay connected to courier ${activeConsignment.driver?.name || 'Partner'}.`)}
-                      className="flex items-center justify-center gap-2 py-2.5 px-3 bg-surface-container hover:bg-surface-container-high text-onyx-black rounded font-button-text text-button-text transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">chat</span>
-                      <span>Masked Chat</span>
-                    </button>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Order Manifest Card */}
                 <div className="bg-surface-container-low rounded-xl p-6 shadow-sm border border-sand-neutral/60 flex flex-col gap-4">

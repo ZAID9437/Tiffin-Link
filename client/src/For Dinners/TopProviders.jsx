@@ -121,7 +121,13 @@ export default function TopProviders({ onExplore, onSelectProvider }) {
 
   const fetchProviders = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/providers');
+      let response;
+      try {
+        response = await fetch('/api/providers');
+        if (!response.ok) throw new Error('Vite proxy failed');
+      } catch {
+        response = await fetch('http://localhost:5000/api/providers');
+      }
       const data = await response.json();
       if (data.success && Array.isArray(data.data)) {
         setProviders(data.data);
@@ -180,7 +186,7 @@ export default function TopProviders({ onExplore, onSelectProvider }) {
         </div>
 
         {/* Slider Wrapper */}
-        <div className="relative">
+        <div className="relative min-h-[360px]">
           {/* Left Arrow */}
           <button 
             onClick={() => scroll('left')}
@@ -196,14 +202,40 @@ export default function TopProviders({ onExplore, onSelectProvider }) {
             className="flex overflow-x-auto gap-6 scrollbar-hide py-4 px-2 scroll-smooth"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
-            {providers.map((provider) => (
-              <ProviderCard 
-                key={provider._id} 
-                provider={provider} 
-                onSelect={handleCardClick}
-                onOrder={handleOrderDirectly}
-              />
-            ))}
+            {loading ? (
+              // Luxury Skeleton Loading Cards
+              [1, 2, 3, 4].map((i) => (
+                <div 
+                  key={i}
+                  className="min-w-[290px] md:min-w-[310px] h-[380px] bg-[#f5f3ef] rounded-2xl border border-clay-earth/20 p-5 flex flex-col justify-between animate-pulse"
+                >
+                  <div className="aspect-[4/3] w-full rounded-xl bg-[#e8e4dc]" />
+                  <div className="space-y-2 mt-4">
+                    <div className="h-6 w-3/4 bg-[#e8e4dc] rounded" />
+                    <div className="h-4 w-1/2 bg-[#e8e4dc] rounded" />
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t border-clay-earth/10">
+                    <div className="h-4 w-16 bg-[#e8e4dc] rounded" />
+                    <div className="h-4 w-20 bg-[#e8e4dc] rounded" />
+                  </div>
+                </div>
+              ))
+            ) : providers.length === 0 ? (
+              <div className="w-full py-16 text-center text-secondary border border-dashed border-clay-earth/30 rounded-2xl">
+                <Utensils className="mx-auto mb-3 opacity-40 text-clay-earth" size={36} />
+                <p className="font-bold text-lg text-onyx-black">No kitchens available right now</p>
+                <p className="text-sm text-secondary mt-1">Check back shortly as home chefs open up daily slots.</p>
+              </div>
+            ) : (
+              providers.map((provider) => (
+                <ProviderCard 
+                  key={provider._id} 
+                  provider={provider} 
+                  onSelect={handleCardClick}
+                  onOrder={handleOrderDirectly}
+                />
+              ))
+            )}
           </div>
 
           {/* Right Arrow */}

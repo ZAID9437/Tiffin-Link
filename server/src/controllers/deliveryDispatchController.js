@@ -767,12 +767,28 @@ const verifyOtp = async (req, res) => {
 
     // 7. Socket.IO Real-time Events
     try {
-      const { emitToDelivery, emitToProvider, emitToDriver } = require('../services/socketService');
-      const payload = { deliveryId: cleanIdStr, orderId: delivery.orderId, status: 'Picked Up', pickedUpAt: delivery.pickedUpAt };
+      const { emitToDelivery, emitToProvider, emitToDriver, emitToCustomer, getIO } = require('../services/socketService');
+      const payload = {
+        deliveryId: cleanIdStr,
+        orderId: delivery.orderId,
+        status: 'Out for Delivery',
+        deliveryStatus: 'Picked Up',
+        pickedUpAt: delivery.pickedUpAt
+      };
       emitToDelivery(cleanIdStr, 'delivery:pickup:verified', payload);
       emitToDelivery(cleanIdStr, 'delivery:status:updated', payload);
       if (delivery.providerId) emitToProvider(delivery.providerId, 'delivery:status:updated', payload);
       if (delivery.assignedDriver?.driverId) emitToDriver(delivery.assignedDriver.driverId, 'delivery:status:updated', payload);
+      if (delivery.customerId) {
+        emitToCustomer(delivery.customerId, 'order:status:updated', payload);
+        emitToCustomer(delivery.customerId, 'order:updated', payload);
+      }
+      const io = getIO();
+      if (io) {
+        io.emit('order:status:updated', payload);
+        io.emit('order:updated', payload);
+        io.emit('delivery:status:updated', payload);
+      }
     } catch (sErr) {
       console.warn('Socket broadcast error in verifyOtp pickup:', sErr.message);
     }
@@ -2178,39 +2194,31 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
 
       // Socket.IO Broadcast: Notify all connected clients that this request is accepted and unavailable for others
       try {
-        const { getIO, emitToProvider } = require('../services/socketService');
+        const { getIO, emitToProvider, emitToCustomer } = require('../services/socketService');
         const io = getIO();
         if (io) {
           const targetId = acceptedReq.requestId || acceptedReq.orderId || String(acceptedReq._id);
+          const assignedPayload = {
+            orderId: acceptedReq.orderId,
+            requestId: targetId,
+            status: 'Delivery',
+            deliveryStatus: 'Assigned',
+            driverId,
+            driverName,
+            driverPhone,
+            deliveryPartnerName: driverName,
+            deliveryPartnerPhone: driverPhone
+          };
+
           if (acceptedReq.providerId) {
-            emitToProvider(acceptedReq.providerId, 'delivery:assigned', {
-              orderId: acceptedReq.orderId,
-              status: 'Delivery',
-              driverId,
-              driverName,
-              driverPhone,
-              deliveryStatus: 'Assigned'
-            });
-            emitToProvider(acceptedReq.providerId, 'order:updated', {
-              orderId: acceptedReq.orderId,
-              status: 'Delivery',
-              deliveryStatus: 'Assigned',
-              driverId,
-              driverName,
-              driverPhone,
-              deliveryPartnerName: driverName,
-              deliveryPartnerPhone: driverPhone
-            });
-            emitToProvider(acceptedReq.providerId, 'order:status:updated', {
-              orderId: acceptedReq.orderId,
-              status: 'Delivery',
-              deliveryStatus: 'Assigned',
-              driverId,
-              driverName,
-              driverPhone,
-              deliveryPartnerName: driverName,
-              deliveryPartnerPhone: driverPhone
-            });
+            emitToProvider(acceptedReq.providerId, 'delivery:assigned', assignedPayload);
+            emitToProvider(acceptedReq.providerId, 'order:updated', assignedPayload);
+            emitToProvider(acceptedReq.providerId, 'order:status:updated', assignedPayload);
+          }
+          if (acceptedReq.customerId) {
+            emitToCustomer(acceptedReq.customerId, 'delivery:assigned', assignedPayload);
+            emitToCustomer(acceptedReq.customerId, 'order:status:updated', assignedPayload);
+            emitToCustomer(acceptedReq.customerId, 'order:updated', assignedPayload);
           }
           io.emit('delivery:request:accepted', {
             requestId: targetId,
@@ -2223,15 +2231,9 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
             orderId: acceptedReq.orderId,
             reason: 'accepted_by_another'
           });
-          io.emit('order:status:updated', {
-            orderId: acceptedReq.orderId,
-            status: 'Delivery',
-            deliveryStatus: 'Assigned',
-            driverId,
-            driverName,
-            driverPhone,
-            deliveryPartnerName: driverName
-          });
+          io.emit('delivery:assigned', assignedPayload);
+          io.emit('order:status:updated', assignedPayload);
+          io.emit('order:updated', assignedPayload);
         }
       } catch (sErr) {
         console.warn('Socket broadcast warning on accept:', sErr.message);
@@ -3987,12 +3989,12 @@ const verifyCustomerHandoverOtp = async (req, res) => {
 
     // 5. Socket.IO Broadcast: Real-Time Panel Synchronization
     try {
-      const { emitToDelivery, emitToProvider, emitToDriver, emitToCustomer } = require('../services/socketService');
+      const { emitToDelivery, emitToProvider, emitToDriver, emitToCustomer, getIO } = require('../services/socketService');
       const payload = {
         deliveryId: cleanIdStr,
         requestId: cleanIdStr,
         orderId: targetDoc.orderId,
-        status: 'Delivered',
+        status: 'Completed',
         deliveryStatus: 'Delivered',
         customerHandoverOtpVerified: true,
         completedAt: now
@@ -4004,7 +4006,17 @@ const verifyCustomerHandoverOtp = async (req, res) => {
 
       if (targetDoc.providerId) emitToProvider(targetDoc.providerId, 'delivery:delivered', payload);
       if (targetDoc.assignedDriver?.driverId) emitToDriver(targetDoc.assignedDriver.driverId, 'delivery:delivered', payload);
-      if (targetDoc.customerId) emitToCustomer(targetDoc.customerId, 'delivery:delivered', payload);
+      if (targetDoc.customerId) {
+        emitToCustomer(targetDoc.customerId, 'delivery:delivered', payload);
+        emitToCustomer(targetDoc.customerId, 'order:status:updated', payload);
+        emitToCustomer(targetDoc.customerId, 'order:updated', payload);
+      }
+      const io = getIO();
+      if (io) {
+        io.emit('delivery:delivered', payload);
+        io.emit('order:status:updated', payload);
+        io.emit('order:updated', payload);
+      }
     } catch (sErr) {
       console.warn('Socket broadcast error on customer handover verification:', sErr.message);
     }

@@ -114,16 +114,21 @@ export default function Navbar({
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
 
-      if (currentScrollY > 120) {
+      if (currentScrollY > 60) {
         setIsScrolled(true);
       } else {
         setIsScrolled(false);
       }
 
-      if (currentScrollY > lastScrollY.current && currentScrollY > 150) {
-        setIsVisible(false);
-      } else {
+      // Always keep navbar visible on pages with sticky sub-bars (find-tiffin, orders, etc.)
+      if (currentView && currentView !== 'home') {
         setIsVisible(true);
+      } else {
+        if (currentScrollY > lastScrollY.current && currentScrollY > 150) {
+          setIsVisible(false);
+        } else {
+          setIsVisible(true);
+        }
       }
 
       lastScrollY.current = currentScrollY;
@@ -131,9 +136,10 @@ export default function Navbar({
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [currentView]);
 
   useEffect(() => {
+    setIsVisible(true);
     setIsScrolled(false);
     setIsMobileMenuOpen(false);
     setIsUserMenuOpen(false);
@@ -230,7 +236,7 @@ export default function Navbar({
   return (
     <>
       <nav 
-        className={`fixed top-0 w-full z-50 px-4 sm:px-6 md:px-margin-desktop py-3.5 md:py-4 flex justify-between items-center transition-all duration-500 ${
+        className={`fixed top-0 left-0 w-full z-50 h-[72px] px-4 sm:px-6 md:px-margin-desktop flex justify-between items-center transition-all duration-300 ${
           isVisible ? 'translate-y-0' : '-translate-y-full'
         } ${
           showSolidNav
@@ -601,7 +607,7 @@ export default function Navbar({
 
       {/* Mobile Off-Canvas Navigation Drawer */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 top-[58px] bg-[#fbf9f5] text-[#1a1a1a] z-40 md:hidden flex flex-col p-6 overflow-y-auto animate-in fade-in slide-in-from-top-4 duration-200 border-b border-[#ded9d1] shadow-2xl">
+        <div className="fixed inset-0 top-[72px] bg-[#fbf9f5] text-[#1a1a1a] z-40 md:hidden flex flex-col p-6 overflow-y-auto animate-in fade-in slide-in-from-top-4 duration-200 border-b border-[#ded9d1] shadow-2xl">
           <div className="flex flex-col space-y-2 pt-2">
             
             {!currentUser ? (

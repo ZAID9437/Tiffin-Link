@@ -217,6 +217,11 @@ export default function App() {
   // State-based router with security enforcement
   const [view, setView] = useState(() => resolveRoute(typeof window !== 'undefined' ? window.location.hash : '', currentUser));
 
+  // Reset scroll position to starting point whenever view changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [view]);
+
   // Sync route whenever user session or hash changes
   useEffect(() => {
     if (!authLoading) {

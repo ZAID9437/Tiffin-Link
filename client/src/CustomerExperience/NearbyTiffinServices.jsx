@@ -16,6 +16,8 @@ const AHMEDABAD_LOCALITIES = {
   'paldi': { lat: 23.0150, lng: 72.5620, name: 'Paldi, Ahmedabad' },
   'gota': { lat: 23.1000, lng: 72.5350, name: 'Gota, Ahmedabad' },
   'bopal': { lat: 23.0350, lng: 72.4650, name: 'South Bopal, Ahmedabad' },
+  'vatva': { lat: 22.9584, lng: 72.6346, name: 'Vatva, Ahmedabad' },
+  'narol': { lat: 22.9734, lng: 72.5935, name: 'Narol, Ahmedabad' },
   'maninagar': { lat: 22.9978, lng: 72.6033, name: 'Maninagar, Ahmedabad' },
   'makarba': { lat: 22.9960, lng: 72.5020, name: 'Makarba, Ahmedabad' },
   'thaltej': { lat: 23.0560, lng: 72.5050, name: 'Thaltej, Ahmedabad' },
@@ -105,6 +107,11 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
       setLoading(false);
     }
   };
+
+  // Scroll to starting point cleanly on mount
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
 
   useEffect(() => {
     fetchProviders();
@@ -338,13 +345,13 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
   };
 
   return (
-    <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a] pt-20 sm:pt-24">
+    <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a] pt-[72px]">
       
       {/* ─────────────────────────────────────────────────────────────────────────────
           TOP STICKY FILTER ARCHITECTURE BAR (SCREEN 2)
           ───────────────────────────────────────────────────────────────────────────── */}
-      <section className="w-full bg-[#f5f3ef] sticky top-[64px] sm:top-[72px] z-30 shadow-xs border-b border-[#ded9d1]">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-20 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <section className="w-full bg-[#fbf9f5]/95 backdrop-blur-md sticky top-[72px] z-30 shadow-xs border-b border-[#ded9d1]">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-20 py-2.5 sm:py-3 flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3">
           
           {/* Left: Back Button & Essential Filter Meta */}
           <div className="flex items-center gap-2.5 flex-wrap min-w-0">
@@ -354,48 +361,49 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
                 if (onNavigate) onNavigate('#home');
                 else window.location.hash = '#home';
               }}
-              className="inline-flex items-center gap-1.5 bg-[#1a1a1a] hover:bg-[#4a4238] text-white px-3 py-1.5 transition-all group cursor-pointer shadow-xs font-bold text-xs uppercase tracking-wider shrink-0"
+              className="inline-flex items-center gap-1.5 bg-[#1a1a1a] hover:bg-[#333] text-white px-3.5 py-1.5 rounded-lg transition-all group cursor-pointer shadow-xs font-bold text-xs uppercase tracking-wider shrink-0 active:scale-95"
             >
-              <span className="material-symbols-outlined text-[16px] transition-transform group-hover:-translate-x-1">arrow_back</span>
+              <span className="material-symbols-outlined text-[15px] transition-transform group-hover:-translate-x-1">arrow_back</span>
               <span>Back to Home</span>
             </button>
 
-            <div className="h-5 w-px bg-[#ded9d1] hidden sm:block shrink-0"></div>
+            <div className="h-4 w-px bg-[#ded9d1] hidden sm:block shrink-0"></div>
 
             <span className="font-label-caps text-xs uppercase text-[#4a4238] tracking-widest flex items-center gap-1.5 font-bold shrink-0">
-              <span className="w-2 h-2 rounded-full bg-[#1b5e20] animate-pulse"></span>Active Filters
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+              Active Filters
             </span>
 
             {/* Filter Chips with clean overflow management */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
-                <span className="material-symbols-outlined text-[14px] text-[#4a4238]">location_on</span>
-                <span className="font-button-text truncate max-w-[150px] sm:max-w-[200px]">{locationAddress}</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
+                <span className="material-symbols-outlined text-[14px] text-[#a0522d]">location_on</span>
+                <span className="font-button-text font-semibold truncate max-w-[150px] sm:max-w-[200px]">{locationAddress}</span>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
-                <span className="material-symbols-outlined text-[14px] text-[#4a4238]">eco</span>
-                <span className="font-button-text">{mealType}</span>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
+                <span className="material-symbols-outlined text-[14px] text-emerald-700">eco</span>
+                <span className="font-button-text font-semibold">{mealType}</span>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
                 <span className="material-symbols-outlined text-[14px] text-[#4a4238]">schedule</span>
-                <span className="font-button-text">{timeSlot.split(' ')[0]}</span>
+                <span className="font-button-text font-semibold">{timeSlot.split(' ')[0]}</span>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
-                <span className="material-symbols-outlined text-[14px] text-[#4a4238]">payments</span>
-                <span className="font-button-text">≤ ₹{budget}</span>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs">
+                <span className="material-symbols-outlined text-[14px] text-emerald-800">payments</span>
+                <span className="font-button-text font-semibold">≤ ₹{budget}</span>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs hidden xl:inline-flex">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs hidden xl:inline-flex">
                 <span className="material-symbols-outlined text-[14px] text-[#4a4238]">near_me</span>
-                <span className="font-button-text">{radiusKm} km</span>
+                <span className="font-button-text font-semibold">{radiusKm} km</span>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs hidden xl:inline-flex">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg text-[#1b1c1a] shadow-xs border border-[#ded9d1] text-xs hidden xl:inline-flex">
                 <span className="material-symbols-outlined text-[14px] text-[#4a4238]">two_wheeler</span>
-                <span className="font-button-text">{fulfillment}</span>
+                <span className="font-button-text font-semibold">{fulfillment}</span>
               </div>
             </div>
           </div>
@@ -405,7 +413,7 @@ export default function NearbyTiffinServices({ onNavigate, initialFilters = {}, 
             <button
               type="button"
               onClick={() => setIsSearchFormOpen(!isSearchFormOpen)}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-[#efeeea] text-[#1a1a1a] border border-[#ded9d1] font-button-text text-xs uppercase tracking-wider transition-colors cursor-pointer font-bold shadow-xs"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white hover:bg-[#1a1a1a] hover:text-white text-[#1a1a1a] rounded-lg border border-[#ded9d1] font-button-text text-xs uppercase tracking-wider transition-all duration-200 cursor-pointer font-bold shadow-xs active:scale-95"
             >
               <span className="material-symbols-outlined text-[16px]">tune</span>
               <span>{isSearchFormOpen ? 'Close Filters' : 'Edit Search'}</span>

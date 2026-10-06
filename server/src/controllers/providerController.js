@@ -50,11 +50,23 @@ const AHMEDABAD_COORDS = {
   'vastrapur': { lat: 23.0358, lng: 72.5293 },
   'bodakdev': { lat: 23.0425, lng: 72.5150 },
   'prahladnagar': { lat: 23.0125, lng: 72.5100 },
+  'prahlad nagar': { lat: 23.0125, lng: 72.5100 },
   'navrangpura': { lat: 23.0370, lng: 72.5600 },
   'cg road': { lat: 23.0280, lng: 72.5590 },
   'paldi': { lat: 23.0150, lng: 72.5620 },
   'gota': { lat: 23.1000, lng: 72.5350 },
-  'bopal': { lat: 23.0350, lng: 72.4650 }
+  'bopal': { lat: 23.0350, lng: 72.4650 },
+  'vatva': { lat: 22.9584, lng: 72.6346 },
+  'maninagar': { lat: 22.9978, lng: 72.6033 },
+  'narol': { lat: 22.9734, lng: 72.5935 },
+  'thaltej': { lat: 23.0560, lng: 72.5050 },
+  'memnagar': { lat: 23.0500, lng: 72.5330 },
+  'science city': { lat: 23.0760, lng: 72.4980 },
+  'sindhu bhavan': { lat: 23.0450, lng: 72.5020 },
+  'iscon': { lat: 23.0270, lng: 72.5070 },
+  'naranpura': { lat: 23.0550, lng: 72.5530 },
+  'ambawadi': { lat: 23.0210, lng: 72.5480 },
+  'chandkheda': { lat: 23.1120, lng: 72.5850 }
 };
 
 // @desc    Get all tiffin providers with real-time calculated ratings & geospatial telemetry
@@ -66,7 +78,8 @@ const getProviders = async (req, res) => {
 
       const customerLat = req.query.lat ? parseFloat(req.query.lat) : 23.0300;
       const customerLng = req.query.lng ? parseFloat(req.query.lng) : 72.5178;
-      const radiusKm = req.query.radius ? parseFloat(req.query.radius) : 5.0;
+      const hasExplicitRadius = Boolean(req.query.radius);
+      const radiusKm = hasExplicitRadius ? parseFloat(req.query.radius) : null;
       const dietary = (req.query.dietary || 'all').toLowerCase();
       const sortBy = req.query.sort || 'distance';
       const search = (req.query.search || '').trim().toLowerCase();
@@ -140,8 +153,8 @@ const getProviders = async (req, res) => {
 
       // Apply Filter Rules
       let matchingProviders = enrichedProviders.filter(p => {
-        // Radius filter
-        if (p.distanceKm > radiusKm) return false;
+        // Radius filter (only apply if explicitly specified by caller)
+        if (radiusKm !== null && p.distanceKm > radiusKm) return false;
 
         // Price filter
         if (p.price < minPrice || p.price > maxPrice) return false;
@@ -170,6 +183,25 @@ const getProviders = async (req, res) => {
         return true;
       });
 
+      let isExpandedRadius = false;
+      // If strict radius returned 0 matches, gracefully provide all available active kitchens in the city
+      if (matchingProviders.length === 0 && enrichedProviders.length > 0) {
+        isExpandedRadius = true;
+        matchingProviders = enrichedProviders.filter(p => {
+          if (p.price < minPrice || p.price > maxPrice) return false;
+          if (search) {
+            const n = (p.name || '').toLowerCase();
+            const l = (p.address?.locality || p.address?.city || '').toLowerCase();
+            if (!n.includes(search) && !l.includes(search)) return false;
+          }
+          return true;
+        }).map(p => ({
+          ...p,
+          isExpandedRadius: true,
+          coverageNote: `Extended delivery zone (${p.distanceKm} km away)`
+        }));
+      }
+
       // Sorting
       if (sortBy === 'distance') {
         matchingProviders.sort((a, b) => a.distanceKm - b.distanceKm);
@@ -189,10 +221,11 @@ const getProviders = async (req, res) => {
         data: matchingProviders, 
         telemetry: {
           customerCoords: { lat: customerLat, lng: customerLng },
-          radiusKm,
+          radiusKm: radiusKm || 'city-wide',
           activeKitchensCount: totalActive,
           matchingCount: matchingProviders.length,
-          excludedCount
+          excludedCount,
+          isExpandedRadius
         },
         source: 'database' 
       });
