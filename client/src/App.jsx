@@ -97,12 +97,22 @@ export default function App() {
   }, []);
 
   // Centralized Route Resolution & Route Protection Guard (Requirement 1, 5 & 6)
-  const resolveRoute = useCallback((hash, user) => {
+  const resolveRoute = useCallback((hash, user, isAuthRestoring = false) => {
     const rawRole = (user?.role || '').toLowerCase();
     const cleanHash = (hash || (typeof window !== 'undefined' ? window.location.hash : '') || '').toLowerCase();
 
     // 1. BEFORE LOGIN (Logged Out State - Requirement 1)
     if (!user) {
+      // If auth session is still restoring from MongoDB/JWT, PRESERVE hash and avoid wiping history or opening modals
+      if (isAuthRestoring) {
+        if (cleanHash.startsWith('#orders') || cleanHash.startsWith('#my-orders') || cleanHash.startsWith('#active-orders') || cleanHash.startsWith('#track-order')) return 'orders';
+        if (cleanHash.startsWith('#/provider') || cleanHash.startsWith('#provider')) return 'provider';
+        if (cleanHash.startsWith('#/delivery') || cleanHash.startsWith('#delivery')) return 'delivery';
+        if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin')) return 'admin';
+        if (cleanHash.startsWith('#find-tiffin') || cleanHash.startsWith('#order-tiffin')) return 'find-tiffin';
+        return 'home';
+      }
+
       // Guard Protected URLs: Directly entering protected URLs must NOT expose private panels
       if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin')) {
         if (typeof window !== 'undefined') window.history.replaceState(null, '', window.location.pathname);
@@ -215,7 +225,14 @@ export default function App() {
   }, [openLoginModal, showToastNotification]);
 
   // State-based router with security enforcement
-  const [view, setView] = useState(() => resolveRoute(typeof window !== 'undefined' ? window.location.hash : '', currentUser));
+  const [view, setView] = useState(() => {
+    const stored = typeof window !== 'undefined' ? (localStorage.getItem('tiffinlink_user') || localStorage.getItem('user')) : null;
+    let initialUser = currentUser;
+    if (!initialUser && stored) {
+      try { initialUser = JSON.parse(stored); } catch (e) {}
+    }
+    return resolveRoute(typeof window !== 'undefined' ? window.location.hash : '', initialUser, true);
+  });
 
   // Reset scroll position to starting point whenever view changes
   useEffect(() => {
@@ -295,41 +312,26 @@ export default function App() {
 
     const checkActiveOrder = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/delivery/requests');
+        const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || '';
+        const email = currentUser?.email || '';
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`http://localhost:5000/api/orders/my-orders?email=${encodeURIComponent(email)}`, { headers });
         const json = await res.json();
-        if (json.success && Array.isArray(json.requests)) {
-          const userPhone = currentUser.phone ? currentUser.phone.replace(/[^\d]/g, '') : '';
-          const userEmail = (currentUser.email || '').toLowerCase();
-          const userName = (currentUser.name || '').toLowerCase();
-
-          const activeRequest = json.requests.find(r => {
-            const reqPhone = r.customerPhone ? r.customerPhone.replace(/[^\d]/g, '') : '';
-            const reqEmail = (r.customerEmail || r.providerEmail || '').toLowerCase();
-            const reqName = (r.customerName || '').toLowerCase();
-
-            const isMatch = (userPhone && reqPhone && reqPhone.endsWith(userPhone.slice(-8))) ||
-                            (userEmail && reqEmail === userEmail) ||
-                            (userName && reqName.includes(userName));
-
-            const isActiveStatus = !['Delivered', 'Cancelled', 'Failed'].includes(r.status);
-            return isMatch && isActiveStatus;
-          });
-
-          if (activeRequest) {
+        if (json.success && Array.isArray(json.data)) {
+          const terminal = ['delivered', 'completed', 'cancelled', 'rejected', 'failed', 'payment_failed', 'delivery_failed'];
+          const active = json.data.find(o => !terminal.includes(String(o.status || '').toLowerCase().trim()));
+          if (active) {
             setHasActiveOrder(true);
-            setActiveCustomerOrderId(activeRequest.requestId || activeRequest.orderId || activeRequest._id);
+            setActiveCustomerOrderId(active.orderId || active._id);
           } else {
-            const sessionPlaced = localStorage.getItem('tiffinlink_recent_order');
-            if (sessionPlaced) {
-              setHasActiveOrder(true);
-              setActiveCustomerOrderId(sessionPlaced);
-            } else {
-              setHasActiveOrder(false);
-            }
+            setHasActiveOrder(false);
+            setActiveCustomerOrderId('');
           }
         }
       } catch (err) {
-        console.error('Error checking active customer orders:', err);
+        console.warn('Active order check warning:', err);
       }
     };
 
@@ -606,6 +608,18 @@ export default function App() {
   }, [view]);
 
 
+
+  // While verifying session on page reload/refresh, render loading state so no routes reset prematurely
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#fbf9f5] flex flex-col items-center justify-center space-y-4">
+        <div className="w-10 h-10 border-3 border-[#1a1a1a] border-t-transparent rounded-full animate-spin" />
+        <span className="font-mono text-xs uppercase tracking-widest text-[#665d52]">
+          Restoring Session...
+        </span>
+      </div>
+    );
+  }
 
   // Only authenticated Super Admin can access Admin Dashboard Control Center
   if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin' || currentUser.role === 'super_admin')) {

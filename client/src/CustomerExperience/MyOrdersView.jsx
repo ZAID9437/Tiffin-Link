@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getSocket, joinDeliveryRoom, leaveDeliveryRoom } from '../services/socket';
+import { getSocket, joinDeliveryRoom, leaveDeliveryRoom, subscribeToLocationUpdates } from '../services/socket';
 
 export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }) {
   // Hash-aware active tab: 'active', 'track', 'upcoming', 'history', 'cancelled'
@@ -87,10 +87,10 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
-  // Countdown timer for Track Order ETA
+  // Countdown timer for Track Order ETA (second-by-second live countdown)
   useEffect(() => {
     const timer = setInterval(() => {
-      setEtaSeconds((prev) => (prev > 0 ? prev - 1 : 684));
+      setEtaSeconds((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -107,7 +107,12 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
   const fetchOrders = async () => {
     try {
       const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('tiffinlink_token') || '';
-      const email = currentUser?.email || '';
+      const savedUserStr = typeof window !== 'undefined' ? (localStorage.getItem('tiffinlink_user') || localStorage.getItem('user')) : null;
+      let fallbackEmail = '';
+      if (savedUserStr) {
+        try { fallbackEmail = JSON.parse(savedUserStr)?.email || ''; } catch (e) {}
+      }
+      const email = currentUser?.email || fallbackEmail;
       const queryParam = email ? `?email=${encodeURIComponent(email)}` : '';
       const res = await fetch(`http://localhost:5000/api/orders/my-orders${queryParam}`, {
         headers: {
@@ -139,7 +144,10 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
           paymentMethod: o.paymentMethod || (o.paymentStatus === 'Cash on Delivery' ? 'Cash on Delivery (COD)' : 'Online Pre-paid (UPI)'),
           paymentStatus: o.paymentStatus || 'Paid',
           otp: o.deliveryOtp || o.otp || '',
-          etaMinutes: o.estimatedTime ? parseInt(o.estimatedTime) || 15 : 15,
+          etaMinutes: o.etaMinutes !== undefined ? Number(o.etaMinutes) : (o.estimatedTime ? parseInt(o.estimatedTime) || 15 : 15),
+          deliveryDistance: o.deliveryDistance || (o.distanceKm ? `${o.distanceKm} km` : '1.8 km'),
+          distanceKm: o.distanceKm !== undefined ? Number(o.distanceKm) : (o.deliveryDistance ? parseFloat(o.deliveryDistance) || 1.8 : 1.8),
+          driverLocation: o.driverLocation || o.assignedDriver?.location || null,
           canisterId: o.canisterId || '#TK-9021',
           canisterTemp: o.canisterTemp || '68.2 °C',
           date: o.date || (o.createdAt ? new Date(o.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent'),
@@ -218,7 +226,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
       clearInterval(interval);
       cleanupSocket();
     };
-  }, [currentUser]);
+  }, [currentUser?.email, currentUser?._id]);
 
   // Canonical terminal order statuses according to TiffinLink business rules
   const TERMINAL_ORDER_STATUSES = [
@@ -300,16 +308,74 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
   const [selectedActiveOrderId, setSelectedActiveOrderId] = useState(null);
   const activeConsignment = (selectedActiveOrderId && activeOrders.find(o => (o.orderId || o._id) === selectedActiveOrderId)) || activeOrders[0] || null;
 
-  // Real-time room joining for active consignment tracking
+  // Real-time room joining & live location / drop ETA tracking for active consignment
+  useEffect(() => {
+    if (!activeConsignment) return;
+
+    const deliveryId = activeConsignment.orderId || activeConsignment._id;
+    joinDeliveryRoom(deliveryId);
+
+    const unsubscribeLocation = subscribeToLocationUpdates((data) => {
+      if (!data) return;
+      const targetMatches = (
+        data.deliveryId === deliveryId ||
+        String(data.deliveryId) === String(deliveryId) ||
+        data.orderId === activeConsignment.orderId ||
+        String(data.orderId) === String(activeConsignment.orderId)
+      );
+
+      if (targetMatches) {
+        if (data.etaMinutes !== undefined && data.etaMinutes !== null) {
+          const freshMins = Math.max(1, Number(data.etaMinutes));
+          setEtaSeconds(freshMins * 60);
+        }
+        fetchOrders();
+      }
+    });
+
+    return () => {
+      leaveDeliveryRoom(deliveryId);
+      unsubscribeLocation();
+    };
+  }, [activeConsignment?.orderId, activeConsignment?._id]);
+
+  // Synchronize countdown timer whenever active consignment ETA changes
   useEffect(() => {
     if (activeConsignment) {
-      const deliveryId = activeConsignment.orderId || activeConsignment._id;
-      joinDeliveryRoom(deliveryId);
-      return () => {
-        leaveDeliveryRoom(deliveryId);
-      };
+      const isDelivered = ['delivered', 'completed'].includes(String(activeConsignment.status || '').toLowerCase());
+      if (isDelivered) {
+        setEtaSeconds(0);
+      } else {
+        const mins = activeConsignment.etaMinutes ? Number(activeConsignment.etaMinutes) : 15;
+        const currentMins = Math.ceil(etaSeconds / 60);
+        if (Math.abs(currentMins - mins) >= 2 || etaSeconds === 0) {
+          setEtaSeconds(mins * 60);
+        }
+      }
     }
-  }, [activeConsignment?.orderId, activeConsignment?._id]);
+  }, [activeConsignment?._id, activeConsignment?.orderId, activeConsignment?.etaMinutes, activeConsignment?.status]);
+
+  const isOrderDelivered = ['delivered', 'completed'].includes(String(activeConsignment?.status || '').toLowerCase());
+  const displayEtaMinutes = isOrderDelivered ? 0 : Math.max(1, Math.ceil(etaSeconds / 60));
+
+  const getEtaStatusText = (consignment, mins) => {
+    if (!consignment) return 'On Schedule';
+    const s = String(consignment.status || '').toLowerCase();
+    const ds = String(consignment.deliveryStatus || '').toLowerCase();
+    if (s === 'delivered' || ds === 'delivered') return 'Delivered • Handover Complete';
+    if (ds.includes('arrived') || ds.includes('customer')) return 'Courier Outside • Ready for Handover';
+    if (mins <= 2) return 'Arriving Shortly • Final Approach';
+    if (ds.includes('picked up') || ds.includes('out for delivery') || s.includes('out for delivery')) {
+      return 'On Schedule • Transit En Route';
+    }
+    if (ds.includes('assigned') || ds.includes('heading')) {
+      return 'Courier En Route to Kitchen';
+    }
+    if (ds.includes('searching') || s.includes('ready')) {
+      return 'Preparing • Courier Dispatched';
+    }
+    return 'On Schedule • Live GPS Tracking';
+  };
 
   // Formatted countdown time
   const formatCountdown = (totalSecs) => {
@@ -921,7 +987,15 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
             </div>
 
             {/* Active Consignment Card */}
-            {activeOrders.length === 0 ? (
+            {loading ? (
+              <div className="bg-surface-container-lowest rounded-xl border border-sand-neutral/70 p-12 text-center space-y-4 shadow-sm animate-pulse">
+                <span className="material-symbols-outlined text-[48px] text-secondary animate-spin">sync</span>
+                <h3 className="font-headline-md text-headline-md text-onyx-black">Loading Active Consignment...</h3>
+                <p className="font-body-md text-on-surface-variant max-w-md mx-auto">
+                  Retrieving your live order status and delivery telemetry from MongoDB...
+                </p>
+              </div>
+            ) : activeOrders.length === 0 ? (
               <div className="bg-surface-container-lowest rounded-xl border border-sand-neutral/70 p-12 text-center space-y-4 shadow-sm">
                 <span className="material-symbols-outlined text-[48px] text-secondary">lunch_dining</span>
                 <h3 className="font-headline-md text-headline-md text-onyx-black">No Active Consignments</h3>
@@ -1014,12 +1088,15 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                       </span>
                       <div className="flex items-baseline gap-1 mt-0.5">
                         <span className="font-headline-lg text-headline-lg text-onyx-black font-normal tracking-tight">
-                          {activeConsignment.etaMinutes || 15}
+                          {isOrderDelivered ? 0 : displayEtaMinutes}
                         </span>
-                        <span className="font-button-text text-button-text text-secondary">mins</span>
+                        <span className="font-button-text text-button-text text-secondary">
+                          {displayEtaMinutes <= 1 ? 'min' : 'mins'}
+                        </span>
                       </div>
-                      <span className="font-label-caps text-[11px] text-emerald-700 font-medium">
-                        On Schedule • Transit En Route
+                      <span className="font-label-caps text-[11px] text-emerald-700 font-medium flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                        {getEtaStatusText(activeConsignment, displayEtaMinutes)}
                       </span>
                     </div>
 

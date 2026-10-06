@@ -224,6 +224,34 @@ const initSocket = (server) => {
         delivery.assignedDriver.location = updatedLocation;
         delivery.driverLocation = updatedLocation;
 
+        // Calculate real-time drop distance & ETA
+        const { calculateLiveDropEta } = require('../controllers/orderController');
+        const dropCoords = delivery.deliveryAddress;
+        const pickupCoords = delivery.pickupAddress;
+
+        if (dropCoords?.lat && dropCoords?.lng) {
+          const calc = calculateLiveDropEta({
+            driverLat: updatedLocation.lat,
+            driverLng: updatedLocation.lng,
+            dropLat: dropCoords.lat,
+            dropLng: dropCoords.lng,
+            pickupLat: pickupCoords?.lat,
+            pickupLng: pickupCoords?.lng,
+            status: delivery.status,
+            currentSpeed: updatedLocation.speed
+          });
+          delivery.distanceKm = calc.distanceKm;
+          delivery.etaMinutes = calc.etaMinutes;
+
+          if (delivery.orderId) {
+            const Order = require('../models/Order');
+            Order.updateOne(
+              { $or: [{ orderId: delivery.orderId }, { _id: delivery.orderId }] },
+              { $set: { estimatedTime: `${calc.etaMinutes} mins`, deliveryDistance: `${calc.distanceKm} km` } }
+            ).catch(() => {});
+          }
+        }
+
         await delivery.save();
 
         const cleanReqId = delivery.requestId ? String(delivery.requestId).trim().replace(/^#+/, '') : '';

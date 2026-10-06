@@ -1195,6 +1195,43 @@ const updateDriverLocation = async (req, res) => {
         { new: true }
       );
 
+      // Calculate real-time drop distance and ETA
+      let liveDropDistance = 1.8;
+      let liveDropEta = 12;
+
+      if (request) {
+        const { calculateLiveDropEta } = require('./orderController');
+        const dropCoords = request.deliveryAddress;
+        const pickupCoords = request.pickupAddress;
+
+        if (dropCoords?.lat && dropCoords?.lng) {
+          const calc = calculateLiveDropEta({
+            driverLat: numLat,
+            driverLng: numLng,
+            dropLat: dropCoords.lat,
+            dropLng: dropCoords.lng,
+            pickupLat: pickupCoords?.lat,
+            pickupLng: pickupCoords?.lng,
+            status: request.status,
+            currentSpeed: numSpeed
+          });
+          liveDropDistance = calc.distanceKm;
+          liveDropEta = calc.etaMinutes;
+
+          request.distanceKm = liveDropDistance;
+          request.etaMinutes = liveDropEta;
+          await request.save().catch(() => {});
+
+          if (request.orderId) {
+            const Order = require('../models/Order');
+            await Order.updateOne(
+              { $or: [{ orderId: request.orderId }, { _id: request.orderId }] },
+              { $set: { estimatedTime: `${liveDropEta} mins`, deliveryDistance: `${liveDropDistance} km` } }
+            ).catch(() => {});
+          }
+        }
+      }
+
       // Sync driver profile collection location if assigned
       const driverIdentifier = request?.assignedDriver?.driverId || req.user?.id || req.user?._id;
       if (driverIdentifier) {
@@ -1216,6 +1253,8 @@ const updateDriverLocation = async (req, res) => {
           orderId: targetOrdId || request?.orderId,
           location: locationObj,
           status: request?.status,
+          distanceKm: liveDropDistance,
+          etaMinutes: liveDropEta,
           accuracy: numAcc,
           isLowAccuracy
         };
@@ -2460,14 +2499,55 @@ const getActiveDelivery = async (req, res) => {
     const driverIdParam = req.user?.id || req.user?._id || req.query.driverId || '';
 
     if (await isDbConnected()) {
-      const activeReq = await DeliveryRequest.findOne({
+      let driverRecord = await Driver.findOne({
         $or: [
-          ...(driverIdParam ? [{ 'assignedDriver.driverId': String(driverIdParam) }] : []),
-          ...(driverEmail ? [{ 'assignedDriver.email': driverEmail }] : []),
-          ...(driverPhone ? [{ 'assignedDriver.phone': driverPhone }] : [])
-        ],
-        status: { $in: ['Driver Assigned', 'Arrived at Provider', 'Picked Up', 'Out for Delivery', 'Arrived at Customer', 'ARRIVED_PROVIDER', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'ARRIVED_CUSTOMER'] }
-      }).sort({ requestedAt: -1 });
+          ...(driverIdParam ? [{ driverId: driverIdParam }, { _id: (driverIdParam && driverIdParam.match(/^[0-9a-fA-F]{24}$/)) ? driverIdParam : null }] : []),
+          ...(driverEmail ? [{ email: driverEmail }] : []),
+          ...(driverPhone ? [{ phone: driverPhone }] : [])
+        ].filter(Boolean)
+      });
+
+      const cleanPhone = driverPhone.replace(/\D/g, '');
+      const activeConditions = [
+        ...(driverIdParam ? [{ 'assignedDriver.driverId': String(driverIdParam) }] : []),
+        ...(driverRecord?._id ? [{ 'assignedDriver.driverId': String(driverRecord._id) }] : []),
+        ...(driverRecord?.driverId ? [{ 'assignedDriver.driverId': String(driverRecord.driverId) }] : []),
+        ...(driverEmail ? [{ 'assignedDriver.email': driverEmail }] : []),
+        ...(driverPhone ? [
+          { 'assignedDriver.phone': driverPhone },
+          { 'assignedDriver.phone': `+91 ${cleanPhone}` },
+          { 'assignedDriver.phone': cleanPhone }
+        ] : []),
+        ...(driverRecord?.name ? [{ 'assignedDriver.name': driverRecord.name }] : []),
+        ...(req.user?.name ? [{ 'assignedDriver.name': req.user.name }] : []),
+        ...(req.user?.fullName ? [{ 'assignedDriver.name': req.user.fullName }] : [])
+      ];
+
+      let activeReq = null;
+      if (activeConditions.length > 0) {
+        activeReq = await DeliveryRequest.findOne({
+          $or: activeConditions,
+          status: { $in: ['Driver Assigned', 'Arrived at Provider', 'Picked Up', 'Out for Delivery', 'Arrived at Customer', 'ARRIVED_PROVIDER', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'ARRIVED_CUSTOMER'] }
+        }).sort({ requestedAt: -1 });
+      }
+
+      // Fallback: check matching active Order directly
+      if (!activeReq && activeConditions.length > 0) {
+        const ordMatch = await Order.findOne({
+          status: { $in: ['Ready', 'Delivery', 'Out for Delivery', 'Dispatched', 'In Transit'] },
+          $or: [
+            ...(driverRecord?.name ? [{ deliveryPartnerName: driverRecord.name }, { driverName: driverRecord.name }] : []),
+            ...(req.user?.name ? [{ deliveryPartnerName: req.user.name }, { driverName: req.user.name }] : []),
+            ...(driverPhone ? [{ deliveryPartnerPhone: driverPhone }, { deliveryPartnerPhone: `+91 ${cleanPhone}` }] : [])
+          ]
+        }).sort({ createdAt: -1 });
+
+        if (ordMatch) {
+          activeReq = await DeliveryRequest.findOne({
+            $or: [{ orderId: ordMatch.orderId }, { orderId: ordMatch._id?.toString() }, { requestId: ordMatch.orderId }]
+          });
+        }
+      }
 
       if (activeReq) {
         const obj = activeReq.toObject ? activeReq.toObject() : { ...activeReq };

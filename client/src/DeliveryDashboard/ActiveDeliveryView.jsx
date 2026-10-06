@@ -58,9 +58,15 @@ export default function ActiveDeliveryView({
   const fetchActiveDelivery = async () => {
     try {
       setLoading(true);
-      const email = currentUser?.email || localStorage.getItem('user_email') || '';
-      const driverId = currentUser?.id || currentUser?._id || localStorage.getItem('driver_id') || '';
-      const phone = currentUser?.phone || '';
+      let storedUser = null;
+      try {
+        const u = localStorage.getItem('tiffinlink_user') || localStorage.getItem('user');
+        if (u) storedUser = JSON.parse(u);
+      } catch (e) {}
+
+      const email = currentUser?.email || storedUser?.email || localStorage.getItem('user_email') || '';
+      const driverId = currentUser?.id || currentUser?._id || storedUser?.id || storedUser?._id || localStorage.getItem('driver_id') || '';
+      const phone = currentUser?.phone || storedUser?.phone || '';
 
       const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || '';
       const headers = { 'Content-Type': 'application/json' };

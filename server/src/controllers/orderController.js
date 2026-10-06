@@ -1392,6 +1392,59 @@ const verifyPayment = async (req, res) => {
 };
 
 // @desc    Customer gets their orders
+const computeHaversineKm = (lat1, lon1, lat2, lon2) => {
+  if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return 2.0;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return Number((2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
+};
+
+const calculateLiveDropEta = ({ driverLat, driverLng, dropLat, dropLng, pickupLat, pickupLng, status, currentSpeed }) => {
+  if (!dropLat || !dropLng || isNaN(dropLat) || isNaN(dropLng)) {
+    return { distanceKm: 2.5, etaMinutes: 15 };
+  }
+
+  const normStatus = String(status || '').toUpperCase();
+  const isDelivered = normStatus.includes('DELIVERED') || normStatus.includes('COMPLETED');
+  const isAtCustomer = normStatus.includes('ARRIVED_CUSTOMER') || normStatus.includes('ARRIVED AT CUSTOMER') || normStatus.includes('DELIVERY_OTP_PENDING') || normStatus.includes('DELIVERY OTP PENDING');
+  const isPickedUp = normStatus.includes('PICKED_UP') || normStatus.includes('PICKED UP') || normStatus.includes('OUT_FOR_DELIVERY') || normStatus.includes('OUT FOR DELIVERY') || normStatus.includes('ON THE WAY');
+
+  if (isDelivered) {
+    return { distanceKm: 0, etaMinutes: 0 };
+  }
+
+  if (isAtCustomer) {
+    return { distanceKm: 0.1, etaMinutes: 1 };
+  }
+
+  let roadDistanceKm = 2.5;
+  let baseEtaMins = 15;
+
+  if (isPickedUp) {
+    // Driver is en route directly to customer drop
+    const straightDist = computeHaversineKm(driverLat, driverLng, dropLat, dropLng);
+    roadDistanceKm = Number((straightDist * 1.3).toFixed(1));
+    const effectiveSpeed = (currentSpeed && currentSpeed > 10) ? Math.min(45, Math.max(15, currentSpeed)) : 24;
+    const trafficBuffer = roadDistanceKm > 3 ? 3 : 2;
+    baseEtaMins = Math.max(2, Math.round((roadDistanceKm / effectiveSpeed) * 60 + trafficBuffer));
+  } else {
+    // Driver is heading to kitchen or waiting for pickup
+    const toPickupDist = (pickupLat && pickupLng) ? computeHaversineKm(driverLat, driverLng, pickupLat, pickupLng) * 1.3 : 1.0;
+    const pickupToDropDist = (pickupLat && pickupLng) ? computeHaversineKm(pickupLat, pickupLng, dropLat, dropLng) * 1.3 : 2.5;
+    roadDistanceKm = Number((toPickupDist + pickupToDropDist).toFixed(1));
+    baseEtaMins = Math.max(3, Math.round((roadDistanceKm / 24) * 60 + 4));
+  }
+
+  return {
+    distanceKm: roadDistanceKm,
+    etaMinutes: baseEtaMins
+  };
+};
+
 // @route   GET /api/orders/my-orders
 const getCustomerOrders = async (req, res) => {
   try {
@@ -1407,8 +1460,84 @@ const getCustomerOrders = async (req, res) => {
     const query = conditions.length > 0 ? { $or: conditions } : {};
 
     if (await isDbConnected()) {
-      const orders = await Order.find(query).sort({ createdAt: -1 }).limit(50);
-      return res.json({ success: true, data: orders.map(enrichOrderFinancials) });
+      const DeliveryRequest = require('../models/DeliveryRequest');
+      const rawOrders = await Order.find(query).sort({ createdAt: -1 }).limit(50).lean();
+
+      // Find active delivery requests matching these orders
+      const orderIdentifiers = rawOrders.map(o => o.orderId || o._id?.toString()).filter(Boolean);
+      let deliveryMap = {};
+
+      if (orderIdentifiers.length > 0) {
+        const delRequests = await DeliveryRequest.find({
+          $or: [
+            { orderId: { $in: orderIdentifiers } },
+            { requestId: { $in: orderIdentifiers } }
+          ]
+        }).lean();
+
+        delRequests.forEach(dr => {
+          if (dr.orderId) deliveryMap[dr.orderId] = dr;
+          if (dr.requestId) deliveryMap[dr.requestId] = dr;
+        });
+      }
+
+      const enrichedList = rawOrders.map(o => {
+        const enriched = enrichOrderFinancials(o);
+        const delReq = deliveryMap[o.orderId] || deliveryMap[o._id?.toString()];
+
+        if (delReq) {
+          const driverLoc = delReq.assignedDriver?.location || delReq.driverLocation;
+          const dropCoords = delReq.deliveryAddress;
+          const pickupCoords = delReq.pickupAddress;
+
+          let dLat = driverLoc && typeof driverLoc.lat === 'number' ? driverLoc.lat : pickupCoords?.lat;
+          let dLng = driverLoc && typeof driverLoc.lng === 'number' ? driverLoc.lng : pickupCoords?.lng;
+
+          if (dLat && dLng && dropCoords?.lat && dropCoords?.lng) {
+            const liveCalc = calculateLiveDropEta({
+              driverLat: dLat,
+              driverLng: dLng,
+              dropLat: dropCoords.lat,
+              dropLng: dropCoords.lng,
+              pickupLat: pickupCoords?.lat,
+              pickupLng: pickupCoords?.lng,
+              status: delReq.status || o.deliveryStatus || o.status,
+              currentSpeed: driverLoc?.speed || 0
+            });
+
+            enriched.etaMinutes = liveCalc.etaMinutes;
+            enriched.estimatedTime = `${liveCalc.etaMinutes} mins`;
+            enriched.deliveryDistance = `${liveCalc.distanceKm} km`;
+            enriched.distanceKm = liveCalc.distanceKm;
+          } else if (delReq.etaMinutes) {
+            enriched.etaMinutes = delReq.etaMinutes;
+            enriched.estimatedTime = `${delReq.etaMinutes} mins`;
+            enriched.deliveryDistance = `${delReq.distanceKm || 2.5} km`;
+            enriched.distanceKm = delReq.distanceKm || 2.5;
+          }
+
+          if (delReq.deliveryOtp) enriched.deliveryOtp = delReq.deliveryOtp;
+          if (delReq.pickupOtp) enriched.pickupOtp = delReq.pickupOtp;
+          if (driverLoc) enriched.driverLocation = driverLoc;
+          if (dropCoords) enriched.deliveryAddressCoords = dropCoords;
+          if (pickupCoords) enriched.pickupAddressCoords = pickupCoords;
+
+          if (delReq.assignedDriver?.name) {
+            enriched.deliveryPartnerName = delReq.assignedDriver.name;
+            enriched.deliveryPartnerPhone = delReq.assignedDriver.phone;
+            enriched.driver = {
+              name: delReq.assignedDriver.name,
+              phone: delReq.assignedDriver.phone,
+              vehicle: delReq.assignedDriver.vehicleNo || 'Delivery Courier Partner',
+              rating: String(delReq.assignedDriver.rating || '4.9')
+            };
+          }
+        }
+
+        return enriched;
+      });
+
+      return res.json({ success: true, data: enrichedList });
     }
     return res.json({ success: true, data: [] });
   } catch (error) {
@@ -1433,5 +1562,7 @@ module.exports = {
   verifyPayment,
   acceptDelivery,
   updateDeliveryStatus,
-  deleteOrder
+  deleteOrder,
+  computeHaversineKm,
+  calculateLiveDropEta
 };
