@@ -25,7 +25,7 @@ const getDateLabel = (idx, dateObj) => {
 const getCapacity = async (req, res) => {
   try {
     const providerId = req.providerId;
-    let globalMaxCapacity = 50;
+    let globalMaxCapacity = 30;
     let autoStopOrders = true;
     let allowOverbooking = false;
 
@@ -34,7 +34,10 @@ const getCapacity = async (req, res) => {
       if (!settings) {
         settings = await ProviderSetting.create({ providerId });
       }
-      globalMaxCapacity = settings.tiffin?.maxDailyLimit ?? 50;
+      const Provider = require('../models/Provider');
+      const prov = await Provider.findById(providerId).lean();
+      const pMax = Number(prov?.maxMeals);
+      globalMaxCapacity = (!isNaN(pMax) && pMax > 0) ? pMax : (settings.tiffin?.maxDailyLimit ?? 30);
       autoStopOrders = settings.tiffin?.autoPauseLimit ?? true;
       allowOverbooking = settings.tiffin?.allowOverbooking ?? false;
     }
@@ -42,8 +45,13 @@ const getCapacity = async (req, res) => {
     const now = new Date();
     const daysList = [];
 
-    // Fetch orders for the next 7 days belonging to this provider
-    const allOrders = (await isDbConnected()) ? await Order.find({ providerId, status: { $ne: 'Cancelled' } }) : [];
+    // Fetch qualifying orders belonging to this provider
+    const allOrders = (await isDbConnected()) 
+      ? await Order.find({ 
+          providerId, 
+          status: { $nin: ['Cancelled', 'CANCELLED', 'REJECTED', 'Rejected', 'PAYMENT_FAILED', 'DELIVERY_FAILED'] } 
+        }) 
+      : [];
 
     for (let i = 0; i < 7; i++) {
       const dateObj = new Date(now);
@@ -63,11 +71,16 @@ const getCapacity = async (req, res) => {
       // Calculate booked count from real orders on this date
       const dayOrders = allOrders.filter(o => {
         const orderDate = new Date(o.createdAt);
+        if (i === 0) {
+          const isSameDateKey = formatDateKey(orderDate) === dateKey;
+          const isWithin24h = (now - orderDate) >= 0 && (now - orderDate) <= 24 * 60 * 60 * 1000;
+          return isSameDateKey || isWithin24h;
+        }
         return formatDateKey(orderDate) === dateKey;
       });
 
-      // Sum quantities of orders
-      const bookedCount = dayOrders.reduce((sum, o) => sum + (o.quantity || 1), 0);
+      // Sum meal quantities of qualifying orders
+      const bookedCount = dayOrders.reduce((sum, o) => sum + Math.max(1, Number(o.quantity) || 1), 0);
       const availableCapacity = Math.max(0, dayMaxCapacity - bookedCount);
       
       let status = 'OPEN';
@@ -146,6 +159,12 @@ const updateCapacitySettings = async (req, res) => {
       settings.updatedAt = new Date();
       await settings.save();
 
+      // Also update Provider doc maxMeals
+      const Provider = require('../models/Provider');
+      if (maxDailyOrders !== undefined) {
+        await Provider.findByIdAndUpdate(providerId, { $set: { maxMeals: Number(maxDailyOrders) } });
+      }
+
       // Also update today's capacity document
       const todayKey = formatDateKey(new Date());
       await KitchenCapacity.findOneAndUpdate(
@@ -160,6 +179,13 @@ const updateCapacitySettings = async (req, res) => {
         },
         { upsert: true, new: true }
       );
+
+      try {
+        const { emitToProvider, getIO } = require('../services/socketService');
+        emitToProvider(String(providerId), 'capacity:updated', { maxDailyOrders });
+        const io = getIO();
+        if (io) io.emit('capacity:updated', { providerId: String(providerId), maxDailyOrders });
+      } catch (sErr) {}
     }
 
     return res.json({

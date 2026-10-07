@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   TrendingUp, 
   CheckCircle, 
@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import AnimatedCounter from './AnimatedCounter';
 import { apiRequest } from '../services/api';
+import { getSocket } from '../services/socket';
 
 export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
   const providerName = currentUser?.name || currentUser?.businessName || 'Provider';
@@ -42,8 +43,13 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
 
   const [todaysOrders, setTodaysOrders] = useState([]);
   const [kitchenCapacity, setKitchenCapacity] = useState({
-    maxMeals: 50,
-    cookedMeals: 0
+    maxMeals: 30,
+    cookedMeals: 0,
+    bookedMeals: 0,
+    remainingMeals: 30,
+    utilization: 0,
+    lunch: { booked: 0, capacity: 15, remaining: 15, isMaxed: false },
+    dinner: { booked: 0, capacity: 15, remaining: 15, isMaxed: false }
   });
   const [deliveryCounts, setDeliveryCounts] = useState({
     ready: 0,
@@ -111,8 +117,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
   };
 
   // Fetch Real Dashboard Data from MongoDB
-  useEffect(() => {
-    const fetchDashboardDataFromDb = async () => {
+  const fetchDashboardDataFromDb = useCallback(async () => {
       try {
         const [dashRes, reqRes] = await Promise.all([
           apiRequest('/providers/dashboard'),
@@ -134,14 +139,44 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
           }));
 
           if (d.kitchenCapacity) {
+            const maxM = Number(d.kitchenCapacity.maxMeals) || 30;
+            const cookedM = Number(d.kitchenCapacity.cookedMeals !== undefined ? d.kitchenCapacity.cookedMeals : d.kitchenCapacity.bookedMeals) || 0;
+            const lunchCap = Number(d.kitchenCapacity.lunch?.capacity) || Math.ceil(maxM / 2);
+            const dinnerCap = Number(d.kitchenCapacity.dinner?.capacity) || Math.floor(maxM / 2);
+            const lunchBooked = Number(d.kitchenCapacity.lunch?.booked) || 0;
+            const dinnerBooked = Number(d.kitchenCapacity.dinner?.booked) || 0;
+            const remainingM = Math.max(0, maxM - cookedM);
+            const util = maxM > 0 ? Math.round((cookedM / maxM) * 100) : 0;
+
             setKitchenCapacity({
-              maxMeals: Number(d.kitchenCapacity.maxMeals) || 50,
-              cookedMeals: Number(d.kitchenCapacity.cookedMeals) || 0
+              maxMeals: maxM,
+              cookedMeals: cookedM,
+              bookedMeals: cookedM,
+              remainingMeals: remainingM,
+              utilization: util,
+              lunch: {
+                booked: lunchBooked,
+                capacity: lunchCap,
+                remaining: Math.max(0, lunchCap - lunchBooked),
+                isMaxed: lunchBooked >= lunchCap
+              },
+              dinner: {
+                booked: dinnerBooked,
+                capacity: dinnerCap,
+                remaining: Math.max(0, dinnerCap - dinnerBooked),
+                isMaxed: dinnerBooked >= dinnerCap
+              }
             });
           } else {
+            const cookedM = d.todaysOrdersCount || 0;
             setKitchenCapacity({
-              maxMeals: 50,
-              cookedMeals: d.todaysOrdersCount || 0
+              maxMeals: 30,
+              cookedMeals: cookedM,
+              bookedMeals: cookedM,
+              remainingMeals: Math.max(0, 30 - cookedM),
+              utilization: Math.round((cookedM / 30) * 100),
+              lunch: { booked: cookedM, capacity: 15, remaining: Math.max(0, 15 - cookedM), isMaxed: cookedM >= 15 },
+              dinner: { booked: 0, capacity: 15, remaining: 15, isMaxed: false }
             });
           }
 
@@ -197,12 +232,51 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
       } catch (err) {
         console.error('Error fetching dashboard data from MongoDB:', err);
       }
-    };
+    }, []);
 
-    if (currentUser) {
-      fetchDashboardDataFromDb();
-    }
-  }, [currentUser]);
+    useEffect(() => {
+      if (currentUser) {
+        fetchDashboardDataFromDb();
+      }
+    }, [currentUser, fetchDashboardDataFromDb]);
+
+    // Real-time synchronization via Socket.IO
+    useEffect(() => {
+      let socket;
+      try {
+        socket = getSocket();
+        if (socket && currentUser) {
+          const pId = currentUser?.providerId || currentUser?.id || currentUser?._id;
+          if (pId) {
+            socket.emit('join:provider', { providerId: String(pId) });
+          }
+
+          const handleRealtimeSync = () => {
+            fetchDashboardDataFromDb();
+          };
+
+          socket.on('order:created', handleRealtimeSync);
+          socket.on('order:new', handleRealtimeSync);
+          socket.on('order:updated', handleRealtimeSync);
+          socket.on('order:status:updated', handleRealtimeSync);
+          socket.on('order:cancelled', handleRealtimeSync);
+          socket.on('capacity:updated', handleRealtimeSync);
+          socket.on('delivery:status:updated', handleRealtimeSync);
+
+          return () => {
+            socket.off('order:created', handleRealtimeSync);
+            socket.off('order:new', handleRealtimeSync);
+            socket.off('order:updated', handleRealtimeSync);
+            socket.off('order:status:updated', handleRealtimeSync);
+            socket.off('order:cancelled', handleRealtimeSync);
+            socket.off('capacity:updated', handleRealtimeSync);
+            socket.off('delivery:status:updated', handleRealtimeSync);
+          };
+        }
+      } catch (err) {
+        console.warn('Socket setup warning in DashboardOverviewTab:', err);
+      }
+    }, [currentUser, fetchDashboardDataFromDb]);
 
   // Filter Orders for Modal Report
   const getFilteredReportOrders = () => {
@@ -650,7 +724,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
                 <span className="material-symbols-outlined text-[14px] text-on-surface">terminal</span>
                 <code>db.orders.find({`{ providerId: "${currentUser?.id || 'PROV-XOXO-991'}", date: "today" }`})</code>
               </div>
-              <span className="font-semibold text-on-surface">Total {kitchenCapacity.cookedMeals || 16} meals fulfilled today</span>
+              <span className="font-semibold text-on-surface">Total {kitchenCapacity.cookedMeals ?? 0} meals fulfilled today</span>
             </div>
           </div>
 
@@ -728,10 +802,10 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
             <div>
               <div className="flex items-baseline justify-between mb-1.5">
                 <span className="font-display-lg text-[32px] leading-none text-on-surface font-normal">
-                  {kitchenCapacity.cookedMeals || 16} <span className="text-secondary text-[20px]">/ {kitchenCapacity.maxMeals || 30} meals</span>
+                  {kitchenCapacity.cookedMeals} <span className="text-secondary text-[20px]">/ {kitchenCapacity.maxMeals} meals</span>
                 </span>
                 <span className="font-label-caps text-[12px] font-bold text-on-surface">
-                  {Math.round(((kitchenCapacity.cookedMeals || 16) / (kitchenCapacity.maxMeals || 30)) * 100)}%
+                  {kitchenCapacity.maxMeals > 0 ? Math.round((kitchenCapacity.cookedMeals / kitchenCapacity.maxMeals) * 100) : 0}%
                 </span>
               </div>
               <p className="font-body-md text-[12px] text-secondary">Daily meal preparation capacity allocation</p>
@@ -741,18 +815,30 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
             <div className="w-full bg-surface-container h-3 rounded-full overflow-hidden p-0.5">
               <div 
                 className="bg-onyx-black h-full rounded-full transition-all duration-500" 
-                style={{ width: `${Math.min(100, Math.round(((kitchenCapacity.cookedMeals || 16) / (kitchenCapacity.maxMeals || 30)) * 100))}%` }}
+                style={{ width: `${Math.min(100, kitchenCapacity.maxMeals > 0 ? Math.round((kitchenCapacity.cookedMeals / kitchenCapacity.maxMeals) * 100) : 0)}%` }}
               ></div>
             </div>
 
             <div className="p-3 rounded-xl bg-surface-container-low space-y-2 border border-sand-neutral/30">
               <div className="flex items-center justify-between font-label-caps text-[11px]">
                 <span className="text-secondary font-medium">Lunch Batch:</span>
-                <span className="font-bold text-on-surface">15 / 15 Booked (Maxed)</span>
+                <span className="font-bold text-on-surface">
+                  {kitchenCapacity.lunch?.booked ?? 0} / {kitchenCapacity.lunch?.capacity ?? 15} Booked {
+                    (kitchenCapacity.lunch?.booked ?? 0) >= (kitchenCapacity.lunch?.capacity ?? 15)
+                      ? '(Maxed)'
+                      : `(${(kitchenCapacity.lunch?.capacity ?? 15) - (kitchenCapacity.lunch?.booked ?? 0)} Slots Open)`
+                  }
+                </span>
               </div>
               <div className="flex items-center justify-between font-label-caps text-[11px]">
                 <span className="text-secondary font-medium">Dinner Batch:</span>
-                <span className="font-bold text-on-surface">1 / 15 Booked (14 Slots Open)</span>
+                <span className="font-bold text-on-surface">
+                  {kitchenCapacity.dinner?.booked ?? 0} / {kitchenCapacity.dinner?.capacity ?? 15} Booked {
+                    (kitchenCapacity.dinner?.booked ?? 0) >= (kitchenCapacity.dinner?.capacity ?? 15)
+                      ? '(Maxed)'
+                      : `(${(kitchenCapacity.dinner?.capacity ?? 15) - (kitchenCapacity.dinner?.booked ?? 0)} Slots Open)`
+                  }
+                </span>
               </div>
             </div>
 

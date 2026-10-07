@@ -508,6 +508,26 @@ const getProviderDashboardStats = async (req, res) => {
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const activeKitchenStatuses = [
+        'New', 'PENDING', 'Pending', 'CONFIRMED', 'Confirmed',
+        'ACCEPTED', 'Accepted', 'PREPARING', 'Preparing',
+        'READY_FOR_PICKUP', 'Ready', 'DELIVERY_REQUESTED',
+        'Delivery', 'Dispatched', 'In Transit', 'At Kitchen',
+        'DRIVER_ASSIGNED', 'PICKED_UP', 'Picked Up',
+        'OUT_FOR_DELIVERY', 'Out for Delivery', 'ARRIVED', 'DELIVERED', 'Completed'
+      ];
+
+      const todayOrderMatch = {
+        providerId,
+        status: { $nin: ['Cancelled', 'CANCELLED', 'REJECTED', 'Rejected', 'PAYMENT_FAILED', 'DELIVERY_FAILED'] },
+        $or: [
+          { createdAt: { $gte: startOfDay, $lte: endOfDay } },
+          { createdAt: { $gte: twentyFourHoursAgo } },
+          { status: { $in: activeKitchenStatuses } }
+        ]
+      };
+
       const [
         providerDoc,
         activeTiffinsCount,
@@ -523,24 +543,40 @@ const getProviderDashboardStats = async (req, res) => {
         Order.find({ providerId })
           .sort({ createdAt: -1 })
           .limit(10)
-          .select('orderId customerName totalAmount quantity tiffinName status deliveryPartnerName createdAt')
+          .select('orderId customerName totalAmount quantity tiffinName status deliveryPartnerName createdAt items deliverySlot')
           .lean(),
         Order.aggregate([
-          { $match: { providerId, createdAt: { $gte: startOfDay, $lte: endOfDay } } },
+          { $match: todayOrderMatch },
           {
             $group: {
               _id: null,
               count: { $sum: 1 },
-              totalMeals: {
+              totalMeals: { $sum: { $ifNull: ['$quantity', 1] } },
+              lunchMeals: {
                 $sum: {
-                  $cond: [{ $ne: ['$status', 'Cancelled'] }, { $ifNull: ['$quantity', 1] }, 0]
+                  $cond: [
+                    {
+                      $or: [
+                        { $regexMatch: { input: { $ifNull: ['$deliverySlot', ''] }, regex: /dinner|night|evening/i } }
+                      ]
+                    },
+                    0,
+                    { $ifNull: ['$quantity', 1] }
+                  ]
                 }
               },
-              revenue: {
+              dinnerMeals: {
                 $sum: {
-                  $cond: [{ $ne: ['$status', 'Cancelled'] }, '$totalAmount', 0]
+                  $cond: [
+                    {
+                      $regexMatch: { input: { $ifNull: ['$deliverySlot', ''] }, regex: /dinner|night|evening/i }
+                    },
+                    { $ifNull: ['$quantity', 1] },
+                    0
+                  ]
                 }
               },
+              revenue: { $sum: '$totalAmount' },
               customers: { $addToSet: { $ifNull: ['$customerPhone', '$customerName'] } }
             }
           }
@@ -563,7 +599,7 @@ const getProviderDashboardStats = async (req, res) => {
       const acceptingOrders = providerDoc ? Boolean(providerDoc.isAcceptingOrders) : true;
 
       // Extract today metrics strictly for current provider
-      const todayAgg = todayAggResult[0] || { count: 0, totalMeals: 0, revenue: 0, customers: [] };
+      const todayAgg = todayAggResult[0] || { count: 0, totalMeals: 0, lunchMeals: 0, dinnerMeals: 0, revenue: 0, customers: [] };
       const todaysOrdersCount = todayAgg.count;
       const revenueToday = todayAgg.revenue;
       const todaysCustomersCount = todayAgg.customers ? todayAgg.customers.length : 0;
@@ -572,10 +608,16 @@ const getProviderDashboardStats = async (req, res) => {
       const rating = reviewAgg && reviewAgg.avgRating ? Number(reviewAgg.avgRating.toFixed(1)) : 0;
       const reviewCount = reviewAgg ? reviewAgg.totalReviews : 0;
 
-      // Kitchen Capacity Calculations
+      // Kitchen Capacity Calculations strictly by meal quantity
       const parsedMaxMeals = Number(providerDoc?.maxMeals);
-      const maxMeals = (!isNaN(parsedMaxMeals) && parsedMaxMeals > 0) ? parsedMaxMeals : 50;
+      const maxMeals = (!isNaN(parsedMaxMeals) && parsedMaxMeals > 0) ? parsedMaxMeals : 30;
       const cookedMeals = todayAgg.totalMeals || 0;
+      const lunchCapacity = Math.ceil(maxMeals / 2);
+      const dinnerCapacity = Math.floor(maxMeals / 2);
+      const lunchBooked = todayAgg.lunchMeals || 0;
+      const dinnerBooked = todayAgg.dinnerMeals || 0;
+      const remainingMeals = Math.max(0, maxMeals - cookedMeals);
+      const utilization = maxMeals > 0 ? Math.round((cookedMeals / maxMeals) * 100) : 0;
 
       // Delivery Status Counts
       const DeliveryRequest = require('../models/DeliveryRequest');
@@ -617,7 +659,22 @@ const getProviderDashboardStats = async (req, res) => {
           acceptingOrders,
           kitchenCapacity: {
             maxMeals,
-            cookedMeals
+            cookedMeals,
+            bookedMeals: cookedMeals,
+            remainingMeals,
+            utilization,
+            lunch: {
+              booked: lunchBooked,
+              capacity: lunchCapacity,
+              remaining: Math.max(0, lunchCapacity - lunchBooked),
+              isMaxed: lunchBooked >= lunchCapacity
+            },
+            dinner: {
+              booked: dinnerBooked,
+              capacity: dinnerCapacity,
+              remaining: Math.max(0, dinnerCapacity - dinnerBooked),
+              isMaxed: dinnerBooked >= dinnerCapacity
+            }
           },
           deliveryCounts: {
             ready: readyCount,

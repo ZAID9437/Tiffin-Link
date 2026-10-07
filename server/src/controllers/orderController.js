@@ -271,19 +271,29 @@ const createOrder = async (req, res) => {
         const dObj = new Date();
         const todayKey = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
         
+        const Provider = require('../models/Provider');
+        const pDoc = await Provider.findById(providerId).lean();
+        const pMax = Number(pDoc?.maxMeals);
+        const effectiveMax = (!isNaN(pMax) && pMax > 0) ? pMax : maxDaily;
+
         const todayCapDoc = await KitchenCapacity.findOne({ providerId, date: todayKey });
-        const finalMax = todayCapDoc ? todayCapDoc.maxCapacity : maxDaily;
+        const finalMax = todayCapDoc ? todayCapDoc.maxCapacity : effectiveMax;
         const finalAutoStop = todayCapDoc ? todayCapDoc.autoStopOrders : autoStop;
         const finalAllowOver = todayCapDoc ? todayCapDoc.allowOverbooking : allowOver;
 
-        const existingOrders = await Order.find({ providerId, status: { $ne: 'Cancelled' } });
+        const existingOrders = await Order.find({ 
+          providerId, 
+          status: { $nin: ['Cancelled', 'CANCELLED', 'REJECTED', 'Rejected', 'PAYMENT_FAILED', 'DELIVERY_FAILED'] } 
+        });
+        const nowMs = Date.now();
         const todayBooked = existingOrders
           .filter(o => {
             const od = new Date(o.createdAt);
             const k = `${od.getFullYear()}-${String(od.getMonth() + 1).padStart(2, '0')}-${String(od.getDate()).padStart(2, '0')}`;
-            return k === todayKey;
+            const isWithin24h = (nowMs - od.getTime()) >= 0 && (nowMs - od.getTime()) <= 24 * 60 * 60 * 1000;
+            return k === todayKey || isWithin24h;
           })
-          .reduce((sum, o) => sum + (o.quantity || 1), 0);
+          .reduce((sum, o) => sum + Math.max(1, Number(o.quantity) || 1), 0);
 
         const newTotal = todayBooked + (Number(quantity) || 1);
         if (newTotal > finalMax && finalAutoStop && !finalAllowOver) {
