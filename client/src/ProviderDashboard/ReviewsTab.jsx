@@ -1,33 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  RotateCw, 
-  Star, 
-  MessageSquare, 
-  CheckCircle2, 
-  Clock, 
-  Eye, 
-  ChevronLeft, 
-  ChevronRight, 
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Star,
+  Search,
+  RotateCw,
+  Download,
+  CheckCircle2,
+  Clock,
+  MessageSquare,
+  TrendingUp,
+  Heart,
+  Reply,
+  Edit3,
   X,
   Send,
-  Filter,
-  TrendingUp,
-  TrendingDown,
-  Minus,
+  Calendar,
+  Package,
   ShoppingBag,
   User,
-  ThumbsUp,
-  AlertTriangle,
-  Download,
-  FileSpreadsheet,
-  Calendar,
-  Sparkles,
-  Phone,
-  Tag,
-  Check
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  Truck
 } from 'lucide-react';
 import { apiRequest } from '../services/api';
+import { getSocket } from '../services/socket';
 
 export default function ReviewsTab({ currentUser }) {
   const [reviews, setReviews] = useState([]);
@@ -35,8 +32,13 @@ export default function ReviewsTab({ currentUser }) {
     overallRating: '0.0',
     totalReviews: 0,
     positivePercent: 0,
-    needAttentionCount: 0,
-    thisMonthCount: 0,
+    fiveStarCount: 0,
+    fiveStarPercent: 0,
+    repliedCount: 0,
+    awaitingReplyCount: 0,
+    responseRate: 0,
+    totalDeliveries: 0,
+    monthTrendText: 'Audited Quality Data',
     breakdownCounts: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
     ratingDistribution: {
       5: { count: 0, percent: 0 },
@@ -45,77 +47,68 @@ export default function ReviewsTab({ currentUser }) {
       2: { count: 0, percent: 0 },
       1: { count: 0, percent: 0 }
     },
-    tiffinPerformance: [],
     uniqueTiffins: []
   });
 
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
-    limit: 5,
+    limit: 6,
     totalPages: 1
   });
 
   const [loading, setLoading] = useState(true);
   const [errorState, setErrorState] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   // Filters State
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [ratingFilter, setRatingFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [tiffinFilter, setTiffinFilter] = useState('All');
   const [dateRangeFilter, setDateRangeFilter] = useState('All');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [sortBy, setSortBy] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Drawer & Modal States
-  const [selectedReview, setSelectedReview] = useState(null);
+  // Modals State
   const [replyModalReview, setReplyModalReview] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-
-  // Polling for Real-Time Live Updates
-  useEffect(() => {
-    if (currentUser) {
-      fetchReviewsFromDb();
-    }
-    const interval = setInterval(() => {
-      if (currentUser) fetchReviewsFromDb(false);
-    }, 10000); // 10s polling for real-time live sync
-    return () => clearInterval(interval);
-  }, [currentUser, searchTerm, ratingFilter, statusFilter, tiffinFilter, dateRangeFilter, sortBy, currentPage]);
+  const [viewOrderModal, setViewOrderModal] = useState(null);
 
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3500);
   };
 
+  // Fetch reviews from MongoDB via server API
   const fetchReviewsFromDb = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
       setErrorState(false);
 
-      const queryParams = new URLSearchParams({
-        search: searchTerm,
+      const params = new URLSearchParams({
+        search: searchQuery.trim(),
         rating: ratingFilter,
         status: statusFilter,
-        tiffin: tiffinFilter,
         dateRange: dateRangeFilter,
         sortBy,
         page: currentPage,
-        limit: 5
+        limit: 6
       });
 
-      const res = await apiRequest(`/reviews?${queryParams.toString()}`);
+      if (dateRangeFilter === 'Custom Date Range' && customStart && customEnd) {
+        params.append('startDate', customStart);
+        params.append('endDate', customEnd);
+      }
+
+      const res = await apiRequest(`/reviews?${params.toString()}`);
       const json = typeof res?.json === 'function' ? await res.json() : res;
 
-      if (json.success && json.data) {
-        if (Array.isArray(json.data.reviews)) {
-          setReviews(json.data.reviews);
-        }
+      if (json && json.success && json.data) {
+        setReviews(Array.isArray(json.data.reviews) ? json.data.reviews : []);
         if (json.data.stats) {
           setStats(prev => ({ ...prev, ...json.data.stats }));
         }
@@ -126,843 +119,960 @@ export default function ReviewsTab({ currentUser }) {
         setErrorState(true);
       }
     } catch (err) {
-      console.error('Error fetching reviews from DB:', err);
+      console.error('Error fetching reviews:', err);
       setErrorState(true);
     } finally {
       if (showLoading) setLoading(false);
-      setIsRefreshing(false);
+      setIsSyncing(false);
     }
   };
 
-  const handleManualRefresh = () => {
-    setIsRefreshing(true);
+  // Trigger fetch when filters or pagination change
+  useEffect(() => {
+    if (currentUser) {
+      fetchReviewsFromDb(true);
+    }
+  }, [
+    currentUser,
+    ratingFilter,
+    statusFilter,
+    dateRangeFilter,
+    customStart,
+    customEnd,
+    sortBy,
+    currentPage
+  ]);
+
+  // Debounced search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentUser) {
+        setCurrentPage(1);
+        fetchReviewsFromDb(false);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Socket.IO Listener for real-time review replies & live sync
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+      if (socket && currentUser) {
+        const pId = currentUser?.providerId || currentUser?._id || currentUser?.id;
+        if (pId) {
+          socket.emit('join:provider', { providerId: String(pId) });
+          socket.on('review:replied', () => {
+            fetchReviewsFromDb(false);
+          });
+        }
+      }
+    } catch (err) {}
+
+    return () => {
+      if (socket) {
+        socket.off('review:replied');
+      }
+    };
+  }, [currentUser]);
+
+  // Manual Live Sync
+  const handleLiveSync = () => {
+    setIsSyncing(true);
     fetchReviewsFromDb(true);
+    showToast('Telemetry refreshed from MongoDB database.');
   };
 
-  const handleClearFilters = () => {
-    setSearchTerm('');
-    setRatingFilter('All');
-    setStatusFilter('All');
-    setTiffinFilter('All');
-    setDateRangeFilter('All');
-    setSortBy('newest');
-    setCurrentPage(1);
+  // Open Reply Modal
+  const handleOpenReplyModal = (review) => {
+    setReplyModalReview(review);
+    setReplyText(review.providerReply || '');
   };
 
-  // Submit / Save Provider Reply in MongoDB
-  const handleSendReply = async (reviewToReply) => {
-    const target = reviewToReply || replyModalReview || selectedReview;
-    if (!target || !replyText.trim()) return;
+  // Submit Provider Reply
+  const handleSubmitReply = async (e) => {
+    e?.preventDefault();
+    if (!replyModalReview || !replyText.trim()) return;
+
+    if (replyText.trim().length > 1000) {
+      showToast('Reply must be within 1000 characters.');
+      return;
+    }
 
     try {
       setSubmittingReply(true);
-      const json = await apiRequest(`/reviews/${target._id}/reply`, {
+      const res = await apiRequest(`/reviews/${replyModalReview._id}/reply`, {
         method: 'PUT',
         body: JSON.stringify({
           providerReply: replyText.trim(),
-          repliedBy: currentUser?.businessName || currentUser?.kitchenName || currentUser?.name || 'Kitchen Partner'
+          repliedBy: currentUser?.businessName || currentUser?.name || 'Mansuri Kitchen'
         })
       });
 
-      if (json.success) {
-        showToast('✓ Provider reply saved successfully in MongoDB!');
-        setReplyText('');
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+
+      if (json && json.success) {
+        showToast('✓ Official reply published successfully!');
         setReplyModalReview(null);
-        if (selectedReview && selectedReview._id === target._id) {
-          setSelectedReview(prev => ({
-            ...prev,
-            providerReply: replyText.trim(),
-            repliedAt: new Date()
-          }));
-        }
-        await fetchReviewsFromDb(false);
+        setReplyText('');
+        // Refresh reviews and statistics from DB
+        fetchReviewsFromDb(false);
       } else {
-        showToast(json.message || 'Failed to save reply');
+        showToast(json?.message || 'Failed to submit reply. Please retry.');
       }
     } catch (err) {
-      console.error('Error sending reply:', err);
-      showToast('Error saving reply to server');
+      console.error('Error saving review reply:', err);
+      showToast('Error communicating with database server.');
     } finally {
       setSubmittingReply(false);
     }
   };
 
-  // CSV Export Functionality
+  // CSV Export
   const handleExportCSV = () => {
     if (reviews.length === 0) {
-      showToast('No reviews available to export.');
+      showToast('No reviews available in current filter to export.');
       return;
     }
 
-    const headers = ['Customer Name', 'Phone', 'Order ID', 'Tiffin Name', 'Rating', 'Review Comment', 'Date', 'Reply Status', 'Provider Reply'];
+    const headers = [
+      'Review ID',
+      'Order ID',
+      'Customer Name',
+      'Customer Phone',
+      'Tiffin Plan',
+      'Rating',
+      'Comment',
+      'Created Date',
+      'Replied Status',
+      'Provider Reply',
+      'Replied Date'
+    ];
+
     const rows = reviews.map(r => [
-      `"${r.customerName || ''}"`,
-      `"${r.customerPhone || ''}"`,
+      `"${r._id || ''}"`,
       `"${r.orderId || ''}"`,
-      `"${r.tiffinName || ''}"`,
+      `"${(r.customerName || '').replace(/"/g, '""')}"`,
+      `"${r.customerPhone || ''}"`,
+      `"${(r.tiffinName || '').replace(/"/g, '""')}"`,
       r.rating || 5,
       `"${(r.comment || '').replace(/"/g, '""')}"`,
-      `"${new Date(r.createdAt).toLocaleDateString()}"`,
-      r.providerReply ? 'Replied' : 'Pending',
-      `"${(r.providerReply || '').replace(/"/g, '""')}"`
+      `"${r.createdAt ? new Date(r.createdAt).toLocaleString('en-IN') : ''}"`,
+      r.providerReply ? 'Replied' : 'Awaiting Reply',
+      `"${(r.providerReply || '').replace(/"/g, '""')}"`,
+      `"${r.repliedAt ? new Date(r.repliedAt).toLocaleString('en-IN') : ''}"`
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `TiffinLink_Reviews_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `TiffinLink_Reviews_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    setIsExportModalOpen(false);
-    showToast('✓ Reviews exported to CSV successfully!');
+    showToast('✓ Reviews CSV exported successfully.');
   };
 
-  // Render Stars Helper
-  const renderStars = (count, size = 14) => {
+  // Star Rating Component
+  const renderStars = (ratingNum, size = 16) => {
+    const val = Number(ratingNum) || 0;
     return (
-      <div className="flex items-center gap-0.5 text-amber-400">
-        {[1, 2, 3, 4, 5].map(star => (
-          <Star
-            key={star}
-            size={size}
-            className={star <= count ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}
-          />
-        ))}
+      <div className="flex items-center text-[#c95e32]">
+        {[1, 2, 3, 4, 5].map(starIndex => {
+          const filled = val >= starIndex;
+          const half = !filled && val >= starIndex - 0.5;
+          return (
+            <span key={starIndex} className="inline-block">
+              {filled ? (
+                <Star size={size} className="fill-[#c95e32] text-[#c95e32]" />
+              ) : half ? (
+                <span className="relative inline-block" style={{ width: size, height: size }}>
+                  <Star size={size} className="text-[#c95e32]/30" />
+                  <span className="absolute top-0 left-0 overflow-hidden w-1/2">
+                    <Star size={size} className="fill-[#c95e32] text-[#c95e32]" />
+                  </span>
+                </span>
+              ) : (
+                <Star size={size} className="text-[#e4dfd7]" />
+              )}
+            </span>
+          );
+        })}
       </div>
     );
   };
 
-  // Relative Time Helper
-  const getRelativeTime = (dateInput) => {
-    if (!dateInput) return 'Recently';
-    const d = new Date(dateInput);
-    if (isNaN(d.getTime())) return dateInput;
-    const now = new Date();
-    const diffMs = now - d;
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 60) return `${diffMins || 1} min ago`;
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 30) return `${diffDays} days ago`;
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  // Format Date Helper
+  const formatReviewDate = (dateVal) => {
+    if (!dateVal) return 'Recently';
+    const d = new Date(dateVal);
+    const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dateStr} • ${timeStr}`;
   };
 
   return (
-    <div className="space-[#111827] space-y-6 text-xs font-bold animate-slide-up">
-      
-      {/* Toast Alert */}
+    <div className="w-full space-y-8 animate-fade-in font-sans text-[#1a1a1a]">
+
+      {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[9999] bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
-          <CheckCircle2 size={18} />
-          <span className="font-extrabold">{toastMessage}</span>
+        <div className="fixed bottom-6 right-6 z-50 bg-[#1a1a1a] text-white px-5 py-3 rounded shadow-2xl text-xs font-mono flex items-center gap-2 border border-[#4a4a46] animate-bounce">
+          <CheckCircle2 size={16} className="text-emerald-400" />
+          <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* ==================== 1. PAGE HEADER ==================== */}
-      <div className="bg-white rounded-2xl p-6 shadow-xs border border-[#E5ECE8] flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* A. Page Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#e4dfd7] pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-[#6B7280] mb-1">
-            <span>Provider</span>
-            <span>/</span>
-            <span>Customers</span>
-            <span>/</span>
-            <span className="text-[#0A8B5F]">Reviews</span>
+          <div className="text-[11px] font-mono uppercase tracking-wider text-[#8c887b] mb-1">
+            CUSTOMER EXPERIENCE // AUDIT &amp; QUALITY ASSURANCE
           </div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-black text-[#111827]">Reviews & Ratings</h1>
-            {/* Real-time Live Badge Indicator */}
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-50 text-[#0A8B5F] border border-emerald-200 text-[10px] font-extrabold rounded-full">
-              <span className="w-2 h-2 rounded-full bg-[#0A8B5F] animate-ping" />
-              ● LIVE
-            </span>
-          </div>
-          <p className="text-xs text-[#6B7280] font-medium mt-0.5">
-            See what customers are saying about your tiffins and service in real-time.
+          <h1 className="text-3xl md:text-4xl font-serif font-bold text-[#1a1a1a] tracking-tight">
+            Ratings &amp; Reviews
+          </h1>
+          <p className="text-sm text-[#5a5955] mt-1.5 max-w-xl">
+            Understand customer feedback and improve your culinary service. Real-time telemetry synchronized with MongoDB collection{' '}
+            <code className="text-xs font-mono text-[#1a1a1a] bg-[#ece8e0] px-1 py-0.5 rounded">
+              reviews
+            </code>.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
-            onClick={handleManualRefresh}
-            disabled={isRefreshing}
-            className="px-4 py-2 border border-[#E5ECE8] bg-[#F9FBF9] hover:bg-gray-100 text-[#111827] text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+            type="button"
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-[#1a1a1a] text-xs font-medium text-[#1a1a1a] bg-transparent hover:bg-[#ece8e0] transition-colors rounded cursor-pointer"
           >
-            <RotateCw size={14} className={isRefreshing ? 'animate-spin text-[#0A8B5F]' : ''} />
-            <span>{isRefreshing ? 'Syncing...' : 'Refresh'}</span>
+            <Download size={15} />
+            <span>Export Reviews (CSV)</span>
           </button>
-
           <button
-            onClick={() => setIsExportModalOpen(true)}
-            className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5 active:scale-95"
+            type="button"
+            onClick={handleLiveSync}
+            disabled={isSyncing}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-xs font-medium text-white hover:bg-neutral-800 transition-colors rounded cursor-pointer disabled:opacity-60"
           >
-            <Download size={14} />
-            <span>Export Reviews</span>
+            <RotateCw size={15} className={isSyncing ? 'animate-spin' : ''} />
+            <span>{isSyncing ? 'Syncing...' : 'Live Sync'}</span>
           </button>
         </div>
       </div>
 
-      {/* ==================== 2. SUMMARY CARDS (4 TOP CARDS) ==================== */}
+      {/* B. Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Overall Rating Card */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-2 relative overflow-hidden">
-          <div className="flex items-center justify-between text-[#6B7280]">
-            <span className="text-xs font-extrabold uppercase tracking-wider">⭐ Overall Rating</span>
-            <span className="p-2 bg-amber-50 rounded-xl text-amber-600">
-              <Star size={16} className="fill-amber-400" />
+
+        {/* Card 1: Average Rating */}
+        <div className="bg-white border border-[#e4dfd7] p-5 rounded relative overflow-hidden shadow-sm">
+          <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#71716b]">
+            <span>AVERAGE RATING</span>
+            <Star size={18} className="text-[#c95e32] fill-[#c95e32]" />
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl md:text-4xl font-serif font-bold text-[#1a1a1a]">
+              {stats.overallRating || '0.0'}
             </span>
+            <div className="flex items-center">
+              {renderStars(stats.overallRating, 16)}
+            </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-[#111827]">{stats.overallRating}</span>
-            <span className="text-xs font-bold text-[#6B7280]">/ 5</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {renderStars(Math.round(Number(stats.overallRating) || 5), 14)}
-            <span className="text-[11px] text-[#6B7280] font-medium">({stats.totalReviews} total)</span>
+          <p className="mt-2 text-xs text-[#71716b]">
+            Based on actual audited reviews across all tiffin plans
+          </p>
+          <div className="mt-3 text-[10px] font-mono text-emerald-700 flex items-center gap-1">
+            <TrendingUp size={13} />
+            <span>{stats.monthTrendText || '+0.2 vs last month'}</span>
           </div>
         </div>
 
-        {/* Total Reviews Card */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-[#6B7280]">
-            <span className="text-xs font-extrabold uppercase tracking-wider">💬 Total Reviews</span>
-            <span className="p-2 bg-blue-50 rounded-xl text-blue-600">
-              <MessageSquare size={16} />
+        {/* Card 2: Total Reviews */}
+        <div className="bg-white border border-[#e4dfd7] p-5 rounded shadow-sm">
+          <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#71716b]">
+            <span>TOTAL REVIEWS</span>
+            <MessageSquare size={18} className="text-[#1a1a1a]" />
+          </div>
+          <div className="mt-3">
+            <span className="text-3xl md:text-4xl font-serif font-bold text-[#1a1a1a]">
+              {stats.totalReviews || 0}
             </span>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-[#111827]">{stats.totalReviews}</span>
-            <span className="px-2 py-0.5 bg-emerald-50 text-[#0A8B5F] text-[10px] font-extrabold rounded-full border border-emerald-200">
-              +{stats.thisMonthCount || 6} this month
-            </span>
+          <p className="mt-2 text-xs text-[#71716b]">
+            Total verified reviews received from delivered orders
+          </p>
+          <div className="mt-3 text-[10px] font-mono text-[#71716b]">
+            <span>{stats.totalDeliveries || 0} verified meal deliveries</span>
           </div>
-          <p className="text-[11px] text-[#6B7280] font-medium">Verified diner feedback</p>
         </div>
 
-        {/* Positive Reviews Card */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-[#6B7280]">
-            <span className="text-xs font-extrabold uppercase tracking-wider">👍 Positive Reviews</span>
-            <span className="p-2 bg-emerald-50 rounded-xl text-[#0A8B5F]">
-              <ThumbsUp size={16} />
+        {/* Card 3: 5-Star Ratings */}
+        <div className="bg-white border border-[#e4dfd7] p-5 rounded shadow-sm">
+          <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#71716b]">
+            <span>5-STAR RATINGS</span>
+            <CheckCircle2 size={18} className="text-amber-600" />
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl md:text-4xl font-serif font-bold text-[#1a1a1a]">
+              {stats.fiveStarCount || 0}
+            </span>
+            <span className="text-xs font-mono text-[#71716b]">
+              ({stats.fiveStarPercent || 0}%)
             </span>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-[#0A8B5F]">{stats.positivePercent || 92}%</span>
-            <span className="text-xs font-bold text-[#6B7280]">4–5 star</span>
+          <p className="mt-2 text-xs text-[#71716b]">
+            Highest customer satisfaction and taste consistency
+          </p>
+          <div className="mt-3 text-[10px] font-mono text-emerald-700 flex items-center gap-1">
+            <Heart size={13} className="fill-emerald-600 text-emerald-600" />
+            <span>Top tier home atelier rating</span>
           </div>
-          <p className="text-[11px] text-[#6B7280] font-medium">High satisfaction rate</p>
         </div>
 
-        {/* Need Attention Card */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-[#6B7280]">
-            <span className="text-xs font-extrabold uppercase tracking-wider">⚠️ Need Attention</span>
-            <span className="p-2 bg-amber-50 rounded-xl text-amber-600">
-              <AlertTriangle size={16} />
+        {/* Card 4: Response Rate */}
+        <div className="bg-white border border-[#e4dfd7] p-5 rounded shadow-sm">
+          <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#71716b]">
+            <span>RESPONSE RATE</span>
+            <Reply size={18} className="text-blue-700" />
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl md:text-4xl font-serif font-bold text-[#1a1a1a]">
+              {stats.responseRate || 0}%
+            </span>
+            <span className="text-xs font-mono text-[#71716b]">
+              {stats.repliedCount || 0} replied
             </span>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className={`text-2xl font-black ${stats.needAttentionCount > 0 ? 'text-amber-600' : 'text-[#111827]'}`}>
-              {stats.needAttentionCount}
+          <p className="mt-2 text-xs text-[#71716b]">
+            Reviews replied by provider within 24hr SLA
+          </p>
+          <div className={`mt-3 text-[10px] font-mono flex items-center gap-1 ${
+            (stats.awaitingReplyCount || 0) > 0 ? 'text-amber-700' : 'text-emerald-700'
+          }`}>
+            <Clock size={13} />
+            <span>
+              {(stats.awaitingReplyCount || 0) > 0
+                ? `${stats.awaitingReplyCount} awaiting your reply`
+                : 'All reviews responded'}
             </span>
-            <span className="text-xs font-bold text-[#6B7280]">Unanswered</span>
           </div>
-          <p className="text-[11px] text-[#6B7280] font-medium">Awaiting provider reply</p>
         </div>
+
       </div>
 
-      {/* ==================== 3. RATING BREAKDOWN CARD ==================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-[#111827]">Rating Breakdown</h3>
-            <span className="text-xs text-[#6B7280] font-semibold">Distribution based on {stats.totalReviews} reviews</span>
+      {/* C. Rating Distribution Section */}
+      <div className="bg-white border border-[#e4dfd7] p-6 rounded shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#f2efe9] pb-4 mb-5">
+          <div>
+            <h2 className="text-lg font-serif font-bold text-[#1a1a1a]">Rating Distribution</h2>
+            <p className="text-xs text-[#71716b]">Real-time frequency histogram aggregated from MongoDB provider records</p>
           </div>
-
-          <div className="space-y-3">
-            {[5, 4, 3, 2, 1].map(star => {
-              const info = stats.ratingDistribution ? stats.ratingDistribution[star] : { count: 0, percent: 0 };
-              const count = info?.count || 0;
-              const percent = info?.percent || 0;
-
-              return (
-                <div key={star} className="flex items-center gap-3 text-xs">
-                  <div className="flex items-center gap-1 w-12 shrink-0 font-extrabold text-[#111827]">
-                    <span>{star}</span>
-                    <Star size={13} className="fill-amber-400 text-amber-400" />
-                  </div>
-                  <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden border border-gray-100">
-                    <div
-                      className={`h-full transition-all duration-500 ${
-                        star >= 4 ? 'bg-[#0A8B5F]' : star === 3 ? 'bg-amber-400' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-                  <div className="w-16 text-right font-black text-[#111827] shrink-0">
-                    {count} <span className="text-[10px] text-[#6B7280] font-medium">({percent}%)</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Tiffin Performance Summary Widget */}
-        <div className="bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-[#111827]">Tiffin Performance</h3>
-            <span className="text-[10px] bg-emerald-50 text-[#0A8B5F] font-extrabold px-2 py-0.5 rounded-md border border-emerald-200">
-              Top Performers
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {stats.tiffinPerformance && stats.tiffinPerformance.length > 0 ? (
-              stats.tiffinPerformance.slice(0, 4).map((t, idx) => (
-                <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-[#F9FBF9] border border-[#E5ECE8]">
-                  <div className="truncate pr-2">
-                    <div className="font-extrabold text-[#111827] truncate">{t.tiffinName}</div>
-                    <div className="text-[10px] text-[#6B7280] font-medium">{t.reviewsCount} reviews</div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-xs font-black text-[#0A8B5F]">⭐ {t.rating}</span>
-                    <span className="text-xs font-bold text-emerald-600">{t.trend || '↑'}</span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-4 text-center text-[#6B7280] text-xs">
-                No tiffin performance data available yet.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ==================== 4. FILTERS & SEARCH BAR ==================== */}
-      <div className="bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search customer, comment, order # or tiffin..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* Filter Dropdowns */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Rating Filter */}
-            <select
-              value={ratingFilter}
-              onChange={(e) => { setRatingFilter(e.target.value); setCurrentPage(1); }}
-              className="bg-[#F9FBF9] border border-[#E5ECE8] text-[#111827] text-xs font-bold px-3 py-2.5 rounded-xl focus:outline-none focus:border-[#0A8B5F] cursor-pointer"
-            >
-              <option value="All">Rating: All</option>
-              <option value="5">5 Stars</option>
-              <option value="4">4 Stars</option>
-              <option value="3">3 Stars</option>
-              <option value="2">2 Stars</option>
-              <option value="1">1 Star</option>
-            </select>
-
-            {/* Tiffin Filter */}
-            <select
-              value={tiffinFilter}
-              onChange={(e) => { setTiffinFilter(e.target.value); setCurrentPage(1); }}
-              className="bg-[#F9FBF9] border border-[#E5ECE8] text-[#111827] text-xs font-bold px-3 py-2.5 rounded-xl focus:outline-none focus:border-[#0A8B5F] cursor-pointer truncate"
-            >
-              <option value="All">Tiffin: All</option>
-              {stats.uniqueTiffins && stats.uniqueTiffins.map((tName, i) => (
-                <option key={i} value={tName}>{tName}</option>
-              ))}
-            </select>
-
-            {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="bg-[#F9FBF9] border border-[#E5ECE8] text-[#111827] text-xs font-bold px-3 py-2.5 rounded-xl focus:outline-none focus:border-[#0A8B5F] cursor-pointer"
-            >
-              <option value="All">Status: All</option>
-              <option value="Replied">Replied</option>
-              <option value="Not Replied">Not Replied</option>
-            </select>
-
-            {/* Sort By Filter */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="bg-[#F9FBF9] border border-[#E5ECE8] text-[#111827] text-xs font-bold px-3 py-2.5 rounded-xl focus:outline-none focus:border-[#0A8B5F] cursor-pointer"
-            >
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="highest">Highest Rating</option>
-              <option value="lowest">Lowest Rating</option>
-            </select>
-          </div>
-
-          {(searchTerm || ratingFilter !== 'All' || statusFilter !== 'All' || tiffinFilter !== 'All' || dateRangeFilter !== 'All') && (
-            <button
-              onClick={handleClearFilters}
-              className="px-3.5 py-2 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl border border-red-200 transition-colors cursor-pointer shrink-0"
-            >
-              Clear Filters
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ==================== 5. REVIEWS LIST SECTION ==================== */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-black text-[#111827]">Customer Reviews</h2>
-            <span className="px-2.5 py-0.5 bg-[#0A8B5F]/10 text-[#0A8B5F] text-[11px] font-extrabold rounded-full">
-              {pagination.total || reviews.length} Reviews
-            </span>
-          </div>
-
-          <span className="text-xs text-[#6B7280] font-semibold">
-            Showing Page {pagination.page} of {pagination.totalPages}
+          <span className="text-[11px] font-mono text-[#71716b] bg-[#f7f4ee] px-2.5 py-1 rounded border border-[#e4dfd7]">
+            AGGREGATION: 100% AUDITED
           </span>
         </div>
 
-        {/* State 1: Loading Skeleton */}
+        <div className="space-y-3 max-w-3xl">
+          {[
+            { star: 5, label: '★★★★★ (5)', count: stats.breakdownCounts?.[5] || 0, percent: stats.ratingDistribution?.[5]?.percent || 0, color: 'bg-[#1a1a1a]' },
+            { star: 4, label: '★★★★☆ (4)', count: stats.breakdownCounts?.[4] || 0, percent: stats.ratingDistribution?.[4]?.percent || 0, color: 'bg-[#4a4a46]' },
+            { star: 3, label: '★★★☆☆ (3)', count: stats.breakdownCounts?.[3] || 0, percent: stats.ratingDistribution?.[3]?.percent || 0, color: 'bg-[#8c887b]' },
+            { star: 2, label: '★★☆☆☆ (2)', count: stats.breakdownCounts?.[2] || 0, percent: stats.ratingDistribution?.[2]?.percent || 0, color: 'bg-[#c95e32]' },
+            { star: 1, label: '★☆☆☆☆ (1)', count: stats.breakdownCounts?.[1] || 0, percent: stats.ratingDistribution?.[1]?.percent || 0, color: 'bg-rose-700' }
+          ].map(row => (
+            <div key={row.star} className="flex items-center gap-4 text-xs">
+              <div className="w-24 flex items-center gap-1 shrink-0 font-medium text-[#1a1a1a]">
+                <span className="text-amber-500 font-serif">{row.label.split(' ')[0]}</span>
+                <span className="text-[11px] text-[#71716b]">{row.label.split(' ')[1]}</span>
+              </div>
+              <div className="flex-1 bg-[#f2efe9] h-2.5 rounded-full overflow-hidden">
+                <div
+                  className={`${row.color} h-full rounded-full transition-all duration-500`}
+                  style={{ width: `${Math.min(100, Math.max(0, row.percent))}%` }}
+                />
+              </div>
+              <div className="w-24 text-right font-mono text-xs text-[#1a1a1a] font-medium">
+                {row.count} <span className="text-[#71716b] text-[11px] font-normal">({row.percent}%)</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* D. Search & Filters Container */}
+      <div className="bg-white border border-[#e4dfd7] p-5 rounded space-y-4 shadow-sm">
+
+        {/* Search bar */}
+        <div className="relative">
+          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#71716b]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search reviews, customers, order ID (e.g. #TL-8421, Rahul Patel)..."
+            className="w-full pl-10 pr-4 py-2.5 bg-[#fbf9f5] border border-[#e4dfd7] rounded text-xs text-[#1a1a1a] placeholder-[#8c887b] focus:outline-none focus:border-[#1a1a1a] transition-colors"
+          />
+        </div>
+
+        {/* Filter Selectors */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+          {/* Rating Filter */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-[#71716b] mb-1">Rating</label>
+            <select
+              value={ratingFilter}
+              onChange={(e) => { setRatingFilter(e.target.value); setCurrentPage(1); }}
+              className="w-full bg-[#fbf9f5] border border-[#e4dfd7] text-xs px-3 py-2 rounded text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a] cursor-pointer"
+            >
+              <option value="All">All Ratings (1 - 5 ★)</option>
+              <option value="5">5 Stars ({stats.breakdownCounts?.[5] || 0})</option>
+              <option value="4">4 Stars ({stats.breakdownCounts?.[4] || 0})</option>
+              <option value="3">3 Stars ({stats.breakdownCounts?.[3] || 0})</option>
+              <option value="2">2 Stars ({stats.breakdownCounts?.[2] || 0})</option>
+              <option value="1">1 Star ({stats.breakdownCounts?.[1] || 0})</option>
+            </select>
+          </div>
+
+          {/* Response Status Filter */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-[#71716b] mb-1">Response Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+              className="w-full bg-[#fbf9f5] border border-[#e4dfd7] text-xs px-3 py-2 rounded text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a] cursor-pointer"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Awaiting Reply">Awaiting Reply ({stats.awaitingReplyCount || 0})</option>
+              <option value="Replied">Replied ({stats.repliedCount || 0})</option>
+            </select>
+          </div>
+
+          {/* Date Range Filter */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-[#71716b] mb-1">Date Range</label>
+            <select
+              value={dateRangeFilter}
+              onChange={(e) => { setDateRangeFilter(e.target.value); setCurrentPage(1); }}
+              className="w-full bg-[#fbf9f5] border border-[#e4dfd7] text-xs px-3 py-2 rounded text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a] cursor-pointer"
+            >
+              <option value="All">All Time</option>
+              <option value="Last 30 Days">Last 30 Days</option>
+              <option value="Last 7 Days">Last 7 Days</option>
+              <option value="This Month">This Month</option>
+              <option value="Today">Today</option>
+              <option value="Custom Date Range">Custom Date Range</option>
+            </select>
+          </div>
+
+          {/* Sort Filter */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-[#71716b] mb-1">Sort By</label>
+            <select
+              value={sortBy}
+              onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
+              className="w-full bg-[#fbf9f5] border border-[#e4dfd7] text-xs px-3 py-2 rounded text-[#1a1a1a] focus:outline-none focus:border-[#1a1a1a] cursor-pointer"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="highest">Highest Rating (5 → 1)</option>
+              <option value="lowest">Lowest Rating (1 → 5)</option>
+            </select>
+          </div>
+
+        </div>
+
+        {/* Custom Date Range Picker */}
+        {dateRangeFilter === 'Custom Date Range' && (
+          <div className="flex items-center gap-3 pt-2 border-t border-[#f2efe9] text-xs font-mono">
+            <span className="text-[#71716b]">Date Span:</span>
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="bg-[#fbf9f5] border border-[#e4dfd7] px-2 py-1 rounded text-xs focus:outline-none focus:border-[#1a1a1a]"
+            />
+            <span className="text-[#71716b]">to</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="bg-[#fbf9f5] border border-[#e4dfd7] px-2 py-1 rounded text-xs focus:outline-none focus:border-[#1a1a1a]"
+            />
+          </div>
+        )}
+
+        {/* Quick Tag Toggles */}
+        <div className="flex items-center gap-2 pt-2 border-t border-[#f2efe9]">
+          <span className="text-[11px] font-mono text-[#71716b] mr-2">Quick View:</span>
+          <button
+            type="button"
+            onClick={() => { setStatusFilter('All'); setCurrentPage(1); }}
+            className={`px-3 py-1 text-xs rounded font-medium cursor-pointer transition-colors ${
+              statusFilter === 'All'
+                ? 'bg-[#1a1a1a] text-white'
+                : 'bg-[#f7f4ee] hover:bg-[#ece8e0] text-[#1a1a1a] border border-[#e4dfd7]'
+            }`}
+          >
+            All Reviews ({stats.totalReviews || 0})
+          </button>
+          <button
+            type="button"
+            onClick={() => { setStatusFilter('Replied'); setCurrentPage(1); }}
+            className={`px-3 py-1 text-xs rounded font-medium cursor-pointer transition-colors ${
+              statusFilter === 'Replied'
+                ? 'bg-[#1a1a1a] text-white'
+                : 'bg-[#f7f4ee] hover:bg-[#ece8e0] text-[#1a1a1a] border border-[#e4dfd7]'
+            }`}
+          >
+            Replied ({stats.repliedCount || 0})
+          </button>
+          <button
+            type="button"
+            onClick={() => { setStatusFilter('Awaiting Reply'); setCurrentPage(1); }}
+            className={`px-3 py-1 text-xs rounded font-medium cursor-pointer transition-colors flex items-center gap-1.5 ${
+              statusFilter === 'Awaiting Reply'
+                ? 'bg-[#c95e32] text-white'
+                : 'bg-[#f7f4ee] hover:bg-[#ece8e0] text-[#c95e32] border border-[#e4dfd7]'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${statusFilter === 'Awaiting Reply' ? 'bg-white' : 'bg-[#c95e32]'}`} />
+            Awaiting Reply ({stats.awaitingReplyCount || 0})
+          </button>
+        </div>
+
+      </div>
+
+      {/* E. Customer Reviews List */}
+      <div className="space-y-4">
+
+        <div className="flex items-center justify-between text-xs text-[#71716b] px-1 font-mono">
+          <span>
+            {pagination.total > 0
+              ? `SHOWING ${(pagination.page - 1) * pagination.limit + 1} - ${Math.min(pagination.page * pagination.limit, pagination.total)} OF ${pagination.total} REVIEWS`
+              : 'SHOWING 0 REVIEWS'}
+          </span>
+          <span>
+            PAGE {pagination.page} OF {pagination.totalPages} // SERVER-SIDE PAGINATED
+          </span>
+        </div>
+
+        {/* Loading State */}
         {loading ? (
           <div className="space-y-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs animate-pulse space-y-4">
+            {[1, 2, 3].map(sk => (
+              <div key={sk} className="bg-white border border-[#e4dfd7] p-6 rounded space-y-4 animate-pulse">
                 <div className="flex justify-between items-center">
-                  <div className="h-4 bg-gray-200 rounded-md w-32" />
-                  <div className="h-4 bg-gray-200 rounded-md w-20" />
+                  <div className="h-4 bg-[#ece8e0] rounded w-32" />
+                  <div className="h-4 bg-[#ece8e0] rounded w-24" />
                 </div>
-                <div className="h-3 bg-gray-200 rounded-md w-48" />
-                <div className="h-12 bg-gray-100 rounded-xl w-full" />
+                <div className="h-4 bg-[#ece8e0] rounded w-48" />
+                <div className="h-16 bg-[#f7f4ee] rounded w-full" />
+                <div className="h-8 bg-[#ece8e0] rounded w-40" />
               </div>
             ))}
           </div>
         ) : errorState ? (
-          /* State 2: Error State */
-          <div className="bg-white rounded-2xl p-12 text-center border border-red-200 space-y-4">
-            <AlertTriangle size={40} className="mx-auto text-red-500" />
-            <h3 className="text-base font-extrabold text-[#111827]">Unable to load reviews</h3>
-            <p className="text-xs text-[#6B7280]">We couldn't fetch your reviews from MongoDB right now.</p>
+          /* Error State */
+          <div className="bg-white border border-rose-300 p-8 rounded text-center space-y-3">
+            <AlertCircle size={32} className="mx-auto text-rose-600" />
+            <h3 className="text-base font-serif font-bold text-[#1a1a1a]">Unable to Load Reviews</h3>
+            <p className="text-xs text-[#71716b] max-w-md mx-auto">
+              There was an issue communicating with the MongoDB cluster. Please check connection and retry.
+            </p>
             <button
+              type="button"
               onClick={() => fetchReviewsFromDb(true)}
-              className="px-5 py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs inline-flex items-center gap-2"
+              className="px-4 py-2 bg-[#1a1a1a] text-white text-xs rounded hover:bg-neutral-800 transition-colors cursor-pointer"
             >
-              <RotateCw size={14} />
-              <span>Try Again</span>
+              Retry Database Fetch
             </button>
           </div>
         ) : reviews.length === 0 ? (
-          /* State 3: Empty State */
-          <div className="bg-white rounded-2xl p-12 text-center border border-[#E5ECE8] space-y-4">
-            <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto text-amber-500 text-2xl font-black shadow-xs">
-              ⭐
+          /* Empty State */
+          <div className="bg-white border border-[#e4dfd7] p-12 rounded text-center space-y-4">
+            <div className="w-12 h-12 mx-auto bg-[#f7f4ee] rounded-full flex items-center justify-center text-[#71716b]">
+              <MessageSquare size={24} />
             </div>
-            <h3 className="text-base font-extrabold text-[#111827]">No reviews found</h3>
-            <p className="text-xs text-[#6B7280] max-w-sm mx-auto">
-              Once customers review your tiffins, their feedback will appear here in real time. Keep serving great food! 🍱
+            <h3 className="text-lg font-serif font-bold text-[#1a1a1a]">No Reviews Found</h3>
+            <p className="text-xs text-[#71716b] max-w-sm mx-auto">
+              No diner feedback matches your selected filters or search criteria. Try modifying your criteria or checking all reviews.
             </p>
-            {(searchTerm || ratingFilter !== 'All' || statusFilter !== 'All' || tiffinFilter !== 'All') && (
-              <button
-                onClick={handleClearFilters}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#111827] text-xs font-bold rounded-xl cursor-pointer"
-              >
-                Reset Filters
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setRatingFilter('All');
+                setStatusFilter('All');
+                setDateRangeFilter('All');
+                setCurrentPage(1);
+              }}
+              className="px-4 py-2 border border-[#1a1a1a] text-xs font-medium text-[#1a1a1a] hover:bg-[#ece8e0] rounded transition-colors cursor-pointer"
+            >
+              Reset Filters
+            </button>
           </div>
         ) : (
-          /* State 4: Populated Reviews List */
-          <div className="space-y-4">
-            {reviews.map(rev => (
-              <div 
-                key={rev._id || rev.id}
-                className="bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4 hover:border-[#0A8B5F]/40 transition-all"
+          /* Render Review Cards */
+          reviews.map((review) => {
+            const hasReply = Boolean(review.providerReply && review.providerReply.trim() !== '');
+
+            return (
+              <div
+                key={review._id}
+                className="bg-white border border-[#e4dfd7] p-6 rounded hover:border-[#8c887b] transition-colors space-y-4 shadow-sm"
               >
-                {/* Review Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5ECE8] pb-3.5">
+                {/* Header Row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#0A8B5F]/10 text-[#0A8B5F] font-black text-sm flex items-center justify-center uppercase shrink-0">
-                      {rev.customerName ? rev.customerName.charAt(0) : 'U'}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-black text-[#111827]">{rev.customerName}</h4>
-                        <span className="px-2 py-0.5 bg-gray-100 text-[#6B7280] text-[10px] font-extrabold rounded-md">
-                          Order {rev.orderId || '#1024'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-[11px] text-[#6B7280] font-medium mt-0.5">
-                        <span>Total Orders: {rev.customerTotalOrders || 12}</span>
-                        <span>•</span>
-                        <span>Reviews Given: {rev.customerTotalReviews || 3}</span>
-                      </div>
-                    </div>
+                    {renderStars(review.rating, 18)}
+                    <span className="text-sm font-serif font-bold text-[#1a1a1a]">
+                      {Number(review.rating).toFixed(1)}
+                    </span>
+                    {review.isVerifiedOrder && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        <CheckCircle2 size={12} className="text-emerald-700" />
+                        Verified Order
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl">
-                      {renderStars(rev.rating, 14)}
-                      <span className="text-xs font-black text-amber-700 ml-1">{rev.rating}.0</span>
-                    </div>
-                    <span className="text-xs text-[#6B7280] font-semibold flex items-center gap-1">
-                      <Clock size={12} />
-                      {getRelativeTime(rev.createdAt)}
+                  <div className="text-[11px] font-mono text-[#71716b]">
+                    {formatReviewDate(review.createdAt)}
+                  </div>
+                </div>
+
+                {/* Customer Details Row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                  <div>
+                    <span className="font-semibold text-[#1a1a1a]">
+                      {review.customerName || 'Verified Diner'}
+                    </span>
+                    <span className="text-[#71716b] ml-2">
+                      {review.customerLocation || 'Ahmedabad'}
                     </span>
                   </div>
-                </div>
-
-                {/* Tiffin Tag */}
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 bg-emerald-50 text-[#0A8B5F] border border-emerald-200 text-[10px] font-extrabold uppercase rounded-lg">
-                    {rev.tiffinCategory || 'Gujarati'}
-                  </span>
-                  <span className="text-xs font-extrabold text-[#111827]">{rev.tiffinName}</span>
-                </div>
-
-                {/* Review Comment Text */}
-                <p className="text-xs text-[#374151] font-medium leading-relaxed bg-[#F9FBF9] p-3.5 rounded-xl border border-[#E5ECE8]">
-                  "{rev.comment}"
-                </p>
-
-                {/* Provider Reply Box (if replied) */}
-                {rev.providerReply && rev.providerReply.trim() !== '' ? (
-                  <div className="bg-emerald-50/70 border border-emerald-200/80 p-4 rounded-xl space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-extrabold text-[#0A8B5F] flex items-center gap-1.5">
-                        <MessageSquare size={13} />
-                        Provider Reply ({rev.repliedBy || currentUser?.businessName || currentUser?.kitchenName || currentUser?.name || 'Kitchen Partner'})
-                      </span>
-                      <span className="text-[10px] text-[#6B7280] font-semibold">
-                        {getRelativeTime(rev.repliedAt)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#111827] font-medium">
-                      "{rev.providerReply}"
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-[11px] text-amber-700 font-semibold bg-amber-50/60 px-3 py-1.5 rounded-lg border border-amber-200/60 inline-flex items-center gap-1.5">
-                    <AlertTriangle size={12} />
-                    <span>Awaiting your provider reply</span>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#E5ECE8]">
-                  <button
-                    onClick={() => {
-                      setReplyModalReview(rev);
-                      setReplyText(rev.providerReply || '');
-                    }}
-                    className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-[#0A8B5F] border border-emerald-200 text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
-                  >
-                    <MessageSquare size={14} />
-                    <span>{rev.providerReply ? 'Edit Reply' : 'Reply'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setSelectedReview(rev)}
-                    className="px-4 py-2 border border-[#E5ECE8] bg-[#F9FBF9] hover:bg-gray-100 text-[#111827] text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
-                  >
-                    <Eye size={14} />
-                    <span>View Details</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ==================== PAGINATION CONTROLS ==================== */}
-        {pagination.totalPages > 1 && (
-          <div className="bg-white p-4 rounded-2xl border border-[#E5ECE8] shadow-xs flex items-center justify-between">
-            <span className="text-xs text-[#6B7280] font-semibold">
-              Showing {(pagination.page - 1) * pagination.limit + 1}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} reviews
-            </span>
-
-            <div className="flex items-center gap-2">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                className="px-3 py-1.5 border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 cursor-pointer flex items-center gap-1"
-              >
-                <ChevronLeft size={14} />
-                <span>Previous</span>
-              </button>
-
-              {[...Array(pagination.totalPages)].map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`w-8 h-8 rounded-xl text-xs font-extrabold transition-colors cursor-pointer ${
-                    currentPage === i + 1 ? 'bg-[#0A8B5F] text-white' : 'bg-gray-100 text-[#111827] hover:bg-gray-200'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-
-              <button
-                disabled={currentPage === pagination.totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
-                className="px-3 py-1.5 border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 cursor-pointer flex items-center gap-1"
-              >
-                <span>Next</span>
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ==================== 6. REVIEW DETAILS DRAWER (RIGHT SLIDE-OVER) ==================== */}
-      {selectedReview && (
-        <div className="fixed inset-0 z-[999] overflow-hidden">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity" 
-            onClick={() => setSelectedReview(null)}
-          />
-
-          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-            <div className="w-screen max-w-md bg-white shadow-2xl border-l border-[#E5ECE8] flex flex-col justify-between overflow-y-auto p-6 space-y-6">
-              
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-4">
-                <div>
-                  <h3 className="text-base font-black text-[#111827]">Review Details</h3>
-                  <p className="text-xs text-[#6B7280] font-medium">Order {selectedReview.orderId}</p>
-                </div>
-                <button
-                  onClick={() => setSelectedReview(null)}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Drawer Content */}
-              <div className="space-y-5">
-                {/* Rating Badge Header */}
-                <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-black text-amber-800">Customer Rating</div>
-                    <div className="text-2xl font-black text-amber-700">{selectedReview.rating}.0 / 5.0</div>
-                  </div>
-                  {renderStars(selectedReview.rating, 18)}
-                </div>
-
-                {/* Customer Info */}
-                <div className="bg-[#F9FBF9] p-4 rounded-xl border border-[#E5ECE8] space-y-2">
-                  <div className="text-xs font-extrabold text-[#6B7280] uppercase tracking-wider">Customer</div>
-                  <div className="text-sm font-black text-[#111827]">{selectedReview.customerName}</div>
-                  <div className="text-xs text-[#6B7280] font-medium flex items-center gap-2">
-                    <Phone size={12} className="text-[#0A8B5F]" />
-                    <span>{selectedReview.customerPhone || '+91 98250 12345'}</span>
-                  </div>
-                  <div className="text-xs text-[#6B7280] font-medium flex items-center gap-3 pt-1 border-t border-[#E5ECE8]">
-                    <span>Total Orders: {selectedReview.customerTotalOrders || 12}</span>
-                    <span>•</span>
-                    <span>Reviews Given: {selectedReview.customerTotalReviews || 3}</span>
+                  <div className="font-mono text-[11px] text-[#71716b]">
+                    Order: <span className="text-[#1a1a1a] font-medium">{review.orderId || '#TL-XXXX'}</span>
+                    {' • '}
+                    <span>{review.tiffinName || 'Gujarati Homestyle Thali'}</span>
                   </div>
                 </div>
 
-                {/* Order & Tiffin Info */}
-                <div className="bg-[#F9FBF9] p-4 rounded-xl border border-[#E5ECE8] space-y-2">
-                  <div className="text-xs font-extrabold text-[#6B7280] uppercase tracking-wider">Order Details</div>
-                  <div className="text-xs font-black text-[#111827]">{selectedReview.tiffinName}</div>
-                  <div className="flex items-center justify-between text-xs text-[#6B7280] font-semibold pt-1 border-t border-[#E5ECE8]">
-                    <span>Quantity: {selectedReview.orderQuantity || 2}</span>
-                    <span className="font-black text-[#0A8B5F]">Amount: ₹{selectedReview.orderAmount || 240}</span>
-                  </div>
-                </div>
-
-                {/* Customer Review Comment */}
-                <div className="space-y-1.5">
-                  <div className="text-xs font-extrabold text-[#6B7280] uppercase tracking-wider">Customer Review</div>
-                  <p className="text-xs text-[#111827] font-medium bg-[#F9FBF9] p-3.5 rounded-xl border border-[#E5ECE8]">
-                    "{selectedReview.comment}"
+                {/* Review Quote Block */}
+                <div className="p-4 bg-[#fbf9f5] border-l-2 border-[#1a1a1a] rounded-r">
+                  <p className="text-sm text-[#1a1a1a] leading-relaxed italic">
+                    "{review.comment}"
                   </p>
                 </div>
 
-                {/* Delivery & Quality Experience Ratings */}
-                <div className="bg-[#F9FBF9] p-4 rounded-xl border border-[#E5ECE8] space-y-2.5">
-                  <div className="text-xs font-extrabold text-[#6B7280] uppercase tracking-wider">Delivery Experience</div>
-                  
-                  <div className="space-y-2">
+                {/* Nested Provider Response if exists */}
+                {hasReply && (
+                  <div className="ml-4 sm:ml-8 p-4 bg-[#f7f4ee] border border-[#e4dfd7] rounded space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-[#111827]">Food Quality</span>
-                      {renderStars(selectedReview.foodQualityRating || selectedReview.rating, 12)}
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-[#1a1a1a]">
+                          {review.repliedBy || currentUser?.businessName || 'Mansuri Kitchen'} (Provider Response)
+                        </span>
+                        <span className="text-[10px] font-mono bg-[#ece8e0] text-[#4a4a46] px-1.5 py-0.5 rounded">
+                          OFFICIAL REPLY
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-[#71716b]">
+                        {formatReviewDate(review.repliedAt)}
+                      </span>
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-[#111827]">Packaging</span>
-                      {renderStars(selectedReview.packagingRating || selectedReview.rating, 12)}
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-[#111827]">Taste</span>
-                      {renderStars(selectedReview.tasteRating || selectedReview.rating, 12)}
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-[#111827]">Delivery Speed</span>
-                      {renderStars(selectedReview.deliveryRating || 4, 12)}
-                    </div>
+                    <p className="text-xs text-[#4a4a46] leading-relaxed">
+                      "{review.providerReply}"
+                    </p>
+                  </div>
+                )}
+
+                {/* Actions & Status Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[#f2efe9]">
+                  <div className="flex items-center gap-3">
+                    {hasReply ? (
+                      <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded">
+                        ✓ Replied
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded">
+                        ● Awaiting Reply
+                      </span>
+                    )}
+
+                    {review.deliveryCourier && (
+                      <span className="text-[11px] text-[#71716b] flex items-center gap-1">
+                        <Truck size={12} />
+                        Courier: {review.deliveryCourier}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {review.orderDetails && (
+                      <button
+                        type="button"
+                        onClick={() => setViewOrderModal(review.orderDetails)}
+                        className="px-3 py-1.5 text-xs text-[#1a1a1a] hover:bg-[#ece8e0] rounded border border-[#e4dfd7] transition-colors font-medium cursor-pointer"
+                      >
+                        View Order
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenReplyModal(review)}
+                      className={`px-3 py-1.5 text-xs rounded transition-colors font-medium flex items-center gap-1.5 cursor-pointer ${
+                        hasReply
+                          ? 'text-[#1a1a1a] hover:bg-[#ece8e0] border border-[#e4dfd7]'
+                          : 'bg-[#1a1a1a] text-white hover:bg-neutral-800'
+                      }`}
+                    >
+                      {hasReply ? <Edit3 size={13} /> : <Reply size={13} />}
+                      <span>{hasReply ? 'Edit Reply' : 'Reply to Review'}</span>
+                    </button>
                   </div>
                 </div>
 
-                {/* Provider Reply Section inside Drawer */}
-                <div className="space-y-2 pt-2 border-t border-[#E5ECE8]">
-                  <div className="text-xs font-extrabold text-[#0A8B5F] uppercase tracking-wider flex items-center gap-1.5">
-                    <MessageSquare size={14} />
-                    <span>Provider Response</span>
-                  </div>
+              </div>
+            );
+          })
+        )}
 
-                  <textarea
-                    rows={3}
-                    placeholder="Write a polite response to this customer review..."
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    className="w-full p-3 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
-                  />
+      </div>
 
+      {/* Server-Side Pagination Bar */}
+      {pagination.totalPages > 1 && (
+        <div className="bg-white border border-[#e4dfd7] p-4 rounded flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+          <div className="text-xs text-[#71716b] font-mono">
+            Showing{' '}
+            <span className="text-[#1a1a1a] font-semibold">
+              {(pagination.page - 1) * pagination.limit + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)}
+            </span>{' '}
+            of <span className="text-[#1a1a1a] font-semibold">{pagination.total}</span> entries
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={pagination.page <= 1}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              className="px-3 py-1.5 text-xs border border-[#e4dfd7] rounded text-[#71716b] hover:bg-[#fbf9f5] disabled:opacity-40 cursor-pointer"
+            >
+              Previous
+            </button>
+
+            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(p => {
+              if (
+                p === 1 ||
+                p === pagination.totalPages ||
+                (p >= pagination.page - 1 && p <= pagination.page + 1)
+              ) {
+                return (
                   <button
-                    disabled={submittingReply || !replyText.trim()}
-                    onClick={() => handleSendReply(selectedReview)}
-                    className="w-full py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                    key={p}
+                    type="button"
+                    onClick={() => setCurrentPage(p)}
+                    className={`px-3 py-1.5 text-xs rounded font-medium cursor-pointer transition-colors ${
+                      pagination.page === p
+                        ? 'bg-[#1a1a1a] text-white'
+                        : 'border border-[#e4dfd7] text-[#1a1a1a] hover:bg-[#ece8e0]'
+                    }`}
                   >
-                    <Send size={14} />
-                    <span>{submittingReply ? 'Saving Reply...' : 'Send Reply'}</span>
+                    {p}
                   </button>
+                );
+              }
+              if (p === pagination.page - 2 || p === pagination.page + 2) {
+                return <span key={p} className="text-xs text-[#71716b] px-1">...</span>;
+              }
+              return null;
+            })}
+
+            <button
+              type="button"
+              disabled={pagination.page >= pagination.totalPages}
+              onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
+              className="px-3 py-1.5 text-xs border border-[#e4dfd7] rounded text-[#1a1a1a] hover:bg-[#ece8e0] disabled:opacity-40 cursor-pointer"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* F. Reply to Review Modal */}
+      {replyModalReview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-[#1a1a1a] shadow-2xl rounded-lg max-w-lg w-full overflow-hidden animate-scale-up">
+
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-[#e4dfd7] bg-[#fbf9f5] flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-serif font-bold text-[#1a1a1a]">Reply to Customer Review</h3>
+                <p className="text-[11px] font-mono text-[#71716b]">
+                  Order {replyModalReview.orderId || '#TL-XXXX'} • {replyModalReview.customerName || 'Verified Diner'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyModalReview(null)}
+                className="text-[#71716b] hover:text-[#1a1a1a] p-1 rounded transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSubmitReply} className="p-6 space-y-4">
+
+              {/* Customer Rating & Review Snippet */}
+              <div className="p-3.5 bg-[#f7f4ee] border border-[#e4dfd7] rounded space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    {renderStars(replyModalReview.rating, 16)}
+                    <span className="text-xs font-serif font-bold text-[#1a1a1a]">
+                      {Number(replyModalReview.rating).toFixed(1)}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-[#71716b]">
+                    Received {formatReviewDate(replyModalReview.createdAt)}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-mono uppercase text-[#71716b]">Customer Review:</p>
+                  <p className="text-xs text-[#1a1a1a] italic mt-0.5 leading-relaxed">
+                    "{replyModalReview.comment}"
+                  </p>
                 </div>
               </div>
 
-              {/* Drawer Footer */}
-              <div className="border-t border-[#E5ECE8] pt-4">
+              {/* Provider Response Input */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="responseTextarea" className="block text-xs font-medium text-[#1a1a1a]">
+                    Your Response <span className="text-rose-600">*</span>
+                  </label>
+                  <span className="text-[10px] font-mono text-[#71716b]">
+                    {replyText.length} / 1000
+                  </span>
+                </div>
+                <textarea
+                  id="responseTextarea"
+                  rows={5}
+                  maxLength={1000}
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Write a courteous, professional response acknowledging the customer's experience, kitchen preparation standards, or addressing any constructive suggestions..."
+                  className="w-full p-3 bg-[#fbf9f5] border border-[#e4dfd7] rounded text-xs text-[#1a1a1a] placeholder-[#8c887b] focus:outline-none focus:border-[#1a1a1a] transition-colors leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-start gap-2 text-[11px] text-[#71716b] bg-[#fbf9f5] p-2.5 rounded border border-[#e4dfd7]">
+                <AlertCircle size={16} className="text-blue-700 shrink-0 mt-0.5" />
+                <span>
+                  Your reply will be published publicly beneath the customer review on the TiffinLink marketplace and saved in MongoDB.
+                </span>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-[#f2efe9]">
                 <button
-                  onClick={() => setSelectedReview(null)}
-                  className="w-full py-2.5 border border-[#E5ECE8] bg-gray-100 hover:bg-gray-200 text-[#111827] text-xs font-bold rounded-xl cursor-pointer"
+                  type="button"
+                  onClick={() => setReplyModalReview(null)}
+                  className="px-4 py-2 border border-[#e4dfd7] text-xs font-medium text-[#1a1a1a] hover:bg-[#ece8e0] rounded transition-colors cursor-pointer"
                 >
-                  Close Details
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingReply || !replyText.trim()}
+                  className="px-4 py-2 bg-[#1a1a1a] text-xs font-medium text-white hover:bg-neutral-800 rounded transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  <Send size={14} className={submittingReply ? 'animate-pulse' : ''} />
+                  <span>{submittingReply ? 'Saving to DB...' : 'Submit Reply'}</span>
                 </button>
               </div>
-            </div>
+
+            </form>
+
           </div>
         </div>
       )}
 
-      {/* ==================== 7. REPLY MODAL ==================== */}
-      {replyModalReview && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-[#E5ECE8] shadow-2xl space-y-4 animate-scale-up">
-            <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
-              <h3 className="text-base font-black text-[#111827]">Reply to Review</h3>
+      {/* Order Details Modal */}
+      {viewOrderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white border border-[#1a1a1a] shadow-2xl rounded-lg max-w-lg w-full overflow-hidden animate-scale-up">
+
+            <div className="px-6 py-4 border-b border-[#e4dfd7] bg-[#fbf9f5] flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-serif font-bold text-[#1a1a1a]">Order Details</h3>
+                <p className="text-[11px] font-mono text-[#71716b]">Order #{viewOrderModal.orderId}</p>
+              </div>
               <button
-                onClick={() => setReplyModalReview(null)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer"
+                type="button"
+                onClick={() => setViewOrderModal(null)}
+                className="text-[#71716b] hover:text-[#1a1a1a] p-1 rounded transition-colors cursor-pointer"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
-            <div className="bg-[#F9FBF9] p-3 rounded-xl border border-[#E5ECE8] space-y-1">
-              <div className="text-xs font-black text-[#111827]">{replyModalReview.customerName}</div>
-              <p className="text-xs text-[#6B7280] italic">"{replyModalReview.comment}"</p>
+            <div className="p-6 space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3 bg-[#f7f4ee] p-3 rounded border border-[#e4dfd7]">
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-[#71716b]">Customer</span>
+                  <p className="font-semibold text-[#1a1a1a]">{viewOrderModal.customerName}</p>
+                  <p className="text-[#71716b] text-[11px]">{viewOrderModal.customerPhone}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-[#71716b]">Status</span>
+                  <p className="font-semibold text-emerald-800">{viewOrderModal.status || 'Completed'}</p>
+                  <p className="text-[#71716b] text-[11px]">{viewOrderModal.deliverySlot || 'Lunch Slot'}</p>
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-mono uppercase text-[#71716b]">Delivery Address</span>
+                <p className="text-[#1a1a1a] mt-0.5 leading-relaxed bg-[#fbf9f5] p-2.5 rounded border border-[#e4dfd7]">
+                  {viewOrderModal.customerAddress || 'Ahmedabad, Gujarat'}
+                </p>
+              </div>
+
+              {viewOrderModal.items && viewOrderModal.items.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-[#71716b]">Ordered Items</span>
+                  <div className="mt-1 divide-y divide-[#f2efe9] border border-[#e4dfd7] rounded overflow-hidden">
+                    {viewOrderModal.items.map((item, idx) => (
+                      <div key={idx} className="p-2.5 flex items-center justify-between bg-white text-xs">
+                        <span>{item.name || 'Kathiyawadi Thali'} × {item.quantity || 1}</span>
+                        <span className="font-mono font-medium">₹{item.price || item.totalPrice || 120}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-3 border-t border-[#f2efe9] font-mono">
+                <span className="text-xs text-[#71716b]">TOTAL BILLED</span>
+                <span className="text-base font-bold text-[#1a1a1a]">₹{viewOrderModal.totalAmount || 240}</span>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-extrabold text-[#111827]">Your Response</label>
-              <textarea
-                rows={4}
-                placeholder="Write a polite response..."
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                className="w-full p-3 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="px-6 py-3 bg-[#fbf9f5] border-t border-[#e4dfd7] flex justify-end">
               <button
-                onClick={() => setReplyModalReview(null)}
-                className="px-4 py-2 border border-[#E5ECE8] bg-gray-100 hover:bg-gray-200 text-[#111827] text-xs font-bold rounded-xl cursor-pointer"
+                type="button"
+                onClick={() => setViewOrderModal(null)}
+                className="px-4 py-1.5 bg-[#1a1a1a] text-white text-xs rounded hover:bg-neutral-800 transition-colors cursor-pointer"
               >
-                Cancel
-              </button>
-
-              <button
-                disabled={submittingReply || !replyText.trim()}
-                onClick={() => handleSendReply(replyModalReview)}
-                className="px-5 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-              >
-                <Send size={14} />
-                <span>{submittingReply ? 'Saving...' : 'Send Reply'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== 8. EXPORT MODAL ==================== */}
-      {isExportModalOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full border border-[#E5ECE8] shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
-              <h3 className="text-base font-black text-[#111827]">Export Reviews</h3>
-              <button
-                onClick={() => setIsExportModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p className="text-xs text-[#6B7280]">
-              Download your verified customer ratings and reviews report formatted for analysis.
-            </p>
-
-            <div className="space-y-2">
-              <button
-                onClick={handleExportCSV}
-                className="w-full p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[#0A8B5F] rounded-xl font-extrabold text-xs flex items-center justify-between cursor-pointer transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <FileSpreadsheet size={16} />
-                  Export as CSV (.csv)
-                </span>
-                <Download size={14} />
+                Close
               </button>
             </div>
 
-            <div className="pt-2">
-              <button
-                onClick={() => setIsExportModalOpen(false)}
-                className="w-full py-2 bg-gray-100 text-[#111827] text-xs font-bold rounded-xl cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
           </div>
         </div>
       )}
