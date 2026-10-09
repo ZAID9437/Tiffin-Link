@@ -31,12 +31,7 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
   const [maxDistanceKm, setMaxDistanceKm] = useState(12.0);
   const [strictBoundary, setStrictBoundary] = useState(true);
   
-  const [preferredAreas, setPreferredAreas] = useState([
-    'Bandra West • Sector 4',
-    'Khar West • Commercial',
-    'Santacruz West',
-    'Pali Hill Kitchen Hub'
-  ]);
+  const [preferredAreas, setPreferredAreas] = useState([]);
   const [newAreaInput, setNewAreaInput] = useState('');
 
   const [minPayout, setMinPayout] = useState(50);
@@ -56,9 +51,9 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
 
   // Radar Simulation Metrics
   const [radarMetrics, setRadarMetrics] = useState({
-    availableCount: 14,
-    eligibleCount: 11,
-    filteredCount: 3
+    availableCount: 0,
+    eligibleCount: 0,
+    filteredCount: 0
   });
 
   // Count active delivery types
@@ -511,7 +506,12 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
 
               {/* Tags Container */}
               <div className="mt-6 flex flex-wrap gap-2.5">
-                {preferredAreas.map(area => (
+                {preferredAreas.length === 0 ? (
+                  <p className="text-xs text-[#665D52] italic">
+                    No specific areas restricted. Deliveries will be matched across all reachable clusters.
+                  </p>
+                ) : (
+                  preferredAreas.map(area => (
                   <div key={area} className="inline-flex items-center gap-2 bg-[#F5F3EF] border border-[#DED9D1] px-3.5 py-2 text-[#1A1A1A]">
                     <span className="text-[11px] uppercase tracking-wider font-bold">{area}</span>
                     <button
@@ -522,7 +522,7 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
                       <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                   </div>
-                ))}
+                )))}
               </div>
 
               {/* Inline Add Form */}
@@ -828,7 +828,7 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
                 <div className="p-3 bg-[#FBF9F5] border-l-2 border-[#1A1A1A] flex items-center gap-2.5">
                   <span className="material-symbols-outlined text-[#1A1A1A] text-sm">lock_clock</span>
                   <span className="text-xs text-[#665D52]">
-                    <strong className="text-[#1A1A1A] font-semibold">Active Dispatch Lockout:</strong> Modifications will queue and update immediately upon completion of active delivery <strong className="text-[#1A1A1A] font-semibold">#ORD-5162</strong>.
+                    <strong className="text-[#1A1A1A] font-semibold">Active Dispatch Lockout:</strong> Modifications will queue and update immediately upon completion of active delivery.
                   </span>
                 </div>
               </div>
@@ -1009,7 +1009,7 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="text-[#1A1A1A] font-bold text-xs mt-0.5">•</span>
-                  <p><strong class="text-[#1A1A1A] font-semibold">Active Order Lockout:</strong> Preferences changes take effect immediately upon completion of active drop #ORD-5162.</p>
+                  <p><strong class="text-[#1A1A1A] font-semibold">Active Order Lockout:</strong> Preferences changes take effect immediately upon completion of active delivery.</p>
                 </div>
                 <div className="flex items-start gap-2">
                   <span className="text-[#1A1A1A] font-bold text-xs mt-0.5">•</span>

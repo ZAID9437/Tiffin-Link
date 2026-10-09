@@ -22,9 +22,9 @@ const getServiceArea = async (req, res) => {
     let kitchenLocation = {
       address: '',
       locality: '',
-      city: 'Ahmedabad',
-      latitude: 23.0300,
-      longitude: 72.5650
+      city: '',
+      latitude: null,
+      longitude: null
     };
 
     let areas = [];
@@ -163,8 +163,8 @@ const addServiceArea = async (req, res) => {
       radiusKm: Number(radiusKm) || 4,
       customersCount: Number(customersCount) || 10,
       status: 'ACTIVE',
-      latitude: 23.0300 + (Math.random() - 0.5) * 0.05,
-      longitude: 72.5650 + (Math.random() - 0.5) * 0.05
+      latitude: req.body.latitude ? Number(req.body.latitude) : 23.0300,
+      longitude: req.body.longitude ? Number(req.body.longitude) : 72.5650
     };
 
     if (await isDbConnected()) {

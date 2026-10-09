@@ -1,6 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiRequest } from '../services/api';
 import { getSocket } from '../services/socket';
+export const isDeliveryStatus = (st) => {
+  const s = String(st || '').toLowerCase().trim();
+  return ['delivery', 'out for delivery', 'dispatched', 'in transit', 'driver assigned', 'picked up', 'arrived at customer', 'arrived at provider', 'searching drivers', 'delivery_requested'].includes(s);
+};
+
+export const isPreparingStatus = (st) => {
+  const s = String(st || '').toLowerCase().trim();
+  return ['preparing', 'in prep', 'accepted', 'confirmed'].includes(s);
+};
+
+export const isReadyStatus = (st) => {
+  const s = String(st || '').toLowerCase().trim();
+  return ['ready', 'ready_for_pickup'].includes(s);
+};
+
+export const isNewStatus = (st) => {
+  const s = String(st || '').toLowerCase().trim();
+  return ['new', 'pending'].includes(s);
+};
 
 export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const [orders, setOrders] = useState([]);
@@ -112,7 +131,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.5);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const fetchOrders = async (isInitial = true) => {
@@ -206,7 +225,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         if (formatted.length > 0) {
           setSelectedOrder(prev => {
             if (!prev) return formatted[0];
-            const match = formatted.find(o => 
+            const match = formatted.find(o =>
               (o.id && prev.id && String(o.id) === String(prev.id)) ||
               (o.orderId && prev.orderId && String(o.orderId) === String(prev.orderId)) ||
               (o._id && prev._id && String(o._id) === String(prev._id))
@@ -252,7 +271,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         window.print();
         return;
       }
-      
+
       const itemsHtml = Array.isArray(ord.itemsBreakdown) && ord.itemsBreakdown.length > 0
         ? ord.itemsBreakdown.map(i => `<li>${i}</li>`).join('')
         : `<li>${ord.quantity || 1} × ${ord.tiffinName || 'Tiffin Meal'}</li>`;
@@ -340,7 +359,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
   const handleUpdateOrderStatus = async (orderId, newStatus, reason = '') => {
     if (updatingOrderId) return;
-    const targetOrder = orders.find(o => 
+    const targetOrder = orders.find(o =>
       (o._id && String(o._id) === String(orderId)) ||
       (o.id && String(o.id) === String(orderId)) ||
       (o.orderId && String(o.orderId) === String(orderId))
@@ -386,8 +405,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
         setOrders(prev => prev.map(o => {
           const isMatch = (o.id && String(o.id) === String(targetOrder.id)) ||
-                          (o._id && String(o._id) === String(targetOrder.id)) ||
-                          (o.orderId && String(o.orderId) === String(targetOrder.orderId));
+            (o._id && String(o._id) === String(targetOrder.id)) ||
+            (o.orderId && String(o.orderId) === String(targetOrder.orderId));
           if (!isMatch) return o;
           return {
             ...o,
@@ -400,7 +419,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
         if (selectedOrder) {
           const isSelMatch = (selectedOrder.id && String(selectedOrder.id) === String(targetOrder.id)) ||
-                             (selectedOrder.orderId && String(selectedOrder.orderId) === String(targetOrder.orderId));
+            (selectedOrder.orderId && String(selectedOrder.orderId) === String(targetOrder.orderId));
           if (isSelMatch) {
             setSelectedOrder(prev => ({
               ...prev,
@@ -471,7 +490,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {
       showToast(`Copied ${text} to clipboard!`);
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   // Metric Computations (Real MongoDB Data Scoped to Authenticated Provider)
@@ -628,7 +647,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
     if (filteredOrders && filteredOrders.length > 0) {
       setSelectedOrder(prev => {
         if (!prev) return filteredOrders[0];
-        const isCurrentInFiltered = filteredOrders.some(o => 
+        const isCurrentInFiltered = filteredOrders.some(o =>
           (o.id && prev.id && String(o.id) === String(prev.id)) ||
           (o.orderId && prev.orderId && String(o.orderId) === String(prev.orderId)) ||
           (o._id && prev._id && String(o._id) === String(prev._id))
@@ -677,9 +696,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               setChimeEnabled(!chimeEnabled);
               showToast(chimeEnabled ? 'Audio alert chime muted' : 'Audio alert chime enabled');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-label-caps transition-colors cursor-pointer border ${
-              chimeEnabled ? 'bg-surface-container border-sand-neutral/40 text-on-surface' : 'bg-surface-container-low text-secondary opacity-60'
-            }`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-label-caps transition-colors cursor-pointer border ${chimeEnabled ? 'bg-surface-container border-sand-neutral/40 text-on-surface' : 'bg-surface-container-low text-secondary opacity-60'
+              }`}
           >
             <span className="material-symbols-outlined text-[16px] text-amber-600">notifications_active</span>
             <span>Alert Chime: {chimeEnabled ? 'ON' : 'OFF'}</span>
@@ -705,9 +723,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               setIsKitchenAccepting(!isKitchenAccepting);
               showToast(isKitchenAccepting ? 'Kitchen status set to Paused' : 'Kitchen status set to Accepting Orders');
             }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-label-caps font-bold tracking-wide border cursor-pointer ${
-              isKitchenAccepting ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-error-container text-on-error-container border-error/20'
-            }`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-label-caps font-bold tracking-wide border cursor-pointer ${isKitchenAccepting ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-error-container text-on-error-container border-error/20'
+              }`}
           >
             <span className={`w-2 h-2 rounded-full ${isKitchenAccepting ? 'bg-emerald-600 animate-pulse' : 'bg-error'}`}></span>
             <span>ACCEPTING ORDERS ({isKitchenAccepting ? 'ON' : 'OFF'})</span>
@@ -729,16 +746,16 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               {isDeliveryTab
                 ? 'Delivery Orders'
                 : isCompletedTab
-                ? 'Completed Orders'
-                : isCancelledTab
-                ? 'Cancelled Orders'
-                : isReadyTab
-                ? 'Ready Orders'
-                : isPreparingTab
-                ? 'Preparing'
-                : isNewOrdersTab
-                ? 'New Orders'
-                : `${activeStatusTab} Orders`}
+                  ? 'Completed Orders'
+                  : isCancelledTab
+                    ? 'Cancelled Orders'
+                    : isReadyTab
+                      ? 'Ready Orders'
+                      : isPreparingTab
+                        ? 'Preparing'
+                        : isNewOrdersTab
+                          ? 'New Orders'
+                          : `${activeStatusTab} Orders`}
             </h1>
             {isDeliveryTab && (
               <span className="px-3 py-1 rounded-full text-xs font-label-caps bg-onyx-black text-bone-white font-bold">
@@ -775,16 +792,16 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             {isDeliveryTab
               ? 'Track orders currently assigned for delivery with assigned delivery partners in real time.'
               : isCompletedTab
-              ? 'Archived records of successfully fulfilled, OTP-verified meal deliveries and financial settlements.'
-              : isCancelledTab
-              ? 'Review orders that were cancelled. Complete timestamps, fault attribution, and cancellation logs are permanently archived.'
-              : isReadyTab
-              ? 'Orders prepared and ready for customer pickup or courier delivery. Complete handover verification.'
-              : isPreparingTab
-              ? 'Orders currently being prepared by your kitchen. Track cooking stations, pack manifests, and transition tickets to Ready.'
-              : isNewOrdersTab
-              ? 'Review and accept incoming customer orders. Verify meal tickets in real time before fulfillment prep windows lapse.'
-              : 'Manage, filter, and track all live, preparing, and historical orders received by your kitchen.'}
+                ? 'Archived records of successfully fulfilled, OTP-verified meal deliveries and financial settlements.'
+                : isCancelledTab
+                  ? 'Review orders that were cancelled. Complete timestamps, fault attribution, and cancellation logs are permanently archived.'
+                  : isReadyTab
+                    ? 'Orders prepared and ready for customer pickup or courier delivery. Complete handover verification.'
+                    : isPreparingTab
+                      ? 'Orders currently being prepared by your kitchen. Track cooking stations, pack manifests, and transition tickets to Ready.'
+                      : isNewOrdersTab
+                        ? 'Review and accept incoming customer orders. Verify meal tickets in real time before fulfillment prep windows lapse.'
+                        : 'Manage, filter, and track all live, preparing, and historical orders received by your kitchen.'}
           </p>
         </div>
 
@@ -813,7 +830,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       {/* 4 Summary Metric Cards (Dynamic from MongoDB) */}
       {isDeliveryTab ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
+
           {/* Card 1: Orders Out for Delivery */}
           <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
             <div className="flex items-center justify-between text-secondary">
@@ -889,7 +906,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         </div>
       ) : isCompletedTab ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
+
           {/* Card 1: Completed Orders */}
           <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
             <div className="flex items-center justify-between text-secondary">
@@ -965,7 +982,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         </div>
       ) : isCancelledTab ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
+
           {/* Card 1: Total Cancelled */}
           <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
             <div className="flex items-center justify-between text-secondary">
@@ -1044,7 +1061,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         </div>
       ) : isReadyTab ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
+
           {/* Card 1: Ready Now */}
           <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
             <div className="flex items-center justify-between text-secondary">
@@ -1125,7 +1142,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         </div>
       ) : isPreparingTab ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
+
           {/* Card 1: Preparing Now */}
           <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
             <div className="flex items-center justify-between text-secondary">
@@ -1206,7 +1223,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
+
           {/* Card 1: New Orders */}
           <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col justify-between space-y-4 hover:shadow-md transition-all">
             <div className="flex items-center justify-between text-secondary">
@@ -1290,7 +1307,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       {/* Filter & Control Deck */}
       <div className="space-y-3">
         <div className="bg-surface-container-lowest p-4 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-col lg:flex-row items-center justify-between gap-4">
-          
+
           {/* Search bar */}
           <div className="relative w-full lg:w-96 flex items-center bg-surface-container-low rounded-xl px-3 py-2 border border-sand-neutral/30">
             <span className="material-symbols-outlined text-secondary text-[20px] mr-2">search</span>
@@ -1310,7 +1327,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
           {/* Filter Selects */}
           <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
-            
+
             {/* Payment Dropdown */}
             <div className="relative">
               <select
@@ -1367,36 +1384,32 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <button
                 type="button"
                 onClick={() => setStationFilter('All')}
-                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${
-                  stationFilter === 'All' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${stationFilter === 'All' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 All Stations ({preparingNowCount})
               </button>
               <button
                 type="button"
                 onClick={() => setStationFilter('Station1')}
-                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${
-                  stationFilter === 'Station1' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${stationFilter === 'Station1' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 Station 1: Hot Breads & Rotis
               </button>
               <button
                 type="button"
                 onClick={() => setStationFilter('Station2')}
-                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${
-                  stationFilter === 'Station2' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${stationFilter === 'Station2' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 Station 2: Curries & Dals
               </button>
               <button
                 type="button"
                 onClick={() => setStationFilter('Station3')}
-                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${
-                  stationFilter === 'Station3' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${stationFilter === 'Station3' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 Station 3: Assembly & Packaging
               </button>
@@ -1407,27 +1420,24 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <button
                 type="button"
                 onClick={() => setDeliveryFilter('All')}
-                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${
-                  deliveryFilter === 'All' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${deliveryFilter === 'All' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 All Staging ({readyNowCount})
               </button>
               <button
                 type="button"
                 onClick={() => setDeliveryFilter('Courier')}
-                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${
-                  deliveryFilter === 'Courier' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${deliveryFilter === 'Courier' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 Ready for Courier ({readyForDeliveryCount})
               </button>
               <button
                 type="button"
                 onClick={() => setDeliveryFilter('Pickup')}
-                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${
-                  deliveryFilter === 'Pickup' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-full font-label-caps text-[11px] font-bold tracking-wider cursor-pointer transition-colors ${deliveryFilter === 'Pickup' ? 'bg-onyx-black text-bone-white shadow-xs' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 Customer Pickup ({readyCustomerPickupCount})
               </button>
@@ -1437,9 +1447,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <button
                 type="button"
                 onClick={() => setQuickChipFilter('ALL')}
-                className={`px-3 py-1 rounded-lg font-label-caps text-[11px] font-bold tracking-wider uppercase transition-all cursor-pointer ${
-                  quickChipFilter === 'ALL' ? 'bg-onyx-black text-bone-white shadow-sm' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-lg font-label-caps text-[11px] font-bold tracking-wider uppercase transition-all cursor-pointer ${quickChipFilter === 'ALL' ? 'bg-onyx-black text-bone-white shadow-sm' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 All Orders ({filteredOrders.length})
               </button>
@@ -1447,9 +1456,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <button
                 type="button"
                 onClick={() => setQuickChipFilter('URGENT')}
-                className={`px-3 py-1 rounded-lg font-label-caps text-[11px] font-bold tracking-wider uppercase transition-all cursor-pointer flex items-center gap-1.5 ${
-                  quickChipFilter === 'URGENT' ? 'bg-onyx-black text-bone-white shadow-sm' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-lg font-label-caps text-[11px] font-bold tracking-wider uppercase transition-all cursor-pointer flex items-center gap-1.5 ${quickChipFilter === 'URGENT' ? 'bg-onyx-black text-bone-white shadow-sm' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
                 Urgent (&lt; 3m left)
@@ -1458,9 +1466,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <button
                 type="button"
                 onClick={() => setQuickChipFilter('BULK')}
-                className={`px-3 py-1 rounded-lg font-label-caps text-[11px] font-bold tracking-wider uppercase transition-all cursor-pointer ${
-                  quickChipFilter === 'BULK' ? 'bg-onyx-black text-bone-white shadow-sm' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-lg font-label-caps text-[11px] font-bold tracking-wider uppercase transition-all cursor-pointer ${quickChipFilter === 'BULK' ? 'bg-onyx-black text-bone-white shadow-sm' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 Corporate Bulk
               </button>
@@ -1468,9 +1475,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <button
                 type="button"
                 onClick={() => setQuickChipFilter('JAIN')}
-                className={`px-3 py-1 rounded-lg font-label-caps text-[11px] font-bold tracking-wider uppercase transition-all cursor-pointer flex items-center gap-1 ${
-                  quickChipFilter === 'JAIN' ? 'bg-onyx-black text-bone-white shadow-sm' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
-                }`}
+                className={`px-3 py-1 rounded-lg font-label-caps text-[11px] font-bold tracking-wider uppercase transition-all cursor-pointer flex items-center gap-1 ${quickChipFilter === 'JAIN' ? 'bg-onyx-black text-bone-white shadow-sm' : 'bg-surface-container-low text-clay-earth border border-sand-neutral/40 hover:bg-surface-container'
+                  }`}
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
                 Dietary / Jain
@@ -1487,10 +1493,10 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
       {/* Main Workspace (7-Column Table + 5-Column Side Inspector Drawer) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
+
         {/* Table View */}
         <div className={`${selectedOrder ? 'lg:col-span-7' : 'lg:col-span-12'} rounded-2xl bg-surface-container-lowest border border-sand-neutral/40 shadow-xs overflow-hidden transition-all`}>
-          
+
           <div className="px-5 py-3.5 bg-surface-container-low/70 border-b border-sand-neutral/40 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-onyx-black text-[18px]">receipt_long</span>
@@ -1530,29 +1536,29 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                 {isDeliveryTab
                   ? 'No delivery orders found.'
                   : isCompletedTab
-                  ? 'No completed orders found.'
-                  : isCancelledTab
-                  ? 'No cancelled orders found.'
-                  : isReadyTab
-                  ? 'No Ready Orders'
-                  : isPreparingTab
-                  ? 'No Orders Being Prepared'
-                  : isNewOrdersTab
-                  ? 'No New Orders'
-                  : 'No Orders Found'}
+                    ? 'No completed orders found.'
+                    : isCancelledTab
+                      ? 'No cancelled orders found.'
+                      : isReadyTab
+                        ? 'No Ready Orders'
+                        : isPreparingTab
+                          ? 'No Orders Being Prepared'
+                          : isNewOrdersTab
+                            ? 'No New Orders'
+                            : 'No Orders Found'}
               </h3>
               <p className="font-body-md text-xs text-secondary max-w-md mx-auto">
                 {isDeliveryTab
                   ? 'Dispatched orders undergoing courier fulfillment will appear here in real time.'
                   : isCompletedTab
-                  ? 'Fulfilled orders verified with handover OTPs will be archived here for settlement auditing.'
-                  : isCancelledTab
-                  ? 'Cancelled order records and audit traces will appear here permanently.'
-                  : isReadyTab
-                  ? 'Prepared orders will appear here automatically when they are ready for pickup or courier delivery.'
-                  : isPreparingTab
-                  ? 'Accepted customer orders will appear here automatically while your kitchen prepares them.'
-                  : 'New customer orders will appear here automatically via Socket.IO.'}
+                    ? 'Fulfilled orders verified with handover OTPs will be archived here for settlement auditing.'
+                    : isCancelledTab
+                      ? 'Cancelled order records and audit traces will appear here permanently.'
+                      : isReadyTab
+                        ? 'Prepared orders will appear here automatically when they are ready for pickup or courier delivery.'
+                        : isPreparingTab
+                          ? 'Accepted customer orders will appear here automatically while your kitchen prepares them.'
+                          : 'New customer orders will appear here automatically via Socket.IO.'}
               </p>
             </div>
           ) : (
@@ -1619,9 +1625,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                       <tr
                         key={ord.id || ord._id || ord.orderId}
                         onClick={() => { setSelectedOrder(ord); setIsDrawerOpen(true); }}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? 'bg-amber-50/40 border-l-4 border-l-onyx-black font-semibold' : 'hover:bg-surface-container-low/60'
-                        }`}
+                        className={`cursor-pointer transition-colors ${isSelected ? 'bg-amber-50/40 border-l-4 border-l-onyx-black font-semibold' : 'hover:bg-surface-container-low/60'
+                          }`}
                       >
                         {isDeliveryTab ? (
                           <>
@@ -1917,9 +1922,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                   key={p}
                   type="button"
                   onClick={() => setCurrentPage(p)}
-                  className={`px-3 py-1 rounded-lg font-bold cursor-pointer ${
-                    currentPage === p ? 'bg-onyx-black text-bone-white' : 'bg-surface-container text-on-surface hover:bg-surface-container-highest'
-                  }`}
+                  className={`px-3 py-1 rounded-lg font-bold cursor-pointer ${currentPage === p ? 'bg-onyx-black text-bone-white' : 'bg-surface-container text-on-surface hover:bg-surface-container-highest'
+                    }`}
                 >
                   {p}
                 </button>
@@ -1940,7 +1944,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         {/* Real-Time Order Details Docket (lg:col-span-5) */}
         {selectedOrder && isDrawerOpen && (
           <div className="lg:col-span-5 bg-surface-container-lowest rounded-2xl border border-sand-neutral/50 shadow-sm overflow-hidden flex flex-col animate-scale-in">
-            
+
             {/* Docket Header */}
             <div className="p-5 bg-surface-container-low border-b border-sand-neutral/40">
               <div className="flex items-start justify-between">
@@ -1973,20 +1977,20 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                 {selectedOrder.status === 'Completed' || selectedOrder.status === 'Delivered'
                   ? 'Order fulfilled and completed.'
                   : selectedOrder.status === 'Cancelled' || selectedOrder.status === 'Rejected'
-                  ? 'Order cancelled and archived.'
-                  : selectedOrder.status === 'Delivery' || selectedOrder.status === 'Out for Delivery' || selectedOrder.status === 'In Transit'
-                  ? 'Dispatched with delivery partner for customer dropoff.'
-                  : selectedOrder.status === 'Ready'
-                  ? 'Staged in Bay 1 / Bay 2. Heat-sealed and ready for courier pickup or customer takeaway.'
-                  : selectedOrder.status === 'Preparing' || selectedOrder.status === 'In Prep'
-                  ? 'Active in kitchen prep. Mark ready once all compartments are sealed.'
-                  : 'Auto-reject fallback if no confirmation within window to avoid kitchen bottleneck.'
+                    ? 'Order cancelled and archived.'
+                    : selectedOrder.status === 'Delivery' || selectedOrder.status === 'Out for Delivery' || selectedOrder.status === 'In Transit'
+                      ? 'Dispatched with delivery partner for customer dropoff.'
+                      : selectedOrder.status === 'Ready'
+                        ? 'Staged in Bay 1 / Bay 2. Heat-sealed and ready for courier pickup or customer takeaway.'
+                        : selectedOrder.status === 'Preparing' || selectedOrder.status === 'In Prep'
+                          ? 'Active in kitchen prep. Mark ready once all compartments are sealed.'
+                          : 'Auto-reject fallback if no confirmation within window to avoid kitchen bottleneck.'
                 }
               </p>
             </div>
 
             <div className="p-5 space-y-6 flex-1 overflow-y-auto max-h-[720px]">
-              
+
               {/* Customer Identity Card */}
               <div className="bg-surface-container-low p-4 rounded-xl border border-sand-neutral/30 space-y-2.5">
                 <div className="flex items-center justify-between">
@@ -2106,11 +2110,10 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                     <span className="text-[11px] font-label-caps text-clay-earth uppercase tracking-wider font-bold">
                       KITCHEN PICKUP OTP
                     </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                      (selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified)
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${(selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified)
                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                         : 'bg-amber-100 text-amber-800 border border-amber-300'
-                    }`}>
+                      }`}>
                       {(selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified)
                         ? 'PICKUP VERIFIED'
                         : 'PENDING PICKUP'}
@@ -2145,7 +2148,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                     Order Cancelled
                   </span>
                 </div>
-              ) : selectedOrder.status === 'Delivery' || selectedOrder.status === 'Out for Delivery' || selectedOrder.status === 'In Transit' ? (
+              ) : isDeliveryStatus(selectedOrder.status) ? (
                 <div className="space-y-2">
                   {selectedOrder.deliveryStatus === 'Searching' || selectedOrder.deliveryStatus === 'SEARCHING' || selectedOrder.deliveryStatus === 'Searching Drivers' || !isDriverAcceptedForOrder(selectedOrder) ? (
                     <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs flex items-center justify-between">
@@ -2277,7 +2280,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                     )}
                   </div>
                 )
-              ) : selectedOrder.status === 'Preparing' || selectedOrder.status === 'In Prep' ? (
+              ) : isPreparingStatus(selectedOrder.status) || isPreparingTab ? (
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
@@ -2316,7 +2319,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                     <span className="material-symbols-outlined text-[16px]">cancel</span>
                     <span>Decline</span>
                   </button>
-       {/* Rejection Modal */}
+                  {/* Rejection Modal */}
                 </div>
               )}
             </div>

@@ -399,10 +399,10 @@ exports.rerouteOrder = async (req, res) => {
     const assignedDriverObj = {
       driverId: driver?.driverId || driverId || '',
       name: driver?.name || driverName || 'Assigned Courier',
-      phone: driver?.phone || driverPhone || '+91 98765 43210',
-      rating: driver?.rating || 4.8,
-      vehicleNo: driver?.vehicleNo || 'Motorbike',
-      location: driver?.currentLocation || { lat: 23.0280, lng: 72.5670 }
+      phone: driver?.phone || driverPhone || '',
+      rating: driver?.rating ?? null,
+      vehicleNo: driver?.vehicleNo || '',
+      location: driver?.currentLocation || null
     };
 
     const idQueries = [
@@ -711,8 +711,8 @@ exports.getLiveOperationsData = async (req, res) => {
         elapsedTime: `${elapsedMinutes}m elapsed`,
         eta: o.eta,
         distance: o.distance,
-        pickupCoords: o.pickupCoords || { lat: 23.0300, lng: 72.5650 },
-        dropCoords: o.dropCoords || { lat: 23.0225, lng: 72.5714 },
+        pickupCoords: o.pickupCoords || null,
+        dropCoords: o.dropCoords || null,
         svgX,
         svgY
       };
@@ -727,17 +727,17 @@ exports.getLiveOperationsData = async (req, res) => {
         _id: d._id,
         name: d.name || `Partner #${idx + 1}`,
         code: d.driverId ? `#${d.driverId}` : `#DP-${4400 + idx}`,
-        phone: d.phone || '+91 95586 01570',
-        email: d.email || 'partner@tiffinlink.com',
-        vehicleNo: d.vehicleNo || 'GJ 27 DX 3654',
+        phone: d.phone || '',
+        email: d.email || '',
+        vehicleNo: d.vehicleNo || '',
         vehicleType: d.vehicleType || 'Motorbike',
         status: d.status === 'BUSY' ? 'BUSY' : d.status === 'AVAILABLE' ? 'AVAILABLE' : 'OFFLINE',
         currentOrderId: d.currentOrderId || null,
         providerName: d.currentProviderName || null,
-        location: d.currentAddress || d.currentLocation?.address || d.area || 'Metro Cluster',
-        lat: d.currentLocation?.lat || 23.0280,
-        lng: d.currentLocation?.lng || 72.5670,
-        rating: d.rating || 4.7,
+        location: d.currentAddress || d.currentLocation?.address || d.area || '',
+        lat: d.currentLocation?.lat || null,
+        lng: d.currentLocation?.lng || null,
+        rating: d.rating ?? null,
         todayDeliveries: d.todayDeliveriesCount || d.activeDeliveries || 0,
         svgX: driverX,
         svgY: driverY
@@ -1416,8 +1416,8 @@ exports.createDriver = async (req, res) => {
       rating: 4.8,
       activeDeliveries: 0,
       currentLocation: {
-        lat: 23.0381 + (Math.random() - 0.5) * 0.02,
-        lng: 72.5119 + (Math.random() - 0.5) * 0.02,
+        lat: req.body.currentLocation?.lat ? Number(req.body.currentLocation.lat) : 23.0381,
+        lng: req.body.currentLocation?.lng ? Number(req.body.currentLocation.lng) : 72.5119,
         address: cluster
       },
       tier: 'Tier 1 Standard Courier',
@@ -2146,7 +2146,7 @@ exports.processWeeklySettlementBatch = async (req, res) => {
         payoutId,
         providerId: String(p._id),
         providerName: p.businessName || p.name,
-        amount: Math.floor(1500 + Math.random() * 2500),
+        amount: Math.max(0, p.walletBalance || p.earnings || p.pendingPayout || 0),
         bankName: p.bankDetails?.bankName || 'HDFC Bank',
         accountNumber: p.bankDetails?.accountNumber || '•••• 8902',
         status: 'Completed',
@@ -2535,9 +2535,9 @@ exports.getSubscriptionDetails = async (req, res) => {
         provider: {
           name: provider?.name || provider?.kitchenName || sub.providerName || 'Xoxo Men Kitchen',
           id: provider?._id ? `#PRV-${String(provider._id).slice(-6).toUpperCase()}` : '#PRV-XOXO-01',
-          chef: provider?.ownerName || 'Chef Rahul Patel',
+          chef: provider?.ownerName || 'Kitchen Head',
           hub: provider?.address?.area || 'Bodakdev Central Kitchen #02',
-          fssai: provider?.fssaiNumber || '#10822003001844',
+          fssai: provider?.fssaiNumber || 'FSSAI Certified',
           rating: `${provider?.rating?.average || 4.84}★ (${provider?.rating?.count || 9410} batches served)`,
           cutoff: '11:15 AM (Lunch)'
         },
@@ -2561,26 +2561,15 @@ exports.getSubscriptionDetails = async (req, res) => {
           platformCut,
           heldAmount: held,
           refundedAmount: sub.status === 'CANCELLED' ? 1980 : 0,
-          transactions: [
-            { id: 'TXN-ICICI-8821', date: '01 Sep', amount: amt, status: 'CAPTURED' },
-            { id: 'ESC-REL-4956', date: '28 Sep', amount: 165, status: 'RELEASED' },
-            { id: 'ESC-REL-4940', date: '27 Sep', amount: 165, status: 'RELEASED' }
-          ]
+          transactions: []
         },
         timeline: [
-          { title: 'Contract Created & Mandate Tokenized', time: '01 Sep • 09:15 IST', desc: `ICICI NPCI Recurring Mandate authorized for ₹${amt}.00 via UPI Handle.`, completed: true },
-          { title: 'RBI Escrow Lock Established', time: '01 Sep • 09:16 IST', desc: 'Funds locked in Yes Bank Nodal Settlement Account #YESB26270019284.', completed: true },
-          { title: 'First Batch Order Fired', time: '02 Sep • 11:30 IST', desc: 'Batch Order generated and dispatched to kitchen. Initial canister #TK-104 assigned.', completed: true },
-          { title: 'Halfway Milestone Reached', time: '15 Sep • 12:45 IST', desc: '13 meals fulfilled. 50% pro-rata escrow unlocked and credited to kitchen.', completed: true },
-          { title: 'Dish Swap Executed via Customer Panel', time: '24 Sep • 16:00 IST', desc: 'Patron swapped standard Dal for authentic Gujarati Sweet Kadhi.', completed: true },
-          { title: '21st Meal Delivered (#TL-4956)', time: '28 Sep • 19:42 IST', desc: 'Delivered by partner Vinod K. Cryptographic OTP handshake matched.', completed: true },
-          { title: 'Cycle-End Renewal Reminder Broadcasted', time: '29 Sep • 10:00 IST', desc: 'Contract auto-renewal ping queued for next cycle.', completed: true }
+          { title: 'Subscription Created', time: sub.createdAt ? new Date(sub.createdAt).toLocaleDateString('en-GB') : 'Active', desc: `Meal subscription authorized for ₹${amt}.00.`, completed: true },
+          { title: 'Kitchen Allocation', time: 'Active', desc: `Assigned to ${provider?.name || provider?.kitchenName || 'Kitchen Hub'}.`, completed: true },
+          { title: 'Fulfillment Active', time: 'Ongoing', desc: `${deliveredMeals} meals delivered out of ${totalMeals}.`, completed: deliveredMeals > 0 }
         ],
         activityLog: [
-          { time: '10:42 AM IST', tag: 'PATRON_MUTATION', desc: 'Customer modified delivery instructions: "Leave with security at tower B"', source: 'Android Client v4.19' },
-          { time: '09:31 AM IST', tag: 'BATCH_JOB', desc: 'Automated lunch dispatch fired for 12:30 PM slot (Order queued for kitchen pickup)', source: 'cron-batch-amd-01' },
-          { time: 'Yesterday', tag: 'SKIP_MEAL', desc: 'Patron skipped lunch for Sunday. Contract validity automatically extended +1 day.', source: 'Cutoff Compliant (03:42 PM)' },
-          { time: '25 Sep', tag: 'NOTIFICATION', desc: 'Automated renewal notice dispatched via WhatsApp Gateway with UPI mandate prompt', source: 'Delivered (200 OK)' }
+          { time: 'Active', tag: 'SUBSCRIPTION_ACTIVE', desc: `Subscription ${sub.status}`, source: 'TiffinLink Core Engine' }
         ]
       }
     });

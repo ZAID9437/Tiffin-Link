@@ -24,272 +24,68 @@ export default function ProviderProfilesTab({ onNavigate, onOpenProvider360 }) {
     cuisine: 'Pure Gujarati Thali'
   });
 
-  const defaultProviders = [
-    {
-      id: 'xoxo',
-      initial: 'X',
-      name: 'Xoxo Men Kitchen',
-      owner: 'Rahul Patel',
-      phone: '+91 98251 44102',
-      email: 'rahul@xoxomen.in',
-      cluster: 'Bodakdev #04',
-      clusterKey: 'bodakdev',
-      zone: 'Zone A-West',
-      cuisine: 'Pure Veg Kathiyawadi',
-      cuisineKey: 'kathiyawadi',
-      liveOrders: 16,
-      totalOrders: 128,
-      rating: 4.8,
-      reviewsCount: 114,
-      complianceTier: 'Tier-1 FSSAI',
-      fssaiNumber: '#10822003001844',
-      status: 'active',
-      statusLabel: 'Active (16/30)',
-      activePrepping: 16,
-      maxQuota: 30,
-      scheduled: 4,
-      openQuota: 10,
-      joinedDate: '14 Aug 2024',
-      address: 'Bodakdev Cloud Cluster #04, SG Highway Link, Ahmedabad',
-      gps: '23.0384° N, 72.5119° E',
-      grossGmv: '₹42.5k',
-      netPayout: '₹39.8k',
-      platformFee: '₹2,125',
-      pendingRelease: '₹10,000',
-      acceptanceRate: '96.4%',
-      onTimeRate: '97.2%',
-      avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBg9QrV3L214vUk1AkCK1lTaWMcMd74dkJ6q0IDVIsaVdbqhaPebT0YZkRyaZNYB33nMorBWrrMsovQ9PxB1rDnUoBpx3RfMkGtaEIkZpWKgg8-7GrpaKfgJOpJ1Ved1RavnLo7ncjWTWrzNGgTahV9jgwxhN5-N7EQi5wle5xdVeyaeXf6UJc-Da6tMX2eaPS-27zOMit-0qJUzimzV-_PqAQSsH2OcqHpXppsmsWosTo0FJeWu1sV'
-    },
-    {
-      id: 'annapurna',
-      initial: 'M',
-      name: 'Maa Annapurna Rasoi',
-      owner: 'Kavita Ben Shah',
-      phone: '+91 94280 11982',
-      email: 'kavita@annapurnarasoi.com',
-      cluster: 'Navrangpura #01',
-      clusterKey: 'navrangpura',
-      zone: 'Zone B-Central',
-      cuisine: 'Punjabi & Gujarati',
-      cuisineKey: 'gujarati',
-      liveOrders: 22,
-      totalOrders: 94,
-      rating: 4.6,
-      reviewsCount: 88,
-      complianceTier: 'Tier-1 FSSAI',
-      fssaiNumber: '#10821004000319',
-      status: 'active',
-      statusLabel: 'Active (22/25)',
-      activePrepping: 22,
-      maxQuota: 25,
-      scheduled: 2,
-      openQuota: 1,
-      joinedDate: '02 Jun 2024',
-      address: 'Shop 12, Swastik Cross Rd, Navrangpura Central, Ahmedabad',
-      gps: '23.0365° N, 72.5611° E',
-      grossGmv: '₹38.2k',
-      netPayout: '₹35.4k',
-      platformFee: '₹1,910',
-      pendingRelease: '₹8,400',
-      acceptanceRate: '97.8%',
-      onTimeRate: '95.1%',
-      avatarUrl: 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=150&auto=format&fit=crop&q=80'
-    },
-    {
-      id: 'rasoi-express',
-      initial: 'R',
-      name: 'Rasoi Express',
-      owner: 'Manish G. Dave',
-      phone: '+91 97129 88341',
-      email: 'manish@rasoiexpress.co',
-      cluster: 'Vastrapur #02',
-      clusterKey: 'vastrapur',
-      zone: 'Zone A-South',
-      cuisine: 'North Indian & Dal Bati',
-      cuisineKey: 'punjabi',
-      liveOrders: 0,
-      totalOrders: 67,
-      rating: 4.7,
-      reviewsCount: 61,
-      complianceTier: 'Docs In Review',
-      fssaiNumber: 'Renewal Doc Uploaded',
-      status: 'pending',
-      statusLabel: 'Pending FSSAI',
-      activePrepping: 0,
-      maxQuota: 20,
-      scheduled: 0,
-      openQuota: 20,
-      joinedDate: '19 Sep 2024',
-      address: 'Near Vastrapur Lake, Vastrapur South, Ahmedabad',
-      gps: '23.0350° N, 72.5293° E',
-      grossGmv: '₹22.1k',
-      netPayout: '₹20.4k',
-      platformFee: '₹1,105',
-      pendingRelease: '₹4,500',
-      acceptanceRate: '94.2%',
-      onTimeRate: '96.0%',
-      avatarUrl: 'https://images.unsplash.com/photo-1583394293214-28ded15ee548?w=150&auto=format&fit=crop&q=80'
-    },
-    {
-      id: 'shreenathji',
-      initial: 'S',
-      name: 'Shreenathji Dining Hall',
-      owner: 'Dharmesh Trivedi',
-      phone: '+91 99092 33411',
-      email: 'dharmesh@shreenathji.in',
-      cluster: 'Paldi #03',
-      clusterKey: 'paldi',
-      zone: 'Zone C-East',
-      cuisine: 'Satvik Pure Jain',
-      cuisineKey: 'jain',
-      liveOrders: 8,
-      totalOrders: 48,
-      rating: 4.9,
-      reviewsCount: 46,
-      complianceTier: 'Tier-1 FSSAI',
-      fssaiNumber: '#10823001004921',
-      status: 'active',
-      statusLabel: 'Active (8/20)',
-      activePrepping: 8,
-      maxQuota: 20,
-      scheduled: 3,
-      openQuota: 9,
-      joinedDate: '28 Jul 2024',
-      address: 'Paldi Cross Road, Old Town Hub, Ahmedabad',
-      gps: '23.0125° N, 72.5622° E',
-      grossGmv: '₹18.9k',
-      netPayout: '₹17.2k',
-      platformFee: '₹945',
-      pendingRelease: '₹3,200',
-      acceptanceRate: '99.1%',
-      onTimeRate: '98.5%',
-      avatarUrl: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=150&auto=format&fit=crop&q=80'
-    },
-    {
-      id: 'tulsi',
-      initial: 'T',
-      name: 'Tulsi Kathiyawadi',
-      owner: 'Bhavik Patel',
-      phone: '+91 98980 55190',
-      email: 'bhavik@tulsirasoi.com',
-      cluster: 'Chandkheda #02',
-      clusterKey: 'chandkheda',
-      zone: 'Zone D-North',
-      cuisine: 'Woodfire Kathiyawadi',
-      cuisineKey: 'kathiyawadi',
-      liveOrders: 0,
-      totalOrders: 112,
-      rating: 4.7,
-      reviewsCount: 98,
-      complianceTier: 'Audit Breached',
-      fssaiNumber: '24m Delay SLA',
-      status: 'suspended',
-      statusLabel: 'Suspended',
-      activePrepping: 0,
-      maxQuota: 25,
-      scheduled: 0,
-      openQuota: 0,
-      joinedDate: '11 May 2024',
-      address: 'Chandkheda Ring Road, North Grid, Ahmedabad',
-      gps: '23.1118° N, 72.5855° E',
-      grossGmv: '₹51.0k',
-      netPayout: '₹47.1k',
-      platformFee: '₹2,550',
-      pendingRelease: '₹0',
-      acceptanceRate: '91.0%',
-      onTimeRate: '88.2%',
-      avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
-    },
-    {
-      id: 'anand',
-      initial: 'A',
-      name: 'Kitchen Anand',
-      owner: 'Anand Soni',
-      phone: '+91 93740 44211',
-      email: 'anand@kitchenanand.in',
-      cluster: 'Navrangpura #04',
-      clusterKey: 'navrangpura',
-      zone: 'Zone B-Central',
-      cuisine: 'Gujarati Thali',
-      cuisineKey: 'gujarati',
-      liveOrders: 0,
-      totalOrders: 85,
-      rating: 4.8,
-      reviewsCount: 79,
-      complianceTier: 'Tier-1 FSSAI',
-      fssaiNumber: '#10822002009841',
-      status: 'offline',
-      statusLabel: 'Offline',
-      activePrepping: 0,
-      maxQuota: 25,
-      scheduled: 5,
-      openQuota: 20,
-      joinedDate: '15 Mar 2024',
-      address: 'Commerce Six Roads, Navrangpura, Ahmedabad',
-      gps: '23.0410° N, 72.5510° E',
-      grossGmv: '₹34.7k',
-      netPayout: '₹32.1k',
-      platformFee: '₹1,735',
-      pendingRelease: '₹5,100',
-      acceptanceRate: '95.5%',
-      onTimeRate: '96.8%',
-      avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-    }
-  ];
-
   // Fetch real providers from API
   const fetchProviders = async () => {
     try {
       setLoading(true);
       const res = await fetch('http://localhost:5000/api/admin/providers');
       const json = await res.json();
-      if (json.success && Array.isArray(json.providers) && json.providers.length > 0) {
-        // Map live DB entries and blend with baseline schema
-        const mapped = json.providers.map((p, idx) => {
-          const fallback = defaultProviders[idx % defaultProviders.length];
+      if (json.success && Array.isArray(json.providers)) {
+        // Map live DB entries cleanly
+        const mapped = json.providers.map((p) => {
+          const kitchenName = p.businessName || p.name || 'Partner Kitchen';
+          const ownerName = p.ownerName || p.fullName || 'Kitchen Owner';
+          const phone = p.phone || p.mobile || '';
+          const email = p.email || '';
+          const locality = p.address?.locality || p.city || 'Ahmedabad Central';
+          const maxQuota = p.maxCapacity || 30;
+          const activePrepping = p.currentCapacity || 0;
+          const totalOrders = p.totalOrdersCount || 0;
+          const price = p.price || 120;
+
           return {
-            id: p._id || fallback.id,
-            initial: (p.businessName || p.name || 'K')[0].toUpperCase(),
-            name: p.businessName || p.name || fallback.name,
-            owner: p.ownerName || p.fullName || fallback.owner,
-            phone: p.phone || p.mobile || fallback.phone,
-            email: p.email || fallback.email,
-            cluster: p.address?.locality ? `${p.address.locality} Hub` : fallback.cluster,
-            clusterKey: 'bodakdev',
-            zone: 'Zone Central',
-            cuisine: p.cuisineTypes || p.cuisineType || fallback.cuisine,
-            cuisineKey: 'gujarati',
-            liveOrders: p.activeOrdersCount || fallback.liveOrders,
-            totalOrders: p.totalOrdersCount || fallback.totalOrders,
-            rating: p.rating || fallback.rating,
-            reviewsCount: p.totalReviews || fallback.reviewsCount,
-            complianceTier: p.fssaiLicense ? 'Tier-1 FSSAI' : fallback.complianceTier,
-            fssaiNumber: p.fssaiLicense ? `#${p.fssaiLicense}` : fallback.fssaiNumber,
-            status: p.status || fallback.status,
-            statusLabel: p.status === 'active' ? `Active (${p.currentCapacity || 16}/${p.maxCapacity || 30})` : p.status,
-            activePrepping: p.currentCapacity || fallback.activePrepping,
-            maxQuota: p.maxCapacity || fallback.maxQuota,
-            scheduled: 4,
-            openQuota: Math.max(0, (p.maxCapacity || 30) - (p.currentCapacity || 16)),
+            id: p._id,
+            initial: kitchenName[0]?.toUpperCase() || 'K',
+            name: kitchenName,
+            owner: ownerName,
+            phone,
+            email,
+            cluster: `${locality} Hub`,
+            clusterKey: locality.toLowerCase().replace(/\s+/g, '-'),
+            zone: p.address?.city || 'Zone Central',
+            cuisine: p.cuisineTypes || p.cuisines || p.cuisineType || 'Home Kitchen',
+            cuisineKey: 'all',
+            liveOrders: p.activeOrdersCount || 0,
+            totalOrders,
+            rating: p.rating || 0,
+            reviewsCount: p.totalReviews || 0,
+            complianceTier: p.fssaiLicense || p.fssaiNumber ? 'Tier-1 FSSAI' : 'Pending Verification',
+            fssaiNumber: p.fssaiLicense || p.fssaiNumber ? `#${p.fssaiLicense || p.fssaiNumber}` : 'N/A',
+            status: p.status || 'active',
+            statusLabel: p.status === 'active' ? `Active (${activePrepping}/${maxQuota})` : (p.status || 'Active'),
+            activePrepping,
+            maxQuota,
+            scheduled: 0,
+            openQuota: Math.max(0, maxQuota - activePrepping),
             joinedDate: new Date(p.createdAt || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-            address: typeof p.address === 'object' ? `${p.address?.houseNo || ''} ${p.address?.street || ''} ${p.address?.locality || 'Ahmedabad'}` : fallback.address,
-            gps: fallback.gps,
-            grossGmv: fallback.grossGmv,
-            netPayout: fallback.netPayout,
-            platformFee: fallback.platformFee,
-            pendingRelease: fallback.pendingRelease,
-            acceptanceRate: fallback.acceptanceRate,
-            onTimeRate: fallback.onTimeRate,
-            avatarUrl: fallback.avatarUrl
+            address: typeof p.address === 'object' ? `${p.address?.houseNo || ''} ${p.address?.street || ''} ${p.address?.locality || ''} ${p.address?.city || 'Ahmedabad'}`.trim() : (p.address || ''),
+            gps: p.address?.lat && p.address?.lng ? `${p.address.lat}° N, ${p.address.lng}° E` : 'Coordinates on file',
+            grossGmv: `₹${(totalOrders * price).toLocaleString()}`,
+            netPayout: `₹${Math.round(totalOrders * price * 0.9).toLocaleString()}`,
+            platformFee: `₹${Math.round(totalOrders * price * 0.1).toLocaleString()}`,
+            pendingRelease: '₹0',
+            acceptanceRate: '100%',
+            onTimeRate: '100%',
+            avatarUrl: p.image || ''
           };
         });
         setProviders(mapped);
       } else {
-        setProviders(defaultProviders);
+        setProviders([]);
       }
     } catch (err) {
-      console.warn('API fetch failed, utilizing baseline providers:', err);
-      setProviders(defaultProviders);
+      console.warn('API fetch failed:', err);
+      setProviders([]);
     } finally {
       setLoading(false);
     }
@@ -1204,99 +1000,35 @@ export default function ProviderProfilesTab({ onNavigate, onOpenProvider360 }) {
 
                   {/* Live Tickets List */}
                   <div className="space-y-3 font-sans">
-                    {[
-                      {
-                        id: '4956',
-                        meal: `${activeDossier.cuisine} Signature Thali × 2`,
-                        customer: 'Aarav Sharma',
-                        address: 'Tower 4B, Prerna Apts (1.2 km)',
-                        stage: 'READY FOR COURIER',
-                        stageClass: 'bg-emerald-100 text-emerald-900 border-emerald-300',
-                        timer: 'Pack complete: Staged Rack #B-04',
-                        courier: 'Rahul Patel (GJ-01-ET-4412)',
-                        courierStatus: 'ETA 3m to kitchen',
-                        amount: '₹372'
-                      },
-                      {
-                        id: '4959',
-                        meal: 'Sev Tameta + 8 Phulkas + Chaas Box × 1',
-                        customer: 'Priya Desai',
-                        address: 'Judges Bungalow (3.1 km)',
-                        stage: 'IN TRANSIT',
-                        stageClass: 'bg-[#1a1a1a] text-white border-transparent',
-                        timer: 'Dispatched 12m ago',
-                        courier: 'Aman Varma (GJ-27-AK-1088)',
-                        courierStatus: 'Dropping off in 4m',
-                        amount: '₹260'
-                      },
-                      {
-                        id: '4961',
-                        meal: 'Dal Bati Churma Homestyle Banquet × 1',
-                        customer: 'Karan Mehta',
-                        address: 'Satellite Central (0.8 km)',
-                        stage: 'PREPARING',
-                        stageClass: 'bg-amber-100 text-amber-900 border-amber-300',
-                        timer: 'Stove #2 simmering (8m in)',
-                        courier: 'Searching Driver Pool',
-                        courierStatus: '2 couriers pinged',
-                        amount: '₹195'
-                      },
-                      {
-                        id: '4964',
-                        meal: 'Kathiyawadi Village Khichdi-Kadhi × 1',
-                        customer: 'Deepal Trivedi',
-                        address: 'Prahladnagar East (1.6 km)',
-                        stage: 'ACCEPTED',
-                        stageClass: 'bg-blue-50 text-blue-900 border-blue-200',
-                        timer: 'Queued on induction station',
-                        courier: 'Assigned: Snehal Joshi',
-                        courierStatus: 'Standby at Hub',
-                        amount: '₹140'
-                      }
-                    ].map((ticket) => (
-                      <div
-                        key={ticket.id}
-                        className="p-4 bg-[#f5f3ef] border border-[#ded9d1]/60 flex flex-col gap-3 hover:border-[#1a1a1a] transition-all"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-sm text-[#1a1a1a]">#{ticket.id}</span>
-                              <span className="text-xs text-[#665d52]">•</span>
-                              <span className="font-medium text-sm text-[#1a1a1a]">{ticket.meal}</span>
+                    {(activeDossier.liveTickets && activeDossier.liveTickets.length > 0) ? (
+                      activeDossier.liveTickets.map((ticket) => (
+                        <div
+                          key={ticket.id}
+                          className="p-4 bg-[#f5f3ef] border border-[#ded9d1]/60 flex flex-col gap-3 hover:border-[#1a1a1a] transition-all"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-sm text-[#1a1a1a]">#{ticket.id}</span>
+                                <span className="text-xs text-[#665d52]">•</span>
+                                <span className="font-medium text-sm text-[#1a1a1a]">{ticket.meal}</span>
+                              </div>
+                              <div className="text-xs text-[#665d52] mt-0.5">
+                                Customer: {ticket.customer} • {ticket.address}
+                              </div>
                             </div>
-                            <div className="text-xs text-[#665d52] mt-0.5">
-                              Customer: {ticket.customer} • {ticket.address}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className="font-mono font-bold text-sm text-[#1a1a1a]">{ticket.amount}</span>
-                            <span className="block font-mono text-[10px] text-emerald-700">UPI Verified</span>
+                            <span className="font-mono text-sm font-bold text-[#1a1a1a]">{ticket.amount}</span>
                           </div>
                         </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#ded9d1]/40 text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 font-mono text-[10px] font-bold border ${ticket.stageClass}`}>
-                              {ticket.stage}
-                            </span>
-                            <span className="font-mono text-[#665d52]">{ticket.timer}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono text-[#665d52]">
-                              Courier: <strong className="text-[#1a1a1a]">{ticket.courier}</strong> ({ticket.courierStatus})
-                            </span>
-                            <button
-                              onClick={() => alert(`POS ping dispatched for Order #${ticket.id}`)}
-                              className="px-2 py-1 bg-white border border-[#ded9d1] hover:bg-[#1a1a1a] hover:text-white transition-colors text-[11px] font-mono"
-                            >
-                              Ping POS
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-xs text-[#665d52] italic py-8 text-center bg-[#f5f3ef] border border-[#ded9d1]">
+                        No active live tickets for this kitchen at this time.
+                      </p>
+                    )}
                   </div>
+
+                  
 
                   {/* Live Control footer */}
                   <div className="p-3 bg-[#efeeea] border border-[#ded9d1] flex items-center justify-between font-mono text-xs">
@@ -1363,14 +1095,14 @@ export default function ProviderProfilesTab({ onNavigate, onOpenProvider360 }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#ded9d1]/40">
-                        {[
-                          { id: '#TL-4956', date: '28 Sep 19:15', meal: 'Kathiyawadi Thali × 1', amount: '₹186.00', status: 'DELIVERED', turnaround: '27m' },
-                          { id: '#TL-4952', date: '28 Sep 12:40', meal: 'Gujarati Meal × 2', amount: '₹280.00', status: 'DELIVERED', turnaround: '26m' },
-                          { id: '#TL-4945', date: '27 Sep 19:50', meal: 'Bajra Rotla Thali × 1', amount: '₹195.00', status: 'DELIVERED', turnaround: '24m' },
-                          { id: '#TL-4938', date: '27 Sep 12:20', meal: 'Dal Bati Churma × 2', amount: '₹240.00', status: 'DELIVERED', turnaround: '29m' },
-                          { id: '#TL-4929', date: '26 Sep 20:05', meal: 'Executive Meal Box × 1', amount: '₹165.00', status: 'DELIVERED', turnaround: '28m' },
-                          { id: '#TL-4912', date: '26 Sep 12:10', meal: 'Sev Tameta Meal × 1', amount: '₹150.00', status: 'CANCELLED', turnaround: 'Auto-Refund' }
-                        ].map((item, i) => (
+                        {(activeDossier.recentOrders || []).length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-8 text-center text-xs font-sans text-[#665d52]">
+                              No completed orders recorded for this provider.
+                            </td>
+                          </tr>
+                        ) : (
+                          (activeDossier.recentOrders || []).map((item, i) => (
                           <tr key={i} className="hover:bg-[#f5f3ef]/50">
                             <td className="py-2.5 px-3 font-mono font-bold text-[#1a1a1a]">{item.id}</td>
                             <td className="py-2.5 px-3 font-mono text-[#665d52]">{item.date}</td>
@@ -1394,7 +1126,7 @@ export default function ProviderProfilesTab({ onNavigate, onOpenProvider360 }) {
                               </button>
                             </td>
                           </tr>
-                        ))}
+                        )))}
                       </tbody>
                     </table>
                   </div>
@@ -1615,11 +1347,7 @@ export default function ProviderProfilesTab({ onNavigate, onOpenProvider360 }) {
                       Recent System Telemetry Logs
                     </span>
                     <div className="p-3 bg-[#1a1a1a] text-emerald-400 font-mono text-[11px] space-y-1.5 border border-neutral-800">
-                      <div>[2026-09-30 19:42:18] ORDER_DISPATCH_CONFIRMED: Canister seal #TK-9021 verified by courier #DP-4409.</div>
-                      <div>[2026-09-30 19:32:40] HEAT_SEAL_LOCKED: Thermal temp verified at 68.4°C. Station #1 cleared.</div>
-                      <div>[2026-09-30 19:16:15] POS_TICKET_ACK: Station #1 induction active. 4 Phulkas, Ringan Bhartu.</div>
-                      <div>[2026-09-30 18:00:00] BATCH_LOAD_INITIALIZED: Dinner service slot opened. Quota capacity: 30 tiffins.</div>
-                      <div>[2026-09-30 14:02:10] LUNCH_SWEEP_CLEARED: 24 lunch tiffins fulfilled with 0 cancellations.</div>
+                      <div>System telemetry link active. Real-time kitchen status synchronized.</div>
                     </div>
                   </div>
                 </div>

@@ -57,94 +57,6 @@ const getSupportUserId = (req) => {
     'DP-4409';
 };
 
-// Initial tickets template for seeding driver inbox in MongoDB
-const initialDriverTickets = (principalId, userEmail = '') => [
-  {
-    ticketId: '#TKT-8841',
-    providerId: principalId,
-    providerEmail: userEmail,
-    subject: 'Monsoon surge bonus ledger credit pending',
-    category: 'Payment',
-    priority: 'High',
-    relatedOrderId: 'ORD-5162',
-    description: 'Completed 6 consecutive deliveries during Sunday dinner monsoon peak between 07:00 PM and 10:30 PM in Bandra West Sector 4, but the 25% surge incentive ledger entry (#TXN-90214) has not reflected in my available wallet balance. Attached trip completion receipts.',
-    attachmentUrl: 'trip_summary_slip_sep22.pdf',
-    status: 'Open',
-    assignedTo: 'Desk Lead Arvind K.',
-    messages: [
-      {
-        senderId: principalId,
-        senderRole: 'provider',
-        senderName: 'Rahul Verma',
-        message: 'Completed 6 consecutive deliveries during Sunday dinner monsoon peak between 07:00 PM and 10:30 PM.',
-        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000)
-      }
-    ],
-    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000)
-  },
-  {
-    ticketId: '#TKT-8790',
-    providerId: principalId,
-    providerEmail: userEmail,
-    subject: 'Customer gate code invalid at Sea Pearl Apt',
-    category: 'Delivery',
-    priority: 'Normal',
-    relatedOrderId: 'ORD-5098',
-    description: 'Customer gate security code provided on order notes was rejected by smart gate. Gatekeeper verified entry after 10 min delay.',
-    status: 'In Progress',
-    assignedTo: 'Bandra Dispatch Unit',
-    messages: [],
-    createdAt: new Date(Date.now() - 20 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 18 * 60 * 60 * 1000)
-  },
-  {
-    ticketId: '#TKT-8622',
-    providerId: principalId,
-    providerEmail: userEmail,
-    subject: 'Handlebar thermal mount replacement request',
-    category: 'Technical Issue',
-    priority: 'Low',
-    relatedOrderId: '',
-    description: 'Crate latch fracture during transit due to heavy road vibrations.',
-    status: 'In Progress',
-    assignedTo: 'Fleet Equipment Hub',
-    messages: [],
-    createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 30 * 60 * 60 * 1000)
-  },
-  {
-    ticketId: '#TKT-8410',
-    providerId: principalId,
-    providerEmail: userEmail,
-    subject: 'FSSAI hygiene re-certification document audit',
-    category: 'Account & Security',
-    priority: 'Normal',
-    relatedOrderId: '',
-    description: 'Quarterly regulatory compliance document submitted for verification.',
-    status: 'Resolved',
-    assignedTo: 'Safety Compliance',
-    messages: [],
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000)
-  },
-  {
-    ticketId: '#TKT-8105',
-    providerId: principalId,
-    providerEmail: userEmail,
-    subject: 'OTP timeout retry during heavy rain downpour',
-    category: 'Technical Issue',
-    priority: 'Low',
-    relatedOrderId: 'ORD-4820',
-    description: 'Network loss manually confirmed via OTP SMS.',
-    status: 'Closed',
-    assignedTo: 'Automated Audit',
-    messages: [],
-    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(Date.now() - 13 * 24 * 60 * 60 * 1000)
-  }
-];
-
 // @desc    Get support tickets with search, filtering, sorting, and pagination
 // @route   GET /api/support/tickets
 const getTickets = async (req, res) => {
@@ -174,16 +86,7 @@ const getTickets = async (req, res) => {
 
       let tickets = await SupportTicket.find(query).sort({ createdAt: -1 });
 
-      // If zero tickets found for this driver/provider, seed initial records
-      if (tickets.length === 0) {
-        try {
-          const seeded = initialDriverTickets(principalId, userEmail);
-          await SupportTicket.insertMany(seeded);
-          tickets = await SupportTicket.find(query).sort({ createdAt: -1 });
-        } catch (seedErr) {
-          console.warn('Seeding support tickets failed:', seedErr.message);
-        }
-      }
+// No seed: return empty tickets if none exist in DB
 
       // Filter in memory for maximum reliability
       let filtered = tickets.filter(t => {

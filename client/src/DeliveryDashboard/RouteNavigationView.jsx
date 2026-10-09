@@ -641,7 +641,7 @@ export default function RouteNavigationView({ currentUser, onNavigateTab }) {
                   <div className="flex items-center gap-3">
                     <span className="font-label-caps text-xs uppercase text-secondary font-bold">Consignment Ref</span>
                     <span className="font-button-text text-xs bg-surface-container-high px-2 py-0.5 text-onyx-black font-bold tracking-wide">
-                      {activeDelivery.orderId || activeDelivery.requestId || '#ORD-5155'}
+                      {activeDelivery.orderId || activeDelivery.requestId || String(activeDelivery._id || '')}
                     </span>
                   </div>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-900 border border-emerald-200 text-[11px] font-label-caps uppercase tracking-wider font-bold">
@@ -652,7 +652,7 @@ export default function RouteNavigationView({ currentUser, onNavigateTab }) {
 
                 <div>
                   <h2 className="font-headline-md text-2xl text-onyx-black font-serif">
-                    {activeDelivery.tiffinName || 'Gujarati Thali Special'} × {activeDelivery.itemCount || 1}
+                    {activeDelivery.tiffinName || 'Tiffin Meal'} × {activeDelivery.itemCount || 1}
                   </h2>
                   <p className="font-body-md text-xs text-on-surface-variant mt-1">
                     Dispatch Origin: <strong className="text-onyx-black">{pickupPos.name}</strong> → Consignee: <strong className="text-onyx-black">{dropPos.name}</strong>
@@ -995,7 +995,7 @@ export default function RouteNavigationView({ currentUser, onNavigateTab }) {
               <div>
                 <h3 className="font-headline-md text-xl text-onyx-black font-serif">Planned Itinerary Maneuvers</h3>
                 <p className="font-body-md text-xs text-on-surface-variant mt-0.5">
-                  Step-by-step verification roadmap for assignment #{activeDelivery.orderId || activeDelivery.requestId || 'ORD-5155'}
+                  Step-by-step verification roadmap for assignment #{activeDelivery.orderId || activeDelivery.requestId || String(activeDelivery._id || '')}
                 </p>
               </div>
               <span className="font-label-caps text-xs uppercase text-secondary font-bold">4 Milestones Total</span>

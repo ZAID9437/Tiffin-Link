@@ -29,6 +29,10 @@ const formatUserPayload = (user) => ({
 
 const Review = require('../models/Review');
 const Tiffin = require('../models/Tiffin');
+const Order = require('../models/Order');
+const Withdrawal = require('../models/Withdrawal');
+const DeliveryRequest = require('../models/DeliveryRequest');
+const MealRequest = require('../models/MealRequest');
 
 // Haversine formula to compute great-circle distance in kilometers
 const haversineKm = (lat1, lon1, lat2, lon2) => {
@@ -1342,7 +1346,14 @@ const updatePayoutAccount = async (req, res) => {
 // @route   GET /api/provider/performance
 const getProviderPerformance = async (req, res) => {
   try {
-    const providerId = req.providerId || '6a7f3051d4b48741d8722416';
+    let providerId = req.providerId;
+    if (!providerId && req.user) {
+      const p = await Provider.findOne({ $or: [{ userId: req.user._id }, { email: req.user.email }] });
+      if (p) providerId = p._id.toString();
+    }
+    if (!providerId) {
+      providerId = '6a7f3051d4b48741d8722416';
+    }
     const { period = 'This Month', startDate, endDate } = req.query;
 
     if (!(await isDbConnected())) {
@@ -1355,27 +1366,36 @@ const getProviderPerformance = async (req, res) => {
     let rangeEnd = new Date();
 
     if (period === 'Today') {
-      rangeStart = new Date(now.setHours(0, 0, 0, 0));
+      rangeStart = new Date();
+      rangeStart.setHours(0, 0, 0, 0);
+      rangeEnd = new Date();
+      rangeEnd.setHours(23, 59, 59, 999);
     } else if (period === 'This Week') {
       rangeStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     } else if (period === 'This Month') {
-      rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      rangeStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
     } else if (period === 'Last Month') {
-      rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      rangeEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+      rangeEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
     } else if (period === 'Custom Range' && startDate && endDate) {
       rangeStart = new Date(startDate);
       rangeEnd = new Date(endDate);
-      rangeEnd.setHours(23, 59, 59);
+      rangeEnd.setHours(23, 59, 59, 999);
+    }
+
+    const pIdStr = String(providerId);
+    let providerFilter = pIdStr;
+    if (mongoose.Types.ObjectId.isValid(pIdStr)) {
+      providerFilter = { $in: [pIdStr, new mongoose.Types.ObjectId(pIdStr)] };
     }
 
     const orderQuery = {
-      providerId,
+      providerId: providerFilter,
       createdAt: { $gte: rangeStart, $lte: rangeEnd }
     };
 
     const orders = await Order.find(orderQuery).sort({ createdAt: -1 }).lean();
-    const reviews = await Review.find({ providerId, createdAt: { $gte: rangeStart, $lte: rangeEnd } }).lean();
+    const reviews = await Review.find({ providerId: providerFilter, createdAt: { $gte: rangeStart, $lte: rangeEnd } }).lean();
 
     const totalOrders = orders.length;
     const completedOrders = orders.filter(o => o.status === 'Completed' || o.status === 'Ready' || o.status === 'Preparing' || o.status === 'Delivery');

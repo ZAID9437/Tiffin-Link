@@ -618,7 +618,7 @@ export default function HelpSupportView({ currentUser, onNavigateTab, onShowToas
                     </option>
                   ))
                 ) : (
-                  <option value="ORD-5162">#ORD-5162 — Gujarati Special Thali (Bhavin Shah, Pali Hill) [ACTIVE]</option>
+                  <option value="">No recent active orders linked</option>
                 )}
                 <option value="none">No Related Order / General Account Support</option>
               </select>

@@ -216,6 +216,7 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
           if (pendingList.length > 0) {
             const req = pendingList[0];
             setLiveRequest({
+              dbId: req._id,
               id: req._id ? `REQ-${String(req._id).slice(-4).toUpperCase()}` : 'REQ',
               customerName: req.customerName || 'Customer',
               customerPhone: req.customerPhone || '—',
@@ -322,34 +323,6 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     document.body.removeChild(link);
   };
 
-  // Helper to create demo today order for dynamic testing
-  const handleCreateTodayOrderDemo = async () => {
-    try {
-      const demoOrder = {
-        customerName: 'Karan Mehta',
-        customerPhone: '+91 98123 77889',
-        customerAddress: 'C-501 Shivalik Park, Bodakdev, Ahmedabad',
-        tiffinName: 'Gujarati Special Kathiawadi Thali',
-        tiffinCategory: 'Gujarati',
-        quantity: 2,
-        unitPrice: 130,
-        distanceKm: 2.4,
-        paymentStatus: 'Paid',
-        status: 'Preparing'
-      };
-
-      const data = await apiRequest('/orders', {
-        method: 'POST',
-        body: JSON.stringify(demoOrder)
-      });
-      if (data.success) {
-        setToastMessage(`✓ Order ${data.data.orderId} created for Today! Orders Today incremented.`);
-        setTimeout(() => setToastMessage(null), 3500);
-      }
-    } catch (err) {
-      console.error('Error creating demo today order:', err);
-    }
-  };
 
   const handleToggleAcceptingOrders = async () => {
     const nextState = !acceptingOrders;
@@ -380,30 +353,13 @@ export default function DashboardOverviewTab({ currentUser, onNavigateTab }) {
     if (!liveRequest) return;
     const activeReq = liveRequest;
     setLiveRequest(null);
-    setToastMessage('✓ Live Request Accepted! Creating order in database & navigating to Preparing...');
+    setToastMessage('✓ Live Request Accepted! Converted to Order in database & navigating to Preparing...');
 
     try {
-      await apiRequest('/orders', {
-        method: 'POST',
-        body: JSON.stringify({
-          customerName: activeReq.customerName || 'Rahul Shah',
-          customerPhone: activeReq.customerPhone || '+91 98765 12345',
-          customerAddress: 'B-402, Shivalik Towers, Satellite, Ahmedabad',
-          tiffinName: activeReq.items || 'Gujarati Veg Special Thali',
-          tiffinCategory: 'Gujarati',
-          tiffinImage: '/assets/provider_1.png',
-          quantity: 2,
-          unitPrice: activeReq.price || 120,
-          distanceKm: 1.8,
-          paymentStatus: 'Paid',
-          status: 'Preparing'
-        })
-      });
-
-      if (activeReq.id && activeReq.id.length > 10) {
-        await apiRequest(`/requests/${activeReq.id}`, {
-          method: 'PUT',
-          body: JSON.stringify({ status: 'accepted' })
+      const targetId = activeReq.dbId || activeReq.id;
+      if (targetId) {
+        await apiRequest(`/requests/${targetId}/accept`, {
+          method: 'POST'
         });
       }
     } catch (err) {

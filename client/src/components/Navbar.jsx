@@ -32,62 +32,7 @@ export default function Navbar({
   const notifMenuRef = useRef(null);
 
   // Live notifications feed
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: 'Order #TL-8821 Accepted',
-      desc: "Mom's Kitchen has accepted your Executive Gujarati Thali.",
-      time: '12:08 PM',
-      unread: true,
-      icon: 'kitchen',
-      link: '#orders'
-    },
-    {
-      id: 2,
-      title: 'Provider Preparing Order',
-      desc: 'Fresh rotlis cooked on direct flame. Packed in 304 Canister.',
-      time: '12:20 PM',
-      unread: true,
-      icon: 'cooking',
-      link: '#orders'
-    },
-    {
-      id: 3,
-      title: 'Driver Assigned & Picked Up',
-      desc: 'Partner Ramesh Solanki picked up your hot lunch canister.',
-      time: '12:35 PM',
-      unread: true,
-      icon: 'truck',
-      link: '#orders'
-    },
-    {
-      id: 4,
-      title: 'Out for Delivery (12 Mins)',
-      desc: 'Transit via Satellite West Corridor. OTP: 4892.',
-      time: '12:38 PM',
-      unread: false,
-      icon: 'truck',
-      link: '#orders'
-    },
-    {
-      id: 5,
-      title: 'Payment Confirmed',
-      desc: '₹160 confirmed via UPI (HDFC Bank).',
-      time: '12:05 PM',
-      unread: false,
-      icon: 'payment',
-      link: '#orders'
-    },
-    {
-      id: 6,
-      title: 'Subscription Reminder',
-      desc: "Tomorrow's lunch: Sev Tameta & 4 Phulka Rotli.",
-      time: '10:00 AM',
-      unread: false,
-      icon: 'calendar',
-      link: '#orders'
-    }
-  ]);
+  const [notifications, setNotifications] = useState([]);
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
@@ -392,7 +337,12 @@ export default function Navbar({
                     </div>
 
                     <div className="divide-y divide-[#ded9d1]/60 max-h-80 overflow-y-auto mt-2">
-                      {notifications.map(notif => (
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-[#665d52]">
+                          No notifications
+                        </div>
+                      ) : (
+                        notifications.map(notif => (
                         <div 
                           key={notif.id}
                           onClick={() => {
@@ -414,7 +364,7 @@ export default function Navbar({
                             <p className="text-[11px] text-[#665d52] mt-0.5 leading-snug">{notif.desc}</p>
                           </div>
                         </div>
-                      ))}
+                      )))}
                     </div>
 
                     {isCustomer && (

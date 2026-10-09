@@ -214,7 +214,7 @@ export default function ActiveDeliveriesTab({ onNavigate }) {
             vector: phase === 'ON ROUTE' ? 'Vector: 28 km/h' : (phase === 'DELIVERED' ? 'Delivery Completed' : 'Standby / Assigned'),
             eta: r.elapsed ? `${r.elapsed}` : '14m',
             distRem: r.dist || '2.4 km',
-            canisterId: '#TK-9021',
+            canisterId: r.canisterId || '',
             temp: '68°C',
             tempVal: 68.2,
             fee: r.fee || '₹51 fee',
@@ -257,30 +257,7 @@ export default function ActiveDeliveriesTab({ onNavigate }) {
     return d.lifecycleKey === lifecycleFilter;
   });
 
-  const selectedDelivery = deliveries.find((d) => d.id === selectedOrderId) || deliveries[0] || {
-    id: 'TL-65013-B',
-    customer: 'Customer',
-    address: 'Ahmedabad',
-    kitchen: 'Partner Kitchen',
-    courierName: 'Ziyan Mansuri',
-    courierId: 'TL-65013-B',
-    phone: '+91 9558601570',
-    phase: 'STANDBY',
-    phaseTone: 'neutral',
-    vector: 'Standby at Bodakdev Hub',
-    eta: '0m',
-    distRem: '0 km',
-    canisterId: '#TK-9021',
-    temp: '68°C',
-    tempVal: 68.2,
-    fee: '₹51 fee',
-    escrow: '₹186 escrow',
-    targetWindow: '20:00 IST',
-    battery: '94% • Active Link',
-    gpsAcc: '±2.4m (RTK-Grade)',
-    clientApp: 'v4.19 (Android 14)',
-    lifecycleKey: 'assigned'
-  };
+  const selectedDelivery = deliveries.find((d) => d.id === selectedOrderId) || deliveries[0] || null;
 
   const handleOverride = (action) => {
     if (action === 'call-courier') {
@@ -635,8 +612,9 @@ export default function ActiveDeliveriesTab({ onNavigate }) {
         </div>
 
         {/* Active Delivery Dossier Flyout / Inspector Panel (4 Cols) */}
-        <div id="delivery-mission-panel" className="2xl:col-span-4 bg-white border border-[#ded9d1] p-5 space-y-5 shadow-sm transition-all">
-          {/* Dossier Header */}
+        {selectedDelivery ? (
+          <div id="delivery-mission-panel" className="2xl:col-span-4 bg-white border border-[#ded9d1] p-5 space-y-5 shadow-sm transition-all">
+            {/* Dossier Header */}
           <div className="border-b border-[#ded9d1] pb-3 flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
@@ -832,6 +810,12 @@ export default function ActiveDeliveriesTab({ onNavigate }) {
             </button>
           </div>
         </div>
+        ) : (
+          <div className="2xl:col-span-4 bg-white border border-[#ded9d1] p-8 text-center text-[#665d52] font-mono text-xs flex flex-col items-center justify-center min-h-[300px]">
+            <span className="material-symbols-outlined text-3xl mb-2 text-[#999]">local_shipping</span>
+            <p>Select a live delivery from the telemetry list to inspect courier dossier and GPS trajectory.</p>
+          </div>
+        )}
       </div>
 
       {/* 1. BROADCAST OPERATIONAL NOTICE MODAL */}

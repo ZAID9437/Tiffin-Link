@@ -9,43 +9,43 @@ export default function FleetAnalyticsTab({ onNavigate }) {
 
   const [analyticsData, setAnalyticsData] = useState({
     kpis: {
-      totalPartners: 67,
-      activeFleet: 42,
-      fleetUtilization: '72.4%',
-      totalDeliveries: '1,248',
-      completionSla: '96.2%',
-      avgLatency: '28.4 min'
+      totalPartners: 0,
+      activeFleet: 0,
+      fleetUtilization: '0%',
+      totalDeliveries: '0',
+      completionSla: '100%',
+      avgLatency: '—'
     },
     availabilityAllocation: {
-      onlineFleet: { count: 34, percentage: '50.7%' },
-      inTransit: { count: 18, percentage: '26.9%' },
-      stagedAtHubs: { count: 15, percentage: '22.4%' },
-      offlineRest: { count: 18, percentage: '—' },
-      suspendedHold: { count: 2, percentage: '3.0%' }
+      onlineFleet: { count: 0, percentage: '0%' },
+      inTransit: { count: 0, percentage: '0%' },
+      stagedAtHubs: { count: 0, percentage: '0%' },
+      offlineRest: { count: 0, percentage: '0%' },
+      suspendedHold: { count: 0, percentage: '0%' }
     },
     latencyVolumeTelemetry: {
-      completedDeliveries: '1,201',
-      completedDeliveriesSub: '96.2% total cycle',
-      onTimeSlaRate: '94.6%',
+      completedDeliveries: '0',
+      completedDeliveriesSub: '0% total cycle',
+      onTimeSlaRate: '100%',
       onTimeSlaSub: '< 35 min guarantee',
-      firstRoundAccept: '95.8%',
+      firstRoundAccept: '100%',
       firstRoundAcceptSub: 'Dispatch lock time <40s',
-      cancelledOrders: '32',
-      cancelledOrdersSub: '2.6% total pool',
-      failedOtpRate: '15',
-      failedOtpSub: '1.2% dispute rate',
-      avgDwellKitchen: '4.8 min',
+      cancelledOrders: '0',
+      cancelledOrdersSub: '0% total pool',
+      failedOtpRate: '0',
+      failedOtpSub: '0% dispute rate',
+      avgDwellKitchen: '—',
       avgDwellSub: 'Packaging handoff lag'
     },
     leaderboard: [],
     corridors: [],
     financialSummary: {
-      grossGmv: '₹1,82,400',
-      partnerDirectPayouts: '₹1,48,200',
-      platformTakeRate: '₹18,240',
-      incentivesFuel: '₹9,450',
-      settledImps: '₹1,41,690',
-      pendingEscrow: '₹6,510'
+      grossGmv: '₹0',
+      partnerDirectPayouts: '₹0',
+      platformTakeRate: '₹0',
+      incentivesFuel: '₹0',
+      settledImps: '₹0',
+      pendingEscrow: '₹0'
     }
   });
 

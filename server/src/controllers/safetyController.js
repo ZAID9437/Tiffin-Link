@@ -535,61 +535,6 @@ const getIssueReports = async (req, res) => {
     // 1. Fetch reports filed by authenticated driver
     let reports = await IssueReport.find({ driverId }).sort({ createdAt: -1 });
 
-    // Seed default initial issue reports if empty for demo courier
-    if (reports.length === 0) {
-      const r1 = await IssueReport.create({
-        reportId: '#ISS-1024',
-        driverId,
-        orderId: 'ORD-5162',
-        category: 'KITCHEN_ISSUE',
-        priority: 'HIGH',
-        description: 'Upon arriving at Pali Hill Kitchen Hub for pickup, the hot-box container seal was compromised with dal spillage from container #2. Kitchen partner refused immediate repacking.',
-        contactPreference: 'PHONE',
-        status: 'OPEN',
-        assignedSupervisor: 'Capt. H. Mehta (Hub 12)',
-        slaMinutes: 15
-      });
-      const r2 = await IssueReport.create({
-        reportId: '#ISS-1019',
-        driverId,
-        orderId: 'ORD-4921',
-        category: 'CUSTOMER_ISSUE',
-        priority: 'MEDIUM',
-        description: 'Customer disputed gate handover and was unreachable for 12 minutes at entry manifest desk.',
-        contactPreference: 'CHAT',
-        status: 'UNDER_REVIEW',
-        assignedSupervisor: 'Capt. H. Mehta (Hub 12)',
-        slaMinutes: 30
-      });
-      const r3 = await IssueReport.create({
-        reportId: '#ISS-0988',
-        driverId,
-        orderId: 'ORD-3810',
-        category: 'VEHICLE_ISSUE',
-        priority: 'CRITICAL',
-        description: 'Rear tire blowout on S.V. Road underpass. Relief courier transferred order seamlessly.',
-        contactPreference: 'PHONE',
-        status: 'RESOLVED',
-        assignedSupervisor: 'Capt. H. Mehta (Hub 12)',
-        slaMinutes: 10,
-        resolvedAt: new Date(Date.now() - 3600000 * 48)
-      });
-      const r4 = await IssueReport.create({
-        reportId: '#ISS-0941',
-        driverId,
-        orderId: 'ORD-2914',
-        category: 'PAYMENT_ISSUE',
-        priority: 'LOW',
-        description: 'Wait time incentive adjustment request for 18-minute kitchen delay.',
-        contactPreference: 'ASYNC',
-        status: 'CLOSED',
-        assignedSupervisor: 'Capt. H. Mehta (Hub 12)',
-        slaMinutes: 60,
-        resolvedAt: new Date(Date.now() - 3600000 * 120)
-      });
-      reports = [r1, r2, r3, r4];
-    }
-
     // 2. Fetch driver's active & recent orders from MongoDB for dropdown
     const deliveryOrders = await DeliveryRequest.find({
       $or: [
@@ -607,14 +552,7 @@ const getIssueReports = async (req, res) => {
       status: o.status || 'COMPLETED'
     }));
 
-    // Fallback order list if database currently has no assigned requests
-    if (formattedOrders.length === 0) {
-      formattedOrders.push(
-        { orderId: 'ORD-5162', tiffinName: 'Gujarati Special Thali', customerName: 'Bhavin Shah', deliveryAddress: 'Pali Hill, Bandra West', status: 'IN TRANSIT - ACTIVE' },
-        { orderId: 'ORD-8569', tiffinName: 'Punjabi Lunch Box', customerName: 'Meera Nair', deliveryAddress: 'Khar West', status: 'COMPLETED - 13:40' },
-        { orderId: 'ORD-4921', tiffinName: 'Satvik Tiffin 3-Tier', customerName: 'Anish Deshmukh', deliveryAddress: 'Bandra Kurla Complex', status: 'COMPLETED - 12:15' }
-      );
-    }
+
 
     return res.status(200).json({
       success: true,

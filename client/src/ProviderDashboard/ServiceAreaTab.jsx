@@ -27,18 +27,18 @@ export default function ServiceAreaTab() {
 
   // Overview Summary Metrics
   const [summary, setSummary] = useState({
-    activeAreasCount: 3,
-    eligibleCustomersCount: 128,
-    todaysDeliveriesCount: 24
+    activeAreasCount: 0,
+    eligibleCustomersCount: 0,
+    todaysDeliveriesCount: 0
   });
 
   // Kitchen Location
   const [kitchenLocation, setKitchenLocation] = useState({
-    address: '102, Shivalik Plaza, CG Road, Ahmedabad',
-    locality: 'CG Road',
-    city: 'Ahmedabad',
-    latitude: 23.0300,
-    longitude: 72.5650
+    address: '',
+    locality: '',
+    city: '',
+    latitude: null,
+    longitude: null
   });
 
   // Settings State

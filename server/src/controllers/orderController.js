@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const { ensureConnected } = require('../config/db');
+const { transitionOrderStatus, buildOrderLookupQuery: lifecycleBuildLookup } = require('../services/orderLifecycleService');
 
 const isDbConnected = async () => await ensureConnected();
 
@@ -463,9 +464,9 @@ const acceptDelivery = async (req, res) => {
                 driverId: String(driverId),
                 name: deliveryPartnerName,
                 phone: deliveryPartnerPhone,
-                rating: 4.8,
-                vehicleNo: '',
-                location: { lat: 23.0280, lng: 72.5670 }
+                rating: req.user?.rating ?? null,
+                vehicleNo: req.user?.vehicleNo || '',
+                location: req.user?.currentLocation || null
               }
             }
           }
@@ -577,77 +578,25 @@ const acceptOrder = async (req, res) => {
     }
 
     if (await isDbConnected()) {
-      const lookupQuery = buildOrderLookupQuery(id, providerId);
-      const existing = await Order.findOne(lookupQuery);
-      if (!existing) {
-        return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
-      }
+      const result = await transitionOrderStatus({
+        orderId: id,
+        targetStatus: 'Preparing',
+        actorRole: 'provider',
+        actorId: providerId,
+        actorName: req.user?.name || req.provider?.name || 'Provider'
+      });
 
-      const currentStatus = String(existing.status || '').toUpperCase();
-      
-      // If already accepted/preparing, return success gracefully
-      if (currentStatus === 'PREPARING' || currentStatus === 'ACCEPTED' || currentStatus === 'IN_PREP') {
-        return res.json({
-          success: true,
-          message: `Order ${existing.orderId} is already accepted and in kitchen preparation.`,
-          data: enrichOrderFinancials(existing)
-        });
-      }
-
-      // If cancelled, cannot accept
-      if (currentStatus === 'CANCELLED' || currentStatus === 'REJECTED') {
-        return res.status(409).json({
+      if (!result.success) {
+        return res.status(result.statusCode || 400).json({
           success: false,
-          message: 'Order was cancelled and cannot be accepted.'
+          message: result.message
         });
       }
-
-      // Update order to Preparing atomically
-      const updatedOrder = await Order.findOneAndUpdate(
-        {
-          _id: existing._id,
-          providerId
-        },
-        {
-          $set: {
-            status: 'Preparing',
-            acceptedAt: new Date(),
-            acceptedBy: req.user?._id
-          }
-        },
-        { new: true }
-      );
-
-      if (!updatedOrder) {
-        return res.status(409).json({
-          success: false,
-          message: 'Order is no longer available.'
-        });
-      }
-
-      // Audit Log & Socket Notification
-      try {
-        const AuditLog = require('../models/AuditLog');
-        await AuditLog.create({
-          action: 'ORDER_ACCEPTED',
-          entityType: 'Order',
-          entityId: String(updatedOrder._id),
-          performedBy: req.user?.name || 'Provider',
-          details: `Order ${updatedOrder.orderId} accepted by provider`
-        });
-      } catch (aErr) {}
-
-      try {
-        const { emitToProvider, getIO } = require('../services/socketService');
-        emitToProvider(providerId, 'order:status:updated', { orderId: updatedOrder.orderId, status: 'Preparing' });
-        const io = getIO();
-        if (io) io.emit('order:status:updated', { orderId: updatedOrder.orderId, status: 'Preparing', providerId });
-      } catch (sErr) {}
 
       return res.json({
         success: true,
-        message: `Order ${updatedOrder.orderId} Accepted! Moved to Kitchen Prep Queue.`,
-        data: enrichOrderFinancials(updatedOrder)
+        message: result.message || `Order ${result.order.orderId} Accepted! Moved to Kitchen Prep Queue.`,
+        data: enrichOrderFinancials(result.order)
       });
     }
 
@@ -937,8 +886,8 @@ const createCustomerOrder = async (req, res) => {
       customerName: finalCustomerName,
       customerPhone: phone,
       customerEmail: email,
-      customerAddress: (customerAddress || 'Satellite, Ahmedabad').trim(),
-      deliveryCoordinates: deliveryCoordinates || { lat: 23.0300, lng: 72.5178 },
+      customerAddress: (customerAddress || '').trim(),
+      deliveryCoordinates: deliveryCoordinates || null,
       deliverySlot: deliverySlot || 'Lunch Slot (12:00 - 13:30)',
       tiffinName: resolvedTiffinName,
       tiffinCategory: resolvedTiffinCategory,
@@ -1032,31 +981,30 @@ const prepareOrder = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Provider authorization required' });
     }
 
-    if (!(await isDbConnected())) {
-      return res.status(503).json({ success: false, message: 'Database connection offline' });
-    }
+    if (await isDbConnected()) {
+      const result = await transitionOrderStatus({
+        orderId: id,
+        targetStatus: 'Preparing',
+        actorRole: 'provider',
+        actorId: providerId,
+        actorName: req.user?.name || req.provider?.name || 'Provider'
+      });
 
-    const query = buildOrderLookupQuery(id, providerId);
-    const updated = await Order.findOneAndUpdate(
-      query,
-      { $set: { status: 'Preparing', preparingAt: new Date() } },
-      { new: true }
-    );
-    if (!updated) {
-      return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
-    }
-
-    try {
-      const { emitToProvider, emitToCustomer, getIO } = require('../services/socketService');
-      emitToProvider(providerId, 'order:status:updated', { orderId: updated.orderId, status: 'Preparing' });
-      if (updated.customerId) {
-        emitToCustomer(updated.customerId, 'order:status:updated', { orderId: updated.orderId, status: 'Preparing' });
+      if (!result.success) {
+        return res.status(result.statusCode || 400).json({
+          success: false,
+          message: result.message
+        });
       }
-      const io = getIO();
-      if (io) io.emit('order:status:updated', { orderId: updated.orderId, status: 'Preparing' });
-    } catch (sErr) {}
 
-    return res.json({ success: true, message: `Order ${updated.orderId} moved to Preparing`, data: enrichOrderFinancials(updated) });
+      return res.json({
+        success: true,
+        message: result.message,
+        data: enrichOrderFinancials(result.order)
+      });
+    }
+
+    return res.status(503).json({ success: false, message: 'Database connection offline' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error: ' + err.message });
   }
@@ -1072,31 +1020,30 @@ const readyOrder = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Provider authorization required' });
     }
 
-    if (!(await isDbConnected())) {
-      return res.status(503).json({ success: false, message: 'Database connection offline' });
-    }
+    if (await isDbConnected()) {
+      const result = await transitionOrderStatus({
+        orderId: id,
+        targetStatus: 'Ready',
+        actorRole: 'provider',
+        actorId: providerId,
+        actorName: req.user?.name || req.provider?.name || 'Provider'
+      });
 
-    const query = buildOrderLookupQuery(id, providerId);
-    const updated = await Order.findOneAndUpdate(
-      query,
-      { $set: { status: 'Ready', readyAt: new Date() } },
-      { new: true }
-    );
-    if (!updated) {
-      return res.status(404).json({ success: false, message: 'Order not found or unauthorized' });
-    }
-
-    try {
-      const { emitToProvider, emitToCustomer, getIO } = require('../services/socketService');
-      emitToProvider(providerId, 'order:status:updated', { orderId: updated.orderId, status: 'Ready' });
-      if (updated.customerId) {
-        emitToCustomer(updated.customerId, 'order:status:updated', { orderId: updated.orderId, status: 'Ready' });
+      if (!result.success) {
+        return res.status(result.statusCode || 400).json({
+          success: false,
+          message: result.message
+        });
       }
-      const io = getIO();
-      if (io) io.emit('order:status:updated', { orderId: updated.orderId, status: 'Ready' });
-    } catch (sErr) {}
 
-    return res.json({ success: true, message: `Order ${updated.orderId} marked Ready for Pickup`, data: enrichOrderFinancials(updated) });
+      return res.json({
+        success: true,
+        message: result.message,
+        data: enrichOrderFinancials(result.order)
+      });
+    }
+
+    return res.status(503).json({ success: false, message: 'Database connection offline' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error: ' + err.message });
   }

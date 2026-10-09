@@ -730,7 +730,7 @@ export default function MyTiffinsTab({
         </div>
 
         <div className="font-label-caps text-label-caps text-secondary px-3 py-1 bg-surface-container rounded">
-          Scope: <strong className="text-primary font-semibold">{currentUser?.businessName || currentUser?.name || "Mom's Kitchen"}</strong>
+          Scope: <strong className="text-primary font-semibold">{currentUser?.businessName || currentUser?.name || "Your Kitchen"}</strong>
         </div>
       </div>
 

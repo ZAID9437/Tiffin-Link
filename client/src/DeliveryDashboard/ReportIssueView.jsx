@@ -471,7 +471,7 @@ export default function ReportIssueView({ currentUser, onNavigateTab, onShowToas
                         </option>
                       ))
                     ) : (
-                      <option value="ORD-5162">#ORD-5162 — Gujarati Special Thali (Customer: Bhavin Shah, Pali Hill) • [IN TRANSIT - ACTIVE]</option>
+                      <option value="">No recent active orders linked</option>
                     )}
                     <option value="NONE">General / Corridor Hazard (No specific order linked)</option>
                   </select>
@@ -632,20 +632,7 @@ export default function ReportIssueView({ currentUser, onNavigateTab, onShowToas
                       <span className="material-symbols-outlined text-lg">close</span>
                     </button>
                   </div>
-                ) : (
-                  <div className="mt-3 flex items-center justify-between p-3 bg-bone-white">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 bg-sand-neutral flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-onyx-black text-lg">image</span>
-                      </div>
-                      <div className="min-w-0">
-                        <span className="font-button-text text-xs text-onyx-black block truncate">spill_evidence_ord5162.jpg</span>
-                        <span className="font-label-caps text-[10px] text-clay-earth uppercase tracking-wider">2.4 MB • Tamper Seal Breach • Tagged GPS</span>
-                      </div>
-                    </div>
-                    <span className="font-label-caps text-[10px] text-clay-earth uppercase">Sample Demo</span>
-                  </div>
-                )}
+                ) : null}
               </div>
             </div>
           </section>

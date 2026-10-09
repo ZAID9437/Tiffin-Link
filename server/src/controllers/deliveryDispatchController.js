@@ -218,20 +218,20 @@ const reconcileMissingDeliveryRequests = async () => {
           providerEmail,
           providerName,
           customerName: ord.customerName || 'Customer',
-          customerPhone: ord.customerPhone || '+91 98250 12345',
+          customerPhone: ord.customerPhone || '',
           tiffinName: `${ord.tiffinName || 'Gujarati Special Thali'} × ${ord.quantity || 1}`,
           tiffinCategory: ord.tiffinCategory || 'Gujarati',
           deliveryAddress: {
-            street: ord.customerAddress || 'Satellite, Ahmedabad',
+            street: ord.customerAddress || '',
             city: 'Ahmedabad',
-            lat: 23.0225,
-            lng: 72.5714
+            lat: ord.deliveryAddress?.lat || null,
+            lng: ord.deliveryAddress?.lng || null
           },
           pickupAddress: {
-            street: `${providerName}, Satellite`,
+            street: providerName,
             city: 'Ahmedabad',
-            lat: 23.0300,
-            lng: 72.5650
+            lat: null,
+            lng: null
           },
           assignedDriver: {
             driverId: '',
@@ -239,7 +239,7 @@ const reconcileMissingDeliveryRequests = async () => {
             phone: hasAssignedDriverOnOrd ? (ord.deliveryPartnerPhone || ord.driverPhone) : '',
             rating: 4.8,
             vehicleNo: '',
-            location: { lat: 23.0280, lng: 72.5670 }
+            location: null
           },
           status: hasAssignedDriverOnOrd ? 'Driver Assigned' : 'Searching Drivers',
           distanceKm: ord.deliveryKm || 2.4,
@@ -296,7 +296,7 @@ const reconcileMissingDeliveryRequests = async () => {
                   phone: assignedPhone,
                   rating: 4.8,
                   vehicleNo: '',
-                  location: { lat: 23.0280, lng: 72.5670 }
+                  location: null
                 },
                 acceptedAt: new Date()
               }
@@ -429,7 +429,7 @@ const findBestNearbyDriverFromDb = async () => {
           rating: best.rating,
           vehicleNo: best.vehicleNo,
           distanceKm: best.distanceKm,
-          location: best.currentLocation || { lat: 23.0280, lng: 72.5670 }
+          location: best.currentLocation || null
         };
       }
     }
@@ -459,10 +459,15 @@ const createDeliveryRequest = async (req, res) => {
       providerEmail,
       providerName,
       customerName: customerName || 'Customer',
-      customerPhone: customerPhone || '+91 98765 12345',
-      tiffinName: tiffinName || 'Gujarati Special Thali × 1',
-      deliveryAddress: typeof deliveryAddress === 'object' ? deliveryAddress : { street: deliveryAddress || 'Ahmedabad', city: 'Ahmedabad', lat: 23.0225, lng: 72.5714 },
-      pickupAddress: { street: `${providerName}, Satellite`, city: 'Ahmedabad', lat: 23.0300, lng: 72.5650 },
+      customerPhone: customerPhone || '',
+      tiffinName: tiffinName || 'Tiffin Package',
+      deliveryAddress: typeof deliveryAddress === 'object' ? deliveryAddress : { street: deliveryAddress || '', city: 'Ahmedabad', lat: null, lng: null },
+      pickupAddress: {
+            street: providerName,
+            city: 'Ahmedabad',
+            lat: null,
+            lng: null
+          },
       assignedDriver: {
         driverId: '',
         name: '',
@@ -493,7 +498,7 @@ const createDeliveryRequest = async (req, res) => {
       } else {
         await DeliveryRequest.updateOne(
           { _id: request._id },
-          { $set: { status: 'Searching Drivers', assignedDriver: { driverId: '', name: '', phone: '', rating: 4.8, vehicleNo: '', location: { lat: 23.0280, lng: 72.5670 } } } }
+          { $set: { status: 'Searching Drivers', assignedDriver: { driverId: '', name: '', phone: '', rating: 4.8, vehicleNo: '', location: null } } }
         );
         request.status = 'Searching Drivers';
         request.assignedDriver = { driverId: '', name: '', phone: '', rating: 4.8, vehicleNo: '' };
@@ -2293,7 +2298,7 @@ const acceptDeliveryRequestAtomic = async (req, res) => {
               phone: driverPhone,
               vehicleNo: vehicleNo || '',
               rating: resolvedDriver?.rating || 4.8,
-              location: { lat: 23.0280, lng: 72.5670 }
+              location: null
             },
             acceptedAt: new Date()
           }
@@ -3006,7 +3011,7 @@ const getCompletedDeliveries = async (req, res) => {
         providerId: reqDoc.providerId,
         providerName: reqDoc.providerName || 'Xoxo Men Kitchen',
         providerEmail: reqDoc.providerEmail,
-        customerName: reqDoc.customerName || 'Priya Sharma',
+        customerName: reqDoc.customerName || 'Customer',
         customerPhone: reqDoc.customerPhone || '+91 98980 99887',
         deliveryAddress: reqDoc.deliveryAddress,
         pickupAddress: reqDoc.pickupAddress,
@@ -3375,7 +3380,7 @@ const getDeliveryHistory = async (req, res) => {
         providerId: reqDoc.providerId,
         providerName: reqDoc.providerName || 'Xoxo Men Kitchen',
         providerEmail: reqDoc.providerEmail,
-        customerName: reqDoc.customerName || 'Priya Sharma',
+        customerName: reqDoc.customerName || 'Customer',
         customerPhone: reqDoc.customerPhone || '+91 98980 99887',
         deliveryAddress: reqDoc.deliveryAddress,
         pickupAddress: reqDoc.pickupAddress,
@@ -4858,7 +4863,7 @@ const getDriverTransactions = async (req, res) => {
           typeLabel: 'Delivery Earnings',
           category: 'Credit',
           isCredit: true,
-          description: `Order ${o.orderId || '#ORD-5155'} (${o.tiffinName || 'Meal Package'})`,
+          description: `Order ${o.orderId || o._id} (${o.tiffinName || 'Meal Consignment'})`,
           providerName: o.providerName || 'Tiffin Kitchen',
           providerLocation: o.pickupAddress || 'Pickup Kitchen',
           customerName: o.customerName || 'Customer',
@@ -6659,16 +6664,16 @@ const getDriverReviews = async (req, res) => {
       if (reqDoc.rating && (reqDoc.reviewComment || reqDoc.status === 'DELIVERED' || reqDoc.status === 'Completed')) {
         delReqReviews.push({
           _id: reqDoc._id,
-          orderId: reqDoc.orderId || reqDoc.requestId || '#ORD-5155',
+          orderId: reqDoc.orderId || reqDoc.requestId || String(reqDoc._id),
           customerId: reqDoc.customerId || '#CST-9021',
-          customerName: reqDoc.customerName || 'Priya Sharma',
+          customerName: reqDoc.customerName || 'Customer',
           tiffinName: reqDoc.tiffinName || 'Gujarati Thali Special',
           rating: reqDoc.rating || 5,
           foodQualityRating: 5,
           packagingRating: 5,
           tasteRating: 5,
           deliveryRating: reqDoc.rating || 5,
-          comment: reqDoc.reviewComment || 'Exceptional delivery service! Arrived early and handed over the hot-pot container completely intact.',
+          comment: reqDoc.reviewComment || 'Delivery verified.',
           createdAt: reqDoc.deliveredAt || reqDoc.requestedAt || new Date()
         });
       }
@@ -6705,90 +6710,7 @@ const getDriverReviews = async (req, res) => {
 
     let combinedList = Array.from(combinedReviewsMap.values());
 
-    // Default seed fallback if 0 records match in DB
-    const defaultSeedReviews = [
-      {
-        id: 'rev-1',
-        orderId: '#ORD-5155',
-        customerId: '#CST-9021',
-        customerName: 'Priya Sharma',
-        tiffinName: 'Gujarati Thali Special from Xoxo Men Kitchen',
-        rating: 5,
-        foodQualityRating: 5,
-        packagingRating: 5,
-        tasteRating: 5,
-        deliveryRating: 5,
-        comment: 'Exceptional delivery service! Rahul was extremely polite, arrived 5 minutes early, and handed over the hot-pot container completely intact and piping hot. Even assisted with exchanging our previous stainless steel dabba smoothly.',
-        tags: ['Punctual Delivery', 'Zero Spillage', 'Dabba Swap Verified'],
-        createdAt: new Date('2026-09-21T14:48:00.000Z')
-      },
-      {
-        id: 'rev-2',
-        orderId: '#ORD-5140',
-        customerId: '#CST-8842',
-        customerName: 'Rohan Mehta',
-        tiffinName: 'Punjabi Healthy Tiffin, Bandra W',
-        rating: 5,
-        foodQualityRating: 5,
-        packagingRating: 5,
-        tasteRating: 5,
-        deliveryRating: 5,
-        comment: 'Great delivery experience. Food arrived hot, tamper seal was intact, and verification with OTP was effortless. Rahul is one of the most reliable drivers in this neighborhood.',
-        tags: ['Tamper Seal Intact', 'Courteous'],
-        createdAt: new Date('2026-09-19T13:15:00.000Z')
-      },
-      {
-        id: 'rev-3',
-        orderId: '#ORD-5098',
-        customerId: '#CST-7319',
-        customerName: 'Ananya Deshmukh',
-        tiffinName: 'Malabar Home Kitchen, Tagore Road',
-        rating: 4,
-        foodQualityRating: 4,
-        packagingRating: 4,
-        tasteRating: 5,
-        deliveryRating: 4,
-        comment: 'Food was warm and properly sealed. Took a few extra minutes because of building security protocols, but courier was patient and followed all instructions diligently.',
-        tags: ['Careful Handling', 'Patient'],
-        createdAt: new Date('2026-09-16T20:35:00.000Z')
-      },
-      {
-        id: 'rev-4',
-        orderId: '#ORD-5077',
-        customerId: '#CST-6210',
-        customerName: 'Vikramaditya Roy',
-        tiffinName: 'Gujarati Rasoi, Turner Road',
-        rating: 5,
-        foodQualityRating: 5,
-        packagingRating: 5,
-        tasteRating: 5,
-        deliveryRating: 5,
-        comment: 'First time trying TiffinLink subscription and Rahul delivered right on the dot. Very clean thermal bag presentation and warm demeanor. Highly recommended.',
-        tags: ['Top Punctuality', 'Clean Presentation'],
-        createdAt: new Date('2026-09-14T13:40:00.000Z')
-      },
-      {
-        id: 'rev-5',
-        orderId: '#ORD-5012',
-        customerId: '#CST-5420',
-        customerName: 'Dr. Sneha Kulkarni',
-        tiffinName: 'Sattvic Living Kitchen, Khar West',
-        rating: 5,
-        foodQualityRating: 5,
-        packagingRating: 5,
-        tasteRating: 5,
-        deliveryRating: 5,
-        comment: 'Prompt drop during peak lunch hour rush. Zero spillage on curries, pristine container handoff.',
-        tags: ['Spillage Free', 'Quick Handoff'],
-        createdAt: new Date('2026-09-12T12:55:00.000Z')
-      }
-    ];
-
-    const hasNoReviewsInDb = combinedList.length === 0;
-    if (hasNoReviewsInDb && (driverRequests.length > 0 || driverOrders.length > 0)) {
-      combinedList = defaultSeedReviews;
-    }
-
+    
     const totalReviewsCount = combinedList.length;
 
     // Calculate rating distribution
@@ -7304,33 +7226,14 @@ const changeDriverPassword = async (req, res) => {
   }
 };
 
-// Default Active Sessions
-const DEFAULT_ACTIVE_SESSIONS = [
-  {
-    id: 'sess-1',
-    device: 'OnePlus 11R (CPH2487) • Android 15',
-    location: 'Ahmedabad, GJ',
-    ip: '103.21.144.92',
-    lastActive: 'Active Now',
-    isCurrent: true
-  },
-  {
-    id: 'sess-2',
-    device: 'Dell Latitude 7440 • Chrome 126',
-    location: 'Ahmedabad, GJ',
-    ip: '49.36.128.45',
-    lastActive: 'Active 4h ago',
-    isCurrent: false
-  },
-  {
-    id: 'sess-3',
-    device: 'TiffinLink Depot v4.2 • iPad Air',
-    location: 'Ahmedabad Central Hub 13',
-    ip: '192.168.12.104',
-    lastActive: 'Active 2d ago',
-    isCurrent: false
-  }
-];
+const getDefaultSession = (req) => [{
+  id: 'sess-current',
+  device: req?.headers?.['user-agent'] ? req.headers['user-agent'].split(')')[0].replace(/^Mozilla\/5\.0 \(/, '') : 'Current Web Client',
+  location: 'Active Session',
+  ip: req?.ip || '127.0.0.1',
+  lastActive: 'Active Now',
+  isCurrent: true
+}];
 
 // @desc    Terminate active device sessions for driver
 // @route   POST /api/driver/account/terminate-sessions
@@ -7358,7 +7261,7 @@ const terminateOtherSessions = async (req, res) => {
       };
 
       if (prefDoc) {
-        prefDoc.activeSessions = [DEFAULT_ACTIVE_SESSIONS[0]];
+        prefDoc.activeSessions = getDefaultSession(req);
         if (!prefDoc.securityAuditLog) prefDoc.securityAuditLog = [];
         prefDoc.securityAuditLog.unshift(revokeEvent);
         await prefDoc.save();
@@ -7486,7 +7389,7 @@ const getDriverSecuritySettings = async (req, res) => {
 
     const activeSessions = (prefDoc?.activeSessions && prefDoc.activeSessions.length > 0)
       ? prefDoc.activeSessions
-      : DEFAULT_ACTIVE_SESSIONS;
+      : getDefaultSession(req);
 
     return res.json({
       success: true,
@@ -8320,7 +8223,74 @@ const resendDriverEmailOtp = async (req, res) => {
   return sendDriverEmailVerificationOtp(req, res);
 };
 
+
+// @desc    Get live delivery tracking by orderId or deliveryId
+// @route   GET /api/delivery/track/:id
+const getDeliveryTrackingById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Order or Delivery ID required' });
+    const cleanId = String(id).trim().replace(/^#+/, '');
+    
+    if (await isDbConnected()) {
+      const q = {
+        $or: [
+          { orderId: id },
+          { orderId: cleanId },
+          { orderId: `#${cleanId}` },
+          { requestId: id },
+          { requestId: cleanId },
+          { requestId: `#${cleanId}` },
+          { requestId: `#DEL-${cleanId}` },
+          { requestId: `TL-REQ-${cleanId}` },
+          ...(isValidObjectId(id) ? [{ _id: id }] : [])
+        ]
+      };
+      let delivery = await DeliveryRequest.findOne(q).lean();
+      if (!delivery) {
+        const ord = await Order.findOne({
+          $or: [
+            { orderId: id },
+            { orderId: cleanId },
+            { orderId: `#${cleanId}` },
+            ...(isValidObjectId(id) ? [{ _id: id }] : [])
+          ]
+        }).lean();
+        if (ord) {
+          delivery = {
+            orderId: ord.orderId,
+            requestId: ord.orderId,
+            status: ord.deliveryStatus === 'Delivered' ? 'Delivered' : (ord.status === 'Delivery' ? (ord.deliveryStatus || 'Searching Drivers') : ord.status),
+            etaMinutes: ord.estimatedTime ? parseInt(ord.estimatedTime) || 15 : 15,
+            distanceKm: ord.deliveryDistance ? parseFloat(ord.deliveryDistance) || 2.4 : 2.4,
+            pickupAddress: { street: ord.pickupAddress || 'Kitchen Hub, Ahmedabad' },
+            deliveryAddress: { street: ord.customerAddress || 'Customer Address, Ahmedabad' },
+            assignedDriver: {
+              name: ord.deliveryPartnerName || ord.driverName || '',
+              phone: ord.deliveryPartnerPhone || ord.driverPhone || '',
+              rating: 4.8,
+              vehicleNo: ord.driverVehicle || ''
+            },
+            pickupOtp: ord.pickupOtp || '',
+            deliveryOtp: ord.deliveryOtp || ''
+          };
+        }
+      }
+      if (delivery) {
+        return res.json({ success: true, request: delivery, delivery });
+      }
+      return res.status(404).json({ success: false, message: 'Delivery tracking not found for this ID' });
+    }
+    return res.status(503).json({ success: false, message: 'Database offline' });
+  } catch (err) {
+    console.error('Error in getDeliveryTrackingById:', err);
+    return res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+  }
+};
+
+
 module.exports = {
+  getDeliveryTrackingById,
   getDeliveryRequests,
   createDeliveryRequest,
   broadcastDeliveryRequest,

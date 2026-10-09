@@ -13,192 +13,42 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false }) + ' IST');
 
-  // Baseline data matching the exact high-contrast design
-  const defaultLiveOrders = [
-    {
-      id: '4956',
-      time: '19:15:22 IST',
-      slot: 'SLOT-DINNER',
-      kitchen: 'Xoxo Men Kitchen',
-      kitchenKey: 'xoxo',
-      sector: 'Sector AMD-West • K-04',
-      rating: '4.9 ★ (Active: 8)',
-      customer: 'Aarav Sharma',
-      location: 'Satellite (1.2 km from kitchen)',
-      address: 'Tower 4B, Prerna Apts',
-      meal: 'Kathiyawadi Village Thali × 1',
-      mealDetails: 'Ringan Bhartu, 4 Phulkas, Fresh Chaas, Garlic Chutney',
-      notes: 'No Onion in Dal',
-      notesType: 'warning',
-      price: '₹186',
-      escrowStatus: 'UPI Escrow Locked',
-      escrowVerified: true,
-      txnId: 'TXN_98012A',
-      lifecycle: 'READY',
-      stagedRack: 'Staged: Rack #B-04',
-      prepTime: 'Pack time: 14 mins',
-      progressPercent: 100,
-      courier: 'Rahul Patel',
-      vehicle: 'Hero Splendor • GJ-01-ET-4412',
-      courierEta: 'ETA 4m to kitchen',
-      courierEtaStatus: 'good',
-      hasAlert: false
-    },
-    {
-      id: '4957',
-      time: '19:22:04 IST',
-      slot: 'SLA ALERT',
-      kitchen: 'Rasoi Express',
-      kitchenKey: 'rasoi',
-      sector: 'Bodakdev Hub • K-12',
-      rating: '4.7 ★ (Active: 5)',
-      customer: 'Zaid Mansuri',
-      location: 'Bodakdev (2.4 km from kitchen)',
-      address: 'Block C, Goyal Intercity',
-      meal: 'Dal Bati Churma Banquet Box × 2',
-      mealDetails: 'Traditional ghee dip, spicy garlic chutney, 6 batis',
-      notes: 'Standard spice profile',
-      notesType: 'neutral',
-      price: '₹240',
-      escrowStatus: 'Paid UPI',
-      escrowVerified: true,
-      txnId: 'TXN_98014B',
-      lifecycle: 'PREPARING',
-      stagedRack: 'Elapsed 18m / SLA 22m',
-      prepTime: 'Cooking fresh',
-      progressPercent: 80,
-      courier: 'Searching Driver',
-      vehicle: '2 couriers pinged',
-      courierEta: '6.4m wait time',
-      courierEtaStatus: 'risk',
-      hasAlert: true,
-      alertText: 'SLA Breach Alert • Driver Search Lag'
-    },
-    {
-      id: '4958',
-      time: '19:28:11 IST',
-      slot: 'SLOT-DINNER',
-      kitchen: 'Maa Annapurna Rasoi',
-      kitchenKey: 'annapurna',
-      sector: 'Prahladnagar Sub-Hub • K-01',
-      rating: '4.8 ★ (Active: 6)',
-      customer: 'Tanvi Mehta',
-      location: 'Prahladnagar (0.9 km from kitchen)',
-      address: 'Shivalik Platinum #702',
-      meal: 'Punjabi Homestyle Executive Thali × 1',
-      mealDetails: 'Paneer Butter Masala, Yellow Dal Tadka, 3 Parathas, Jeera Rice',
-      notes: 'Extra Pickle sachet',
-      notesType: 'neutral',
-      price: '₹165',
-      escrowStatus: 'Paid Card',
-      escrowVerified: true,
-      txnId: 'TXN_98018C',
-      lifecycle: 'ACCEPTED',
-      stagedRack: 'Queued stove #2',
-      prepTime: 'Kitchen accepted in 45s',
-      progressPercent: 40,
-      courier: 'Courier Standby',
-      vehicle: 'Courier ID #DP-1804',
-      courierEta: 'Radius: 350m to store',
-      courierEtaStatus: 'neutral',
-      hasAlert: false
-    },
-    {
-      id: '4959',
-      time: '19:30:45 IST',
-      slot: 'SLOT-DINNER',
-      kitchen: 'Xoxo Men Kitchen',
-      kitchenKey: 'xoxo',
-      sector: 'Sector AMD-West • K-04',
-      rating: '4.9 ★ (Active: 8)',
-      customer: 'Priya Desai',
-      location: 'Judges Bungalow (3.1 km)',
-      address: 'Vardhman Kripa Bung #3',
-      meal: 'Gujarati Home Meal × 2',
-      mealDetails: 'Sev Tameta, Sukhi Bhaji, 8 Rotli, Masala Khichdi',
-      notes: 'Strictly No Ghee on Rotlis',
-      notesType: 'warning',
-      price: '₹260',
-      escrowStatus: 'UPI AutoPay',
-      escrowVerified: true,
-      txnId: 'TXN_98020D',
-      lifecycle: 'IN TRANSIT',
-      stagedRack: '1.8 km left to drop',
-      prepTime: 'Dispatched: 19:38',
-      progressPercent: 75,
-      courier: 'Aman Varma',
-      vehicle: 'Pulsar 150 • GJ-27-AK-1088',
-      courierEta: 'ETA 8m to customer',
-      courierEtaStatus: 'good',
-      hasAlert: false
-    },
-    {
-      id: '4960',
-      time: '19:34:10 IST',
-      slot: 'SLOT-DINNER',
-      kitchen: 'Shreenathji Satvik',
-      kitchenKey: 'shreenathji',
-      sector: 'Vastrapur • K-09',
-      rating: '4.9 ★ (Active: 5)',
-      customer: 'Hardik Parmar',
-      location: 'Vastrapur (1.5 km)',
-      address: 'Near Vastrapur Lake',
-      meal: 'Jain Satvik Khichdi-Kadhi Box × 1',
-      mealDetails: 'Moong Dal Khichdi, Gujarati Sweet Kadhi, Papad, Athana',
-      notes: 'Pure Jain Prep Verified',
-      notesType: 'success',
-      price: '₹130',
-      escrowStatus: 'Paid Escrow',
-      escrowVerified: true,
-      txnId: 'TXN_98025E',
-      lifecycle: 'PREPARING',
-      stagedRack: 'Cooking fresh (4m in)',
-      prepTime: 'Pack queue: 10 mins left',
-      progressPercent: 30,
-      courier: 'Jay Dave',
-      vehicle: 'Activa 6G • GJ-01-WQ-8819',
-      courierEta: 'En route to kitchen',
-      courierEtaStatus: 'neutral',
-      hasAlert: false
-    }
-  ];
-
   // Fetch live orders from server
   const fetchLiveOrders = async () => {
     setIsRefreshing(true);
     try {
       const res = await fetch('http://localhost:5000/api/admin/orders?status=active');
       const json = await res.json();
-      if (json.success && Array.isArray(json.orders) && json.orders.length > 0) {
-        // Merge with our rich structure
-        const liveItems = json.orders.slice(0, 15).map((o, idx) => ({
-          id: o.orderNumber || o._id?.slice(-4) || `495${idx}`,
+      if (json.success && Array.isArray(json.orders)) {
+        // Map live DB entries cleanly
+        const liveItems = json.orders.map((o, idx) => ({
+          id: o.orderNumber || o.orderId || (o._id ? `#${o._id.slice(-4).toUpperCase()}` : `#ORD-${idx + 1}`),
           time: new Date(o.createdAt || Date.now()).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false }) + ' IST',
-          slot: o.deliverySlot || 'SLOT-DINNER',
-          kitchen: o.provider?.businessName || o.provider?.name || defaultLiveOrders[idx % defaultLiveOrders.length].kitchen,
-          kitchenKey: 'xoxo',
-          sector: o.provider?.address?.locality || 'Ahmedabad Central',
-          rating: '4.8 ★',
-          customer: o.user?.name || o.deliveryAddress?.contactName || 'Valued Customer',
-          location: `${o.deliveryAddress?.locality || 'Central Hub'} (${o.distance || '1.8 km'})`,
-          address: o.deliveryAddress?.houseNo ? `${o.deliveryAddress?.houseNo}, ${o.deliveryAddress?.street || ''}` : 'Ahmedabad Grid',
-          meal: o.items?.[0]?.name ? `${o.items[0].name} × ${o.items[0].quantity || 1}` : 'Deluxe Tiffin Thali',
-          mealDetails: o.items?.[0]?.description || 'Complete freshly cooked artisanal meal',
+          slot: o.deliverySlot || (o.mealSlot || 'Standard Delivery'),
+          kitchen: o.provider?.businessName || o.provider?.name || o.providerName || 'Partner Kitchen',
+          kitchenKey: (o.provider?.businessName || o.provider?.name || 'kitchen').toLowerCase().replace(/\s+/g, '-'),
+          sector: o.provider?.address?.locality || o.provider?.address?.city || 'Ahmedabad Central',
+          rating: o.provider?.rating ? `${o.provider.rating} ★` : '4.8 ★',
+          customer: o.user?.name || o.customerName || o.deliveryAddress?.contactName || 'Valued Customer',
+          location: `${o.deliveryAddress?.locality || o.deliveryAddress?.city || 'Central Hub'} (${o.distance || o.distanceKm || '1.8'} km)`,
+          address: typeof o.deliveryAddress === 'object' ? `${o.deliveryAddress?.houseNo || ''} ${o.deliveryAddress?.street || ''} ${o.deliveryAddress?.locality || ''}`.trim() : (o.deliveryAddress || 'Customer Address'),
+          meal: o.items?.[0]?.name ? `${o.items[0].name} × ${o.items[0].quantity || 1}` : (o.tiffinName || 'Artisanal Meal'),
+          mealDetails: o.items?.[0]?.description || o.description || 'Complete freshly cooked home meal',
           notes: o.specialInstructions || 'Standard prep',
           notesType: o.specialInstructions ? 'warning' : 'neutral',
-          price: `₹${o.totalAmount || 180}`,
-          escrowStatus: o.paymentStatus === 'paid' ? 'UPI Escrow Locked' : 'Pending Escrow',
-          escrowVerified: true,
-          txnId: o.paymentDetails?.transactionId || `TXN_${Math.floor(10000 + Math.random() * 90000)}A`,
-          lifecycle: (o.orderStatus || 'PREPARING').toUpperCase(),
-          stagedRack: 'Staged at Hub',
+          price: `₹${o.totalAmount || o.price || 140}`,
+          escrowStatus: o.paymentStatus === 'paid' || o.paymentStatus === 'Paid' ? 'UPI Escrow Locked' : 'Pending Escrow',
+          escrowVerified: o.paymentStatus === 'paid' || o.paymentStatus === 'Paid',
+          txnId: o.paymentDetails?.transactionId || o.transactionId || 'TXN-SETTLED',
+          lifecycle: (o.orderStatus || o.status || 'PREPARING').toUpperCase(),
+          stagedRack: 'Staged at Kitchen Node',
           prepTime: 'Active ticket',
-          progressPercent: o.orderStatus === 'ready' ? 100 : o.orderStatus === 'delivered' ? 100 : 65,
-          courier: o.deliveryPartner?.name || 'Assigned Courier',
-          vehicle: o.deliveryPartner?.vehicleNumber || 'GJ-01-ET-4412',
-          courierEta: 'ETA 5m',
+          progressPercent: o.orderStatus === 'ready' ? 100 : (o.orderStatus === 'delivered' ? 100 : 50),
+          courier: o.deliveryPartner?.name || o.driverName || 'Courier Partner',
+          vehicle: o.deliveryPartner?.vehicleNumber || o.deliveryPartner?.vehicleNo || 'Two-Wheeler Fleet',
+          courierEta: 'ETA En route',
           courierEtaStatus: 'good',
-          hasAlert: false
+          hasAlert: Boolean(o.hasAlert)
         }));
         setOrders(liveItems);
       } else {
@@ -347,7 +197,7 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
           </div>
         </div>
 
-        {/* KPI Summary Metrics (High Contrast Brutalist Strip) */}
+        {/* KPI Summary Metrics (Dynamic Strip) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-5 bg-white border border-[#ded9d1]/60 flex flex-col justify-between relative overflow-hidden group">
             <div className="flex justify-between items-start">
@@ -355,10 +205,10 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
               <span className="material-symbols-outlined text-[18px] text-[#665d52]">alt_route</span>
             </div>
             <div className="mt-4 flex items-baseline gap-3">
-              <span className="font-serif text-3xl text-[#1a1a1a] font-normal">24</span>
-              <span className="font-mono text-[12px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 font-medium">+4 last 10m</span>
+              <span className="font-serif text-3xl text-[#1a1a1a] font-normal">{orders.length}</span>
+              <span className="font-mono text-[12px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 font-medium">Real-time load</span>
             </div>
-            <div className="text-[12px] text-[#665d52] mt-1 font-sans">Total active platform load</div>
+            <div className="text-[12px] text-[#665d52] mt-1 font-sans">Active orders in current cycle</div>
             <div className="absolute bottom-0 left-0 h-0.5 w-full bg-[#1a1a1a] transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
           </div>
 
@@ -368,10 +218,12 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
               <span className="material-symbols-outlined text-[18px] text-[#665d52]">skillet</span>
             </div>
             <div className="mt-4 flex items-baseline gap-3">
-              <span className="font-serif text-3xl text-[#1a1a1a] font-normal">08</span>
-              <span className="font-mono text-[12px] text-[#665d52] bg-[#efeeea] px-1.5 py-0.5">8 Kitchens</span>
+              <span className="font-serif text-3xl text-[#1a1a1a] font-normal">
+                {orders.filter(o => o.lifecycle.includes('PREP')).length}
+              </span>
+              <span className="font-mono text-[12px] text-[#665d52] bg-[#efeeea] px-1.5 py-0.5">Cooking Fresh</span>
             </div>
-            <div className="text-[12px] text-[#665d52] mt-1 font-sans">Mean ticket prep: 18.4 mins</div>
+            <div className="text-[12px] text-[#665d52] mt-1 font-sans">Kitchen assembly queue</div>
             <div className="absolute bottom-0 left-0 h-0.5 w-full bg-[#1a1a1a] transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
           </div>
 
@@ -381,10 +233,12 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
               <span className="material-symbols-outlined text-[18px] text-[#665d52]">inventory_2</span>
             </div>
             <div className="mt-4 flex items-baseline gap-3">
-              <span className="font-serif text-3xl text-[#1a1a1a] font-normal">06</span>
-              <span className="font-mono text-[12px] text-amber-800 bg-amber-50 px-1.5 py-0.5">Staged at Hub</span>
+              <span className="font-serif text-3xl text-[#1a1a1a] font-normal">
+                {orders.filter(o => o.lifecycle.includes('READY')).length}
+              </span>
+              <span className="font-mono text-[12px] text-amber-800 bg-amber-50 px-1.5 py-0.5">Staged at Kitchen</span>
             </div>
-            <div className="text-[12px] text-[#665d52] mt-1 font-sans">Average rack time: 3.2m</div>
+            <div className="text-[12px] text-[#665d52] mt-1 font-sans">Packaged &amp; sealed canisters</div>
             <div className="absolute bottom-0 left-0 h-0.5 w-full bg-[#1a1a1a] transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
           </div>
 
@@ -394,100 +248,77 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
               <span className="material-symbols-outlined text-[18px] text-[#665d52]">electric_moped</span>
             </div>
             <div className="mt-4 flex items-baseline gap-3">
-              <span className="font-serif text-3xl text-[#1a1a1a] font-normal">10</span>
-              <span className="font-mono text-[12px] text-[#665d52] bg-[#efeeea] px-1.5 py-0.5">94% on-time</span>
+              <span className="font-serif text-3xl text-[#1a1a1a] font-normal">
+                {orders.filter(o => o.lifecycle.includes('TRANSIT') || o.lifecycle.includes('ASSIGN') || o.lifecycle.includes('DISPATCH')).length}
+              </span>
+              <span className="font-mono text-[12px] text-[#665d52] bg-[#efeeea] px-1.5 py-0.5">Dispatched</span>
             </div>
-            <div className="text-[12px] text-[#665d52] mt-1 font-sans">Median ETA: 9.6 mins</div>
+            <div className="text-[12px] text-[#665d52] mt-1 font-sans">Doorstep transit progress</div>
             <div className="absolute bottom-0 left-0 h-0.5 w-full bg-[#1a1a1a] transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></div>
           </div>
         </div>
 
-        {/* Live Pipeline Flow (Visual Progress Ribbon) */}
+        {/* Live Pipeline Flow (Dynamic Visual Progress Ribbon) */}
         <div className="flex flex-col gap-3 p-5 bg-white border border-[#ded9d1]/60">
           <div className="flex items-center justify-between pb-2 border-b border-[#ded9d1]/40">
             <span className="font-mono text-xs text-[#1a1a1a] uppercase tracking-wider flex items-center gap-2">
               <span className="material-symbols-outlined text-[16px]">linear_scale</span>
-              Live Pipeline Flow (Batch: Dinner Service)
+              Live Pipeline Flow (Real-Time Service)
             </span>
             <span className="font-mono text-[11px] text-[#665d52]">Live Tick • {currentTime}</span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-9 gap-2 pt-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2">
             {[
-              { num: '01', stage: 'NEW', count: '03', width: 'w-1/3' },
-              { num: '02', stage: 'ACCEPTED', count: '05', width: 'w-1/2' },
-              { num: '03', stage: 'PREPARING', count: '08', width: 'w-3/4' },
-              { num: '04', stage: 'READY', count: '06', width: 'w-2/3' },
-              { num: '05', stage: 'SEARCHING', count: '02', width: 'w-2/5', highlight: true },
-              { num: '06', stage: 'ASSIGNED', count: '10', width: 'w-full' },
-              { num: '07', stage: 'PICKED UP', count: '04', width: 'w-2/5' },
-              { num: '08', stage: 'IN TRANSIT', count: '08', width: 'w-4/5' },
-              { num: '09', stage: 'DELIVERED', count: '42', width: 'w-full', dim: true }
+              { num: '01', stage: 'PREPARING', count: orders.filter(o => o.lifecycle.includes('PREP')).length },
+              { num: '02', stage: 'READY', count: orders.filter(o => o.lifecycle.includes('READY')).length },
+              { num: '03', stage: 'IN TRANSIT', count: orders.filter(o => o.lifecycle.includes('TRANSIT') || o.lifecycle.includes('ASSIGN')).length },
+              { num: '04', stage: 'DELIVERED TODAY', count: orders.filter(o => o.lifecycle.includes('DELIVER')).length }
             ].map((p, idx) => (
               <div
                 key={idx}
-                className={`flex flex-col p-2.5 border transition-colors ${
-                  p.highlight
-                    ? 'bg-amber-50/60 border-amber-200 hover:border-amber-400'
-                    : p.dim
-                    ? 'bg-white border-[#ded9d1]/30 opacity-70'
-                    : 'bg-[#f5f3ef] border-[#ded9d1]/40 hover:border-[#1a1a1a]'
-                }`}
+                className="flex flex-col p-2.5 border transition-colors bg-[#f5f3ef] border-[#ded9d1]/40 hover:border-[#1a1a1a]"
               >
                 <div className="flex items-center justify-between">
-                  <span className={`font-mono text-[10px] uppercase ${p.highlight ? 'text-amber-900' : 'text-[#665d52]'}`}>
+                  <span className="font-mono text-[10px] uppercase text-[#665d52]">
                     {p.num} • {p.stage}
                   </span>
-                  <span className={`font-mono text-[11px] font-bold ${p.highlight ? 'text-amber-900' : p.dim ? 'text-[#665d52]' : 'text-[#1a1a1a]'}`}>
+                  <span className="font-mono text-[11px] font-bold text-[#1a1a1a]">
                     {p.count}
                   </span>
                 </div>
-                <div className={`w-full ${p.highlight ? 'bg-amber-100' : 'bg-[#ded9d1]/50'} h-1 mt-2`}>
-                  <div className={`h-1 ${p.highlight ? 'bg-amber-600' : p.dim ? 'bg-[#665d52]' : 'bg-[#1a1a1a]'} ${p.width}`} />
+                <div className="w-full bg-[#ded9d1]/50 h-1 mt-2">
+                  <div className="h-1 bg-[#1a1a1a]" style={{ width: orders.length > 0 ? `${Math.min(100, Math.round((p.count / orders.length) * 100))}%` : '0%' }} />
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Operational Exceptions & Interventions Strip */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="p-4 bg-amber-50/70 border-l-2 border-amber-600 border-y border-r border-amber-200/60 flex items-start gap-4 justify-between">
-            <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined text-amber-700 text-[20px] mt-0.5">warning</span>
-              <div className="flex flex-col">
-                <span className="font-mono text-xs uppercase text-amber-900 tracking-wider">SLA Breach Alert • Driver Search Lag</span>
-                <p className="font-sans text-[13px] text-amber-950 mt-0.5 leading-snug">
-                  Order <strong className="font-mono font-semibold">#4957</strong> driver search exceeding 6 mins. Courier ping pool exhausted in Bodakdev radius.
-                </p>
+        {/* Operational Exceptions & Interventions Strip (Only Shown If Real Alert Exists) */}
+        {orders.some(o => o.hasAlert) && (
+          <div className="grid grid-cols-1 gap-4">
+            {orders.filter(o => o.hasAlert).map((alertOrder) => (
+              <div key={alertOrder.id} className="p-4 bg-amber-50/70 border-l-2 border-amber-600 border-y border-r border-amber-200/60 flex items-start gap-4 justify-between">
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-amber-700 text-[20px] mt-0.5">warning</span>
+                  <div className="flex flex-col">
+                    <span className="font-mono text-xs uppercase text-amber-900 tracking-wider">Operational Exception</span>
+                    <p className="font-sans text-[13px] text-amber-950 mt-0.5 leading-snug">
+                      Order <strong className="font-mono font-semibold">{alertOrder.id}</strong> ({alertOrder.kitchen}) requires supervisor attention.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleAction('assign', alertOrder.id)}
+                  className="shrink-0 px-3 py-1.5 bg-[#1a1a1a] text-white text-[12px] font-mono hover:bg-neutral-800 transition-colors uppercase tracking-wider"
+                >
+                  Manage Order
+                </button>
               </div>
-            </div>
-            <button
-              onClick={() => handleAction('assign', '4957')}
-              className="shrink-0 px-3 py-1.5 bg-[#1a1a1a] text-white text-[12px] font-mono hover:bg-neutral-800 transition-colors uppercase tracking-wider"
-            >
-              Auto-Dispatch Bay #04
-            </button>
+            ))}
           </div>
-
-          <div className="p-4 bg-white border-l-2 border-[#1a1a1a] border-y border-r border-[#ded9d1]/60 flex items-start gap-4 justify-between">
-            <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined text-[#1a1a1a] text-[20px] mt-0.5">speed</span>
-              <div className="flex flex-col">
-                <span className="font-mono text-xs uppercase text-[#1a1a1a] tracking-wider">Kitchen Capacity Notice</span>
-                <p className="font-sans text-[13px] text-[#665d52] mt-0.5 leading-snug">
-                  <strong className="text-[#1a1a1a]">Maa Annapurna Rasoi</strong> active dinner slot load is at 88% capacity (7 pending tickets).
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => alert('Inbound orders paused for Maa Annapurna Rasoi for 15 minutes.')}
-              className="shrink-0 px-3 py-1.5 border border-[#1a1a1a] text-[#1a1a1a] text-[12px] font-mono hover:bg-[#1a1a1a] hover:text-white transition-colors uppercase tracking-wider"
-            >
-              Pause Inbound (15m)
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Filter & Query Control Console */}
         <div className="flex flex-col gap-4 p-5 bg-white border border-[#ded9d1]/60">
@@ -499,7 +330,7 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search Order ID (#4956), Kitchen, Customer, Geocode, or Rider..."
+                placeholder="Search Order ID, Kitchen, Customer, or Rider..."
                 className="w-full pl-10 pr-4 py-2.5 bg-[#f5f3ef] border border-[#ded9d1]/60 text-[14px] text-[#1a1a1a] placeholder:text-[#665d52]/70 focus:outline-none focus:border-[#1a1a1a] transition-colors font-sans"
               />
             </div>
@@ -514,11 +345,10 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
                   onChange={(e) => setSelectedKitchen(e.target.value)}
                   className="bg-transparent text-[13px] text-[#1a1a1a] font-medium focus:outline-none cursor-pointer"
                 >
-                  <option value="all">All Providers (142)</option>
-                  <option value="xoxo">Xoxo Men Kitchen (8)</option>
-                  <option value="rasoi">Rasoi Express (5)</option>
-                  <option value="maa">Maa Annapurna Rasoi (6)</option>
-                  <option value="shreenathji">Shreenathji Satvik (5)</option>
+                  <option value="all">All Kitchens ({orders.length})</option>
+                  {Array.from(new Set(orders.map(o => o.kitchen).filter(Boolean))).map(kName => (
+                    <option key={kName} value={kName}>{kName}</option>
+                  ))}
                 </select>
               </div>
 
@@ -531,10 +361,10 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
                   className="bg-transparent text-[13px] text-[#1a1a1a] font-medium focus:outline-none cursor-pointer"
                 >
                   <option value="all">All Active States</option>
-                  <option value="preparing">Preparing (08)</option>
-                  <option value="ready">Ready (06)</option>
-                  <option value="assigned">Driver Assigned (10)</option>
-                  <option value="transit">In Transit (08)</option>
+                  <option value="preparing">Preparing</option>
+                  <option value="ready">Ready</option>
+                  <option value="assigned">Driver Assigned</option>
+                  <option value="transit">In Transit</option>
                 </select>
               </div>
 
@@ -549,7 +379,7 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
                   <option value="all">All Payment Types</option>
                   <option value="verified">Escrow Verified</option>
                   <option value="mandate">UPI Mandate Active</option>
-                  <option value="cod">COD Locked</option>
+                  <option value="cod">COD</option>
                 </select>
               </div>
 
@@ -561,9 +391,10 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
                   onChange={(e) => setSelectedSlot(e.target.value)}
                   className="bg-transparent text-[13px] text-[#1a1a1a] font-medium focus:outline-none cursor-pointer"
                 >
-                  <option value="dinner">Dinner (17:00 - 19:30)</option>
-                  <option value="lunch">Lunch (12:00 - 14:00)</option>
-                  <option value="breakfast">Breakfast (07:30 - 09:30)</option>
+                  <option value="all">All Slots</option>
+                  <option value="dinner">Dinner</option>
+                  <option value="lunch">Lunch</option>
+                  <option value="breakfast">Breakfast</option>
                 </select>
               </div>
             </div>

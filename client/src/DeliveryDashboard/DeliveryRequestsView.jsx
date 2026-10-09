@@ -413,9 +413,9 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
         headers: getAuthHeaders(),
         signal: controller.signal,
         body: JSON.stringify({
-          driverId: currentUser?.id || currentUser?._id || 'TL-65013-B',
-          driverName: currentUser?.fullName || currentUser?.name || 'Ziyan Mansuri',
-          driverPhone: currentUser?.phone || '+91 9558601570'
+          driverId: currentUser?.driverId || currentUser?.id || currentUser?._id || '',
+          driverName: currentUser?.fullName || currentUser?.name || '',
+          driverPhone: currentUser?.phone || ''
         })
       });
 

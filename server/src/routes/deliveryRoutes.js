@@ -3,6 +3,7 @@ const router = express.Router();
 const { protect, requireProvider, requireDriver, driverAuthWithFallback } = require('../middleware/authMiddleware');
 const { registerDelivery, getDeliveryApplications, updateVerificationStatus } = require('../controllers/deliveryController');
 const {
+  getDeliveryTrackingById,
   getDeliveryRequests,
   createDeliveryRequest,
   broadcastDeliveryRequest,
@@ -182,6 +183,7 @@ router.get('/driver-requests', protect, requireDriver, getEligibleRequestsForDri
 router.post('/requests/:requestId/accept', protect, requireDriver, acceptDeliveryRequestAtomic);
 router.post('/requests/:requestId/decline', protect, requireDriver, declineDeliveryRequest);
 router.post('/status/toggle', protect, requireDriver, toggleDriverStatus);
+router.get('/track/:id', protect, getDeliveryTrackingById);
 router.get('/requests', protect, requireProvider, getDeliveryRequests);
 router.get('/metrics', protect, requireProvider, getDeliveryMetrics);
 router.post('/dispatch', protect, requireProvider, createDeliveryRequest);

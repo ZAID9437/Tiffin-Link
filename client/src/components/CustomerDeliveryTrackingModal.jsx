@@ -80,24 +80,34 @@ export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initial
     setError(null);
 
     try {
-      const res = await apiRequest('/delivery/requests');
-      if (res.success && Array.isArray(res.requests)) {
-        const found = res.requests.find(r => 
-          String(r.requestId).toLowerCase() === queryId.toLowerCase() ||
-          String(r.orderId).toLowerCase() === queryId.toLowerCase() ||
-          String(r._id).toLowerCase() === queryId.toLowerCase() ||
-          String(r.orderId).toLowerCase() === `#${queryId.toLowerCase().replace(/^#+/, '')}`
-        );
-
-        if (found) {
-          setActiveDelivery(found);
-        } else if (res.requests.length > 0) {
-          setActiveDelivery(res.requests[0]);
+      const cleanId = String(queryId).replace(/^#+/, '');
+      const res = await apiRequest(`/delivery/track/${encodeURIComponent(cleanId)}`);
+      if (res && res.success && (res.delivery || res.request)) {
+        setActiveDelivery(res.delivery || res.request);
+      } else {
+        const ordRes = await apiRequest(`/orders/${encodeURIComponent(cleanId)}`);
+        if (ordRes && ordRes.success && ordRes.data) {
+          const ord = ordRes.data;
+          setActiveDelivery({
+            orderId: ord.orderId,
+            requestId: ord.orderId,
+            status: ord.deliveryStatus === 'Delivered' ? 'Delivered' : (ord.status === 'Delivery' ? (ord.deliveryStatus || 'Searching Drivers') : ord.status),
+            etaMinutes: ord.estimatedTime ? parseInt(ord.estimatedTime) || 15 : 15,
+            distanceKm: ord.deliveryDistance ? parseFloat(ord.deliveryDistance) || 2.4 : 2.4,
+            pickupAddress: { street: ord.pickupAddress || 'Kitchen Hub, Ahmedabad' },
+            deliveryAddress: { street: ord.customerAddress || 'Customer Address, Ahmedabad' },
+            assignedDriver: {
+              name: ord.deliveryPartnerName || ord.driverName || '',
+              phone: ord.deliveryPartnerPhone || ord.driverPhone || '',
+              rating: 4.8,
+              vehicleNo: ord.driverVehicle || ''
+            },
+            pickupOtp: ord.pickupOtp || '',
+            deliveryOtp: ord.deliveryOtp || ''
+          });
         } else {
           setError('No active delivery found matching this order ID.');
         }
-      } else {
-        setError('Unable to fetch live delivery details.');
       }
     } catch (err) {
       console.error('Error fetching customer delivery tracking:', err);
@@ -185,11 +195,11 @@ export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initial
                   ...activeDelivery,
                   requestId: activeDelivery.requestId || activeDelivery.orderId || activeDelivery._id,
                   pickupAddress: typeof activeDelivery.pickupAddress === 'string'
-                    ? { street: activeDelivery.pickupAddress, lat: 23.0300, lng: 72.5650 }
-                    : activeDelivery.pickupAddress || { street: 'Kitchen Location', lat: 23.0300, lng: 72.5650 },
+                    ? { street: activeDelivery.pickupAddress, lat: activeDelivery.pickupLocation?.lat, lng: activeDelivery.pickupLocation?.lng }
+                    : activeDelivery.pickupAddress || { street: 'Kitchen Location' },
                   deliveryAddress: typeof activeDelivery.deliveryAddress === 'string'
-                    ? { street: activeDelivery.deliveryAddress, lat: 23.0380, lng: 72.5580 }
-                    : activeDelivery.deliveryAddress || { street: 'Customer Drop Location', lat: 23.0380, lng: 72.5580 }
+                    ? { street: activeDelivery.deliveryAddress, lat: activeDelivery.deliveryLocation?.lat, lng: activeDelivery.deliveryLocation?.lng }
+                    : activeDelivery.deliveryAddress || { street: 'Customer Drop Location' }
                 }}
                 height="20rem"
                 activeRole="customer"

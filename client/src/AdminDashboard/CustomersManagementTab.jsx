@@ -797,7 +797,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
 
                             <td className="py-3 px-4 max-w-[190px]">
                               <div className="truncate text-[#1a1a1a] font-medium">{ord.tiffinName} × {ord.quantity || 1}</div>
-                              <div className="text-[10px] font-mono text-[#665d52]">Canister #TK-9021</div>
+                              {ord.canisterId ? <div className="text-[10px] font-mono text-[#665d52]">Canister #{ord.canisterId}</div> : null}
                             </td>
 
                             <td className="py-3 px-4 text-right">
@@ -937,7 +937,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                       </div>
                       <div className="text-[#665d52]">Culinary Dispatch Bay #04</div>
                       <div className="p-2 bg-[#f5f3ef] font-mono text-[11px] text-[#1a1a1a] flex items-center justify-between border border-[#ded9d1]">
-                        <span>CANISTER HW: 304 STEEL #TK-9021</span>
+                        <span>CANISTER HW: {currentOrder.canisterId ? `304 STEEL #${currentOrder.canisterId}` : '304 FOOD GRADE STEEL'}</span>
                         <span className="font-bold">RFID LOCKED</span>
                       </div>
                     </div>
@@ -1383,7 +1383,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                       <span>19:15:02 IST</span>
                       <span>ORDER INITIALIZED</span>
                     </div>
-                    <div className="text-[#1a1a1a] font-medium mt-1">Patron {currentOrder?.customerName || 'Aarav Sharma'} authorized payment via UPI Intent.</div>
+                    <div className="text-[#1a1a1a] font-medium mt-1">Patron {currentOrder?.customerName || 'Customer'} authorized payment via UPI Intent.</div>
                   </div>
 
                   <div className="p-3 bg-[#f5f3ef] border border-[#ded9d1]">

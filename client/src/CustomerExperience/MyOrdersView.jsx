@@ -148,8 +148,8 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
           deliveryDistance: o.deliveryDistance || (o.distanceKm ? `${o.distanceKm} km` : '1.8 km'),
           distanceKm: o.distanceKm !== undefined ? Number(o.distanceKm) : (o.deliveryDistance ? parseFloat(o.deliveryDistance) || 1.8 : 1.8),
           driverLocation: o.driverLocation || o.assignedDriver?.location || null,
-          canisterId: o.canisterId || '#TK-9021',
-          canisterTemp: o.canisterTemp || '68.2 °C',
+          canisterId: o.canisterId || '',
+          canisterTemp: o.canisterTemp || '',
           date: o.date || (o.createdAt ? new Date(o.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Recent'),
           driverId: o.driverId || o.assignedDriver?.driverId || '',
           deliveryPartnerName: o.deliveryPartnerName || o.driverName || o.assignedDriver?.name || '',
@@ -478,12 +478,12 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
     const orderId = targetOrder.orderId || ('#TL-' + (targetOrder._id ? String(targetOrder._id).slice(-6).toUpperCase() : '8421'));
     const dateStr = targetOrder.date || new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const providerName = targetOrder.providerName || 'Artisanal Culinary Hub';
-    const providerAddress = targetOrder.providerAddress || 'Satellite Central Kitchen, Ahmedabad, Gujarat 380015';
+    const providerAddress = targetOrder.providerAddress || 'Kitchen Address';
     const customerAddress = targetOrder.customerAddress || 'Ahmedabad, Gujarat';
-    const fssai = targetOrder.fssai || '10721026000412';
+    const fssai = targetOrder.fssai || 'FSSAI Verified';
     const paymentMethod = targetOrder.paymentMethod || 'Cash on Delivery';
     const paymentStatus = targetOrder.paymentStatus || 'Paid';
-    const canisterId = targetOrder.canisterId || '#TK-9021';
+    const canisterId = targetOrder.canisterId || 'Insulated Canister';
     const totalAmount = Number(targetOrder.totalAmount || 0);
     const deliveryFee = Number(
       targetOrder.deliveryFee !== undefined && targetOrder.deliveryFee !== null
@@ -816,6 +816,373 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
     printWin.document.write(invoiceHtml);
     printWin.document.close();
   };
+
+  // Download / Print Official Verified Refund Receipt (PDF)
+  const handleDownloadRefundReceipt = (order, explicitArn) => {
+    const targetOrder = order || {};
+    const orderId = targetOrder.orderId || ('#TL-' + (targetOrder._id ? String(targetOrder._id).slice(-6).toUpperCase() : '7445'));
+    const arnNum = explicitArn || targetOrder.arn || targetOrder.npciRef || `NPCI-REF-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+    const utrNum = targetOrder.utr || `4291${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const dateStr = targetOrder.date || targetOrder.cancelledAt || new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const providerName = targetOrder.providerName || 'Artisanal Home Kitchen';
+    const customerName = currentUser?.name || currentUser?.fullName || targetOrder.customerName || 'Zaid Mansuri';
+    const customerPhone = currentUser?.phone || targetOrder.customerPhone || '+91 98765 43210';
+    const tiffinName = targetOrder.tiffinName || 'Executive Homestyle Tiffin';
+    const reason = targetOrder.cancellationReason || targetOrder.declaredCause || 'Customer requested 0-penalty cancellation under Escrow policy';
+    const totalAmount = Number(targetOrder.totalAmount || targetOrder.grossAmount || 164);
+    const subtotal = Number(targetOrder.subtotal || targetOrder.mealSubtotal || (totalAmount > 40 ? totalAmount - 40 : totalAmount));
+    const deliveryFee = Number(targetOrder.deliveryFee || 25);
+    const packagingFee = Number(targetOrder.packagingFee || 15);
+
+    triggerToast(`Downloading verified PDF refund receipt with ${arnNum}...`);
+
+    const receiptHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Refund Receipt - ${orderId}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: #1a1a1a;
+      background: #ffffff;
+      padding: 36px;
+      max-width: 820px;
+      margin: 0 auto;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #1a1a1a;
+      padding-bottom: 18px;
+      margin-bottom: 24px;
+    }
+    .brand-title {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #1a1a1a;
+    }
+    .brand-subtitle {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #0A8B5F;
+      font-weight: 700;
+      margin-top: 3px;
+    }
+    .brand-sub {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+    .badge-box {
+      text-align: right;
+    }
+    .refund-badge {
+      display: inline-block;
+      background: #E8F5E9;
+      color: #0A8B5F;
+      border: 1px solid #A5D6A7;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .receipt-num {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin-top: 6px;
+    }
+    .receipt-date {
+      font-size: 12px;
+      color: #666;
+      margin-top: 3px;
+    }
+    .alert-banner {
+      background: #F4FBF7;
+      border: 1.5px solid #0A8B5F;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .alert-banner-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .alert-icon {
+      font-size: 24px;
+      color: #0A8B5F;
+      font-weight: bold;
+    }
+    .alert-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0A8B5F;
+    }
+    .alert-desc {
+      font-size: 12px;
+      color: #2e7d32;
+      margin-top: 2px;
+    }
+    .alert-amount {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0A8B5F;
+      font-family: monospace;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      background: #faf8f5;
+      border: 1px solid #e7e2d8;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+    }
+    .meta-col h4 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #666;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .meta-col p {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #333;
+    }
+    .table-container {
+      margin-bottom: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      background: #f5f2eb;
+      border-bottom: 1px solid #ddd;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #444;
+    }
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+      color: #333;
+    }
+    td.num, th.num {
+      text-align: right;
+      font-family: monospace;
+    }
+    .total-row {
+      font-weight: 800;
+      font-size: 15px;
+      border-top: 2px solid #1a1a1a;
+      border-bottom: 2px solid #1a1a1a;
+      background: #faf8f5;
+    }
+    .footer-note {
+      font-size: 11px;
+      color: #666;
+      line-height: 1.6;
+      border-left: 3px solid #0A8B5F;
+      padding-left: 12px;
+      margin-bottom: 24px;
+      background: #f9fbf9;
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+    .signature-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 16px;
+      border-top: 1px dashed #ccc;
+      font-size: 11px;
+      color: #888;
+    }
+    .btn-actions {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .btn-print {
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      padding: 10px 22px;
+      font-size: 13.5px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-print:hover {
+      background: #0A8B5F;
+    }
+    @media print {
+      .btn-actions { display: none; }
+      body { padding: 0; }
+      @page { margin: 15mm; size: A4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="btn-actions">
+    <button class="btn-print" onclick="window.print()">
+      🖨️ Print or Save as PDF
+    </button>
+  </div>
+  <div class="header">
+    <div>
+      <div class="brand-title">TIFFIN LINK</div>
+      <div class="brand-subtitle">Escrow Reversal &amp; Settlement System</div>
+      <div class="brand-sub">NPCI Fast-Path Settlement Gateway • Escrow Protocol TL-ESC-2026</div>
+    </div>
+    <div class="badge-box">
+      <div class="refund-badge">✓ 100% Refund Credited</div>
+      <div class="receipt-num">Ref: ${arnNum}</div>
+      <div class="receipt-date">Processed: ${dateStr}</div>
+    </div>
+  </div>
+
+  <div class="alert-banner">
+    <div class="alert-banner-left">
+      <div class="alert-icon">✓</div>
+      <div>
+        <div class="alert-title">Instant Escrow Reversal Confirmed</div>
+        <div class="alert-desc">Amount successfully reversed to source account via NPCI UPI / Banking Switch</div>
+      </div>
+    </div>
+    <div class="alert-amount">₹${totalAmount.toFixed(2)}</div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-col">
+      <h4>Beneficiary (Customer)</h4>
+      <p><strong>${customerName}</strong></p>
+      <p>Phone: ${customerPhone}</p>
+      <p>Order ID: <strong>${orderId}</strong></p>
+      <p>Meal: ${tiffinName}</p>
+    </div>
+    <div class="meta-col">
+      <h4>Banking &amp; Settlement Audit</h4>
+      <p>Banking Reference (ARN): <strong>${arnNum}</strong></p>
+      <p>UTR Number: <strong>${utrNum}</strong></p>
+      <p>Kitchen Provider: ${providerName}</p>
+      <p>Cancellation Cause: <em>${reason}</em></p>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Transaction Item</th>
+          <th>Original Charge</th>
+          <th class="num">Refund Status</th>
+          <th class="num">Reversed Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <strong>${tiffinName}</strong>
+            <div style="font-size: 11px; color: #666;">Meal subtotal component</div>
+          </td>
+          <td>₹${subtotal.toFixed(2)}</td>
+          <td class="num"><span style="color: #0A8B5F; font-weight: 700;">Reversed (100%)</span></td>
+          <td class="num">₹${subtotal.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td>
+            <strong>Delivery &amp; Logistics Charge</strong>
+            <div style="font-size: 11px; color: #666;">Zero dispatch penalty fee waived</div>
+          </td>
+          <td>₹${deliveryFee.toFixed(2)}</td>
+          <td class="num"><span style="color: #0A8B5F; font-weight: 700;">Reversed (100%)</span></td>
+          <td class="num">₹${deliveryFee.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td>
+            <strong>Thermal Canister Packaging Fee</strong>
+            <div style="font-size: 11px; color: #666;">Eco-canister seal charge reversed</div>
+          </td>
+          <td>₹${packagingFee.toFixed(2)}</td>
+          <td class="num"><span style="color: #0A8B5F; font-weight: 700;">Reversed (100%)</span></td>
+          <td class="num">₹${packagingFee.toFixed(2)}</td>
+        </tr>
+        <tr class="total-row">
+          <td colspan="3">
+            <strong>Total Escrow Refund Disbursed</strong>
+            <div style="font-size: 10px; font-weight: 500; color: #666; text-transform: uppercase; margin-top: 2px;">Zero Cancellation Penalty Applied</div>
+          </td>
+          <td class="num" style="color: #0A8B5F;">₹${totalAmount.toFixed(2)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer-note">
+    <strong>Escrow Guarantee:</strong> As per TiffinLink Fair Escrow Policy, cancellations initiated within the allowable threshold incur zero penalties. Funds have been returned to your original payment method. NPCI UTR: ${utrNum}.
+  </div>
+
+  <div class="signature-row">
+    <div>Authorized Signatory: TiffinLink NPCI Escrow Gateway</div>
+    <div>Official Computer Generated Refund Receipt • Valid Without Physical Signature</div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+      }, 350);
+    };
+  </script>
+</body>
+</html>`;
+
+    try {
+      // 1. Direct downloadable receipt file
+      const blob = new Blob([receiptHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = url;
+      downloadAnchor.download = `Refund_Receipt_${String(orderId).replace(/[^a-zA-Z0-9_-]/g, '')}_${arnNum}.html`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (dErr) {
+      console.warn('Direct file download warning:', dErr);
+    }
+
+    // 2. Open print/PDF generation window
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(receiptHtml);
+      printWin.document.close();
+    }
+  };
+
 
   return (
     <div className="flex flex-col w-full bg-surface font-body-md text-on-surface antialiased pt-20 sm:pt-24 pb-20">
@@ -1390,7 +1757,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                             {activeConsignment.canisterTemp || '68.2 °C'}
                           </span>
                           <span className="font-body-md text-[13px] text-on-surface-variant">
-                            Grade 304 Stainless Steel • {activeConsignment.canisterId || '#TK-9021'}
+                            Grade 304 Stainless Steel • {activeConsignment.canisterId || 'Insulated Canister'}
                           </span>
                         </div>
                       </div>
@@ -1938,7 +2305,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                       <div className="flex items-baseline gap-1 mt-0.5">
                         <span className="font-headline-md text-[24px] text-emerald-400">{activeConsignment.canisterTemp || '68.2°C'}</span>
                       </div>
-                      <span className="font-label-caps text-[10px] text-sand-neutral/70">Canister {activeConsignment.canisterId || '#TK-9021'} • Sealed</span>
+                      <span className="font-label-caps text-[10px] text-sand-neutral/70">Canister {activeConsignment.canisterId || 'Insulated'} • Sealed</span>
                     </div>
                   </div>
                 </div>
@@ -2692,11 +3059,10 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                     onChange={(e) => setKitchenFilter(e.target.value)}
                     className="bg-surface px-3 py-2 font-button-text text-button-text text-onyx-black focus:outline-none cursor-pointer"
                   >
-                    <option>All Kitchens</option>
-                    <option>Mom's Kitchen</option>
-                    <option>Ghar Ka Khana</option>
-                    <option>Healthy Meals</option>
-                    <option>Shree Tiffin Service</option>
+                    <option value="All Kitchens">All Kitchens</option>
+                    {[...new Set((historyOrders || []).map(o => o.providerName || (o.items && o.items[0]?.providerName)).filter(Boolean))].map(k => (
+                      <option key={k} value={k}>{k}</option>
+                    ))}
                   </select>
 
                   <select
@@ -3153,7 +3519,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                           <div>
                             <div className="flex items-baseline gap-2">
                               <h3 className="font-headline-md text-headline-md text-onyx-black">
-                                {order.providerName || "Mom's Kitchen"}
+                                {order.providerName || "Artisan Kitchen"}
                               </h3>
                               <span className="font-label-caps text-label-caps text-secondary uppercase">
                                 {order.providerAddress || 'Satellite, Ahmedabad'}
@@ -3202,7 +3568,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
 
                           {isOnline ? (
                             <button
-                              onClick={() => triggerToast(`Downloading verified PDF refund receipt with ${arn}...`)}
+                              onClick={() => handleDownloadRefundReceipt(order, arn)}
                               className="bg-surface-container hover:bg-surface-container-high text-onyx-black font-button-text text-button-text px-4 py-2.5 rounded transition-colors flex items-center gap-2"
                             >
                               <span className="material-symbols-outlined text-[18px]">download</span>
@@ -3523,7 +3889,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
               <div className="bg-surface-container-low p-4 rounded space-y-2">
                 <div className="flex justify-between font-label-caps text-label-caps uppercase text-secondary">
                   <span>Culinary Partner</span>
-                  <span className="text-onyx-black">{modalPayload.provider || "Mom's Kitchen"}</span>
+                  <span className="text-onyx-black">{modalPayload.provider || "Artisan Kitchen"}</span>
                 </div>
                 <div className="flex justify-between font-label-caps text-label-caps uppercase text-secondary">
                   <span>Scheduled Delivery</span>
@@ -3870,7 +4236,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                   <div>
                     <span className="font-label-caps text-label-caps text-secondary uppercase block mb-1">Delivery Destination</span>
                     <p className="font-body-md text-[13px] text-onyx-black">{modalPayload.customerAddress || 'Customer Address'}</p>
-                    <p className="font-body-md text-[12px] text-secondary mt-0.5">Canister ID: {modalPayload.canisterId || '#TK-9021'}</p>
+                    <p className="font-body-md text-[12px] text-secondary mt-0.5">Canister ID: {modalPayload.canisterId || 'Standard Stainless'}</p>
                   </div>
                 </div>
 

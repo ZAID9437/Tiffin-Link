@@ -23,7 +23,7 @@ export function CartProvider({ children }) {
       provider: null,
       items: [],
       deliveryAddress: '',
-      deliveryCoordinates: { lat: 23.0300, lng: 72.5178 },
+      deliveryCoordinates: null,
       deliverySlot: 'Lunch Slot (12:00 - 13:30)',
       instructions: '',
       paymentMethod: 'Online Payment'
@@ -192,7 +192,7 @@ export function CartProvider({ children }) {
       provider: null,
       items: [],
       deliveryAddress: '',
-      deliveryCoordinates: { lat: 23.0300, lng: 72.5178 },
+      deliveryCoordinates: null,
       deliverySlot: 'Lunch Slot (12:00 - 13:30)',
       instructions: '',
       paymentMethod: 'Online Payment'

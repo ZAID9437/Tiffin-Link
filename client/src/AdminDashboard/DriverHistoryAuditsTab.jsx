@@ -139,16 +139,16 @@ export default function DriverHistoryAuditsTab({ onNavigate }) {
       timestamp: selectedEvent.timestamp || new Date().toISOString(),
       partnerId: selectedEvent.partnerId,
       partnerName: selectedEvent.partnerName,
-      orderId: selectedEvent.payloadDetails?.orderId || '#TL-4956',
+      orderId: selectedEvent.payloadDetails?.orderId || '—',
       stateMutation: {
         oldStatus: selectedEvent.previousState,
         newStatus: selectedEvent.mutatedState
       },
       handshakeVerification: {
-        otpValidation: selectedEvent.payloadDetails?.otpResult || '4826 MATCHED',
+        otpValidation: selectedEvent.payloadDetails?.otpResult || 'VERIFIED',
         handshakeMode: 'PHYSICAL_CANISTER_EXCHANGE',
-        recipient: selectedEvent.payloadDetails?.recipient || 'Aarav Sharma',
-        canisterId: selectedEvent.payloadDetails?.canisterId || 'TK-9021'
+        recipient: selectedEvent.payloadDetails?.recipient || 'Customer',
+        canisterId: selectedEvent.payloadDetails?.canisterId || '—'
       },
       physicalTelemetry: {
         canisterTemp: selectedEvent.payloadDetails?.canisterTemp || '67.8°C',
@@ -819,16 +819,16 @@ export default function DriverHistoryAuditsTab({ onNavigate }) {
                     timestamp: selectedEvent.timestamp,
                     partnerId: selectedEvent.partnerId,
                     partnerName: selectedEvent.partnerName,
-                    orderId: selectedEvent.payloadDetails?.orderId || '#TL-4956',
+                    orderId: selectedEvent.payloadDetails?.orderId || '—',
                     stateMutation: {
                       oldStatus: selectedEvent.previousState,
                       newStatus: selectedEvent.mutatedState
                     },
                     handshakeVerification: {
-                      otpValidation: selectedEvent.payloadDetails?.otpResult || '4826 MATCHED',
+                      otpValidation: selectedEvent.payloadDetails?.otpResult || 'VERIFIED',
                       handshakeMode: 'PHYSICAL_CANISTER_EXCHANGE',
-                      recipient: selectedEvent.payloadDetails?.recipient || 'Aarav Sharma',
-                      canisterId: selectedEvent.payloadDetails?.canisterId || 'TK-9021'
+                      recipient: selectedEvent.payloadDetails?.recipient || 'Customer',
+                      canisterId: selectedEvent.payloadDetails?.canisterId || '—'
                     },
                     physicalTelemetry: {
                       canisterTemp: selectedEvent.payloadDetails?.canisterTemp || '67.8°C',

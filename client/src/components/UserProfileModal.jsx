@@ -10,30 +10,23 @@ export default function UserProfileModal({ isOpen, onClose, initialTab = 'profil
 
   // Profile fields state
   const [profileData, setProfileData] = useState({
-    name: currentUser?.name || 'Zaid Mansuri',
-    email: currentUser?.email || 'zaid@example.com',
-    phone: currentUser?.phone || '+91 98250 99881',
-    dietary: 'Veg',
-    spiceLevel: 'Medium Spice',
-    rotliType: 'Soft Phulka Rotli (Ghee)',
-    noOnionGarlic: false,
-    lessOil: true
+    name: currentUser?.name || '',
+    email: currentUser?.email || '',
+    phone: currentUser?.phone || '',
+    dietary: currentUser?.dietary || 'Veg',
+    spiceLevel: currentUser?.spiceLevel || 'Medium Spice',
+    rotliType: currentUser?.rotliType || 'Soft Phulka Rotli (Ghee)',
+    noOnionGarlic: currentUser?.noOnionGarlic || false,
+    lessOil: currentUser?.lessOil || false
   });
 
   // Saved addresses state
-  const [addresses, setAddresses] = useState([
-    { id: 1, type: 'Home', address: 'B-402, Shivalik Residency, Satellite Road', locality: 'Satellite', city: 'Ahmedabad', isDefault: true },
-    { id: 2, type: 'Office', address: '5th Floor, Westgate Tower, SG Highway', locality: 'Bodakdev', city: 'Ahmedabad', isDefault: false }
-  ]);
+  const [addresses, setAddresses] = useState(currentUser?.addresses || []);
   const [newAddressText, setNewAddressText] = useState('');
   const [newAddressType, setNewAddressType] = useState('Home');
 
   // Payment methods state
-  const [paymentMethods, setPaymentMethods] = useState([
-    { id: 1, type: 'UPI', detail: 'zaid@okhdfcbank', label: 'Primary UPI', isDefault: true },
-    { id: 2, type: 'UPI', detail: '9825099881@paytm', label: 'Paytm UPI', isDefault: false },
-    { id: 3, type: 'Card', detail: '•••• •••• •••• 4242', label: 'HDFC Bank Visa', isDefault: false }
-  ]);
+  const [paymentMethods, setPaymentMethods] = useState(currentUser?.paymentMethods || []);
   const [newUpiId, setNewUpiId] = useState('');
 
   // Notifications preferences state
@@ -260,7 +253,12 @@ export default function UserProfileModal({ isOpen, onClose, initialTab = 'profil
             {activeTab === 'addresses' && (
               <div className="space-y-6">
                 <div className="space-y-3">
-                  {addresses.map((addr) => (
+                  {addresses.length === 0 ? (
+                  <p className="text-xs text-[#665d52] italic py-4 text-center">
+                    No saved delivery addresses. Add your address below.
+                  </p>
+                ) : (
+                  addresses.map((addr) => (
                     <div 
                       key={addr.id}
                       className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-4 ${
@@ -308,7 +306,7 @@ export default function UserProfileModal({ isOpen, onClose, initialTab = 'profil
                         </button>
                       </div>
                     </div>
-                  ))}
+                  )))}
                 </div>
 
                 {/* Add New Address Form */}
@@ -352,7 +350,12 @@ export default function UserProfileModal({ isOpen, onClose, initialTab = 'profil
             {activeTab === 'payments' && (
               <div className="space-y-6">
                 <div className="space-y-3">
-                  {paymentMethods.map((pm) => (
+                  {paymentMethods.length === 0 ? (
+                  <p className="text-xs text-[#665d52] italic py-4 text-center">
+                    No saved payment methods. Add your UPI ID below.
+                  </p>
+                ) : (
+                  paymentMethods.map((pm) => (
                     <div 
                       key={pm.id}
                       className="p-4 rounded-2xl border border-[#ded9d1] bg-[#f5f3ef] flex items-center justify-between"
@@ -379,7 +382,7 @@ export default function UserProfileModal({ isOpen, onClose, initialTab = 'profil
                         </button>
                       )}
                     </div>
-                  ))}
+                  )))}
                 </div>
 
                 <form onSubmit={handleAddUpi} className="p-4 rounded-2xl bg-[#f5f3ef] border border-[#ded9d1] space-y-3">
@@ -500,37 +503,36 @@ export default function UserProfileModal({ isOpen, onClose, initialTab = 'profil
             {/* Tab 5: Subscriptions */}
             {activeTab === 'subscriptions' && (
               <div className="space-y-4">
-                <div className="p-5 rounded-2xl border border-[#1b5e20]/30 bg-[#1b5e20]/5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-[#1b5e20]">Active Plan</span>
-                      <h4 className="font-display-lg text-lg text-[#1a1a1a] mt-0.5">Monthly Executive Lunch Plan (Mom's Kitchen)</h4>
+                {currentUser?.subscription ? (
+                  <div className="p-5 rounded-2xl border border-[#1b5e20]/30 bg-[#1b5e20]/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold uppercase tracking-wider text-[#1b5e20]">Active Plan</span>
+                        <h4 className="font-display-lg text-lg text-[#1a1a1a] mt-0.5">{currentUser.subscription.planName || 'Active Meal Plan'}</h4>
+                      </div>
+                      <span className="bg-[#1b5e20] text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
+                        {currentUser.subscription.mealsLeft || 0} Meals Left
+                      </span>
                     </div>
-                    <span className="bg-[#1b5e20] text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
-                      24 Meals Left
-                    </span>
+                    <p className="text-xs text-[#665d52]">
+                      {currentUser.subscription.schedule || 'Scheduled delivery in 304 Food-Grade Insulated Canisters.'}
+                    </p>
                   </div>
-                  <p className="text-xs text-[#665d52]">
-                    Delivers Monday to Friday at 12:45 PM in 304 Food-Grade Insulated Canisters.
-                  </p>
-                  <div className="flex items-center gap-2 pt-2">
-                    <button 
-                      onClick={() => alert('Meal for tomorrow has been paused. 1 meal credited to your subscription balance.')}
-                      className="px-3.5 py-1.5 rounded-lg border border-[#ded9d1] bg-white text-xs font-bold text-[#1a1a1a] hover:bg-black/5 cursor-pointer"
-                    >
-                      Pause Tomorrow's Tiffin
-                    </button>
+                ) : (
+                  <div className="py-8 text-center text-xs text-[#665d52] bg-[#f5f3ef] border border-[#ded9d1] rounded-2xl p-6">
+                    <p className="font-semibold text-sm text-[#1a1a1a] mb-1">No Active Meal Subscription</p>
+                    <p className="mb-4">Subscribe to a daily or weekly tiffin plan for automated fresh deliveries.</p>
                     <button 
                       onClick={() => {
                         onClose();
                         window.location.hash = '#find-tiffin';
                       }}
-                      className="px-3.5 py-1.5 rounded-lg bg-[#1a1a1a] text-white text-xs font-bold hover:bg-[#a0522d] cursor-pointer"
+                      className="px-4 py-2 bg-[#1a1a1a] text-white text-xs font-bold rounded-xl hover:bg-[#a0522d] cursor-pointer"
                     >
-                      Browse More Plans
+                      Browse Tiffin Plans
                     </button>
                   </div>
-                </div>
+                )}
 
                 <div className="p-4 rounded-xl border border-[#ded9d1] bg-[#f5f3ef] text-xs text-[#665d52]">
                   💡 <strong>Did you know?</strong> You can pause or reschedule your tiffins up to 2 hours before the delivery slot without any penalty.
@@ -538,7 +540,6 @@ export default function UserProfileModal({ isOpen, onClose, initialTab = 'profil
               </div>
             )}
 
-            {/* Tab 6: Notifications Settings */}
             {activeTab === 'notifications' && (
               <div className="space-y-4 max-w-lg">
                 <p className="text-xs text-[#665d52]">Select how you would like to receive real-time updates regarding your meals:</p>

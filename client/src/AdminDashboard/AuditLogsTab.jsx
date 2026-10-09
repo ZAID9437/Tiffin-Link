@@ -42,331 +42,7 @@ export default function AuditLogsTab({ onNavigate }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Comprehensive Baseline Master Audit Events Store
-  const eventDataStore = useMemo(() => ({
-    evt_904130: {
-      id: 'EVT-904130',
-      timestamp: '19:53:14.412',
-      date: '28 Sep 2026',
-      provider: 'Xoxo Men Kitchen',
-      providerKey: 'xoxo',
-      node: 'BOM-01 • Lower Parel',
-      actor: 'Chef Mahesh',
-      actorId: '#USR-9021',
-      category: 'Order Dispatch',
-      categoryKey: 'order',
-      action: 'Driver Assigned Handshake',
-      target: 'Order #TL-4956',
-      targetKey: 'TL-4956',
-      prevState: 'READY',
-      newState: 'ASSIGNED',
-      transitionDetails: '(Rahul Patel)',
-      ip: '152.58.42.112',
-      device: 'Android Kitchen POS',
-      result: 'success',
-      resultLabel: 'Success',
-      hash: '0x892a0914e1f7ca40bb2a7810ec491024bd3914a810fceb9914bc8192a0149021',
-      merkleLeaf: '#41,300',
-      blockHeight: '1,489,104',
-      hardware: 'Samsung Tab A8 POS',
-      network: 'Jio Fiber (Static IP)',
-      geo: '18.9986° N, 72.8258° E',
-      latency: '11ms (BOM Hub)',
-      json: {
-        eventId: 'evt_904130_xoxo_4956',
-        orderId: 'TL-4956',
-        providerId: 'PRV-XOXO-01',
-        providerName: 'Xoxo Men Kitchen',
-        staffId: 'USR-9021',
-        driverAssigned: 'Rahul Patel (#DRV-2041)',
-        previousStatus: 'READY',
-        newStatus: 'ASSIGNED',
-        handshakeOtpMatched: true,
-        thermalBagCheckVerified: true,
-        timestamp: '2026-09-28T19:53:14.412Z',
-        merkleRoot: '0x9d4a8e32cb68fa201bce4710a3952f1e'
-      }
-    },
-    evt_904128: {
-      id: 'EVT-904128',
-      timestamp: '19:51:02.148',
-      date: '28 Sep 2026',
-      provider: 'Xoxo Men Kitchen',
-      providerKey: 'xoxo',
-      node: 'BOM-01 • Lower Parel',
-      actor: 'Chef Mahesh',
-      actorId: '#USR-9021',
-      category: 'Kitchen POS',
-      categoryKey: 'pos',
-      action: 'Marked Meal Ready & Sealed',
-      target: 'Order #TL-4956',
-      targetKey: 'TL-4956',
-      prevState: 'PREPARING',
-      newState: 'READY',
-      transitionDetails: 'Seal #TK-9021 (68°C)',
-      ip: '152.58.42.112',
-      device: 'Android Kitchen POS',
-      result: 'success',
-      resultLabel: 'Success',
-      hash: '0x7b1a9fe20489c4a852e90c5da849204bc920f7194f808a34d0b1712a892ec841',
-      merkleLeaf: '#41,298',
-      blockHeight: '1,489,102',
-      hardware: 'Samsung Tab A8 POS',
-      network: 'Jio Fiber (Static IP)',
-      geo: '18.9986° N, 72.8258° E',
-      latency: '12ms (BOM Hub)',
-      json: {
-        eventId: 'evt_904128_xoxo_4956',
-        orderId: 'TL-4956',
-        providerId: 'PRV-XOXO-01',
-        providerName: 'Xoxo Men Kitchen',
-        staffId: 'USR-9021',
-        staffRole: 'Head Chef Mahesh',
-        previousStatus: 'PREPARING',
-        newStatus: 'READY',
-        vesselId: 'TK-9021',
-        sealTemperature: '68C',
-        thermalCompliance: true,
-        weightGrams: 650,
-        clientIp: '152.58.42.112',
-        authMethod: 'BIOMETRIC_KITCHEN_APP',
-        timestamp: '2026-09-28T19:51:02.148Z',
-        merkleRoot: '0x9d4a8e32cb68fa201bce4710a3952f1e'
-      }
-    },
-    evt_904122: {
-      id: 'EVT-904122',
-      timestamp: '19:44:20.892',
-      date: '28 Sep 2026',
-      provider: 'Xoxo Men Kitchen',
-      providerKey: 'xoxo',
-      node: 'BOM-01 • Lower Parel',
-      actor: 'System Daemon',
-      actorId: '#SYS-BOM-01',
-      category: 'Lifecycle Step',
-      categoryKey: 'order',
-      action: 'Fired Batch on Stove #1',
-      target: 'Order #TL-4956',
-      targetKey: 'TL-4956',
-      prevState: 'ACCEPTED',
-      newState: 'PREPARING',
-      transitionDetails: 'Induction Range 140°C',
-      ip: '10.0.4.82',
-      device: 'Internal Worker Node',
-      result: 'success',
-      resultLabel: 'Success',
-      hash: '0x5391c491aa90218172bc91024f910481ecba8192a0149021a892ec84152e90c5',
-      merkleLeaf: '#41,292',
-      blockHeight: '1,489,098',
-      hardware: 'Dell Edge Server Node 01',
-      network: 'Cluster VPC LAN',
-      geo: '18.9986° N, 72.8258° E',
-      latency: '2ms (Local Mesh)',
-      json: {
-        eventId: 'evt_904122_sys_bom',
-        orderId: 'TL-4956',
-        providerId: 'PRV-XOXO-01',
-        triggeredBy: 'SYSTEM_DAEMON_CRON',
-        stoveAssignment: 'Stove-01',
-        batchId: 'BATCH-BOM-89',
-        previousStatus: 'ACCEPTED',
-        newStatus: 'PREPARING',
-        estimatedPrepSeconds: 420,
-        timestamp: '2026-09-28T19:44:20.892Z'
-      }
-    },
-    evt_904118: {
-      id: 'EVT-904118',
-      timestamp: '19:42:15.004',
-      date: '28 Sep 2026',
-      provider: 'Xoxo Men Kitchen',
-      providerKey: 'xoxo',
-      node: 'BOM-01 • Lower Parel',
-      actor: 'Rahul Patel (Owner)',
-      actorId: '#PRV-OWN-01',
-      category: 'Kitchen POS',
-      categoryKey: 'pos',
-      action: 'Order Accepted by Kitchen',
-      target: 'Order #TL-4956',
-      targetKey: 'TL-4956',
-      prevState: 'NEW',
-      newState: 'ACCEPTED',
-      transitionDetails: 'Auto Ack within 45s',
-      ip: '152.58.42.112',
-      device: 'Android Kitchen POS',
-      result: 'success',
-      resultLabel: 'Success',
-      hash: '0x334fa01928bc194a810283fa01924bb38192a0149021a892ec84102941fa8921',
-      merkleLeaf: '#41,288',
-      blockHeight: '1,489,095',
-      hardware: 'Samsung Tab A8 POS',
-      network: 'Jio Fiber',
-      geo: '18.9986° N, 72.8258° E',
-      latency: '12ms',
-      json: {
-        eventId: 'evt_904118_owner_xoxo',
-        orderId: 'TL-4956',
-        providerId: 'PRV-XOXO-01',
-        acceptedBy: 'Rahul Patel (Owner)',
-        manualPrepOverrideMinutes: 0,
-        posDeviceId: 'POS-TAB-A8-01',
-        timestamp: '2026-09-28T19:42:15.004Z'
-      }
-    },
-    evt_904104: {
-      id: 'EVT-904104',
-      timestamp: '19:35:48.551',
-      date: '28 Sep 2026',
-      provider: 'Maa Annapurna Rasoi',
-      providerKey: 'annapurna',
-      node: 'BOM-04 • Dadar West',
-      actor: 'Kavita Ben Shah',
-      actorId: '#USR-8140',
-      category: 'Capacity Quota',
-      categoryKey: 'capacity',
-      action: 'Quota Warning Throttled',
-      target: 'Kitchen Capacity',
-      targetKey: 'capacity',
-      prevState: 'NOMINAL',
-      newState: 'THROTTLED',
-      transitionDetails: '22/25 Slots (88% Load)',
-      ip: '115.240.18.94',
-      device: 'Chrome • Win11',
-      result: 'warning',
-      resultLabel: 'Warning',
-      hash: '0x120491823abce19401924bb38192a0149021a892ec84102941fa892190141209',
-      merkleLeaf: '#41,274',
-      blockHeight: '1,489,082',
-      hardware: 'Desktop Station Dadar',
-      network: 'Airtel Broadband',
-      geo: '19.0178° N, 72.8478° E',
-      latency: '14ms',
-      json: {
-        eventId: 'evt_904104_capacity_warn',
-        providerId: 'PRV-ANNAPURNA-04',
-        currentActiveMeals: 22,
-        capacityCeiling: 25,
-        throttleRate: '88%',
-        actionTaken: 'NEW_ORDER_THROTTLED_120S',
-        actor: 'Kavita Ben Shah',
-        timestamp: '2026-09-28T19:35:48.551Z'
-      }
-    },
-    evt_904098: {
-      id: 'EVT-904098',
-      timestamp: '19:31:05.903',
-      date: '28 Sep 2026',
-      provider: 'Rasoi Express',
-      providerKey: 'rasoi',
-      node: 'AMD-02 • Navrangpura',
-      actor: 'Manish G. Dave',
-      actorId: '#USR-7104',
-      category: 'Order Override',
-      categoryKey: 'security',
-      action: 'Cancelled Due to Gas Pressure',
-      target: 'Order #TL-4940',
-      targetKey: 'TL-4940',
-      prevState: 'ACCEPTED',
-      newState: 'CANCELLED',
-      transitionDetails: 'Escrow Auto-Refund Triggered',
-      ip: '49.36.120.44',
-      device: 'Mobile Browser Safari',
-      result: 'error',
-      resultLabel: 'Error',
-      hash: '0xecba9012481029bb38192a0149021a892ec84102941fa89211902410a892ec90',
-      merkleLeaf: '#41,268',
-      blockHeight: '1,489,076',
-      hardware: 'iPhone 14 Pro Mobile',
-      network: 'Jio 5G',
-      geo: '23.0345° N, 72.5288° E',
-      latency: '18ms',
-      json: {
-        eventId: 'evt_904098_gas_leak_abort',
-        orderId: 'TL-4940',
-        providerId: 'PRV-RASOI-02',
-        cancellationCode: 'FACILITY_MALFUNCTION_GAS',
-        refundTriggered: true,
-        escrowAmountINR: 190.0,
-        refundDestination: 'UPI_VPA_CUSTOMER',
-        timestamp: '2026-09-28T19:31:05.903Z'
-      }
-    },
-    evt_904085: {
-      id: 'EVT-904085',
-      timestamp: '19:15:02.119',
-      date: '28 Sep 2026',
-      provider: 'TiffinLink Core',
-      providerKey: 'system',
-      node: 'PAY-ESCROW-V2',
-      actor: 'Client App',
-      actorId: '#CLI-AHM-99',
-      category: 'Escrow Capture',
-      categoryKey: 'escrow',
-      action: 'Payment Confirmed via UPI',
-      target: 'Order #TL-4956',
-      targetKey: 'TL-4956',
-      prevState: 'INITIATED',
-      newState: 'ESCROW_CAPTURED',
-      transitionDetails: '₹186.00 Yes Bank Escrow',
-      ip: '27.57.192.81',
-      device: 'Flutter iOS App',
-      result: 'success',
-      resultLabel: 'Success',
-      hash: '0xfa892ec84102941fa89211902410a892ec90120491823abce19401924bb38192',
-      merkleLeaf: '#41,255',
-      blockHeight: '1,489,065',
-      hardware: 'Apple iPhone 15',
-      network: 'Vodafone 5G',
-      geo: '23.0338° N, 72.5850° E',
-      latency: '24ms',
-      json: {
-        eventId: 'evt_904085_escrow_inbound',
-        orderId: 'TL-4956',
-        amountINR: 186.0,
-        pgTransactionRef: 'UPI-YES-8910401829',
-        escrowVaultState: 'LOCKED_PENDING_DELIVERY',
-        timestamp: '2026-09-28T19:15:02.119Z'
-      }
-    },
-    evt_903991: {
-      id: 'EVT-903991',
-      timestamp: '18:30:00.000',
-      date: '28 Sep 2026',
-      provider: 'Tulsi Kathiyawadi',
-      providerKey: 'tulsi',
-      node: 'AMD-07 • Bodakdev',
-      actor: 'Root Admin',
-      actorId: '#SUPER-ADMIN-01',
-      category: 'Compliance Lock',
-      categoryKey: 'security',
-      action: 'Kitchen Suspended for 24h',
-      target: 'Provider #PRV-8812',
-      targetKey: 'PRV-8812',
-      prevState: 'ACTIVE',
-      newState: 'SUSPENDED',
-      transitionDetails: 'SLA Violation Review',
-      ip: '14.139.122.10',
-      device: 'Root Auth Console',
-      result: 'override',
-      resultLabel: 'Override',
-      hash: '0x9910481ecba8192a0149021a892ec84152e90c50x5391c491aa90218172bc9102',
-      merkleLeaf: '#41,190',
-      blockHeight: '1,489,000',
-      hardware: 'MacBook Pro SuperAdmin',
-      network: 'Corporate VPN Static',
-      geo: '23.0225° N, 72.5714° E',
-      latency: '5ms',
-      json: {
-        eventId: 'evt_903991_admin_lock',
-        targetProviderId: 'PRV-8812',
-        providerName: 'Tulsi Kathiyawadi',
-        adminIdentity: 'SUPER-ADMIN-01',
-        reason: 'SLA_BREACH_CONSECUTIVE_LATE_PREP',
-        lockDurationHours: 24,
-        timestamp: '2026-09-28T18:30:00.000Z'
-      }
-    }
-  }), []);
+
 
   // Fetch Real Database Audit Logs
   useEffect(() => {
@@ -389,7 +65,6 @@ export default function AuditLogsTab({ onNavigate }) {
 
   // Events list as array
   const rawEventsList = useMemo(() => {
-    const baseline = Object.values(eventDataStore);
 
     // If MongoDB has real audit logs, integrate them into the stream
     if (dbLogs.length > 0) {
@@ -439,11 +114,11 @@ export default function AuditLogsTab({ onNavigate }) {
         };
       });
 
-      return [...mappedDb, ...baseline];
+      return mappedDb;
     }
 
-    return baseline;
-  }, [eventDataStore, dbLogs]);
+    return [];
+  }, [dbLogs]);
 
   // Filtering Logic
   const filteredEvents = useMemo(() => {
@@ -727,7 +402,7 @@ export default function AuditLogsTab({ onNavigate }) {
                 ref={searchInputRef}
                 className="w-full bg-transparent pl-9 pr-24 py-2 font-mono text-xs text-[#1a1a1a] placeholder:text-[#665d52] focus:outline-none"
                 id="forensic-search"
-                placeholder="Search by Event ID, Order ID (#TL-4956), Provider, IP Address, Staff UUID, Hash..."
+                placeholder="Search by Event ID, Order ID, Provider, IP Address, Staff UUID, Hash..."
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -1103,7 +778,7 @@ export default function AuditLogsTab({ onNavigate }) {
                 className="p-2.5 bg-white text-[#1a1a1a] hover:bg-[#eae8e4] transition-colors flex items-center gap-2 border border-[#ded9d1] text-left"
               >
                 <span className="material-symbols-outlined text-[16px]">radar</span>
-                <span className="truncate">Live Order #TL-4956</span>
+                <span className="truncate">Live Orders Radar</span>
               </button>
 
               {/* Link to Page 3: Order History */}

@@ -605,10 +605,10 @@ export default function DutyStatusView({
                   </span>
                 </div>
                 <div className="font-serif text-base text-[#1A1A1A] mt-1">
-                  {activeDelivery ? (activeDelivery.orderId || activeDelivery.requestId || '#ORD-5162') : 'No Active Delivery'}
+                  {activeDelivery ? (activeDelivery.orderId || activeDelivery.requestId || String(activeDelivery._id || '')) : 'No Active Delivery'}
                 </div>
                 <p className="text-[11px] text-[#4A4238] mt-0.5">
-                  {activeDelivery ? (activeDelivery.tiffinName || 'Gujarati Special Thali • Destination: Pali Hill') : 'You have no active consignments in transit.'}
+                  {activeDelivery ? (activeDelivery.tiffinName || 'Meal Consignment in Transit') : 'You have no active consignments in transit.'}
                 </p>
               </div>
             </div>
@@ -725,13 +725,13 @@ export default function DutyStatusView({
                 Active Delivery In Progress
               </h3>
               <p className="text-sm text-[#4A4238] mt-3 leading-relaxed">
-                You have an active delivery (<span className="font-mono font-bold text-[#1A1A1A]">{activeDelivery ? (activeDelivery.orderId || activeDelivery.requestId) : '#ORD-5162'}</span> • Gujarati Thali to Pali Hill). Complete your current delivery before going offline to prevent consignment abandonment.
+                You have an active delivery (<span className="font-mono font-bold text-[#1A1A1A]">{activeDelivery ? (activeDelivery.orderId || activeDelivery.requestId || 'Active') : 'Active'}</span>{activeDelivery?.tiffinName ? ` • ${activeDelivery.tiffinName}` : ''}). Complete your current delivery before going offline to prevent consignment abandonment.
               </p>
 
               <div className="mt-4 p-4 bg-[#F5F3EF] border border-[#DED9D1]">
                 <div className="flex items-center justify-between text-xs">
                   <span className="uppercase text-[#4A4238] tracking-wider text-[10px] font-bold">Consignment</span>
-                  <span className="font-mono text-[#1A1A1A] font-semibold">{activeDelivery ? (activeDelivery.orderId || activeDelivery.requestId) : '#ORD-5162'}</span>
+                  <span className="font-mono text-[#1A1A1A] font-semibold">{activeDelivery ? (activeDelivery.orderId || activeDelivery.requestId || 'Active') : 'Active'}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs mt-1.5">
                   <span className="uppercase text-[#4A4238] tracking-wider text-[10px] font-bold">ETA to Destination</span>

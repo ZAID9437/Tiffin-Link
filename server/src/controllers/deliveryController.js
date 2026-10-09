@@ -141,13 +141,13 @@ const registerDelivery = async (req, res) => {
         name: fullName || 'Delivery Partner',
         phone: mobile || '',
         email: email ? email.toLowerCase().trim() : '',
-        vehicleNo: registrationNo || 'GJ-01-TL-100',
+        vehicleNo: registrationNo || '',
         vehicleType: vehicleType || 'Bike',
         status: 'AVAILABLE',
         currentLocation: {
-          lat: 23.0225,
-          lng: 72.5714,
-          address: `${area || 'Satellite'}, ${city || 'Ahmedabad'}`
+          lat: null,
+          lng: null,
+          address: `${area || ''}, ${city || ''}`.trim()
         }
       },
       { upsert: true, new: true }
