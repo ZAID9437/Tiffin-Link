@@ -19,8 +19,20 @@ import "maplibre-gl/dist/maplibre-gl.css"
       root.classList.remove('dark');
       root.setAttribute('data-theme', 'light');
     }
+
+    if (localStorage.getItem('tiffinlink_compact') === 'true') {
+      root.classList.add('compact-density');
+    }
+    if (localStorage.getItem('tiffinlink_reduce_motion') === 'true') {
+      root.classList.add('reduce-motion');
+    }
+    const savedLang = localStorage.getItem('tiffinlink_language');
+    if (savedLang) {
+      root.lang = savedLang === 'gu_IN' ? 'gu' : savedLang === 'hi_IN' ? 'hi' : 'en';
+    }
   } catch (e) {}
 })();
+
 
 class RootErrorBoundary extends React.Component {
   constructor(props) {

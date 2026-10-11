@@ -6,10 +6,11 @@ const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
 
+
 // Helper to ensure default provider settings document exists
 const getOrCreateProviderSetting = async (pId, realProvider, realUser) => {
   let settings = await ProviderSetting.findOne({ providerId: pId });
-  
+
   if (!settings) {
     settings = await ProviderSetting.create({
       providerId: pId,
@@ -114,6 +115,14 @@ const getOrCreateProviderSetting = async (pId, realProvider, realUser) => {
         updated = true;
       }
     }
+
+    if (!settings.security?.activeSessions || settings.security.activeSessions.length === 0 || !settings.security.activeSessions[0]?.device) {
+      if (!settings.security) settings.security = {};
+      settings.security.activeSessions = defaultSessions;
+      settings.security.securityLogs = defaultLogs;
+      updated = true;
+    }
+
     if (updated) {
       await settings.save();
     }
@@ -230,7 +239,7 @@ const getAccountSettings = async (req, res) => {
   try {
     const pId = req.providerId.toString();
     const settings = await getOrCreateProviderSetting(pId, req.provider, req.user);
-    
+
     return res.json({
       success: true,
       data: {
@@ -311,7 +320,7 @@ const getNotificationPreferences = async (req, res) => {
   try {
     const pId = req.providerId.toString();
     const settings = await getOrCreateProviderSetting(pId, req.provider, req.user);
-    
+
     return res.json({
       success: true,
       data: settings.notifications
@@ -352,7 +361,7 @@ const getSecurityOverview = async (req, res) => {
   try {
     const pId = req.providerId.toString();
     const settings = await getOrCreateProviderSetting(pId, req.provider, req.user);
-    
+
     return res.json({
       success: true,
       data: settings.security
@@ -383,7 +392,7 @@ const changePassword = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Incorrect current password.' });
           }
         }
-        
+
         // Hash new password using bcrypt (12 rounds)
         const salt = await bcrypt.genSalt(12);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
@@ -406,7 +415,7 @@ const changePassword = async (req, res) => {
 
     await ProviderSetting.findOneAndUpdate(
       { providerId: pId },
-      { 
+      {
         $push: { 'security.securityLogs': { $each: [logItem], $position: 0 } },
         $set: { updatedAt: Date.now() }
       }
@@ -428,7 +437,7 @@ const getActiveSessions = async (req, res) => {
   try {
     const pId = req.providerId.toString();
     const settings = await getOrCreateProviderSetting(pId, req.provider, req.user);
-    
+
     return res.json({
       success: true,
       data: settings.security.activeSessions || []
@@ -476,7 +485,7 @@ const getAppPreferences = async (req, res) => {
   try {
     const pId = req.providerId.toString();
     const settings = await getOrCreateProviderSetting(pId, req.provider, req.user);
-    
+
     return res.json({
       success: true,
       data: settings.preferences

@@ -93,6 +93,16 @@ const getProviderTabFromHash = (rawHash) => {
   if (hash.includes('/requests') || hash.includes('/live-requests')) return 'live-requests';
   if (hash.includes('/help')) return 'help';
 
+  // Honor user's saved default landing view when visiting generic provider root
+  if (typeof window !== 'undefined' && (!hash || hash === '#provider' || hash === '#/provider' || hash === '#/provider/dashboard')) {
+    try {
+      const savedLanding = localStorage.getItem('tiffinlink_landing');
+      if (savedLanding === 'live-requests') return 'live-requests';
+      if (savedLanding === 'orders-prep' || savedLanding === 'orders-preparing') return 'orders-preparing';
+      if (savedLanding === 'dashboard') return 'dashboard';
+    } catch (e) {}
+  }
+
   return 'dashboard';
 };
 
@@ -172,11 +182,19 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
   const [isKitchenOnline, setIsKitchenOnline] = useState(true);
   const [statusToast, setStatusToast] = useState('');
 
-  // Dynamic Sidebar Badge Counts from MongoDB Database
+  // Dynamic Sidebar & Header Badge Counts from MongoDB Database
   const [badgeCounts, setBadgeCounts] = useState({
     liveRequests: 0,
-    newOrders: 0
+    newOrders: 0,
+    notifications: 0
   });
+
+  const updateNotificationBadgeCount = (count) => {
+    setBadgeCounts(prev => ({
+      ...prev,
+      notifications: typeof count === 'number' ? Math.max(0, count) : 0
+    }));
+  };
 
   useEffect(() => {
     const fetchSidebarBadges = async () => {
@@ -187,10 +205,21 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
           if (dashJson.data.acceptingOrders !== undefined) {
             setIsKitchenOnline(Boolean(dashJson.data.acceptingOrders));
           }
-          setBadgeCounts({
+          setBadgeCounts(prev => ({
+            ...prev,
             liveRequests: dashJson.data.liveRequestsCount || 0,
             newOrders: dashJson.data.newOrdersCount || 0
-          });
+          }));
+        }
+
+        // Fetch real unread notification count
+        const notifRes = await apiRequest('/notifications?limit=1');
+        const notifJson = typeof notifRes?.json === 'function' ? await notifRes.json() : notifRes;
+        if (notifJson && notifJson.success && notifJson.summary) {
+          setBadgeCounts(prev => ({
+            ...prev,
+            notifications: notifJson.summary.unread || 0
+          }));
         }
       } catch (err) {
         console.error('Error fetching sidebar badge counts from MongoDB:', err);
@@ -290,7 +319,13 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
         case 'schedule':
           return <ScheduleTab currentUser={currentUser} />;
         case 'notifications':
-          return <NotificationsTab currentUser={currentUser} onNavigateTab={setActiveTab} />;
+          return (
+            <NotificationsTab
+              currentUser={currentUser}
+              onNavigateTab={setActiveTab}
+              onUnreadCountChange={updateNotificationBadgeCount}
+            />
+          );
         case 'settings':
         case 'settings-account':
         case 'settings-notifications':
@@ -374,9 +409,11 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
               className="relative p-2 rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[20px]">notifications</span>
-              <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-clay-earth text-bone-white font-label-caps text-[9px] flex items-center justify-center font-bold">
-                {badgeCounts.notifications || 3}
-              </span>
+              {badgeCounts.notifications > 0 && (
+                <span className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-clay-earth text-bone-white font-label-caps text-[9px] flex items-center justify-center font-bold">
+                  {badgeCounts.notifications > 99 ? '99+' : badgeCounts.notifications}
+                </span>
+              )}
             </button>
 
             <button

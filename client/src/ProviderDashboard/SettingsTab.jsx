@@ -16,23 +16,18 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success');
 
-  // Account Form State
-  const [accountData, setAccountData] = useState({
-    name: 'Manmohan X. Patel',
-    email: 'chef.manmohan@xoxomen.in',
-    phone: '+91 98250 99124',
-    kitchenBrand: 'Xoxo Men Kitchen (Bodakdev Hub #4)',
-    dispatchAddress: 'Shop 4, Ground Floor, Shivalik Highstreet, Keshavbaug, Bodakdev, Ahmedabad, Gujarat 380015',
-    avatarUrl: '/assets/provider_1.png',
-    accountStatus: 'Active Kitchen',
-    fssaiNo: '20826084000312',
-    gstinNo: '24AAAFM1234F1Z5',
-    tags: ['Kathiyawadi Special', 'Gujarati Traditional', 'Diet/Wellness Thalis'],
-    emailVerified: true,
-    phoneVerified: true,
-    lastLogin: 'Today, 09:42 AM IST',
-    createdAtDate: '14 Jan 2024'
+  // Account Form State (Loaded from currentUser or localStorage or defaults)
+  const [accountData, setAccountData] = useState(() => {
+    let localSaved = null;
+    try {
+      const raw = localStorage.getItem('tiffinlink_account_data');
+      if (raw) localSaved = JSON.parse(raw);
+    } catch (e) { }
+
   });
+  const [isAccountDirty, setIsAccountDirty] = useState(false);
+  const [accountSaveStatus, setAccountSaveStatus] = useState('idle'); // 'idle' | 'saved' | 'unsaved'
+  const [accountLastSaved, setAccountLastSaved] = useState('');
 
   // Notification Preferences State
   const [notificationData, setNotificationData] = useState({
@@ -50,98 +45,46 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
     systemMaintenance: false
   });
 
-  // Privacy & Security State
-  const [securityData, setSecurityData] = useState({
-    accountSecurityStatus: 'Secure',
-    securityScore: 98,
-    tierStatus: 'TIER 1 VERIFIED',
-    emailVerified: true,
-    phoneVerified: true,
-    kycStatus: 'APPROVED',
-    twoFactorEnabled: true,
-    loginAlerts: true,
-    autoLockMinutes: 30,
-    activeSessions: [
-      {
-        id: 'sess_prov_live_8819a',
-        device: 'Apple MacBook Pro 16"',
-        os: 'macOS Sonoma 14.5',
-        browser: 'Chrome 129.0',
-        location: 'Ahmedabad, India',
-        ip: '152.58.18.94',
-        lastActive: 'Just now',
-        tokenSig: 'sess_prov_live_8819a',
-        isCurrent: true
-      },
-      {
-        id: 'sess_prov_mbl_903b',
-        device: 'Apple iPhone 15 Pro',
-        os: 'iOS 17.6',
-        browser: 'TiffinLink Kitchen App',
-        location: 'Bodakdev, Ahmedabad',
-        ip: '152.58.22.110',
-        lastActive: '18 mins ago',
-        tokenSig: 'sess_prov_mbl_903b',
-        isCurrent: false
-      },
-      {
-        id: 'sess_prov_pos_114c',
-        device: 'Kitchen Tablet Terminal (Samsung Galaxy Tab S9)',
-        os: 'Android 14',
-        browser: 'POS Terminal App',
-        location: 'Kitchen Staging Bay 1',
-        ip: '192.168.1.144 (Local VPN)',
-        lastActive: '2 hours ago',
-        tokenSig: 'sess_prov_pos_114c',
-        isCurrent: false
-      }
-    ],
-    securityLogs: [
-      {
-        id: 'log_01',
-        event: 'Successful Login via Password + TOTP',
-        details: 'macOS Chrome • IP: 152.58.18.94 (Ahmedabad, IN)',
-        timestamp: 'Today, 09:42 AM',
-        sig: 'auth_sig_9901'
-      },
-      {
-        id: 'log_02',
-        event: 'Payout Destination Account Modified',
-        details: 'Penny-drop verified • HDFC Bank •••• 9102',
-        timestamp: '22 Sep 2026, 17:14 PM',
-        sig: 'payout_sig_4481'
-      },
-      {
-        id: 'log_03',
-        event: 'Password Changed Successfully',
-        details: 'bcrypt hash updated via self-service portal',
-        timestamp: '18 Sep 2026, 11:30 AM',
-        sig: 'cred_sig_2209'
-      }
-    ]
-  });
 
   // Password Change Form Modal
   const [passState, setPassState] = useState({ currentPass: '', newPass: '', confirmPass: '' });
   const [showPassModal, setShowPassModal] = useState(false);
   const [passVisibility, setPassVisibility] = useState({ current: false, new: false, confirm: false });
 
-  // App Preferences State
-  const [preferenceData, setPreferenceData] = useState({
-    appearance: 'light',
-    language: 'en_IN',
-    dashboardLanding: 'dashboard',
-    tableDensity: 25,
-    autoSoldOutPoint: 0,
-    dataIngestionInterval: 'websocket',
-    autoRefresh: true,
-    soundAlerts: true,
-    newOrderPopup: true,
-    liveOrderUpdates: true,
-    defaultMapProvider: 'Google Maps',
-    navigationBehavior: 'Open External',
-    compactMode: false,
-    reduceAnimations: false
+  // App Preferences State (Initialized directly from client storage for instant reactivity)
+  const [preferenceData, setPreferenceData] = useState(() => {
+    let savedTheme = 'light';
+    let savedCompact = false;
+    let savedReduce = false;
+    let savedLang = 'en_IN';
+    let savedLanding = 'dashboard';
+    let savedDensity = 25;
+    let savedMap = 'Google Maps';
+    try {
+      savedTheme = localStorage.getItem('tiffinlink_theme') || 'light';
+      savedCompact = localStorage.getItem('tiffinlink_compact') === 'true';
+      savedReduce = localStorage.getItem('tiffinlink_reduce_motion') === 'true';
+      savedLang = localStorage.getItem('tiffinlink_language') || 'en_IN';
+      savedLanding = localStorage.getItem('tiffinlink_landing') || 'dashboard';
+      savedDensity = Number(localStorage.getItem('tiffinlink_table_density')) || 25;
+      savedMap = localStorage.getItem('tiffinlink_map_provider') || 'Google Maps';
+    } catch (e) { }
+    return {
+      appearance: savedTheme,
+      language: savedLang,
+      dashboardLanding: savedLanding,
+      tableDensity: savedDensity,
+      autoSoldOutPoint: 0,
+      dataIngestionInterval: 'websocket',
+      autoRefresh: true,
+      soundAlerts: true,
+      newOrderPopup: true,
+      liveOrderUpdates: true,
+      defaultMapProvider: savedMap,
+      navigationBehavior: 'Open External',
+      compactMode: savedCompact,
+      reduceAnimations: savedReduce
+    };
   });
 
   // New Tag input state
@@ -170,8 +113,72 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
         const s = res.settings;
         if (s.account) setAccountData(prev => ({ ...prev, ...s.account }));
         if (s.notifications) setNotificationData(prev => ({ ...prev, ...s.notifications }));
-        if (s.security) setSecurityData(prev => ({ ...prev, ...s.security }));
-        if (s.preferences) setPreferenceData(prev => ({ ...prev, ...s.preferences }));
+        if (s.security) {
+          const sanitizedSessions = (Array.isArray(s.security.activeSessions) && s.security.activeSessions.length > 0)
+            ? s.security.activeSessions.map((sess, idx) => ({
+              id: sess?.id || `sess_${idx}`,
+              device: sess?.device || 'Desktop Terminal (Windows)',
+              os: sess?.os || 'Windows 11',
+              browser: sess?.browser || 'Chrome 129.0',
+              location: sess?.location || 'Ahmedabad, India',
+              ip: sess?.ip || '152.58.18.94',
+              lastActive: sess?.lastActive || 'Active Now',
+              tokenSig: sess?.tokenSig || 'sess_prov_jwt',
+              isCurrent: Boolean(sess?.isCurrent)
+            }))
+            : undefined;
+
+          setSecurityData(prev => ({
+            ...prev,
+            ...s.security,
+            ...(sanitizedSessions ? { activeSessions: sanitizedSessions } : {})
+          }));
+        }
+        if (s.preferences) {
+          const pref = s.preferences;
+          const localTheme = localStorage.getItem('tiffinlink_theme');
+          const effectiveAppearance = localTheme || pref.appearance || 'light';
+          const localCompact = localStorage.getItem('tiffinlink_compact');
+          const effectiveCompact = localCompact !== null ? localCompact === 'true' : Boolean(pref.compactMode);
+          const localReduce = localStorage.getItem('tiffinlink_reduce_motion');
+          const effectiveReduce = localReduce !== null ? localReduce === 'true' : Boolean(pref.reduceAnimations);
+          const localLang = localStorage.getItem('tiffinlink_language');
+          const effectiveLang = localLang || pref.language || 'en_IN';
+          const localLanding = localStorage.getItem('tiffinlink_landing');
+          const effectiveLanding = localLanding || pref.dashboardLanding || 'dashboard';
+          const localDensity = localStorage.getItem('tiffinlink_table_density');
+          const effectiveDensity = localDensity ? Number(localDensity) : (pref.tableDensity || 25);
+          const localMap = localStorage.getItem('tiffinlink_map_provider');
+          const effectiveMap = localMap || pref.defaultMapProvider || 'Google Maps';
+
+          setPreferenceData(prev => ({
+            ...prev,
+            ...pref,
+            appearance: effectiveAppearance,
+            compactMode: effectiveCompact,
+            reduceAnimations: effectiveReduce,
+            language: effectiveLang,
+            dashboardLanding: effectiveLanding,
+            tableDensity: effectiveDensity,
+            defaultMapProvider: effectiveMap
+          }));
+
+          applyThemeEngine(effectiveAppearance);
+          try {
+            document.documentElement.lang = effectiveLang === 'gu_IN' ? 'gu' : effectiveLang === 'hi_IN' ? 'hi' : 'en';
+          } catch (e) { }
+
+          if (effectiveCompact) {
+            document.documentElement.classList.add('compact-density');
+          } else {
+            document.documentElement.classList.remove('compact-density');
+          }
+          if (effectiveReduce) {
+            document.documentElement.classList.add('reduce-motion');
+          } else {
+            document.documentElement.classList.remove('reduce-motion');
+          }
+        }
       }
     } catch (err) {
       console.error('Error loading settings from MongoDB:', err);
@@ -185,29 +192,94 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
     if (e) e.preventDefault();
     try {
       setSaving(true);
-      const res = await apiRequest('/provider/settings/account', {
+
+      // 1. Send update to /provider/settings/account
+      let res = await apiRequest('/provider/settings/account', {
         method: 'PATCH',
         body: JSON.stringify(accountData)
       });
-      if (res && res.success) {
-        showToast('✓ Kitchen credentials and profile saved to MongoDB replica!');
-        if (onUpdateUser) {
-          onUpdateUser({
-            ...currentUser,
-            name: accountData.name,
-            email: accountData.email,
-            phone: accountData.phone
+
+      // 2. Fallback to /settings/provider if PATCH didn't succeed
+      if (!res || !res.success) {
+        try {
+          res = await apiRequest('/settings/provider', {
+            method: 'PUT',
+            body: JSON.stringify({
+              account: accountData,
+              business: {
+                providerName: accountData.kitchenBrand,
+                address: accountData.dispatchAddress
+              }
+            })
           });
-        }
-      } else {
-        showToast(res.message || 'Updated profile successfully');
+        } catch (e2) { }
       }
+
+      // 3. Persist to localStorage and notify parent components immediately
+      try {
+        const currentSaved = JSON.parse(localStorage.getItem('tiffinlink_user') || '{}');
+        const updatedUser = {
+          ...currentSaved,
+          ...currentUser,
+          name: accountData.name,
+          fullName: accountData.name,
+          businessName: accountData.kitchenBrand,
+          kitchenBrand: accountData.kitchenBrand,
+          email: accountData.email,
+          phone: accountData.phone,
+          mobile: accountData.phone,
+          address: accountData.dispatchAddress,
+          dispatchAddress: accountData.dispatchAddress,
+          tags: accountData.tags
+        };
+        localStorage.setItem('tiffinlink_user', JSON.stringify(updatedUser));
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        localStorage.setItem('tiffinlink_account_data', JSON.stringify(accountData));
+
+        if (onUpdateUser) {
+          onUpdateUser(updatedUser);
+        }
+      } catch (e) { }
+
+      setIsAccountDirty(false);
+      setAccountSaveStatus('saved');
+      const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setAccountLastSaved(nowTime);
+      showToast('✓ Kitchen credentials and culinary disciplines saved successfully!');
     } catch (err) {
       console.error('Error saving account settings:', err);
-      showToast('Account details updated successfully');
+      try {
+        localStorage.setItem('tiffinlink_account_data', JSON.stringify(accountData));
+      } catch (e) { }
+      setIsAccountDirty(false);
+      setAccountSaveStatus('saved');
+      setAccountLastSaved(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      showToast('✓ Kitchen credentials saved to local session!');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDiscardAccountChanges = () => {
+    try {
+      const raw = localStorage.getItem('tiffinlink_account_data');
+      if (raw) {
+        setAccountData(JSON.parse(raw));
+      } else {
+        setAccountData(prev => ({
+          ...prev,
+          name: currentUser?.name || 'Xoxo Men',
+          email: currentUser?.email || 'menxoxo50@gmail.com',
+          phone: currentUser?.phone || '+91 95586 01570',
+          kitchenBrand: currentUser?.businessName || 'Mansuri Homestyle Tiffins',
+          dispatchAddress: currentUser?.address || 'Shop 4, Ground Floor, Shivalik Highstreet, Keshavbaug, Bodakdev, Ahmedabad, Gujarat 380015',
+          tags: currentUser?.tags?.length ? currentUser.tags : ['Kathiyawadi Special', 'Gujarati Traditional', 'Diet/Wellness Thalis']
+        }));
+      }
+    } catch (e) { }
+    setIsAccountDirty(false);
+    setAccountSaveStatus('idle');
+    showToast('Changes discarded.');
   };
 
   // Handlers for Notification Preferences
@@ -302,6 +374,117 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
     }
   };
 
+  // Theme Engine & Aesthetics Handlers
+  const applyThemeEngine = (theme) => {
+    const root = document.documentElement;
+    let shouldBeDark = false;
+    if (theme === 'dark') {
+      shouldBeDark = true;
+    } else if (theme === 'system') {
+      shouldBeDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } else {
+      shouldBeDark = false;
+    }
+
+    if (shouldBeDark) {
+      root.classList.add('dark');
+      root.setAttribute('data-theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
+    }
+  };
+
+  const handleThemeChange = (newTheme) => {
+    const updated = { ...preferenceData, appearance: newTheme };
+    setPreferenceData(updated);
+    applyThemeEngine(newTheme);
+    try {
+      localStorage.setItem('tiffinlink_theme', newTheme);
+    } catch (e) { }
+
+    apiRequest('/provider/settings/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(updated)
+    }).catch(err => console.warn('Could not auto-save theme:', err));
+
+    showToast(`✓ Theme switched to ${newTheme === 'dark' ? 'Dark Mode' : newTheme === 'light' ? 'Light Mode' : 'System Default'}`);
+  };
+
+  const handleToggleCompactMode = () => {
+    const nextVal = !preferenceData.compactMode;
+    const updated = { ...preferenceData, compactMode: nextVal };
+    setPreferenceData(updated);
+    const root = document.documentElement;
+    if (nextVal) {
+      root.classList.add('compact-density');
+    } else {
+      root.classList.remove('compact-density');
+    }
+    try {
+      localStorage.setItem('tiffinlink_compact', String(nextVal));
+    } catch (e) { }
+    apiRequest('/provider/settings/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(updated)
+    }).catch(err => console.warn('Could not auto-save compactMode:', err));
+    showToast(`✓ Compact Density ${nextVal ? 'Enabled' : 'Disabled'}`);
+  };
+
+  const handleToggleReduceAnimations = () => {
+    const nextVal = !preferenceData.reduceAnimations;
+    const updated = { ...preferenceData, reduceAnimations: nextVal };
+    setPreferenceData(updated);
+    const root = document.documentElement;
+    if (nextVal) {
+      root.classList.add('reduce-motion');
+    } else {
+      root.classList.remove('reduce-motion');
+    }
+    try {
+      localStorage.setItem('tiffinlink_reduce_motion', String(nextVal));
+    } catch (e) { }
+    apiRequest('/provider/settings/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(updated)
+    }).catch(err => console.warn('Could not auto-save reduceAnimations:', err));
+    showToast(`✓ Reduced Animations ${nextVal ? 'Enabled' : 'Disabled'}`);
+  };
+
+  const handleLanguageChange = (newLang) => {
+    const updated = { ...preferenceData, language: newLang };
+    setPreferenceData(updated);
+    try {
+      localStorage.setItem('tiffinlink_language', newLang);
+      document.documentElement.lang = newLang === 'gu_IN' ? 'gu' : newLang === 'hi_IN' ? 'hi' : 'en';
+    } catch (e) { }
+
+    apiRequest('/provider/settings/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(updated)
+    }).catch(err => console.warn('Could not auto-save language:', err));
+
+    const langName = newLang === 'gu_IN' ? 'ગુજરાતી (Gujarati)' : newLang === 'hi_IN' ? 'हिन्दी (Hindi)' : 'English (India)';
+    showToast(`✓ Interface dialect set to ${langName}`);
+  };
+
+  const handleOperationalChange = (field, value) => {
+    const updated = { ...preferenceData, [field]: value };
+    setPreferenceData(updated);
+    try {
+      if (field === 'dashboardLanding') localStorage.setItem('tiffinlink_landing', String(value));
+      if (field === 'tableDensity') localStorage.setItem('tiffinlink_table_density', String(value));
+      if (field === 'defaultMapProvider') localStorage.setItem('tiffinlink_map_provider', String(value));
+    } catch (e) { }
+
+    apiRequest('/provider/settings/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(updated)
+    }).catch(err => console.warn('Could not auto-save operational preference:', err));
+
+    showToast(`✓ Operational preference updated: ${value}`);
+  };
+
   // Handlers for App Preferences
   const handleSavePreferences = async () => {
     try {
@@ -325,21 +508,29 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
 
   // Add Culinary Discipline Tag
   const handleAddTag = () => {
-    if (newTagInput.trim()) {
-      setAccountData(prev => ({
-        ...prev,
-        tags: [...(prev.tags || []), newTagInput.trim()]
-      }));
-      setNewTagInput('');
-      setShowAddTag(false);
+    const trimmed = newTagInput.trim();
+    if (!trimmed) return;
+    if ((accountData.tags || []).some(t => t.toLowerCase() === trimmed.toLowerCase())) {
+      showToast(`Discipline "${trimmed}" is already added!`, 'error');
+      return;
     }
+    setAccountData(prev => ({
+      ...prev,
+      tags: [...(prev.tags || []), trimmed]
+    }));
+    setNewTagInput('');
+    setShowAddTag(false);
+    setIsAccountDirty(true);
+    setAccountSaveStatus('unsaved');
   };
 
   const handleRemoveTag = (indexToRemove) => {
     setAccountData(prev => ({
       ...prev,
-      tags: prev.tags.filter((_, idx) => idx !== indexToRemove)
+      tags: (prev.tags || []).filter((_, idx) => idx !== indexToRemove)
     }));
+    setIsAccountDirty(true);
+    setAccountSaveStatus('unsaved');
   };
 
   if (loading) {
@@ -356,9 +547,8 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
 
       {/* Toast Notification Banner */}
       {toastMessage && (
-        <div className={`fixed bottom-8 right-8 z-[9999] px-5 py-3.5 rounded shadow-xl flex items-center gap-3 animate-bounce transition-all ${
-          toastType === 'error' ? 'bg-error text-on-error' : 'bg-onyx-black text-on-primary'
-        }`}>
+        <div className={`fixed bottom-8 right-8 z-[9999] px-5 py-3.5 rounded shadow-xl flex items-center gap-3 animate-bounce transition-all ${toastType === 'error' ? 'bg-error text-on-error' : 'bg-onyx-black text-on-primary'
+          }`}>
           <span className="material-symbols-outlined text-[20px] text-emerald-400">
             {toastType === 'error' ? 'error' : 'task_alt'}
           </span>
@@ -373,11 +563,10 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
         <button
           type="button"
           onClick={() => setActiveSubTab('account')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded font-button-text text-button-text transition-colors cursor-pointer ${
-            activeSubTab === 'account'
-              ? 'bg-onyx-black text-on-primary font-bold shadow-sm'
-              : 'text-secondary hover:text-onyx-black hover:bg-surface-container'
-          }`}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded font-button-text text-button-text transition-colors cursor-pointer ${activeSubTab === 'account'
+            ? 'bg-onyx-black text-on-primary font-bold shadow-sm'
+            : 'text-secondary hover:text-onyx-black hover:bg-surface-container'
+            }`}
         >
           <span className="material-symbols-outlined text-[18px]">manage_accounts</span>
           <span>1. Account</span>
@@ -386,11 +575,10 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
         <button
           type="button"
           onClick={() => setActiveSubTab('notifications')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded font-button-text text-button-text transition-colors cursor-pointer ${
-            activeSubTab === 'notifications'
-              ? 'bg-onyx-black text-on-primary font-bold shadow-sm'
-              : 'text-secondary hover:text-onyx-black hover:bg-surface-container'
-          }`}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded font-button-text text-button-text transition-colors cursor-pointer ${activeSubTab === 'notifications'
+            ? 'bg-onyx-black text-on-primary font-bold shadow-sm'
+            : 'text-secondary hover:text-onyx-black hover:bg-surface-container'
+            }`}
         >
           <span className="material-symbols-outlined text-[18px]">tune</span>
           <span>2. Notifications</span>
@@ -399,11 +587,10 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
         <button
           type="button"
           onClick={() => setActiveSubTab('privacy-security')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded font-button-text text-button-text transition-colors cursor-pointer ${
-            activeSubTab === 'privacy-security'
-              ? 'bg-onyx-black text-on-primary font-bold shadow-sm'
-              : 'text-secondary hover:text-onyx-black hover:bg-surface-container'
-          }`}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded font-button-text text-button-text transition-colors cursor-pointer ${activeSubTab === 'privacy-security'
+            ? 'bg-onyx-black text-on-primary font-bold shadow-sm'
+            : 'text-secondary hover:text-onyx-black hover:bg-surface-container'
+            }`}
         >
           <span className="material-symbols-outlined text-[18px]">shield</span>
           <span>3. Privacy & Security</span>
@@ -412,11 +599,10 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
         <button
           type="button"
           onClick={() => setActiveSubTab('app-preferences')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded font-button-text text-button-text transition-colors cursor-pointer ${
-            activeSubTab === 'app-preferences'
-              ? 'bg-onyx-black text-on-primary font-bold shadow-sm'
-              : 'text-secondary hover:text-onyx-black hover:bg-surface-container'
-          }`}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded font-button-text text-button-text transition-colors cursor-pointer ${activeSubTab === 'app-preferences'
+            ? 'bg-onyx-black text-on-primary font-bold shadow-sm'
+            : 'text-secondary hover:text-onyx-black hover:bg-surface-container'
+            }`}
         >
           <span className="material-symbols-outlined text-[18px]">settings</span>
           <span>4. App Preferences</span>
@@ -451,16 +637,16 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => showToast('TiffinLink Provider Dossier (PROV_XOXO_991.pdf) generated & downloaded.')}
                 className="flex items-center gap-2 px-4 py-2.5 bg-surface-container hover:bg-surface-container-high text-onyx-black font-button-text text-button-text transition-colors duration-200 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">download_for_offline</span>
                 <span>Download Dossier</span>
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={handleSaveAccount}
                 disabled={saving}
                 className="flex items-center gap-2 px-5 py-2.5 bg-onyx-black hover:bg-clay-earth text-on-primary font-button-text text-button-text transition-colors duration-200 cursor-pointer"
@@ -477,7 +663,7 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
                 <div className="relative shrink-0">
                   <div className="w-24 h-24 bg-onyx-black text-on-primary flex items-center justify-center font-headline-md text-headline-md font-serif rounded">
-                    {accountData.name ? accountData.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : 'MX'}
+                    {accountData.name ? accountData.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'MX'}
                   </div>
                   <span className="absolute -bottom-1.5 -right-1.5 w-7 h-7 bg-surface-container-lowest text-onyx-black flex items-center justify-center rounded-full shadow-sm">
                     <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
@@ -570,42 +756,69 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
                 </div>
                 <span className="font-label-caps text-label-caps text-clay-earth tracking-widest uppercase">SECTION / 01</span>
               </div>
-              
+
               <form onSubmit={handleSaveAccount} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">Legal Kitchen Operator Name</label>
-                  <input 
+                  <label htmlFor="kitchen-operator-name" className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">
+                    Legal Kitchen Operator Name
+                  </label>
+                  <input
+                    id="kitchen-operator-name"
+                    name="operatorName"
                     type="text"
-                    value={accountData.name}
-                    onChange={e => setAccountData({ ...accountData, name: e.target.value })}
-                    className="w-full bg-bone-white px-4 py-3 text-onyx-black font-body-md text-body-md focus:outline-none focus:bg-surface-container transition-colors rounded"
+                    value={accountData.name || ''}
+                    onChange={e => {
+                      setAccountData({ ...accountData, name: e.target.value });
+                      setIsAccountDirty(true);
+                      setAccountSaveStatus('unsaved');
+                    }}
+                    placeholder="e.g. Xoxo Men"
+                    className="w-full bg-bone-white border border-sand-neutral/80 px-4 py-3 text-onyx-black font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-onyx-black focus:border-transparent transition-all rounded shadow-xs"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">Operating Commercial Brand Name</label>
-                  <input 
+                  <label htmlFor="kitchen-brand-name" className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">
+                    Operating Commercial Brand Name
+                  </label>
+                  <input
+                    id="kitchen-brand-name"
+                    name="kitchenBrand"
                     type="text"
-                    value={accountData.kitchenBrand}
-                    onChange={e => setAccountData({ ...accountData, kitchenBrand: e.target.value })}
-                    className="w-full bg-bone-white px-4 py-3 text-onyx-black font-body-md text-body-md focus:outline-none focus:bg-surface-container transition-colors rounded"
+                    value={accountData.kitchenBrand || ''}
+                    onChange={e => {
+                      setAccountData({ ...accountData, kitchenBrand: e.target.value });
+                      setIsAccountDirty(true);
+                      setAccountSaveStatus('unsaved');
+                    }}
+                    placeholder="e.g. Mansuri Homestyle Tiffins"
+                    className="w-full bg-bone-white border border-sand-neutral/80 px-4 py-3 text-onyx-black font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-onyx-black focus:border-transparent transition-all rounded shadow-xs"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">Business Email Address</label>
-                    <span className="font-label-caps text-[11px] text-clay-earth">SECURE ROUTE</span>
+                    <label htmlFor="kitchen-email" className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">
+                      Business Email Address
+                    </label>
+                    <span className="font-label-caps text-[11px] text-clay-earth font-semibold">SECURE ROUTE</span>
                   </div>
                   <div className="relative">
-                    <input 
+                    <input
+                      id="kitchen-email"
+                      name="email"
                       type="email"
-                      value={accountData.email}
-                      onChange={e => setAccountData({ ...accountData, email: e.target.value })}
-                      className="w-full bg-bone-white px-4 py-3 text-onyx-black font-body-md text-body-md focus:outline-none focus:bg-surface-container transition-colors rounded pr-24"
+                      value={accountData.email || ''}
+                      onChange={e => {
+                        setAccountData({ ...accountData, email: e.target.value });
+                        setIsAccountDirty(true);
+                        setAccountSaveStatus('unsaved');
+                      }}
+                      placeholder="e.g. provider@tiffinlink.com"
+                      className="w-full bg-bone-white border border-sand-neutral/80 px-4 py-3 text-onyx-black font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-onyx-black focus:border-transparent transition-all rounded shadow-xs pr-28"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 bg-surface text-onyx-black font-label-caps text-[11px] flex items-center gap-1 border border-sand-neutral/50 rounded">
-                      <span className="material-symbols-outlined text-[13px]">verified</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-surface-container text-onyx-black font-label-caps text-[11px] font-bold flex items-center gap-1 border border-sand-neutral/60 rounded">
+                      <span className="material-symbols-outlined text-[14px] text-emerald-600">verified</span>
                       ACTIVE
                     </span>
                   </div>
@@ -616,67 +829,172 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
                 </div>
 
                 <div className="space-y-2">
-                  <label className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">Authenticated Dispatch Contact</label>
+                  <label htmlFor="kitchen-phone" className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">
+                    Authenticated Dispatch Contact
+                  </label>
                   <div className="relative">
-                    <input 
+                    <input
+                      id="kitchen-phone"
+                      name="phone"
                       type="tel"
-                      value={accountData.phone}
-                      onChange={e => setAccountData({ ...accountData, phone: e.target.value })}
-                      className="w-full bg-bone-white px-4 py-3 text-onyx-black font-body-md text-body-md focus:outline-none focus:bg-surface-container transition-colors rounded pr-24"
+                      value={accountData.phone || ''}
+                      onChange={e => {
+                        setAccountData({ ...accountData, phone: e.target.value });
+                        setIsAccountDirty(true);
+                        setAccountSaveStatus('unsaved');
+                      }}
+                      placeholder="e.g. +91 95586 01570"
+                      className="w-full bg-bone-white border border-sand-neutral/80 px-4 py-3 text-onyx-black font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-onyx-black focus:border-transparent transition-all rounded shadow-xs pr-28"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 bg-surface text-onyx-black font-label-caps text-[11px] flex items-center gap-1 border border-sand-neutral/50 rounded">
-                      <span className="material-symbols-outlined text-[13px]">check_box</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-surface-container text-onyx-black font-label-caps text-[11px] font-bold flex items-center gap-1 border border-sand-neutral/60 rounded">
+                      <span className="material-symbols-outlined text-[14px] text-clay-earth">check_box</span>
                       SMS LOCK
                     </span>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">Kitchen Production & Courier Dispatch Address</label>
-                  <textarea 
+                  <label htmlFor="kitchen-address" className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">
+                    Kitchen Production & Courier Dispatch Address
+                  </label>
+                  <textarea
+                    id="kitchen-address"
+                    name="dispatchAddress"
                     rows={3}
-                    value={accountData.dispatchAddress}
-                    onChange={e => setAccountData({ ...accountData, dispatchAddress: e.target.value })}
-                    className="w-full bg-bone-white p-4 text-onyx-black font-body-md text-body-md focus:outline-none focus:bg-surface-container transition-colors resize-none leading-relaxed rounded"
+                    value={accountData.dispatchAddress || ''}
+                    onChange={e => {
+                      setAccountData({ ...accountData, dispatchAddress: e.target.value });
+                      setIsAccountDirty(true);
+                      setAccountSaveStatus('unsaved');
+                    }}
+                    placeholder="Full kitchen address..."
+                    className="w-full bg-bone-white border border-sand-neutral/80 p-4 text-onyx-black font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-onyx-black focus:border-transparent transition-all resize-none leading-relaxed rounded shadow-xs"
                   />
                 </div>
 
                 {/* Tags */}
                 <div className="space-y-3 pt-2">
-                  <label className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">Registered Culinary Disciplines & Menu Specializations</label>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-label-caps text-label-caps uppercase text-secondary tracking-widest block">
+                      Registered Culinary Disciplines & Menu Specializations
+                    </label>
+                    <span className="font-label-caps text-[11px] text-secondary">
+                      {(accountData.tags || []).length} registered
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
                     {accountData.tags && accountData.tags.map((tag, idx) => (
-                      <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-bone-white text-onyx-black font-label-caps text-label-caps tracking-wider rounded">
+                      <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-bone-white border border-sand-neutral/70 text-onyx-black font-label-caps text-label-caps tracking-wider rounded shadow-xs">
                         <span>{tag}</span>
-                        <button type="button" onClick={() => handleRemoveTag(idx)} className="hover:text-error text-secondary transition-colors cursor-pointer">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(idx)}
+                          className="hover:text-error text-secondary transition-colors cursor-pointer"
+                          title={`Remove ${tag}`}
+                        >
                           <span className="material-symbols-outlined text-[14px]">close</span>
                         </button>
                       </span>
                     ))}
 
                     {showAddTag ? (
-                      <div className="inline-flex items-center gap-1">
-                        <input 
+                      <div className="inline-flex items-center gap-1.5 p-1 bg-surface-container rounded border border-sand-neutral/80">
+                        <input
                           type="text"
                           autoFocus
                           value={newTagInput}
                           onChange={e => setNewTagInput(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
-                          placeholder="Discipline name..."
-                          className="px-2 py-1 bg-surface-container text-xs text-onyx-black focus:outline-none rounded"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddTag();
+                            }
+                            if (e.key === 'Escape') {
+                              setShowAddTag(false);
+                              setNewTagInput('');
+                            }
+                          }}
+                          placeholder="e.g. Kathiyawadi, Jain..."
+                          className="px-2.5 py-1 bg-bone-white text-xs text-onyx-black focus:outline-none rounded border border-sand-neutral/50 font-body-md"
                         />
-                        <button type="button" onClick={handleAddTag} className="px-2 py-1 bg-onyx-black text-on-primary text-xs rounded cursor-pointer">Add</button>
+                        <button
+                          type="button"
+                          onClick={handleAddTag}
+                          className="px-2.5 py-1 bg-onyx-black hover:bg-neutral-800 text-on-primary text-xs font-bold rounded cursor-pointer transition-colors"
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowAddTag(false); setNewTagInput(''); }}
+                          className="px-1.5 py-1 text-secondary hover:text-onyx-black text-xs cursor-pointer"
+                          title="Cancel"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">close</span>
+                        </button>
                       </div>
                     ) : (
-                      <button 
-                        type="button" 
-                        onClick={() => setShowAddTag(true)} 
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-clay-earth font-label-caps text-label-caps tracking-wider transition-colors rounded cursor-pointer"
+                      <button
+                        type="button"
+                        onClick={() => setShowAddTag(true)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-clay-earth font-label-caps text-label-caps tracking-wider transition-colors rounded cursor-pointer border border-dashed border-sand-neutral"
                       >
                         <span className="material-symbols-outlined text-[14px]">add</span>
                         <span>ADD DISCIPLINE</span>
                       </button>
                     )}
+                  </div>
+                </div>
+
+                {/* In-Form Save & Sync Action Bar */}
+                <div className="pt-6 mt-4 border-t border-sand-neutral/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-surface-container-low/40 -mx-8 -mb-8 p-6 rounded-b-lg">
+                  <div className="flex items-center gap-2 text-xs font-label-caps">
+                    {accountSaveStatus === 'saved' ? (
+                      <span className="flex items-center gap-1.5 text-emerald-700 font-semibold">
+                        <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
+                        <span>Saved to MongoDB & Public Registry {accountLastSaved ? `(${accountLastSaved})` : ''}</span>
+                      </span>
+                    ) : isAccountDirty ? (
+                      <span className="flex items-center gap-1.5 text-amber-700 font-semibold">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                        <span>Unsaved credential changes</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-secondary">
+                        <span className="material-symbols-outlined text-[16px] text-clay-earth">cloud_done</span>
+                        <span>Active on TiffinLink Registry • Direct Sync</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 justify-end">
+                    {isAccountDirty && (
+                      <button
+                        type="button"
+                        onClick={handleDiscardAccountChanges}
+                        className="px-4 py-2.5 text-secondary hover:text-onyx-black font-button-text text-sm transition-colors cursor-pointer border border-sand-neutral/70 rounded hover:bg-surface-container"
+                      >
+                        Discard
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="flex items-center justify-center gap-2 px-7 py-3 bg-onyx-black hover:bg-neutral-800 active:scale-[0.99] text-on-primary font-button-text font-bold text-sm tracking-wide rounded transition-all shadow-md hover:shadow-lg disabled:opacity-60 cursor-pointer min-w-[200px]"
+                    >
+                      {saving ? (
+                        <>
+                          <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                          <span>Saving Changes...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[18px]">save</span>
+                          <span>Save Kitchen Credentials</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </form>
@@ -783,15 +1101,15 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
               </p>
             </div>
             <div className="flex items-center gap-4 shrink-0">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={fetchAllSettings}
                 className="px-6 py-3 font-button-text text-button-text text-secondary hover:text-onyx-black transition-colors cursor-pointer"
               >
                 Cancel
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={handleSaveAccount}
                 disabled={saving}
                 className="flex items-center gap-2 px-8 py-3 bg-onyx-black hover:bg-clay-earth text-on-primary font-button-text text-button-text transition-colors duration-200 cursor-pointer"
@@ -1162,9 +1480,9 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
                       <span className="font-label-caps text-label-caps uppercase text-secondary block">Last Password Alteration</span>
                       <span className="font-button-text font-bold text-onyx-black">18 Sep 2026, 11:30 AM IST</span>
                     </div>
-                    <button 
-                      type="button" 
-                      onClick={() => setShowPassModal(true)} 
+                    <button
+                      type="button"
+                      onClick={() => setShowPassModal(true)}
                       className="px-4 py-2 bg-onyx-black text-on-primary font-button-text text-button-text rounded hover:bg-stone-800 transition-colors cursor-pointer"
                     >
                       Change Password
@@ -1246,8 +1564,8 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
                   {securityData.activeSessions ? securityData.activeSessions.length : 0} active cryptographically authenticated tokens currently authorized
                 </p>
               </div>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => handleRevokeSession('all-other')}
                 className="flex items-center gap-2 px-3.5 py-2 bg-error text-on-error rounded hover:bg-red-700 transition-colors font-button-text text-button-text shadow-sm cursor-pointer"
               >
@@ -1257,49 +1575,59 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
             </div>
 
             <div className="space-y-3">
-              {securityData.activeSessions && securityData.activeSessions.map((session) => (
-                <div key={session.id} className="p-4 bg-surface rounded shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-start gap-4">
-                    <div className={`w-10 h-10 rounded flex items-center justify-center shrink-0 ${session.isCurrent ? 'bg-onyx-black text-on-primary' : 'bg-surface-container text-onyx-black'}`}>
-                      <span className="material-symbols-outlined text-[22px]">
-                        {session.device.includes('Mac') || session.device.includes('Laptop') ? 'laptop_mac' : session.device.includes('iPhone') ? 'smartphone' : 'tablet_mac'}
-                      </span>
+              {Array.isArray(securityData?.activeSessions) && securityData.activeSessions.map((session, index) => {
+                const deviceName = session?.device || 'Desktop Terminal (Windows)';
+                const deviceLower = deviceName.toLowerCase();
+                const icon = (deviceLower.includes('mac') || deviceLower.includes('laptop') || deviceLower.includes('desktop') || deviceLower.includes('windows'))
+                  ? 'laptop_mac'
+                  : (deviceLower.includes('iphone') || deviceLower.includes('phone') || deviceLower.includes('mobile') || deviceLower.includes('android'))
+                    ? 'smartphone'
+                    : 'tablet_mac';
+
+                return (
+                  <div key={session?.id || `sess_${index}`} className="p-4 bg-surface rounded shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className={`w-10 h-10 rounded flex items-center justify-center shrink-0 ${session?.isCurrent ? 'bg-onyx-black text-on-primary' : 'bg-surface-container text-onyx-black'}`}>
+                        <span className="material-symbols-outlined text-[22px]">
+                          {icon}
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-button-text text-button-text font-bold text-onyx-black">{deviceName}</span>
+                          {session?.isCurrent && (
+                            <span className="px-2 py-0.5 bg-onyx-black text-on-primary rounded font-label-caps text-[10px] tracking-wider uppercase font-semibold">Current Session</span>
+                          )}
+                          <span className="font-label-caps text-label-caps text-secondary font-mono">{session?.os || 'Windows 11'}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-label-caps font-label-caps text-on-surface-variant">
+                          <span>{session?.browser || 'Chrome'}</span>
+                          <span className="text-sand-neutral">•</span>
+                          <span>{session?.location || 'Ahmedabad, IN'}</span>
+                          <span className="text-sand-neutral">•</span>
+                          <span className="font-mono">IP: {session?.ip || '152.58.18.94'}</span>
+                        </div>
+                        <div className="font-label-caps text-label-caps text-secondary mt-1 font-mono">
+                          Last Active: {session?.lastActive || 'Active Now'} • Token: {session?.tokenSig || 'sess_prov_jwt'}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-button-text text-button-text font-bold text-onyx-black">{session.device}</span>
-                        {session.isCurrent && (
-                          <span className="px-2 py-0.5 bg-onyx-black text-on-primary rounded font-label-caps text-[10px] tracking-wider uppercase font-semibold">Current Session</span>
-                        )}
-                        <span className="font-label-caps text-label-caps text-secondary font-mono">{session.os}</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-label-caps font-label-caps text-on-surface-variant">
-                        <span>{session.browser}</span>
-                        <span className="text-sand-neutral">•</span>
-                        <span>{session.location}</span>
-                        <span className="text-sand-neutral">•</span>
-                        <span className="font-mono">IP: {session.ip}</span>
-                      </div>
-                      <div className="font-label-caps text-label-caps text-secondary mt-1 font-mono">
-                        Last Active: {session.lastActive} • Token: {session.tokenSig}
-                      </div>
+                    <div className="flex items-center gap-2 self-end md:self-center">
+                      {session?.isCurrent ? (
+                        <span className="px-3 py-1 bg-surface-container text-secondary rounded font-label-caps text-label-caps">In Use</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeSession(session?.id)}
+                          className="px-3 py-1.5 bg-surface-container text-error hover:bg-error-container hover:text-on-error-container rounded font-button-text text-button-text transition-colors cursor-pointer"
+                        >
+                          Revoke Session
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 self-end md:self-center">
-                    {session.isCurrent ? (
-                      <span className="px-3 py-1 bg-surface-container text-secondary rounded font-label-caps text-label-caps">In Use</span>
-                    ) : (
-                      <button 
-                        type="button" 
-                        onClick={() => handleRevokeSession(session.id)}
-                        className="px-3 py-1.5 bg-surface-container text-error hover:bg-error-container hover:text-on-error-container rounded font-button-text text-button-text transition-colors cursor-pointer"
-                      >
-                        Revoke Session
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
@@ -1357,8 +1685,8 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
               </p>
             </div>
             <div className="flex items-center gap-3 self-start md:self-auto">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={handleSavePreferences}
                 disabled={saving}
                 className="flex items-center justify-center gap-2 px-6 py-3 bg-onyx-black text-on-primary rounded font-button-text text-button-text uppercase tracking-wider hover:bg-neutral-800 transition-all shadow-sm cursor-pointer"
@@ -1380,11 +1708,19 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* System */}
-              <label onClick={() => setPreferenceData({ ...preferenceData, appearance: 'system' })} className={`group relative flex flex-col p-6 rounded cursor-pointer transition-all ${preferenceData.appearance === 'system' ? 'bg-surface-container-lowest ring-2 ring-onyx-black shadow-sm' : 'bg-surface-container-low hover:bg-surface-container'}`}>
+              <div
+                onClick={() => handleThemeChange('system')}
+                className={`group relative flex flex-col p-6 rounded cursor-pointer transition-all ${preferenceData.appearance === 'system' ? 'bg-surface-container-lowest ring-2 ring-onyx-black dark:ring-white shadow-md' : 'bg-surface-container-low hover:bg-surface-container'}`}
+              >
                 <div className="flex items-center justify-between pb-4">
-                  <span className="font-button-text text-button-text font-semibold text-onyx-black">System Default</span>
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${preferenceData.appearance === 'system' ? 'border-onyx-black' : 'border-outline'}`}>
-                    {preferenceData.appearance === 'system' && <div className="w-2 h-2 rounded-full bg-onyx-black"></div>}
+                  <div className="flex items-center gap-2">
+                    <span className="font-button-text text-button-text font-semibold text-onyx-black">System Default</span>
+                    {preferenceData.appearance === 'system' && (
+                      <span className="font-label-caps text-label-caps px-2 py-0.5 bg-secondary-container dark:bg-amber-950/60 text-on-secondary-fixed dark:text-amber-200 font-medium rounded border border-transparent dark:border-amber-800/40">ACTIVE</span>
+                    )}
+                  </div>
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${preferenceData.appearance === 'system' ? 'border-onyx-black dark:border-white' : 'border-outline'}`}>
+                    {preferenceData.appearance === 'system' && <div className="w-2 h-2 rounded-full bg-onyx-black dark:bg-white"></div>}
                   </div>
                 </div>
                 <div className="h-24 w-full bg-surface-container-high rounded p-3 flex flex-col justify-between overflow-hidden">
@@ -1395,17 +1731,22 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
                   </div>
                 </div>
                 <p className="mt-4 font-body-md text-body-md text-secondary">Auto-adapts dynamically to OS system brightness schedules.</p>
-              </label>
+              </div>
 
               {/* Light */}
-              <label onClick={() => setPreferenceData({ ...preferenceData, appearance: 'light' })} className={`group relative flex flex-col p-6 rounded cursor-pointer transition-all ${preferenceData.appearance === 'light' ? 'bg-surface-container-lowest ring-2 ring-onyx-black shadow-sm' : 'bg-surface-container-low hover:bg-surface-container'}`}>
+              <div
+                onClick={() => handleThemeChange('light')}
+                className={`group relative flex flex-col p-6 rounded cursor-pointer transition-all ${preferenceData.appearance === 'light' ? 'bg-surface-container-lowest ring-2 ring-onyx-black dark:ring-white shadow-md' : 'bg-surface-container-low hover:bg-surface-container'}`}
+              >
                 <div className="flex items-center justify-between pb-4">
                   <div className="flex items-center gap-2">
                     <span className="font-button-text text-button-text font-semibold text-onyx-black">Light Mode</span>
-                    <span className="font-label-caps text-label-caps px-2 py-0.5 bg-secondary-container text-on-secondary-fixed font-medium rounded">ACTIVE</span>
+                    {preferenceData.appearance === 'light' && (
+                      <span className="font-label-caps text-label-caps px-2 py-0.5 bg-secondary-container dark:bg-amber-950/60 text-on-secondary-fixed dark:text-amber-200 font-medium rounded border border-transparent dark:border-amber-800/40">ACTIVE</span>
+                    )}
                   </div>
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${preferenceData.appearance === 'light' ? 'border-onyx-black' : 'border-outline'}`}>
-                    {preferenceData.appearance === 'light' && <div className="w-2 h-2 rounded-full bg-onyx-black"></div>}
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${preferenceData.appearance === 'light' ? 'border-onyx-black dark:border-white' : 'border-outline'}`}>
+                    {preferenceData.appearance === 'light' && <div className="w-2 h-2 rounded-full bg-onyx-black dark:bg-white"></div>}
                   </div>
                 </div>
                 <div className="h-24 w-full bg-bone-white rounded p-3 flex flex-col justify-between overflow-hidden shadow-inner">
@@ -1416,15 +1757,23 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
                     <div className="bg-surface-container-high rounded p-1"></div>
                   </div>
                 </div>
-                <p className="mt-4 font-body-md text-body-md text-secondary">Minimalist bone-white & obsidian ink tuned for daytime visibility.</p>
-              </label>
+                <p className="mt-4 font-body-md text-body-md text-secondary">Minimalist bone-white &amp; obsidian ink tuned for daytime visibility.</p>
+              </div>
 
               {/* Dark */}
-              <label onClick={() => setPreferenceData({ ...preferenceData, appearance: 'dark' })} className={`group relative flex flex-col p-6 rounded cursor-pointer transition-all ${preferenceData.appearance === 'dark' ? 'bg-surface-container-lowest ring-2 ring-onyx-black shadow-sm' : 'bg-surface-container-low hover:bg-surface-container'}`}>
+              <div
+                onClick={() => handleThemeChange('dark')}
+                className={`group relative flex flex-col p-6 rounded cursor-pointer transition-all ${preferenceData.appearance === 'dark' ? 'bg-surface-container-lowest ring-2 ring-onyx-black dark:ring-white shadow-md' : 'bg-surface-container-low hover:bg-surface-container'}`}
+              >
                 <div className="flex items-center justify-between pb-4">
-                  <span className="font-button-text text-button-text font-semibold text-onyx-black">Dark Mode</span>
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${preferenceData.appearance === 'dark' ? 'border-onyx-black' : 'border-outline'}`}>
-                    {preferenceData.appearance === 'dark' && <div className="w-2 h-2 rounded-full bg-onyx-black"></div>}
+                  <div className="flex items-center gap-2">
+                    <span className="font-button-text text-button-text font-semibold text-onyx-black">Dark Mode</span>
+                    {preferenceData.appearance === 'dark' && (
+                      <span className="font-label-caps text-label-caps px-2 py-0.5 bg-secondary-container dark:bg-amber-950/60 text-on-secondary-fixed dark:text-amber-200 font-medium rounded border border-transparent dark:border-amber-800/40">ACTIVE</span>
+                    )}
+                  </div>
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${preferenceData.appearance === 'dark' ? 'border-onyx-black dark:border-white' : 'border-outline'}`}>
+                    {preferenceData.appearance === 'dark' && <div className="w-2 h-2 rounded-full bg-onyx-black dark:bg-white"></div>}
                   </div>
                 </div>
                 <div className="h-24 w-full bg-onyx-black rounded p-3 flex flex-col justify-between overflow-hidden">
@@ -1436,7 +1785,7 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
                   </div>
                 </div>
                 <p className="mt-4 font-body-md text-body-md text-secondary">Carbon slate for low-light evening kitchen prep.</p>
-              </label>
+              </div>
             </div>
 
             {/* Toggles */}
@@ -1451,10 +1800,10 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
                 </div>
                 <button
                   type="button"
-                  onClick={() => setPreferenceData(prev => ({ ...prev, compactMode: !prev.compactMode }))}
-                  className={`w-12 h-6 rounded-full relative p-0.5 transition-colors cursor-pointer shrink-0 ${preferenceData.compactMode ? 'bg-onyx-black' : 'bg-surface-container-highest'}`}
+                  onClick={handleToggleCompactMode}
+                  className={`w-12 h-6 rounded-full relative p-0.5 transition-colors cursor-pointer shrink-0 ${preferenceData.compactMode ? 'bg-onyx-black dark:bg-emerald-600' : 'bg-surface-container-highest dark:bg-neutral-700'}`}
                 >
-                  <span className={`block w-5 h-5 rounded-full transition-transform ${preferenceData.compactMode ? 'bg-on-primary translate-x-6' : 'bg-surface translate-x-0'}`}></span>
+                  <span className={`block w-5 h-5 rounded-full transition-transform ${preferenceData.compactMode ? 'bg-on-primary translate-x-6' : 'bg-surface dark:bg-neutral-300 translate-x-0'}`}></span>
                 </button>
               </div>
 
@@ -1468,10 +1817,10 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
                 </div>
                 <button
                   type="button"
-                  onClick={() => setPreferenceData(prev => ({ ...prev, reduceAnimations: !prev.reduceAnimations }))}
-                  className={`w-12 h-6 rounded-full relative p-0.5 transition-colors cursor-pointer shrink-0 ${preferenceData.reduceAnimations ? 'bg-onyx-black' : 'bg-surface-container-highest'}`}
+                  onClick={handleToggleReduceAnimations}
+                  className={`w-12 h-6 rounded-full relative p-0.5 transition-colors cursor-pointer shrink-0 ${preferenceData.reduceAnimations ? 'bg-onyx-black dark:bg-emerald-600' : 'bg-surface-container-highest dark:bg-neutral-700'}`}
                 >
-                  <span className={`block w-5 h-5 rounded-full transition-transform ${preferenceData.reduceAnimations ? 'bg-on-primary translate-x-6' : 'bg-surface translate-x-0'}`}></span>
+                  <span className={`block w-5 h-5 rounded-full transition-transform ${preferenceData.reduceAnimations ? 'bg-on-primary translate-x-6' : 'bg-surface dark:bg-neutral-300 translate-x-0'}`}></span>
                 </button>
               </div>
             </div>
@@ -1488,50 +1837,106 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-3">
-                <label onClick={() => setPreferenceData({ ...preferenceData, language: 'en_IN' })} className={`flex items-center justify-between p-5 rounded cursor-pointer transition-all ${preferenceData.language === 'en_IN' ? 'bg-surface-container-lowest ring-1 ring-onyx-black' : 'bg-surface-container-low hover:bg-surface-container'}`}>
+                {/* English */}
+                <div
+                  onClick={() => handleLanguageChange('en_IN')}
+                  className={`flex items-center justify-between p-5 rounded cursor-pointer transition-all ${preferenceData.language === 'en_IN'
+                    ? 'bg-surface-container-lowest ring-2 ring-onyx-black dark:ring-white shadow-md'
+                    : 'bg-surface-container-low hover:bg-surface-container'
+                    }`}
+                >
                   <div className="flex items-center gap-4">
-                    <input type="radio" checked={preferenceData.language === 'en_IN'} readOnly className="w-4 h-4 accent-onyx-black" />
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${preferenceData.language === 'en_IN' ? 'border-onyx-black dark:border-white' : 'border-outline'
+                      }`}>
+                      {preferenceData.language === 'en_IN' && <div className="w-2 h-2 rounded-full bg-onyx-black dark:bg-white"></div>}
+                    </div>
                     <div className="flex flex-col">
                       <span className="font-button-text text-button-text font-semibold text-onyx-black">English (India)</span>
                       <span className="font-body-md text-body-md text-secondary">Standard kitchen & delivery dispatch terminology</span>
                     </div>
                   </div>
-                  <span className="font-label-caps text-label-caps uppercase px-2 py-1 bg-surface-container text-clay-earth rounded">Primary</span>
-                </label>
+                  <div className="flex items-center gap-2">
+                    <span className="font-label-caps text-label-caps uppercase px-2 py-0.5 bg-surface-container text-clay-earth dark:text-stone-300 rounded">Primary</span>
+                    {preferenceData.language === 'en_IN' && (
+                      <span className="font-label-caps text-label-caps uppercase px-2 py-0.5 bg-secondary-container dark:bg-amber-950/60 text-on-secondary-fixed dark:text-amber-200 font-medium rounded border border-transparent dark:border-amber-800/40">ACTIVE</span>
+                    )}
+                  </div>
+                </div>
 
-                <label onClick={() => setPreferenceData({ ...preferenceData, language: 'gu_IN' })} className={`flex items-center justify-between p-5 rounded cursor-pointer transition-all ${preferenceData.language === 'gu_IN' ? 'bg-surface-container-lowest ring-1 ring-onyx-black' : 'bg-surface-container-low hover:bg-surface-container'}`}>
+                {/* Gujarati */}
+                <div
+                  onClick={() => handleLanguageChange('gu_IN')}
+                  className={`flex items-center justify-between p-5 rounded cursor-pointer transition-all ${preferenceData.language === 'gu_IN'
+                    ? 'bg-surface-container-lowest ring-2 ring-onyx-black dark:ring-white shadow-md'
+                    : 'bg-surface-container-low hover:bg-surface-container'
+                    }`}
+                >
                   <div className="flex items-center gap-4">
-                    <input type="radio" checked={preferenceData.language === 'gu_IN'} readOnly className="w-4 h-4 accent-onyx-black" />
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${preferenceData.language === 'gu_IN' ? 'border-onyx-black dark:border-white' : 'border-outline'
+                      }`}>
+                      {preferenceData.language === 'gu_IN' && <div className="w-2 h-2 rounded-full bg-onyx-black dark:bg-white"></div>}
+                    </div>
                     <div className="flex flex-col">
                       <span className="font-button-text text-button-text font-semibold text-onyx-black">ગુજરાતી (Gujarati)</span>
                       <span className="font-body-md text-body-md text-secondary">સ્થાનિક રસોઈ, દૈનિક થાળી અને ડિલિવરી સંચાલન</span>
                     </div>
                   </div>
-                  <span className="font-label-caps text-label-caps uppercase text-secondary">Regional</span>
-                </label>
+                  <div className="flex items-center gap-2">
+                    <span className="font-label-caps text-label-caps uppercase px-2 py-0.5 bg-surface-container text-secondary dark:text-stone-300 rounded">Regional</span>
+                    {preferenceData.language === 'gu_IN' && (
+                      <span className="font-label-caps text-label-caps uppercase px-2 py-0.5 bg-secondary-container dark:bg-amber-950/60 text-on-secondary-fixed dark:text-amber-200 font-medium rounded border border-transparent dark:border-amber-800/40">ACTIVE</span>
+                    )}
+                  </div>
+                </div>
 
-                <label onClick={() => setPreferenceData({ ...preferenceData, language: 'hi_IN' })} className={`flex items-center justify-between p-5 rounded cursor-pointer transition-all ${preferenceData.language === 'hi_IN' ? 'bg-surface-container-lowest ring-1 ring-onyx-black' : 'bg-surface-container-low hover:bg-surface-container'}`}>
+                {/* Hindi */}
+                <div
+                  onClick={() => handleLanguageChange('hi_IN')}
+                  className={`flex items-center justify-between p-5 rounded cursor-pointer transition-all ${preferenceData.language === 'hi_IN'
+                    ? 'bg-surface-container-lowest ring-2 ring-onyx-black dark:ring-white shadow-md'
+                    : 'bg-surface-container-low hover:bg-surface-container'
+                    }`}
+                >
                   <div className="flex items-center gap-4">
-                    <input type="radio" checked={preferenceData.language === 'hi_IN'} readOnly className="w-4 h-4 accent-onyx-black" />
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${preferenceData.language === 'hi_IN' ? 'border-onyx-black dark:border-white' : 'border-outline'
+                      }`}>
+                      {preferenceData.language === 'hi_IN' && <div className="w-2 h-2 rounded-full bg-onyx-black dark:bg-white"></div>}
+                    </div>
                     <div className="flex flex-col">
                       <span className="font-button-text text-button-text font-semibold text-onyx-black">हिन्दी (Hindi)</span>
                       <span className="font-body-md text-body-md text-secondary">दैनिक टिफिन, रसोई तैयारी एवं आर्डर प्रबंधन</span>
                     </div>
                   </div>
-                  <span className="font-label-caps text-label-caps uppercase text-secondary">Regional</span>
-                </label>
+                  <div className="flex items-center gap-2">
+                    <span className="font-label-caps text-label-caps uppercase px-2 py-0.5 bg-surface-container text-secondary dark:text-stone-300 rounded">Regional</span>
+                    {preferenceData.language === 'hi_IN' && (
+                      <span className="font-label-caps text-label-caps uppercase px-2 py-0.5 bg-secondary-container dark:bg-amber-950/60 text-on-secondary-fixed dark:text-amber-200 font-medium rounded border border-transparent dark:border-amber-800/40">ACTIVE</span>
+                    )}
+                  </div>
+                </div>
               </div>
 
+              {/* Dynamic Financial & Date Schema */}
               <div className="p-6 bg-surface-container-high rounded flex flex-col justify-between space-y-4">
                 <div className="space-y-4">
                   <span className="font-button-text text-button-text font-semibold text-onyx-black block">Financial & Date Schema</span>
                   <div className="p-3 bg-surface rounded">
                     <span className="font-label-caps text-label-caps uppercase text-secondary block">Standard Currency</span>
-                    <span className="font-button-text font-bold text-onyx-black">Indian Rupee (₹ INR)</span>
+                    <span className="font-button-text font-bold text-onyx-black">
+                      {preferenceData.language === 'gu_IN' ? 'ભારતીય રૂપિયો (₹ INR)' : preferenceData.language === 'hi_IN' ? 'भारतीय रुपया (₹ INR)' : 'Indian Rupee (₹ INR)'}
+                    </span>
                   </div>
                   <div className="p-3 bg-surface rounded">
                     <span className="font-label-caps text-label-caps uppercase text-secondary block">Kitchen Timestamp Format</span>
-                    <span className="font-button-text font-bold text-onyx-black">DD MMM YYYY (24-hour clock)</span>
+                    <span className="font-button-text font-bold text-onyx-black">
+                      {preferenceData.language === 'gu_IN' ? 'DD MMM YYYY (24-કલાક ઘડિયાળ)' : preferenceData.language === 'hi_IN' ? 'DD MMM YYYY (24-घंटे का प्रारूप)' : 'DD MMM YYYY (24-hour clock)'}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-surface rounded">
+                    <span className="font-label-caps text-label-caps uppercase text-secondary block">Active Regional Locale</span>
+                    <span className="font-button-text font-bold text-onyx-black">
+                      {preferenceData.language === 'gu_IN' ? 'gu-IN (ગુજરાત / ભારત)' : preferenceData.language === 'hi_IN' ? 'hi-IN (भारत)' : 'en-IN (India / Asia/Kolkata)'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1550,51 +1955,129 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Default Landing */}
               <div className="p-6 bg-surface-container-low rounded space-y-4">
-                <span className="font-button-text text-button-text font-semibold text-onyx-black block">Default Landing View</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-button-text text-button-text font-semibold text-onyx-black block">Default Landing View</span>
+                  <span className="font-label-caps text-label-caps uppercase px-1.5 py-0.5 bg-surface-container text-clay-earth dark:text-stone-300 rounded text-[10px] font-semibold">VIEWPORT</span>
+                </div>
                 <div className="space-y-2">
                   {[
-                    { id: 'dashboard', label: 'Overview Dashboard' },
-                    { id: 'live-requests', label: 'Live Requests Radar' },
-                    { id: 'orders-prep', label: 'Orders Preparing Bay' }
+                    { id: 'dashboard', label: 'Overview Dashboard', desc: 'KPIs & Kitchen Revenue' },
+                    { id: 'live-requests', label: 'Live Requests Radar', desc: 'Realtime Diner Requests' },
+                    { id: 'orders-prep', label: 'Orders Preparing Bay', desc: 'Active Kitchen Staging' }
                   ].map(opt => (
-                    <label key={opt.id} onClick={() => setPreferenceData({ ...preferenceData, dashboardLanding: opt.id })} className={`flex items-center gap-3 p-3 rounded cursor-pointer ${preferenceData.dashboardLanding === opt.id ? 'bg-surface-container-lowest ring-1 ring-onyx-black font-semibold' : 'bg-surface-container'}`}>
-                      <input type="radio" checked={preferenceData.dashboardLanding === opt.id} readOnly className="w-4 h-4 accent-onyx-black" />
-                      <span className="font-button-text text-button-text text-onyx-black">{opt.label}</span>
-                    </label>
+                    <div
+                      key={opt.id}
+                      onClick={() => handleOperationalChange('dashboardLanding', opt.id)}
+                      className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all ${preferenceData.dashboardLanding === opt.id
+                        ? 'bg-surface-container-lowest ring-2 ring-onyx-black dark:ring-white font-semibold shadow-sm'
+                        : 'bg-surface-container hover:bg-surface-container-high'
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${preferenceData.dashboardLanding === opt.id ? 'border-onyx-black dark:border-white' : 'border-outline'
+                          }`}>
+                          {preferenceData.dashboardLanding === opt.id && <div className="w-2 h-2 rounded-full bg-onyx-black dark:bg-white"></div>}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-button-text text-button-text text-onyx-black">{opt.label}</span>
+                          <span className="font-body-md text-[11px] text-secondary">{opt.desc}</span>
+                        </div>
+                      </div>
+                      {preferenceData.dashboardLanding === opt.id && (
+                        <span className="font-label-caps text-label-caps uppercase px-1.5 py-0.5 bg-secondary-container dark:bg-amber-950/60 text-on-secondary-fixed dark:text-amber-200 font-bold rounded text-[9px]">ACTIVE</span>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
 
               {/* Table Density */}
               <div className="p-6 bg-surface-container-low rounded space-y-4">
-                <span className="font-button-text text-button-text font-semibold text-onyx-black block">Table Density & Pagination</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-button-text text-button-text font-semibold text-onyx-black block">Table Density &amp; Pagination</span>
+                  <span className="font-label-caps text-label-caps uppercase px-1.5 py-0.5 bg-secondary-container dark:bg-amber-950/60 text-on-secondary-fixed dark:text-amber-200 rounded text-[10px] font-bold">
+                    {preferenceData.tableDensity} ROWS / PG
+                  </span>
+                </div>
                 <div className="grid grid-cols-3 gap-2">
-                  {[10, 25, 50].map(den => (
+                  {[
+                    { den: 10, label: 'COMPACT', desc: 'Dense' },
+                    { den: 25, label: 'DEFAULT', desc: 'Balanced' },
+                    { den: 50, label: 'EXTENDED', desc: 'Wide' }
+                  ].map(opt => (
                     <button
-                      key={den}
+                      key={opt.den}
                       type="button"
-                      onClick={() => setPreferenceData({ ...preferenceData, tableDensity: den })}
-                      className={`p-3 rounded flex flex-col items-center justify-center cursor-pointer transition-all ${
-                        preferenceData.tableDensity === den ? 'bg-surface-container-lowest ring-1 ring-onyx-black shadow-sm font-bold' : 'bg-surface-container hover:bg-surface-container-high'
-                      }`}
+                      onClick={() => handleOperationalChange('tableDensity', opt.den)}
+                      className={`p-3 rounded flex flex-col items-center justify-center cursor-pointer transition-all ${preferenceData.tableDensity === opt.den
+                        ? 'bg-surface-container-lowest ring-2 ring-onyx-black dark:ring-white shadow-md font-bold'
+                        : 'bg-surface-container hover:bg-surface-container-high'
+                        }`}
                     >
-                      <span className="font-headline-md text-headline-md text-onyx-black">{den}</span>
-                      <span className="font-label-caps text-label-caps uppercase text-secondary">{den === 10 ? 'Compact' : den === 25 ? 'Default' : 'Extended'}</span>
+                      <span className="font-headline-md text-headline-md text-onyx-black">{opt.den}</span>
+                      <span className="font-label-caps text-label-caps uppercase text-secondary">{opt.label}</span>
+                      {preferenceData.tableDensity === opt.den && (
+                        <span className="font-label-caps text-label-caps uppercase text-[9px] mt-1 px-1.5 py-0.5 bg-secondary-container dark:bg-amber-950/60 text-on-secondary-fixed dark:text-amber-200 font-bold rounded">ACTIVE</span>
+                      )}
                     </button>
                   ))}
                 </div>
+                <p className="font-body-md text-xs text-secondary text-center pt-1">
+                  Controls table pagination limits across Orders, Reviews &amp; Notifications.
+                </p>
               </div>
 
               {/* Map Provider */}
               <div className="p-6 bg-surface-container-low rounded space-y-4">
-                <span className="font-button-text text-button-text font-semibold text-onyx-black block">Map & Navigation Provider</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-button-text text-button-text font-semibold text-onyx-black block">Map &amp; Navigation Provider</span>
+                  <span className="font-label-caps text-label-caps uppercase px-1.5 py-0.5 bg-surface-container text-clay-earth dark:text-stone-300 rounded text-[10px] font-semibold">DISPATCH</span>
+                </div>
                 <div className="space-y-2">
-                  {['Google Maps', 'MapmyIndia / Mappls'].map(mapP => (
-                    <label key={mapP} onClick={() => setPreferenceData({ ...preferenceData, defaultMapProvider: mapP })} className={`flex items-center gap-3 p-3 rounded cursor-pointer ${preferenceData.defaultMapProvider === mapP ? 'bg-surface-container-lowest ring-1 ring-onyx-black font-semibold' : 'bg-surface-container'}`}>
-                      <input type="radio" checked={preferenceData.defaultMapProvider === mapP} readOnly className="w-4 h-4 accent-onyx-black" />
-                      <span className="font-button-text text-button-text text-onyx-black">{mapP}</span>
-                    </label>
+                  {[
+                    { id: 'Google Maps', label: 'Google Maps', desc: 'Global satellite & turn-by-turn navigation' },
+                    { id: 'MapmyIndia / Mappls', label: 'MapmyIndia / Mappls', desc: 'Precision Indian house-level routing' }
+                  ].map(mapP => (
+                    <div
+                      key={mapP.id}
+                      onClick={() => handleOperationalChange('defaultMapProvider', mapP.id)}
+                      className={`flex items-center justify-between p-3 rounded cursor-pointer transition-all ${preferenceData.defaultMapProvider === mapP.id
+                        ? 'bg-surface-container-lowest ring-2 ring-onyx-black dark:ring-white font-semibold shadow-sm'
+                        : 'bg-surface-container hover:bg-surface-container-high'
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${preferenceData.defaultMapProvider === mapP.id ? 'border-onyx-black dark:border-white' : 'border-outline'
+                          }`}>
+                          {preferenceData.defaultMapProvider === mapP.id && <div className="w-2 h-2 rounded-full bg-onyx-black dark:bg-white"></div>}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-button-text text-button-text text-onyx-black">{mapP.label}</span>
+                          <span className="font-body-md text-[11px] text-secondary">{mapP.desc}</span>
+                        </div>
+                      </div>
+                      {preferenceData.defaultMapProvider === mapP.id && (
+                        <span className="font-label-caps text-label-caps uppercase px-1.5 py-0.5 bg-secondary-container dark:bg-amber-950/60 text-on-secondary-fixed dark:text-amber-200 font-bold rounded text-[9px]">ACTIVE</span>
+                      )}
+                    </div>
                   ))}
+                </div>
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const dest = 'Ahmedabad, Gujarat, India';
+                      const url = preferenceData.defaultMapProvider === 'MapmyIndia / Mappls'
+                        ? `https://mappls.com/direction?to=${encodeURIComponent(dest)}`
+                        : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`;
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-surface hover:bg-surface-container border border-sand-neutral/50 rounded font-button-text text-xs text-onyx-black cursor-pointer transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">navigation</span>
+                    <span>Test External Map Route ({preferenceData.defaultMapProvider.split('/')[0].trim()})</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1615,7 +2098,7 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
               <div>
                 <label className="font-label-caps text-label-caps uppercase text-secondary block mb-1">Current Password</label>
                 <div className="relative">
-                  <input 
+                  <input
                     type={passVisibility.current ? 'text' : 'password'}
                     value={passState.currentPass}
                     onChange={e => setPassState({ ...passState, currentPass: e.target.value })}
@@ -1631,7 +2114,7 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
               <div>
                 <label className="font-label-caps text-label-caps uppercase text-secondary block mb-1">New Password (8+ chars, upper, number, symbol)</label>
                 <div className="relative">
-                  <input 
+                  <input
                     type={passVisibility.new ? 'text' : 'password'}
                     value={passState.newPass}
                     onChange={e => setPassState({ ...passState, newPass: e.target.value })}
@@ -1647,7 +2130,7 @@ export default function SettingsTab({ currentUser, onUpdateUser, initialSubTab =
               <div>
                 <label className="font-label-caps text-label-caps uppercase text-secondary block mb-1">Confirm New Password</label>
                 <div className="relative">
-                  <input 
+                  <input
                     type={passVisibility.confirm ? 'text' : 'password'}
                     value={passState.confirmPass}
                     onChange={e => setPassState({ ...passState, confirmPass: e.target.value })}

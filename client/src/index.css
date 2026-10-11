@@ -181,41 +181,45 @@ textarea:focus {
 
 html.dark {
   color-scheme: dark;
-  background-color: #121212 !important;
+  background-color: #141413 !important;
 }
 
 html.dark body {
-  background-color: #121212 !important;
+  background-color: #141413 !important;
   color: #F5F3EF !important;
 }
 
 html.dark .bg-bone-white {
-  background-color: #1a1a1a !important;
+  background-color: #1f1f1d !important;
 }
 
 html.dark .bg-surface {
-  background-color: #141414 !important;
+  background-color: #141413 !important;
 }
 
 html.dark .bg-surface-container {
-  background-color: #1e1e1e !important;
+  background-color: #1f1f1d !important;
 }
 
 html.dark .bg-surface-container-lowest {
-  background-color: #242424 !important;
+  background-color: #242422 !important;
 }
 
 html.dark .bg-surface-container-low {
-  background-color: #1c1c1c !important;
+  background-color: #1c1c1a !important;
 }
 
 html.dark .bg-surface-container-high,
 html.dark .bg-surface-container-highest {
-  background-color: #2a2a2a !important;
+  background-color: #2e2e2b !important;
 }
 
 html.dark .text-onyx-black {
   color: #F5F3EF !important;
+}
+
+html.dark .text-on-surface {
+  color: #E6E4DF !important;
 }
 
 html.dark .text-clay-earth,
@@ -228,8 +232,56 @@ html.dark .border-sand-neutral,
 html.dark .border-sand-neutral\/30,
 html.dark .border-sand-neutral\/40,
 html.dark .border-sand-neutral\/50,
-html.dark .border-sand-neutral\/60 {
-  border-color: #333333 !important;
+html.dark .border-sand-neutral\/60,
+html.dark .border-sand-neutral\/80 {
+  border-color: #333330 !important;
+}
+
+html.dark .ring-onyx-black {
+  --tw-ring-color: #F5F3EF !important;
+  box-shadow: 0 0 0 2px #F5F3EF !important;
+}
+
+html.dark .border-onyx-black {
+  border-color: #F5F3EF !important;
+}
+
+html.dark aside {
+  background-color: #181816 !important;
+  border-color: #2a2a28 !important;
+}
+
+html.dark header {
+  background-color: rgba(22, 22, 20, 0.94) !important;
+  border-color: #2a2a28 !important;
+}
+
+html.dark .bg-secondary-container {
+  background-color: #382c20 !important;
+  color: #f7e6d7 !important;
+}
+
+html.dark button.bg-onyx-black,
+html.dark a.bg-onyx-black {
+  background-color: #F5F3EF !important;
+  color: #141413 !important;
+}
+html.dark button.bg-onyx-black span,
+html.dark button.bg-onyx-black p {
+  color: #141413 !important;
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select {
+  color: #F5F3EF !important;
+  background-color: #1c1c1a;
+  border-color: #333330;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #7a7770 !important;
 }
 
 /* Compact Density Modifier */

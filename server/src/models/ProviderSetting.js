@@ -40,6 +40,7 @@ const providerSettingSchema = new mongoose.Schema({
     orderCancelled: { type: Boolean, default: true },
     orderReady: { type: Boolean, default: true },
     deliveryUpdates: { type: Boolean, default: true },
+    driverAssigned: { type: Boolean, default: true },
     // Business Notifications
     earningsUpdate: { type: Boolean, default: true },
     payoutUpdate: { type: Boolean, default: true },
@@ -48,7 +49,8 @@ const providerSettingSchema = new mongoose.Schema({
     // System Notifications
     securityAlerts: { type: Boolean, default: true },
     accountUpdates: { type: Boolean, default: true },
-    systemMaintenance: { type: Boolean, default: false }
+    systemMaintenance: { type: Boolean, default: false },
+    audits: { type: Boolean, default: true }
   },
   security: {
     accountSecurityStatus: { type: String, default: 'Secure' },

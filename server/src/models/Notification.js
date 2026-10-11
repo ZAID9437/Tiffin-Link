@@ -21,7 +21,7 @@ const notificationSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['Orders', 'Customers', 'Payments', 'Reviews', 'Tiffins', 'System'],
+    enum: ['Orders', 'Delivery', 'Customers', 'Payments', 'Reviews', 'Tiffins', 'System'],
     default: 'Orders'
   },
   read: {
@@ -42,11 +42,19 @@ const notificationSchema = new mongoose.Schema({
   },
   referenceType: {
     type: String,
-    enum: ['order', 'review', 'payment', 'tiffin', 'system', 'safety']
+    enum: ['order', 'delivery', 'review', 'payment', 'tiffin', 'system', 'safety']
   },
   metadata: {
     type: Object,
     default: {}
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date,
+    default: null
   },
   createdAt: {
     type: Date,

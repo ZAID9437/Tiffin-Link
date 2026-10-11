@@ -30,12 +30,28 @@ const supportTicketSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['Orders', 'Tiffins', 'Payments', 'Delivery', 'Customers', 'Account & Security', 'Technical Issue', 'Other'],
-    default: 'Orders'
+    enum: [
+      'Order Management',
+      'Payments & Payouts',
+      'Delivery Problems',
+      'Tiffin Management',
+      'Account & Profile',
+      'Technical Issues',
+      'Orders',
+      'Tiffins',
+      'Payments',
+      'Delivery',
+      'Customers',
+      'Account & Security',
+      'Technical Issue',
+      'General Inquiry',
+      'Other'
+    ],
+    default: 'Order Management'
   },
   priority: {
     type: String,
-    enum: ['Low', 'Normal', 'High', 'Urgent'],
+    enum: ['Low', 'Normal', 'High', 'Urgent', 'Critical'],
     default: 'Normal'
   },
   relatedOrderId: {
