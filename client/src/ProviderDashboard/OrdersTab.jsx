@@ -1,22 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { apiRequest } from '../services/api';
+import { apiRequest, cleanErrorMessage } from '../services/api';
 import { getSocket } from '../services/socket';
-export const isDeliveryStatus = (st) => {
+import { playKitchenOrderSound, stopKitchenAlertSound } from '../services/soundNotifier';
+const isDeliveryStatus = (st) => {
   const s = String(st || '').toLowerCase().trim();
-  return ['delivery', 'out for delivery', 'dispatched', 'in transit', 'driver assigned', 'picked up', 'arrived at customer', 'arrived at provider', 'searching drivers', 'delivery_requested'].includes(s);
+  return [
+    'delivery', 'out for delivery', 'dispatched', 'in transit', 
+    'driver assigned', 'picked up', 'arrived at customer', 
+    'arrived at provider', 'arrived_provider', 'arrived at pickup', 
+    'at kitchen', 'at_kitchen', 'searching drivers', 'delivery_requested'
+  ].includes(s);
 };
 
-export const isPreparingStatus = (st) => {
+const isPreparingStatus = (st) => {
   const s = String(st || '').toLowerCase().trim();
   return ['preparing', 'in prep', 'accepted', 'confirmed'].includes(s);
 };
 
-export const isReadyStatus = (st) => {
+const isReadyStatus = (st) => {
   const s = String(st || '').toLowerCase().trim();
   return ['ready', 'ready_for_pickup'].includes(s);
 };
 
-export const isNewStatus = (st) => {
+const isNewStatus = (st) => {
   const s = String(st || '').toLowerCase().trim();
   return ['new', 'pending'].includes(s);
 };
@@ -80,29 +86,47 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
           socket.emit('join:provider', { providerId: pId });
         }
 
-        const handleRealtimeOrderEvent = (data) => {
+        const handleNewIncomingOrder = (data) => {
+          if (data?.providerId && pId && String(data.providerId) !== String(pId)) {
+            return;
+          }
           fetchOrders(false);
         };
 
-        socket.on('order:created', handleRealtimeOrderEvent);
+        const handleRealtimeOrderEvent = (data) => {
+          if (data?.providerId && pId && String(data.providerId) !== String(pId)) {
+            return;
+          }
+          fetchOrders(false);
+        };
+
+        const handleCustomWindowOrderEvent = () => {
+          fetchOrders(false);
+        };
+        window.addEventListener('tiffinlink:new-order', handleCustomWindowOrderEvent);
+
+        socket.on('order:created', handleNewIncomingOrder);
+        socket.on('order:new', handleNewIncomingOrder);
         socket.on('order:updated', handleRealtimeOrderEvent);
         socket.on('order:status:updated', handleRealtimeOrderEvent);
         socket.on('delivery:status:updated', handleRealtimeOrderEvent);
         socket.on('delivery:assigned', handleRealtimeOrderEvent);
         socket.on('delivery:accepted', handleRealtimeOrderEvent);
-        socket.on('delivery:request:new', handleRealtimeOrderEvent);
+        socket.on('delivery:request:new', handleNewIncomingOrder);
         socket.on('kitchen_pickup_otp_created', handleRealtimeOrderEvent);
         socket.on('delivery:pickup:verified', handleRealtimeOrderEvent);
         socket.on('delivery:otp:sent', handleRealtimeOrderEvent);
 
         return () => {
-          socket.off('order:created', handleRealtimeOrderEvent);
+          window.removeEventListener('tiffinlink:new-order', handleCustomWindowOrderEvent);
+          socket.off('order:created', handleNewIncomingOrder);
+          socket.off('order:new', handleNewIncomingOrder);
           socket.off('order:updated', handleRealtimeOrderEvent);
           socket.off('order:status:updated', handleRealtimeOrderEvent);
           socket.off('delivery:status:updated', handleRealtimeOrderEvent);
           socket.off('delivery:assigned', handleRealtimeOrderEvent);
           socket.off('delivery:accepted', handleRealtimeOrderEvent);
-          socket.off('delivery:request:new', handleRealtimeOrderEvent);
+          socket.off('delivery:request:new', handleNewIncomingOrder);
           socket.off('kitchen_pickup_otp_created', handleRealtimeOrderEvent);
           socket.off('delivery:pickup:verified', handleRealtimeOrderEvent);
           socket.off('delivery:otp:sent', handleRealtimeOrderEvent);
@@ -234,11 +258,11 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
           });
         }
       } else {
-        setError(json?.message || 'Unable to load orders from MongoDB');
+        setError(cleanErrorMessage(json?.message, 'Connection interrupted. Please check your internet connection and try again.'));
       }
     } catch (err) {
-      console.error('Error fetching orders from MongoDB API:', err);
-      setError('Unable to load orders. Please check database connection.');
+      console.error('Error fetching orders:', err);
+      setError('Connection interrupted. Please check your internet connection and try again.');
     } finally {
       if (isInitial) setLoading(false);
     }
@@ -432,12 +456,16 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
         }
 
         if (newStatus === 'Preparing' || newStatus === 'Accepted') {
+          stopKitchenAlertSound();
+          window.dispatchEvent(new CustomEvent('tiffinlink:order-accepted', { detail: { id: targetOrder.orderId || targetOrder.id } }));
           showToast(`✓ Order ${targetOrder.orderId} Accepted! Moved to Kitchen Prep Queue.`);
           setActiveStatusTab('Preparing');
         } else if (newStatus === 'Delivery' || newStatus === 'Confirm Pickup') {
           showToast(`✓ Order ${targetOrder.orderId} dispatched to courier network! Delivery broadcast active.`);
           setActiveStatusTab('Delivery');
         } else if (newStatus === 'Cancelled') {
+          stopKitchenAlertSound();
+          window.dispatchEvent(new CustomEvent('tiffinlink:request-declined', { detail: { id: targetOrder.orderId || targetOrder.id } }));
           showToast(`Order ${targetOrder.orderId} Declined. Reason logged.`);
         } else {
           showToast(`✓ Order ${targetOrder.orderId} status updated to ${newStatus}`);
@@ -448,8 +476,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       }
       fetchOrders(false);
     } catch (err) {
-      console.error('Error updating order status in MongoDB:', err);
-      showToast('⚠️ Failed to communicate with database engine');
+      console.error('Error updating order status:', err);
+      showToast('⚠️ Failed to update order status. Please retry.');
       fetchOrders(false);
     } finally {
       setUpdatingOrderId(null);
@@ -663,7 +691,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
       {/* Toast Notification Alert */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-[9999] bg-onyx-black text-bone-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 font-button-text text-button-text animate-bounce border border-sand-neutral/40">
-          <span className="material-symbols-outlined text-[18px] text-[#0A8B5F]">check_circle</span>
+          <span className="material-symbols-outlined text-[18px] text-bone-white">check_circle</span>
           <span className="font-bold">{toastMessage}</span>
         </div>
       )}
@@ -679,12 +707,6 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             <span className="text-onyx-black font-extrabold">
               {isReadyTab ? 'Ready' : isPreparingTab ? 'Preparing' : isNewOrdersTab ? 'New Orders' : `${activeStatusTab} Orders`}
             </span>
-          </div>
-          <div className="hidden xl:flex items-center gap-2 pl-3 border-l border-sand-neutral/60 text-[11px] font-mono text-secondary">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-ping"></span>
-            <span className="text-emerald-800 font-semibold uppercase">Socket.IO Live (0.8ms)</span>
-            <span className="text-sand-neutral">•</span>
-            <span>Replica Synced</span>
           </div>
         </div>
 
@@ -703,17 +725,17 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             <span>Alert Chime: {chimeEnabled ? 'ON' : 'OFF'}</span>
           </button>
 
-          {/* Auto Refresh */}
+          {/* Refresh Orders */}
           <button
             type="button"
             onClick={() => {
-              showToast('Refreshed latest websocket event backlog from MongoDB');
+              showToast('Orders refreshed');
               fetchOrders(false);
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-highest transition-colors text-xs font-label-caps text-on-surface border border-sand-neutral/40 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px]">sync</span>
-            <span>Auto-Sync (3s)</span>
+            <span className="material-symbols-outlined text-[16px]">refresh</span>
+            <span>Refresh</span>
           </button>
 
           {/* Accepting Orders Status Badge */}
@@ -769,7 +791,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             )}
             {isCancelledTab && (
               <span className="px-3 py-1 rounded-full text-xs font-label-caps bg-error-container text-error font-bold border border-error/30">
-                {totalCancelledOrders} ARCHIVED INCIDENTS
+                {totalCancelledOrders} CANCELLED ORDERS
               </span>
             )}
             {isReadyTab && (
@@ -845,7 +867,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             </div>
             <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
               <span>Fleet Dispatch</span>
-              <span className="text-emerald-800 font-bold">Live GPS Telemetry</span>
+              <span className="text-emerald-800 font-bold">Live Tracking</span>
             </div>
           </div>
 
@@ -957,7 +979,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             </div>
             <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
               <span>Reconciliation</span>
-              <span className="text-emerald-800 font-bold">MongoDB Aggregated</span>
+              <span className="text-emerald-800 font-bold">Verified Settlements</span>
             </div>
           </div>
 
@@ -993,11 +1015,11 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
                 {totalCancelledOrders < 10 ? `0${totalCancelledOrders}` : totalCancelledOrders}
               </div>
-              <div className="text-xs text-error font-bold">Immutable Incidents Preserved</div>
+              <div className="text-xs text-secondary font-bold">Historical Cancellations</div>
             </div>
             <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
-              <span>Record Retention</span>
-              <span className="text-onyx-black font-bold">Never Deleted</span>
+              <span>Status</span>
+              <span className="text-onyx-black font-bold">Archived</span>
             </div>
           </div>
 
@@ -1011,11 +1033,11 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
                 {cancelledTodayCount < 10 ? `0${cancelledTodayCount}` : cancelledTodayCount}
               </div>
-              <div className="text-xs text-secondary font-bold">Today's Shift Cancellation Count</div>
+              <div className="text-xs text-secondary font-bold">Cancellations Today</div>
             </div>
             <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
-              <span>Grace Window</span>
-              <span>5 Min Policy</span>
+              <span>Order Policy</span>
+              <span>Standard</span>
             </div>
           </div>
 
@@ -1029,11 +1051,11 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               <div className="text-4xl font-headline-md text-onyx-black font-semibold mb-1">
                 ₹{cancellationValue.toLocaleString('en-IN')}.00
               </div>
-              <div className="text-xs text-secondary font-bold">Gross Refunded / Waived Amount</div>
+              <div className="text-xs text-secondary font-bold">Total Refunded Amount</div>
             </div>
             <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
-              <span>Refund Telemetry</span>
-              <span className="text-emerald-800 font-bold">Gateway Reconciled</span>
+              <span>Refund Summary</span>
+              <span className="text-emerald-800 font-bold">Processed</span>
             </div>
           </div>
 
@@ -1049,12 +1071,12 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               </div>
               <div className="text-xs text-emerald-800 font-bold flex items-center gap-1">
                 <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                <span>Nominal SLA Status</span>
+                <span>Normal Operating Range</span>
               </div>
             </div>
             <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
-              <span>Kitchen Health</span>
-              <span className="text-emerald-800 font-bold">Tier 1 Standing</span>
+              <span>Kitchen Status</span>
+              <span className="text-emerald-800 font-bold">Active</span>
             </div>
           </div>
 
@@ -1078,7 +1100,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               </div>
             </div>
             <div className="pt-3 border-t border-sand-neutral/40 text-[11px] text-secondary flex justify-between font-mono font-semibold">
-              <span>Staging Telemetry</span>
+              <span>Staging Status</span>
               <span className="text-emerald-800 font-bold">100% On-Time</span>
             </div>
           </div>
@@ -1416,7 +1438,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             </div>
           ) : isReadyTab ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-label-caps text-[11px] uppercase tracking-wider text-secondary font-bold mr-1">Logistics Telemetry:</span>
+              <span className="font-label-caps text-[11px] uppercase tracking-wider text-secondary font-bold mr-1">Logistics Status:</span>
               <button
                 type="button"
                 onClick={() => setDeliveryFilter('All')}
@@ -1484,9 +1506,8 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             </div>
           )}
 
-          <div className="text-[11px] font-mono text-secondary flex items-center gap-1.5 font-semibold">
-            <span className="material-symbols-outlined text-[14px] text-emerald-700">hub</span>
-            <span>Event: <code className="text-onyx-black font-bold">"ready_orders_sync"</code> active</span>
+          <div className="text-[11px] font-label-caps text-secondary font-medium">
+            <span>{filteredOrders.length} {filteredOrders.length === 1 ? 'Order' : 'Orders'}</span>
           </div>
         </div>
       </div>
@@ -1501,17 +1522,17 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-onyx-black text-[18px]">receipt_long</span>
               <span className="font-label-caps text-xs font-bold text-onyx-black uppercase tracking-wider">
-                Queue: {filteredOrders.length} {isReadyTab ? 'Ready Orders' : isPreparingTab ? 'Preparing Orders' : isNewOrdersTab ? 'New Orders' : `${activeStatusTab} Orders`}
+                Orders: {filteredOrders.length} {isReadyTab ? 'Ready Orders' : isPreparingTab ? 'Preparing Orders' : isNewOrdersTab ? 'New Orders' : `${activeStatusTab} Orders`}
               </span>
             </div>
-            <span className="text-[11px] font-mono text-secondary font-semibold">Click row to inspect docket</span>
+            <span className="text-[11px] font-mono text-secondary font-semibold">Click row to view details</span>
           </div>
 
           {loading ? (
             <div className="p-12 text-center space-y-3">
               <span className="material-symbols-outlined text-[32px] text-onyx-black animate-spin">refresh</span>
-              <h3 className="font-headline-md text-lg text-on-surface">Connecting to MongoDB Orders Queue...</h3>
-              <p className="font-body-md text-xs text-secondary">Fetching real customer orders scoped to authenticated kitchen.</p>
+              <h3 className="font-headline-md text-lg text-on-surface">Loading orders...</h3>
+              <p className="font-body-md text-xs text-secondary">Fetching your kitchen's latest orders.</p>
             </div>
           ) : error ? (
             <div className="p-12 text-center space-y-4 bg-error-container/20 border-t border-error/30">
@@ -1549,16 +1570,16 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
               </h3>
               <p className="font-body-md text-xs text-secondary max-w-md mx-auto">
                 {isDeliveryTab
-                  ? 'Dispatched orders undergoing courier fulfillment will appear here in real time.'
+                  ? 'Dispatched orders undergoing courier delivery will appear here in real time.'
                   : isCompletedTab
-                    ? 'Fulfilled orders verified with handover OTPs will be archived here for settlement auditing.'
+                    ? 'Fulfilled orders verified with handover OTPs will appear here.'
                     : isCancelledTab
-                      ? 'Cancelled order records and audit traces will appear here permanently.'
+                      ? 'Cancelled order records will appear here.'
                       : isReadyTab
                         ? 'Prepared orders will appear here automatically when they are ready for pickup or courier delivery.'
                         : isPreparingTab
                           ? 'Accepted customer orders will appear here automatically while your kitchen prepares them.'
-                          : 'New customer orders will appear here automatically via Socket.IO.'}
+                          : 'New customer orders will appear here automatically in real time.'}
               </p>
             </div>
           ) : (
@@ -1630,7 +1651,16 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                       >
                         {isDeliveryTab ? (
                           <>
-                            <td className="py-3.5 px-4 font-mono font-bold text-onyx-black">{ord.orderId}</td>
+                            <td className="py-3.5 px-4 font-mono font-bold text-onyx-black">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{ord.orderId}</span>
+                                {ord.pickupOtp && (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-950 border border-amber-300 font-mono font-bold text-[10px] tracking-wider">
+                                    OTP: {ord.pickupOtp}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td className="py-3.5 px-4">
                               <div className="font-bold text-onyx-black">{ord.customerName}</div>
                               <div className="text-[11px] text-secondary font-mono">{ord.customerPhone}</div>
@@ -1777,6 +1807,14 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                                 <span className="material-symbols-outlined text-[12px] text-amber-700">timer</span>
                                 <span>{formatTimer(ord.secondsLeft)} left</span>
                               </div>
+                              {ord.pickupOtp && (
+                                <div className="mt-1">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-950 border border-amber-300 font-mono font-bold text-[10px] tracking-wider">
+                                    <span className="material-symbols-outlined text-[11px] text-amber-700">key</span>
+                                    <span>OTP: {ord.pickupOtp}</span>
+                                  </span>
+                                </div>
+                              )}
                             </td>
 
                             {/* Customer */}
@@ -1814,7 +1852,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
 
                             {/* Quick Action */}
                             <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              {ord.status === 'Completed' ? (
+                              {ord.status === 'Completed' || ord.status === 'Delivered' ? (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                   ✓ Completed
                                 </span>
@@ -1822,15 +1860,34 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
                                   ✕ Cancelled
                                 </span>
-                              ) : ord.status === 'Delivery' || ord.status === 'Out for Delivery' || ord.status === 'In Transit' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateOrderStatus(ord.orderId, 'Completed')}
-                                  className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold"
-                                >
-                                  Mark Delivered
-                                </button>
-                              ) : ord.status === 'Ready' || isReadyTab ? (
+                              ) : isDeliveryStatus(ord.status) || isDeliveryTab ? (
+                                ord.status === 'At Kitchen' || (ord.deliveryStatus || '').toLowerCase().includes('kitchen') || (ord.deliveryStatus || '').toLowerCase().includes('arrived') ? (
+                                  <div className="inline-flex items-center gap-1.5">
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs" title="Driver is at kitchen waiting for pickup">
+                                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                      OTP: {ord.pickupOtp || '----'}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={updatingOrderId === ord.orderId}
+                                      onClick={() => handleUpdateOrderStatus(ord.orderId, 'Completed')}
+                                      className="px-2.5 py-1 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold disabled:opacity-60"
+                                      title="Confirm Driver Handover & Delivery"
+                                    >
+                                      Delivered
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={updatingOrderId === ord.orderId}
+                                    onClick={() => handleUpdateOrderStatus(ord.orderId, 'Completed')}
+                                    className="px-3 py-1.5 bg-onyx-black text-bone-white rounded-lg text-xs font-button-text hover:bg-stone-800 transition-colors shadow-2xs cursor-pointer font-bold disabled:opacity-60"
+                                  >
+                                    Mark Delivered
+                                  </button>
+                                )
+                              ) : isReadyStatus(ord.status) || isReadyTab ? (
                                 ord.deliveryMode.toLowerCase().includes('pickup') ? (
                                   <button
                                     type="button"
@@ -1856,7 +1913,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                                     )}
                                   </button>
                                 )
-                              ) : ord.status === 'Preparing' || ord.status === 'In Prep' || isPreparingTab ? (
+                              ) : isPreparingStatus(ord.status) || isPreparingTab ? (
                                 <>
                                   <button
                                     type="button"
@@ -1874,7 +1931,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                                     ✕
                                   </button>
                                 </>
-                              ) : (
+                              ) : isNewStatus(ord.status) || isNewOrdersTab ? (
                                 <>
                                   <button
                                     type="button"
@@ -1892,6 +1949,10 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                                     ✕
                                   </button>
                                 </>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-surface-container text-secondary border border-sand-neutral/40">
+                                  {ord.status}
+                                </span>
                               )}
                             </td>
                           </>
@@ -1978,18 +2039,54 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                   ? 'Order fulfilled and completed.'
                   : selectedOrder.status === 'Cancelled' || selectedOrder.status === 'Rejected'
                     ? 'Order cancelled and archived.'
-                    : selectedOrder.status === 'Delivery' || selectedOrder.status === 'Out for Delivery' || selectedOrder.status === 'In Transit'
+                    : selectedOrder.status === 'At Kitchen' || (selectedOrder.deliveryStatus || '').toLowerCase().includes('kitchen') || (selectedOrder.deliveryStatus || '').toLowerCase().includes('arrived')
+                      ? 'Courier partner has arrived at your kitchen. Hand over tiffin packages using Courier Pickup OTP.'
+                    : selectedOrder.status === 'Delivery' || selectedOrder.status === 'Out for Delivery' || selectedOrder.status === 'In Transit' || isDeliveryStatus(selectedOrder.status)
                       ? 'Dispatched with delivery partner for customer dropoff.'
-                      : selectedOrder.status === 'Ready'
-                        ? 'Staged in Bay 1 / Bay 2. Heat-sealed and ready for courier pickup or customer takeaway.'
-                        : selectedOrder.status === 'Preparing' || selectedOrder.status === 'In Prep'
-                          ? 'Active in kitchen prep. Mark ready once all compartments are sealed.'
-                          : 'Auto-reject fallback if no confirmation within window to avoid kitchen bottleneck.'
+                    : selectedOrder.status === 'Ready' || isReadyStatus(selectedOrder.status)
+                      ? 'Staged in Bay 1 / Bay 2. Heat-sealed and ready for courier pickup or customer takeaway.'
+                    : selectedOrder.status === 'Preparing' || selectedOrder.status === 'In Prep' || isPreparingStatus(selectedOrder.status)
+                      ? 'Active in kitchen prep. Mark ready once all compartments are sealed.'
+                      : 'Auto-reject fallback if no confirmation within window to avoid kitchen bottleneck.'
                 }
               </p>
             </div>
 
             <div className="p-5 space-y-6 flex-1 overflow-y-auto max-h-[720px]">
+
+              {/* HIGH-VISIBILITY KITCHEN PICKUP OTP CARD (PROMINENT AT TOP) */}
+              {selectedOrder.pickupOtp && (
+                <div className="p-4 bg-gradient-to-r from-amber-50 to-amber-100/80 border-2 border-amber-500 rounded-xl flex items-center justify-between shadow-xs">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-600 animate-pulse"></span>
+                      <span className="text-xs font-mono font-black text-amber-950 uppercase tracking-wider">
+                        COURIER PICKUP OTP
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#554b3f] font-semibold">
+                      Hand this 4-digit code to delivery driver at pickup
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="font-mono text-2xl sm:text-3xl font-black tracking-widest text-[#1a1a1a] bg-white px-4 py-1.5 rounded-lg border-2 border-amber-600 shadow-sm inline-block select-all">
+                      {(selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified)
+                        ? '••••'
+                        : selectedOrder.pickupOtp}
+                    </div>
+                    <span className={`text-[10px] font-bold block mt-1 uppercase ${
+                      (selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified)
+                        ? 'text-emerald-700'
+                        : 'text-amber-800'
+                    }`}>
+                      {(selectedOrder.deliveryStatus === 'Picked Up' || selectedOrder.pickupOtpVerified)
+                        ? '✓ Pickup Verified'
+                        : '● Handover Code'}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Customer Identity Card */}
               <div className="bg-surface-container-low p-4 rounded-xl border border-sand-neutral/30 space-y-2.5">
@@ -2300,7 +2397,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                     <span>Cancel</span>
                   </button>
                 </div>
-              ) : (
+              ) : isNewStatus(selectedOrder.status) || isNewOrdersTab ? (
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
@@ -2319,7 +2416,12 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                     <span className="material-symbols-outlined text-[16px]">cancel</span>
                     <span>Decline</span>
                   </button>
-                  {/* Rejection Modal */}
+                </div>
+              ) : (
+                <div className="p-3 bg-surface-container-low border border-sand-neutral/40 rounded-xl text-center">
+                  <span className="text-xs font-bold text-secondary">
+                    Active Order Status: {selectedOrder.status}
+                  </span>
                 </div>
               )}
             </div>
@@ -2344,7 +2446,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
             </div>
 
             <p className="text-xs text-secondary leading-relaxed font-medium">
-              Are you sure you want to decline this order from <strong className="text-on-surface">{rejectingOrder.customerName}</strong>? Please select a reason for platform telemetry:
+              Are you sure you want to decline this order from <strong className="text-on-surface">{rejectingOrder.customerName}</strong>? Please select a cancellation reason:
             </p>
 
             <div className="space-y-2">
@@ -2437,7 +2539,7 @@ export default function OrdersTab({ currentUser, initialStatus = 'All' }) {
                 type="button"
                 onClick={() => {
                   setIsManualEntryOpen(false);
-                  showToast('✓ Manual order created & added to MongoDB database!');
+                  showToast('✓ Manual order created successfully!');
                   fetchOrders(false);
                 }}
                 className="px-5 py-2.5 rounded-lg bg-onyx-black text-bone-white font-button-text text-button-text cursor-pointer font-bold"

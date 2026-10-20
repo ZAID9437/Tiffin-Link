@@ -128,7 +128,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
     } catch (err) {
       console.error('Error fetching delivery management data:', err);
       if (isInitial) {
-        setError('Unable to load delivery data. Please verify backend connection.');
+        setError('Unable to load delivery data. Please check your network connection.');
       }
     } finally {
       if (isInitial) setLoading(false);
@@ -488,7 +488,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
             <span className="font-label-caps text-[11px] text-secondary">Fulfilled Orders</span>
           </div>
           <div className="mt-3 pt-3 border-t border-sand-neutral/60 flex items-center justify-between text-secondary font-label-caps text-[11px]">
-            <span>Customer Handshake</span>
+            <span>Customer Handover</span>
             <span className="text-on-surface font-semibold">OTP Verified</span>
           </div>
         </div>
@@ -609,7 +609,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
           </div>
           <div className="font-label-caps text-[11px] text-secondary flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-onyx-black"></span>
-            <span>Real-time backend synchronization</span>
+            <span>Real-time delivery updates</span>
           </div>
         </div>
 
@@ -617,7 +617,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
         {loading ? (
           <div className="p-16 text-center text-secondary space-y-3">
             <span className="material-symbols-outlined text-[32px] animate-spin text-onyx-black">sync</span>
-            <p className="font-button-text text-button-text">Loading delivery ledger from database...</p>
+            <p className="font-button-text text-button-text">Loading delivery ledger...</p>
           </div>
         ) : filteredDeliveries.length === 0 ? (
           <div className="p-16 text-center space-y-4">
@@ -841,8 +841,8 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
           <div>
             Showing {filteredDeliveries.length} of {deliveries.length} delivery records
           </div>
-          <div className="font-mono text-[10px] text-clay-earth">
-            MongoDB Collection: DeliveryRequests • Real-time Socket Listener Active
+          <div className="font-mono text-[10px] text-clay-earth font-semibold">
+            Real-time Delivery Network Active
           </div>
         </div>
       </div>
@@ -852,7 +852,7 @@ export default function DeliveryManagementTab({ currentUser, onNavigateTab }) {
         <div className="flex items-center justify-between border-b border-sand-neutral pb-3">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[20px] text-onyx-black">map</span>
-            <span className="font-label-caps text-label-caps uppercase font-bold text-on-surface">Active Fleet Live GPS Telemetry</span>
+            <span className="font-label-caps text-label-caps uppercase font-bold text-on-surface">Active Fleet Live GPS Tracking</span>
           </div>
           <span className="font-label-caps text-[10px] text-secondary font-mono">Real-Time Transit View</span>
         </div>

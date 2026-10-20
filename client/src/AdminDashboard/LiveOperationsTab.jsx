@@ -375,7 +375,7 @@ export default function LiveOperationsTab({ data: initialData, onNavigate }) {
                 <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-600 animate-pulse' : 'bg-rose-600'}`}></span>
                 {isConnected ? 'System Live (99.98% SLA)' : 'Reconnecting to Stream...'}
               </span>
-              <span className="text-[#665d52]">MongoDB State: <strong className="text-emerald-700 font-semibold">Live Primary Connected</strong></span>
+              <span className="text-[#665d52]">Service Health: <strong className="text-emerald-700 font-semibold">Optimal & Connected</strong></span>
             </div>
           </div>
 
@@ -384,8 +384,8 @@ export default function LiveOperationsTab({ data: initialData, onNavigate }) {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="font-serif text-3xl md:text-4xl text-[#1a1a1a] tracking-tight">Live Operations</h1>
-                <span className="px-2.5 py-1 font-mono text-[11px] bg-[#1a1a1a] text-white uppercase tracking-widest">
-                  Real-time Sync
+                <span className="px-2.5 py-1 text-[11px] bg-[#1a1a1a] text-white uppercase tracking-widest font-semibold rounded">
+                  Active
                 </span>
               </div>
               <p className="text-[#665d52] text-[15px] mt-1 max-w-2xl">
@@ -1250,7 +1250,7 @@ export default function LiveOperationsTab({ data: initialData, onNavigate }) {
                 <div className="flex items-center justify-between pb-2 border-b border-[#ded9d1]/50">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                    <span className="text-[#1a1a1a] font-medium">Backend Core API Cluster</span>
+                    <span className="text-[#1a1a1a] font-medium">Core Application Service</span>
                   </div>
                   <span className="font-mono text-[11px] text-[#665d52]">99.98% • 14ms latency</span>
                 </div>
@@ -1258,17 +1258,17 @@ export default function LiveOperationsTab({ data: initialData, onNavigate }) {
                 <div className="flex items-center justify-between pb-2 border-b border-[#ded9d1]/50">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                    <span className="text-[#1a1a1a] font-medium">Database Replica Set (MongoDB)</span>
+                    <span className="text-[#1a1a1a] font-medium">Central Data Service</span>
                   </div>
-                  <span className="font-mono text-[11px] text-[#665d52]">Primary Synced</span>
+                  <span className="font-mono text-[11px] text-[#665d52]">Fully Synchronized</span>
                 </div>
 
                 <div className="flex items-center justify-between pb-2 border-b border-[#ded9d1]/50">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                    <span className="text-[#1a1a1a] font-medium">WebSocket Event Gateway</span>
+                    <span className="text-[#1a1a1a] font-medium">Real-Time Message Gateway</span>
                   </div>
-                  <span className="font-mono text-[11px] text-[#665d52]">{kpis.usersOnline || 0} Sockets Live</span>
+                  <span className="font-mono text-[11px] text-[#665d52]">{kpis.usersOnline || 0} Active Sessions</span>
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -1286,7 +1286,7 @@ export default function LiveOperationsTab({ data: initialData, onNavigate }) {
               <div className="flex items-center justify-between pb-2 border-b border-stone-800 text-[11px]">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="font-mono tracking-widest text-[10px] text-stone-300">WEBSOCKET ACTIVITY STREAM</span>
+                  <span className="font-mono tracking-widest text-[10px] text-stone-300">REAL-TIME PLATFORM LOG</span>
                 </div>
                 <span className="text-[10px] text-stone-500">LIVE STACK</span>
               </div>
@@ -1294,7 +1294,7 @@ export default function LiveOperationsTab({ data: initialData, onNavigate }) {
               <div className="space-y-2.5 pt-3 text-[11px] max-h-56 overflow-y-auto">
                 {auditLogs.length === 0 ? (
                   <div className="text-stone-500 text-xs py-2">
-                    No recent activity logs recorded in database.
+                    No recent activity logs recorded.
                   </div>
                 ) : (
                   auditLogs.map((log, idx) => (

@@ -18,13 +18,33 @@ export default function SafetyEmergencyView({ currentUser, onNavigateTab, onShow
 
   // Live sensor GPS telemetry
   const [location, setLocation] = useState({
-    lat: 19.0596,
-    lng: 72.8295,
-    accuracy: 11.4,
-    speed: 26,
-    heading: 284,
-    address: 'Bandra West, Carter Road Sector'
+    lat: 23.0225,
+    lng: 72.5714,
+    accuracy: 10,
+    speed: 0,
+    heading: 0,
+    address: 'Live GPS Corridor Active'
   });
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocation(prev => ({
+            ...prev,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy || 10,
+            speed: pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0,
+            heading: pos.coords.heading || 0,
+            address: `GPS: ${pos.coords.latitude.toFixed(4)}° N, ${pos.coords.longitude.toFixed(4)}° E`
+          }));
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
+  }, []);
 
   // Emergency Contact Modal State
   const [contactModalOpen, setContactModalOpen] = useState(false);
@@ -204,6 +224,10 @@ export default function SafetyEmergencyView({ currentUser, onNavigateTab, onShow
 
       const json = await res.json();
       if (res.ok && json.success) {
+        setSafetyData(prev => ({
+          ...prev,
+          activeSos: null
+        }));
         showToastMsg('SOS RESOLVED', 'Safety incident status set to resolved.');
         fetchSafetyData();
       } else {
@@ -211,7 +235,7 @@ export default function SafetyEmergencyView({ currentUser, onNavigateTab, onShow
       }
     } catch (err) {
       console.error('Error resolving SOS:', err);
-      showToastMsg('Error', 'Unable to reach backend to resolve SOS.');
+      showToastMsg('Error', 'Unable to reach server to resolve SOS.');
     } finally {
       setResolvingSos(false);
     }
@@ -444,7 +468,7 @@ export default function SafetyEmergencyView({ currentUser, onNavigateTab, onShow
                       </button>
                       <div className="flex items-center justify-between text-stone-400 font-label-caps text-[10px] uppercase tracking-wider">
                         <span>Click to reveal 2-step confirmation check</span>
-                        <span>Encrypted via SHA-256</span>
+                        <span>Emergency Priority Line</span>
                       </div>
                     </div>
                   ) : (
@@ -715,9 +739,9 @@ export default function SafetyEmergencyView({ currentUser, onNavigateTab, onShow
           <section className="bg-bone-white p-6 flex flex-col border border-surface-container-highest">
             <div className="flex items-center justify-between border-b border-surface-container-highest pb-4">
               <div>
-                <h3 className="font-headline-md text-xl text-onyx-black font-serif">Incident & SOS Audit History</h3>
+                <h3 className="font-headline-md text-xl text-onyx-black font-serif">Incident &amp; SOS Audit History</h3>
                 <p className="font-label-caps text-[10px] text-clay-earth uppercase mt-0.5 tracking-wider font-semibold">
-                  MongoDB Authenticated Driver Logs
+                  Verified Driver Incident Records
                 </p>
               </div>
               <span className="font-label-caps text-[11px] text-on-surface-variant">
@@ -772,12 +796,12 @@ export default function SafetyEmergencyView({ currentUser, onNavigateTab, onShow
             <div className="flex items-center justify-between border-b border-surface-container-highest pb-3">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-onyx-black text-xl">satellite_alt</span>
-                <h3 className="font-headline-md text-lg text-onyx-black font-serif">Live Corridor Telemetry</h3>
+                <h3 className="font-headline-md text-lg text-onyx-black font-serif">Live Corridor Location</h3>
               </div>
               
               <span className="flex items-center gap-1 font-label-caps text-[10px] text-onyx-black uppercase font-bold">
                 <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                Socket.IO Link
+                Live Emergency Link
               </span>
             </div>
 
@@ -818,7 +842,6 @@ export default function SafetyEmergencyView({ currentUser, onNavigateTab, onShow
 
               <div className="relative z-10 flex justify-between items-center text-[10px] font-label-caps uppercase font-bold">
                 <span className="bg-bone-white/90 px-2 py-0.5 text-onyx-black tracking-widest backdrop-blur-sm">Sector 14 • Pali Hill</span>
-                <span className="bg-onyx-black text-white px-2 py-0.5 tracking-wider">LIVE CARRIER VECTOR</span>
               </div>
 
               <div className="relative z-10 flex justify-between items-end">
@@ -1010,18 +1033,7 @@ export default function SafetyEmergencyView({ currentUser, onNavigateTab, onShow
             </div>
           </section>
 
-          {/* H. SECURITY COMPLIANCE BADGE */}
-          <div className="bg-surface-container p-4 flex flex-col gap-2 border border-surface-container-highest">
-            <div className="flex items-center justify-between">
-              <span className="font-label-caps text-[10px] uppercase text-clay-earth tracking-widest font-bold">
-                Security Provenance
-              </span>
-              <span className="material-symbols-outlined text-base text-clay-earth">verified_user</span>
-            </div>
-            <p className="font-label-caps text-[10px] text-on-surface-variant uppercase tracking-wider leading-relaxed font-mono">
-              Cryptographic Audit: SHA-256 Encrypted Incident Logs • JWT Principal {currentUser?.driverId || currentUser?.id ? `#${currentUser?.driverId || currentUser?.id}` : ''} • Central Zone Gateway • Socket.IO WebRTC Active.
-            </p>
-          </div>
+
 
         </div>
       </div>

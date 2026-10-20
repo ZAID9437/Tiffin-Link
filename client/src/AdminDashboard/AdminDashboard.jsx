@@ -24,7 +24,8 @@ import ActivePartnersTab from './ActivePartnersTab';
 import DriverHistoryAuditsTab from './DriverHistoryAuditsTab';
 import FleetAnalyticsTab from './FleetAnalyticsTab';
 
-import { Search, Bell, Menu, Radio, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Search, Bell, Menu, Radio, ShieldCheck, CheckCircle2, Sun, Moon, Monitor, Check } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 const getAdminTabFromHash = (rawHash) => {
   const hash = (rawHash || (typeof window !== 'undefined' ? window.location.hash : '') || '').toLowerCase().trim();
@@ -140,6 +141,8 @@ export default function AdminDashboard({ currentUser, onLogout }) {
   }, []);
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isAdminThemeOpen, setIsAdminThemeOpen] = useState(false);
+  const { theme, resolvedTheme, isDark, setTheme } = useTheme();
   const [overviewData, setOverviewData] = useState(null);
   const [loadingOverview, setLoadingOverview] = useState(true);
 
@@ -154,7 +157,14 @@ export default function AdminDashboard({ currentUser, onLogout }) {
     try {
       if (!isSilent) setLoadingOverview(true);
       const url = rangeOption ? `http://localhost:5000/api/admin/overview?range=${encodeURIComponent(rangeOption)}` : 'http://localhost:5000/api/admin/overview';
-      const res = await fetch(url);
+      const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('tiffinlink_token') || localStorage.getItem('token');
+      const res = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        credentials: 'include'
+      });
       const json = await res.json();
       if (json.success && json.data) {
         setOverviewData(json.data);
@@ -235,6 +245,62 @@ export default function AdminDashboard({ currentUser, onLogout }) {
                 <span className="font-semibold text-xs text-[#1b1c1a]">Ahmedabad Hub</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#1b1c1a] animate-pulse" />
                 <span className="font-mono text-[10px] uppercase text-[#665d52]">WS Live</span>
+              </div>
+
+              {/* Universal Theme Mode Quick Switcher */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsAdminThemeOpen(!isAdminThemeOpen)}
+                  className="p-2 rounded-lg text-[#444748] dark:text-[#A1A1AA] hover:text-[#1b1c1a] dark:hover:text-[#F4F4F6] hover:bg-[#efeeea] dark:hover:bg-white/10 transition-colors cursor-pointer"
+                  title={`Interface Theme: ${theme === 'system' ? 'System Default' : theme === 'dark' ? 'Dark Mode' : 'Light Mode'}`}
+                >
+                  {theme === 'system' ? <Monitor size={18} /> : isDark ? <Moon size={18} /> : <Sun size={18} />}
+                </button>
+
+                {isAdminThemeOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-[#fbf9f5] dark:bg-[#18181B] border border-[#ded9d1] dark:border-[#2C2C34] rounded-xl shadow-xl p-1.5 text-xs z-50">
+                    <button
+                      type="button"
+                      onClick={() => { setTheme('system'); setIsAdminThemeOpen(false); }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
+                        theme === 'system' ? 'bg-[#1b1c1a] text-white dark:bg-white dark:text-[#111113]' : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#1b1c1a] dark:text-[#F4F4F6]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Monitor size={14} />
+                        <span>System Default</span>
+                      </div>
+                      {theme === 'system' && <Check size={14} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setTheme('light'); setIsAdminThemeOpen(false); }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
+                        theme === 'light' ? 'bg-[#1b1c1a] text-white dark:bg-white dark:text-[#111113]' : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#1b1c1a] dark:text-[#F4F4F6]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sun size={14} />
+                        <span>Light Mode</span>
+                      </div>
+                      {theme === 'light' && <Check size={14} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setTheme('dark'); setIsAdminThemeOpen(false); }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors cursor-pointer ${
+                        theme === 'dark' ? 'bg-[#1b1c1a] text-white dark:bg-white dark:text-[#111113]' : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#1b1c1a] dark:text-[#F4F4F6]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Moon size={14} />
+                        <span>Dark Mode</span>
+                      </div>
+                      {theme === 'dark' && <Check size={14} />}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Notifications */}

@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getSocket, joinDeliveryRoom, leaveDeliveryRoom, subscribeToLocationUpdates } from '../services/socket';
 
 export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }) {
-  // Hash-aware active tab: 'active', 'track', 'upcoming', 'history', 'cancelled'
+  // Hash-aware active tab: 'active', 'track', 'quotes', 'upcoming', 'history', 'cancelled'
   const getTabFromHash = () => {
     const hash = window.location.hash || '';
     if (hash.includes('track-order')) return 'track';
+    if (hash.includes('custom-quotes') || hash.includes('meal-quotes')) return 'quotes';
     if (hash.includes('upcoming-tiffins')) return 'upcoming';
     if (hash.includes('order-history')) return 'history';
     if (hash.includes('cancelled-orders')) return 'cancelled';
@@ -16,6 +17,11 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
   const [orders, setOrders] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Customer Requests & Competing Kitchen Quotes State
+  const [customerRequests, setCustomerRequests] = useState([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [selectedOfferActionId, setSelectedOfferActionId] = useState(null);
 
   // Sync Timer & Latency Telemetry
   const [syncSeconds, setSyncSeconds] = useState(2);
@@ -53,6 +59,8 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
   const [reviewOrder, setReviewOrder] = useState(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
+  const [deliveryRating, setDeliveryRating] = useState(5);
+  const [deliveryComment, setDeliveryComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
 
   const triggerToast = (msg) => {
@@ -69,6 +77,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
     const hashMapping = {
       active: '#active-orders',
       track: '#track-order',
+      quotes: '#custom-quotes',
       upcoming: '#upcoming-tiffins',
       history: '#order-history',
       cancelled: '#cancelled-orders'
@@ -77,6 +86,16 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
       window.location.hash = hashMapping[tab];
     }
   };
+
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, [activeTab]);
 
   // Keep tab in sync with window hash change
   useEffect(() => {
@@ -141,8 +160,12 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
           deliveryFee: Number(o.deliveryFee !== undefined && o.deliveryFee !== null ? o.deliveryFee : (o.deliveryCharge !== undefined && o.deliveryCharge !== null ? o.deliveryCharge : 25)),
           packagingFee: Number(o.packagingFee) || 0,
           items: Array.isArray(o.items) && o.items.length > 0 ? o.items : (Array.isArray(o.selectedItems) && o.selectedItems.length > 0 ? o.selectedItems : []),
-          paymentMethod: o.paymentMethod || (o.paymentStatus === 'Cash on Delivery' ? 'Cash on Delivery (COD)' : 'Online Pre-paid (UPI)'),
-          paymentStatus: o.paymentStatus || 'Paid',
+          paymentMethod: (String(o.paymentMethod || '').toLowerCase().includes('cash') || String(o.paymentMethod || '').toLowerCase().includes('cod') || String(o.paymentStatus || '').toLowerCase().includes('cash'))
+            ? 'Cash on Delivery'
+            : (o.paymentMethod || 'Online Pre-paid (UPI)'),
+          paymentStatus: (String(o.paymentMethod || '').toLowerCase().includes('cash') || String(o.paymentMethod || '').toLowerCase().includes('cod') || String(o.paymentStatus || '').toLowerCase().includes('cash'))
+            ? 'Cash on Delivery'
+            : (o.paymentStatus || 'Paid'),
           otp: o.deliveryOtp || o.otp || '',
           etaMinutes: o.etaMinutes !== undefined ? Number(o.etaMinutes) : (o.estimatedTime ? parseInt(o.estimatedTime) || 15 : 15),
           deliveryDistance: o.deliveryDistance || (o.distanceKm ? `${o.distanceKm} km` : '1.8 km'),
@@ -191,9 +214,64 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
     }
   };
 
+  const fetchCustomerRequests = async () => {
+    try {
+      const savedUserStr = typeof window !== 'undefined' ? (localStorage.getItem('tiffinlink_user') || localStorage.getItem('user')) : null;
+      let fallbackEmail = '';
+      let fallbackPhone = '';
+      if (savedUserStr) {
+        try {
+          const parsed = JSON.parse(savedUserStr);
+          fallbackEmail = parsed?.email || '';
+          fallbackPhone = parsed?.phone || '';
+        } catch (e) {}
+      }
+      const email = currentUser?.email || fallbackEmail;
+      const phone = currentUser?.phone || fallbackPhone;
+      const params = new URLSearchParams();
+      if (email) params.append('email', email);
+      if (phone) params.append('phone', phone);
+      const res = await fetch(`http://localhost:5000/api/requests/my-requests?${params.toString()}`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setCustomerRequests(json.data);
+      }
+    } catch (err) {
+      console.warn('Customer requests fetch error:', err);
+    }
+  };
+
+  const handleSelectOffer = async (requestId, offerId, kitchenName) => {
+    setSelectedOfferActionId(offerId);
+    triggerToast(`⚡ Accepting quote from ${kitchenName}...`);
+    try {
+      const res = await fetch(`http://localhost:5000/api/requests/${requestId}/offers/${offerId}/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const json = await res.json();
+      if (json.success) {
+        triggerToast(`🎉 Quote accepted! Order placed with ${kitchenName}.`);
+        await fetchCustomerRequests();
+        await fetchOrders();
+        setTimeout(() => switchTab('active'), 1200);
+      } else {
+        triggerToast(`❌ ${json.message || 'Could not select quote'}`);
+      }
+    } catch (e) {
+      triggerToast('❌ Error confirming quote');
+    } finally {
+      setSelectedOfferActionId(null);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
-    const interval = setInterval(fetchOrders, 4000);
+    fetchCustomerRequests();
+    const interval = setInterval(() => {
+      fetchOrders();
+      fetchCustomerRequests();
+    }, 4000);
 
     // Real-time synchronization with Socket.IO
     let cleanupSocket = () => {};
@@ -201,22 +279,51 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
       const s = getSocket();
       const handleRealtimeUpdate = () => {
         fetchOrders();
+        fetchCustomerRequests();
+      };
+      const handleOfferNotice = () => {
+        fetchCustomerRequests();
+        triggerToast('⚡ Live kitchen quote received on your meal request!');
+      };
+      const handleOrderDeclinedNotice = (data) => {
+        fetchOrders();
+        if (data) {
+          triggerToast(`⚠️ Order ${data.orderId || ''} declined by ${data.providerName || 'kitchen'}: "${data.cancellationReason || 'Kitchen at full capacity'}"`);
+        }
+      };
+      const handleRequestDeclinedNotice = (data) => {
+        fetchCustomerRequests();
+        if (data) {
+          triggerToast(`⚠️ Meal request declined by kitchen: "${data.reason || 'Unavailable'}"`);
+        }
       };
 
       s.on('order:status:updated', handleRealtimeUpdate);
       s.on('order:updated', handleRealtimeUpdate);
+      s.on('order:declined', handleOrderDeclinedNotice);
+      s.on('order:cancelled', handleOrderDeclinedNotice);
       s.on('delivery:assigned', handleRealtimeUpdate);
       s.on('delivery:status:updated', handleRealtimeUpdate);
       s.on('delivery:delivered', handleRealtimeUpdate);
       s.on('delivery:request:accepted', handleRealtimeUpdate);
+      s.on('request:offer:new', handleOfferNotice);
+      s.on('request:new', handleRealtimeUpdate);
+      s.on('request:accepted', handleRealtimeUpdate);
+      s.on('request:declined', handleRequestDeclinedNotice);
 
       cleanupSocket = () => {
         s.off('order:status:updated', handleRealtimeUpdate);
         s.off('order:updated', handleRealtimeUpdate);
+        s.off('order:declined', handleOrderDeclinedNotice);
+        s.off('order:cancelled', handleOrderDeclinedNotice);
         s.off('delivery:assigned', handleRealtimeUpdate);
         s.off('delivery:status:updated', handleRealtimeUpdate);
         s.off('delivery:delivered', handleRealtimeUpdate);
         s.off('delivery:request:accepted', handleRealtimeUpdate);
+        s.off('request:offer:new', handleOfferNotice);
+        s.off('request:new', handleRealtimeUpdate);
+        s.off('request:accepted', handleRealtimeUpdate);
+        s.off('request:declined', handleRequestDeclinedNotice);
       };
     } catch (sockErr) {
       console.warn('Socket registration warning in MyOrdersView:', sockErr);
@@ -398,7 +505,11 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
   // Review Submission
   const handleSubmitReview = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (!reviewOrder || !reviewComment.trim()) return;
+    if (!reviewOrder) return;
+    if (!reviewRating || reviewRating < 1) {
+      triggerToast('Please select a star rating for kitchen & food quality.');
+      return;
+    }
     setSubmittingReview(true);
     try {
       const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('tiffinlink_token') || '';
@@ -412,8 +523,12 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
           providerId: reviewOrder.providerId || '6a7f3051d4b48741d8722416',
           orderId: reviewOrder.orderId || reviewOrder._id,
           tiffinName: reviewOrder.tiffinName || 'Deluxe Thali',
-          rating: reviewRating,
-          comment: reviewComment.trim()
+          rating: Number(reviewRating) || 5,
+          comment: reviewComment.trim(),
+          deliveryRating: Number(deliveryRating) || 5,
+          deliveryComment: deliveryComment.trim(),
+          driverId: reviewOrder.driverId || reviewOrder.driver?.id || '',
+          driverName: reviewOrder.deliveryPartnerName || reviewOrder.driverName || reviewOrder.driver?.name || ''
         })
       });
       const data = await res.json();
@@ -421,7 +536,8 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
         setActiveModal(null);
         setReviewOrder(null);
         setReviewComment('');
-        triggerToast('Thank you! Your culinary inspection review has been recorded.');
+        setDeliveryComment('');
+        triggerToast('Thank you! Your food & delivery ratings have been recorded in real time.');
         fetchOrders();
       } else {
         alert(data.message || 'Failed to submit review');
@@ -795,11 +911,11 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
   </div>
 
   <div class="footer-note">
-    <strong>Culinary &amp; Quality Guarantee:</strong> Prepared with fresh daily ingredients adhering strictly to FSSAI culinary standards. Sealed in food-grade 304 stainless steel thermal canisters. Verified digitally under TiffinLink Escrow Protocol SEC-889102-AHM.
+    <strong>Culinary &amp; Quality Guarantee:</strong> Prepared with fresh daily ingredients adhering strictly to FSSAI culinary standards. Sealed in food-grade insulated canisters with 100% freshness guarantee.
   </div>
 
   <div class="signature-row">
-    <div>Authorized Signatory: TiffinLink Escrow Ledger</div>
+    <div>Authorized Signatory: TiffinLink Operations</div>
     <div>Original for Recipient • Computer Generated Invoice</div>
   </div>
 
@@ -1054,8 +1170,8 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
   <div class="header">
     <div>
       <div class="brand-title">TIFFIN LINK</div>
-      <div class="brand-subtitle">Escrow Reversal &amp; Settlement System</div>
-      <div class="brand-sub">NPCI Fast-Path Settlement Gateway • Escrow Protocol TL-ESC-2026</div>
+      <div class="brand-subtitle">Order Refund Receipt</div>
+      <div class="brand-sub">Secure Payment Gateway • Customer Protection Guarantee</div>
     </div>
     <div class="badge-box">
       <div class="refund-badge">✓ 100% Refund Credited</div>
@@ -1228,7 +1344,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
 
         {/* COMMON TOP SUB-NAVIGATION (Exact 5-tab bar with Dynamic Badges) */}
         <header className="w-full bg-surface/90 border-b border-sand-neutral mb-8">
-          <div className="h-14 flex items-center justify-between overflow-x-auto">
+          <div className="h-14 flex items-center justify-between overflow-x-auto no-scrollbar">
             <nav className="flex items-center gap-6 sm:gap-8 h-full whitespace-nowrap">
               {/* Active Orders */}
               <button
@@ -1256,6 +1372,24 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
               >
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
                 <span>Track Order</span>
+              </button>
+
+              {/* Custom Quotes (Request & Offer Path) */}
+              <button
+                onClick={() => switchTab('quotes')}
+                className={`flex items-center gap-2 h-full font-button-text text-button-text transition-colors cursor-pointer ${
+                  activeTab === 'quotes'
+                    ? 'border-b-2 border-onyx-black text-onyx-black font-semibold'
+                    : 'text-on-surface-variant hover:text-onyx-black'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px] text-clay-earth">local_offer</span>
+                <span>Custom Quotes</span>
+                {customerRequests.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded bg-surface-container-high font-label-caps text-label-caps text-onyx-black font-bold">
+                    {customerRequests.length}
+                  </span>
+                )}
               </button>
 
               {/* Upcoming Tiffins */}
@@ -1321,18 +1455,18 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3">
                   <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest">
-                    Active Dispatch Manifest
+                    Active Order Status
                   </span>
                   <span className="w-1.5 h-1.5 rounded-full bg-onyx-black" />
                   <span className="font-label-caps text-label-caps text-secondary">
-                    Node Cluster: Satellite West (GJ-01)
+                    Delivery Zone: Satellite, Ahmedabad
                   </span>
                 </div>
                 <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-none">
-                  Active Consignments
+                  Active Orders
                 </h1>
                 <p className="font-body-md text-body-md text-on-surface-variant max-w-2xl">
-                  Real-time operational orders feed backed by MongoDB &amp; Socket.IO telemetry. Cryptographically sealed handshakes and thermal threshold monitoring.
+                  Real-time updates on your meal preparation, homestyle packing, and live doorstep delivery.
                 </p>
               </div>
 
@@ -1343,12 +1477,12 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600" />
                   </span>
                   <span className="font-label-caps text-label-caps text-onyx-black uppercase tracking-wider">
-                    WebSocket: Live
+                    Live Tracking: Active
                   </span>
                 </div>
                 <span className="text-sand-neutral text-xs">|</span>
                 <span className="font-label-caps text-label-caps text-secondary lowercase">
-                  last sync: {syncSeconds}s ago
+                  updated {syncSeconds}s ago
                 </span>
               </div>
             </div>
@@ -1357,39 +1491,39 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
             {loading ? (
               <div className="bg-surface-container-lowest rounded-xl border border-sand-neutral/70 p-12 text-center space-y-4 shadow-sm animate-pulse">
                 <span className="material-symbols-outlined text-[48px] text-secondary animate-spin">sync</span>
-                <h3 className="font-headline-md text-headline-md text-onyx-black">Loading Active Consignment...</h3>
+                <h3 className="font-headline-md text-headline-md text-onyx-black">Loading Active Orders...</h3>
                 <p className="font-body-md text-on-surface-variant max-w-md mx-auto">
-                  Retrieving your live order status and delivery telemetry from MongoDB...
+                  Retrieving your live order status and delivery updates...
                 </p>
               </div>
             ) : activeOrders.length === 0 ? (
               <div className="bg-surface-container-lowest rounded-xl border border-sand-neutral/70 p-12 text-center space-y-4 shadow-sm">
-                <span className="material-symbols-outlined text-[48px] text-secondary">lunch_dining</span>
-                <h3 className="font-headline-md text-headline-md text-onyx-black">No Active Consignments</h3>
-                <p className="font-body-md text-on-surface-variant max-w-md mx-auto">
-                  All your past orders have been safely delivered. Browse artisanal home kitchens in Satellite and Bodakdev to order fresh homestyle tiffins!
-                </p>
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <button
-                    onClick={() => {
-                      if (onNavigate) onNavigate('#order-tiffin');
-                      else window.location.hash = '#order-tiffin';
-                    }}
-                    className="px-6 py-3 bg-onyx-black text-on-primary rounded font-button-text text-button-text hover:bg-neutral-800 transition-colors"
-                  >
-                    Order Tiffin Now
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (onNavigate) onNavigate('#home');
-                      else window.location.hash = '#home';
-                    }}
-                    className="px-6 py-3 bg-[#efeeea] text-[#1a1a1a] rounded font-button-text text-button-text hover:bg-[#eae8e4] transition-colors border border-[#ded9d1]"
-                  >
-                    Back to Home
-                  </button>
+                  <span className="material-symbols-outlined text-[48px] text-secondary">lunch_dining</span>
+                  <h3 className="font-headline-md text-headline-md text-onyx-black">No Active Consignments</h3>
+                  <p className="font-body-md text-on-surface-variant max-w-md mx-auto">
+                    All your past orders have been safely delivered. Browse artisanal home kitchens in Satellite and Bodakdev to order fresh homestyle tiffins!
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <button
+                      onClick={() => {
+                        if (onNavigate) onNavigate('#order-tiffin');
+                        else window.location.hash = '#order-tiffin';
+                      }}
+                      className="px-6 py-3 bg-onyx-black text-on-primary rounded font-button-text text-button-text hover:bg-neutral-800 transition-colors cursor-pointer"
+                    >
+                      Order Tiffin Now
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (onNavigate) onNavigate('#home');
+                        else window.location.hash = '#home';
+                      }}
+                      className="px-6 py-3 bg-[#efeeea] text-[#1a1a1a] rounded font-button-text text-button-text hover:bg-[#eae8e4] transition-colors border border-[#ded9d1] cursor-pointer"
+                    >
+                      Back to Home
+                    </button>
+                  </div>
                 </div>
-              </div>
             ) : (
               <div className="w-full bg-surface-container-lowest rounded-xl border border-sand-neutral/70 shadow-sm overflow-hidden flex flex-col">
                 {/* Consignment Header with Provider, ETA, and Handover OTP */}
@@ -1527,7 +1661,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                       <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                           <span className="font-label-caps text-label-caps uppercase tracking-wider text-secondary">
-                            Telemetry Progression
+                            Delivery Progress
                           </span>
                           <span className="font-label-caps text-label-caps text-onyx-black font-semibold">
                             Transit Leg {currentLeg} of 5 ({currentLeg * 20}% Complete)
@@ -1738,10 +1872,10 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                     <div className="flex flex-col gap-4">
                       <div className="flex items-center justify-between border-b border-sand-neutral/50 pb-3">
                         <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest">
-                          Hardware Telemetry
+                          Packaging &amp; Temperature Status
                         </span>
                         <span className="font-label-caps text-[11px] text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded">
-                          Thermal Lock Active
+                          Insulated &amp; Freshness Sealed
                         </span>
                       </div>
 
@@ -1910,6 +2044,282 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
         )}
 
         {/* ========================================================================= */}
+        {/* SUBVIEW: CUSTOM QUOTES (Request-and-Offer Path)                           */}
+        {/* ========================================================================= */}
+        {activeTab === 'quotes' && (
+          <div className="flex flex-col gap-8 pb-16 animate-in fade-in duration-200">
+            {/* Header info */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-sand-neutral/40">
+              <div>
+                <h2 className="font-serif text-2xl sm:text-3xl font-bold text-onyx-black tracking-tight">
+                  Custom Meal Requests & Quotes
+                </h2>
+                <p className="font-body-md text-sm text-secondary mt-1">
+                  Compare real-time offers submitted by local kitchens and select your preferred chef.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchCustomerRequests();
+                    triggerToast('Refreshed meal requests and quotes');
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-highest transition-colors text-xs font-semibold text-on-surface border border-sand-neutral/30 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-[15px]">refresh</span>
+                  <span>Refresh Offers</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Requests List */}
+            {customerRequests.length === 0 ? (
+              <div className="bg-surface-container-lowest rounded-2xl border border-sand-neutral/50 p-12 text-center space-y-4 shadow-xs">
+                <div className="w-14 h-14 bg-surface-container text-clay-earth rounded-2xl flex items-center justify-center mx-auto border border-sand-neutral/40">
+                  <span className="material-symbols-outlined text-[32px]">local_offer</span>
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-serif text-2xl font-bold text-onyx-black">No Active Requests</h3>
+                  <p className="font-body-md text-sm text-secondary max-w-md mx-auto">
+                    You haven't requested any custom meals yet. Submit a request using our Kitchen Concierge to receive competitive quotes from top nearby chefs.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onNavigate) {
+                      onNavigate('#order-tiffin');
+                    } else {
+                      window.location.hash = '#order-tiffin';
+                    }
+                  }}
+                  className="px-6 py-2.5 rounded-lg bg-onyx-black text-bone-white font-button-text text-sm hover:bg-neutral-800 transition-colors inline-flex items-center gap-2 cursor-pointer shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  <span>Request a Custom Meal</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {customerRequests.map((reqItem) => {
+                  const offers = reqItem.offers || [];
+                  const isPending = reqItem.status === 'pending';
+                  const isAccepted = reqItem.status === 'accepted';
+                  const isExpired = reqItem.status === 'expired';
+
+                  return (
+                    <article
+                      key={reqItem._id || reqItem.id}
+                      className="bg-surface-container-lowest rounded-2xl border border-sand-neutral/50 p-6 sm:p-8 shadow-xs space-y-6"
+                    >
+                      {/* Request Summary Card */}
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-sand-neutral/30">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <span className="font-mono text-xs font-bold text-secondary uppercase">
+                              #{reqItem.id || (reqItem._id ? `REQ-${reqItem._id.toString().slice(-4).toUpperCase()}` : 'REQ')}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                              isPending
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                : isAccepted
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-gray-100 text-gray-700 border border-gray-300'
+                            }`}>
+                              {reqItem.status}
+                            </span>
+                            {reqItem.category && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-surface-container text-xs font-semibold text-secondary">
+                                {reqItem.category}
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="font-serif text-2xl font-bold text-onyx-black">
+                            {reqItem.mealType}
+                          </h3>
+
+                          <div className="flex items-center gap-4 text-xs text-secondary flex-wrap pt-0.5">
+                            <span className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px]">restaurant</span>
+                              {reqItem.quantity || 1} {reqItem.quantity === 1 ? 'Meal' : 'Meals'}
+                            </span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px]">payments</span>
+                              Budget: ₹{reqItem.totalAmount || (reqItem.quantity * reqItem.budget) || reqItem.budget}
+                            </span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[14px]">location_on</span>
+                              {reqItem.customerAddress || reqItem.location}
+                            </span>
+                          </div>
+
+                          {reqItem.specialInstructions && (
+                            <p className="text-xs text-clay-earth font-medium pt-1">
+                              Note: {reqItem.specialInstructions}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Timing / Expiry indicator */}
+                        {isPending && reqItem.secondsLeft > 0 && (
+                          <div className="px-3.5 py-2 rounded-xl bg-surface-container-low border border-sand-neutral/40 flex items-center gap-2 self-start">
+                            <span className="material-symbols-outlined text-[18px] text-amber-600 animate-spin">timelapse</span>
+                            <div className="text-right">
+                              <div className="text-[10px] uppercase font-bold text-secondary tracking-wider">Window Closes In</div>
+                              <div className="font-mono text-xs font-bold text-onyx-black">
+                                {Math.floor(reqItem.secondsLeft / 60)}:{(reqItem.secondsLeft % 60).toString().padStart(2, '0')}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Offers Section */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-serif text-lg font-bold text-onyx-black flex items-center gap-2">
+                            <span>Kitchen Quotes Received</span>
+                            <span className="px-2 py-0.5 rounded-full bg-surface-container text-xs font-bold text-onyx-black">
+                              {offers.length}
+                            </span>
+                          </h4>
+
+                          {isPending && (
+                            <span className="text-xs text-secondary flex items-center gap-1.5 font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" />
+                              Awaiting quotes from nearby chefs
+                            </span>
+                          )}
+                        </div>
+
+                        {offers.length === 0 ? (
+                          <div className="p-6 rounded-xl bg-surface-container-low border border-dashed border-sand-neutral/60 text-center space-y-2">
+                            <span className="material-symbols-outlined text-[28px] text-secondary animate-pulse">radar</span>
+                            <div className="text-xs font-semibold text-onyx-black">
+                              Broadcasting to verified home kitchens in your area
+                            </div>
+                            <div className="text-xs text-secondary max-w-sm mx-auto">
+                              Local chefs are reviewing your dining request. Quotes will appear here automatically in real time.
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {offers.map((offer) => {
+                              const isThisSelected = offer.status === 'selected' || String(reqItem.selectedOfferId) === String(offer._id);
+                              const isOtherSelected = isAccepted && !isThisSelected;
+                              const isActionLoading = selectedOfferActionId === offer._id;
+
+                              return (
+                                <div
+                                  key={offer._id || offer.providerId}
+                                  className={`p-5 rounded-xl border transition-all flex flex-col justify-between space-y-4 ${
+                                    isThisSelected
+                                      ? 'bg-emerald-50/50 border-emerald-300 shadow-sm'
+                                      : isOtherSelected
+                                      ? 'bg-surface-container-lowest/60 border-sand-neutral/30 opacity-60'
+                                      : 'bg-surface-container-lowest border-sand-neutral/50 hover:border-onyx-black shadow-xs'
+                                  }`}
+                                >
+                                  <div className="space-y-3">
+                                    {/* Kitchen Header */}
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div>
+                                        <div className="flex items-center gap-1.5">
+                                          <h5 className="font-serif text-lg font-bold text-onyx-black leading-tight">
+                                            {offer.providerName}
+                                          </h5>
+                                          <span className="material-symbols-outlined text-[16px] text-emerald-700" title="Verified Kitchen">
+                                            verified
+                                          </span>
+                                        </div>
+                                        <div className="text-xs text-secondary mt-0.5">
+                                          {offer.kitchenAddress || 'Local Kitchen Hub'}
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-xs font-bold text-onyx-black shrink-0">
+                                        <span className="text-amber-500">★</span>
+                                        <span>{offer.providerRating || 4.8}</span>
+                                      </div>
+                                    </div>
+
+                                    {/* Financial Breakdown */}
+                                    <div className="p-3 rounded-lg bg-surface-container-low border border-sand-neutral/30 space-y-1">
+                                      <div className="flex items-baseline justify-between">
+                                        <span className="text-xs text-secondary">Offered Price:</span>
+                                        <span className="font-bold text-lg text-onyx-black">₹{offer.price}</span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-[11px] text-secondary">
+                                        <span>Ready Time:</span>
+                                        <span className="font-semibold text-on-surface">{offer.readyTimeMinutes || 25} mins</span>
+                                      </div>
+                                      <div className="flex items-center justify-between text-[11px] text-secondary">
+                                        <span>Delivery:</span>
+                                        <span className="font-semibold text-on-surface">
+                                          {offer.deliveryCharge ? `₹${offer.deliveryCharge}` : 'Free Delivery'}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Message */}
+                                    {offer.message && (
+                                      <p className="text-xs text-secondary italic border-l-2 border-clay-earth pl-2.5">
+                                        "{offer.message}"
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {/* Action */}
+                                  <div className="pt-2">
+                                    {isThisSelected ? (
+                                      <div className="w-full py-2 rounded-lg bg-emerald-600 text-white text-center font-button-text text-xs font-bold flex items-center justify-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                        <span>Accepted Kitchen</span>
+                                      </div>
+                                    ) : isOtherSelected ? (
+                                      <div className="w-full py-2 rounded-lg bg-surface-container text-secondary text-center font-button-text text-xs">
+                                        Request Closed
+                                      </div>
+                                    ) : isPending ? (
+                                      <button
+                                        type="button"
+                                        disabled={isActionLoading}
+                                        onClick={() => handleSelectOffer(reqItem._id, offer._id, offer.providerName)}
+                                        className="w-full py-2.5 rounded-lg bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                                      >
+                                        {isActionLoading ? (
+                                          <span className="material-symbols-outlined text-[16px] animate-spin">refresh</span>
+                                        ) : (
+                                          <span className="material-symbols-outlined text-[16px]">done</span>
+                                        )}
+                                        <span>Accept This Quote</span>
+                                      </button>
+                                    ) : (
+                                      <div className="w-full py-2 rounded-lg bg-surface-container text-secondary text-center text-xs">
+                                        Expired
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================================= */}
         {/* SUBVIEW 2: TRACK ORDER (Live Ahmedabad Geomatics Radar)                   */}
         {/* ========================================================================= */}
         {activeTab === 'track' && (
@@ -1919,7 +2329,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                 <span className="material-symbols-outlined text-[48px] text-secondary">explore</span>
                 <h3 className="font-headline-md text-headline-md text-onyx-black">No Active Delivery in Transit</h3>
                 <p className="font-body-md text-on-surface-variant max-w-md mx-auto">
-                  Live GPS transit telemetry, route geomatics, and handover OTP will appear here as soon as an order is dispatched.
+                  Live GPS tracking, route updates, and delivery handover OTP will appear here as soon as an order is dispatched.
                 </p>
                 <div className="flex items-center justify-center gap-3 pt-2">
                   <button
@@ -1955,7 +2365,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                 </button>
                 <span className="text-sand-neutral text-xs">/</span>
                 <div className="flex items-baseline gap-2">
-                  <span className="font-label-caps text-label-caps uppercase text-secondary">Telemetry</span>
+                  <span className="font-label-caps text-label-caps uppercase text-secondary">Order</span>
                   <span className="font-button-text text-button-text font-semibold text-onyx-black tracking-wider">
                     {activeConsignment.orderId || '#TL-4669'}
                   </span>
@@ -1968,11 +2378,9 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600" />
                 </span>
                 <div className="px-3 py-1 bg-surface-container rounded-full text-on-surface-variant font-label-caps text-label-caps flex items-center gap-2 shadow-sm">
-                  <span>Socket.IO v4.7</span>
+                  <span>Live Tracking</span>
                   <span className="text-sand-neutral">•</span>
-                  <span className="text-onyx-black font-semibold">20ms latency</span>
-                  <span className="text-sand-neutral">•</span>
-                  <span className="text-emerald-700">PostGIS Lock</span>
+                  <span className="text-emerald-700 font-semibold">GPS Active</span>
                 </div>
               </div>
             </div>
@@ -2000,8 +2408,8 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                 <div className="bg-surface-container-low rounded-xl p-6 md:p-8 shadow-sm">
                   <div className="flex items-center justify-between mb-6 pb-4 border-b border-sand-neutral/60">
                     <div>
-                      <span className="font-label-caps text-label-caps uppercase text-secondary block mb-1">State Vector</span>
-                      <h2 className="font-headline-md text-headline-md text-onyx-black">Transit Telemetry</h2>
+                      <span className="font-label-caps text-label-caps uppercase text-secondary block mb-1">Live Status</span>
+                      <h2 className="font-headline-md text-headline-md text-onyx-black">Live Delivery Progress</h2>
                     </div>
                     <div className="text-right">
                       <span className="font-label-caps text-label-caps uppercase text-secondary block mb-1">Target Arrival</span>
@@ -2958,12 +3366,6 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                   <span className="material-symbols-outlined text-[18px]">download</span>
                   <span>Export Statement (PDF)</span>
                 </button>
-                <div className="hidden sm:flex items-center gap-2 px-4 py-3 bg-surface-container-lowest shadow-sm">
-                  <span className="material-symbols-outlined text-[18px] text-secondary">verified_user</span>
-                  <span className="font-label-caps text-label-caps text-secondary uppercase">
-                    304 Steel Canister Cycle Active
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -3194,7 +3596,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                                 Vessel Custody
                               </span>
                               <span className="font-button-text text-button-text text-clay-earth">
-                                {order.vesselStatus || '304 Steel Cycle Completed'}
+                                {order.vesselStatus || 'Packaging Returned & Cleaned'}
                               </span>
                             </div>
                           </div>
@@ -3330,11 +3732,11 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
               <div>
                 <div className="flex items-center gap-3 mb-2">
                   <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary">
-                    Telemetry Node // Escrow Journal
+                    Refund &amp; Cancellation Log
                   </span>
                   <span className="h-1.5 w-1.5 rounded-full bg-error" />
                   <span className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">
-                    Archive Registry
+                    Order History
                   </span>
                 </div>
                 <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-none">
@@ -3372,13 +3774,13 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6">
                 <div>
                   <span className="font-label-caps text-label-caps uppercase text-clay-earth tracking-widest">
-                    Protocol 102.4-A
+                    Instant Resolution
                   </span>
-                  <h2 className="font-headline-md text-headline-md text-onyx-black mt-1">Automated Escrow Telemetry</h2>
+                  <h2 className="font-headline-md text-headline-md text-onyx-black mt-1">Automated Refund Tracking</h2>
                 </div>
                 <div className="flex items-center gap-2 text-on-surface-variant font-label-caps text-label-caps bg-surface-container px-3 py-1.5 rounded self-start lg:self-auto">
                   <span className="material-symbols-outlined text-[16px] text-clay-earth">verified_user</span>
-                  <span>NPCI Direct Relay • Yes Bank Nodal Account 0038</span>
+                  <span>Instant UPI &amp; Bank Direct Refund</span>
                 </div>
               </div>
 
@@ -3470,11 +3872,17 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
             ) : (
               <div className="space-y-10">
                 {cancelledOrders.map((order) => {
-                const isOnline =
-                  (order.paymentMethod || '').toLowerCase().includes('upi') ||
-                  (order.paymentMethod || '').toLowerCase().includes('online');
+                const isCod = 
+                  String(order.paymentMethod || '').toLowerCase().includes('cash') ||
+                  String(order.paymentMethod || '').toLowerCase().includes('cod') ||
+                  String(order.paymentStatus || '').toLowerCase().includes('cash');
+                const isOnline = !isCod && (
+                  String(order.paymentMethod || '').toLowerCase().includes('upi') ||
+                  String(order.paymentMethod || '').toLowerCase().includes('online') ||
+                  String(order.paymentStatus || '').toLowerCase() === 'paid'
+                );
                 const orderKey = order.orderId || order._id;
-                const arn = order.arnRef || 'NPCI-REF-8921048201';
+                const refundRef = `REF-${orderKey.replace(/^#+/, '')}`;
 
                 return (
                   <div
@@ -3487,11 +3895,17 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                         <span className="font-headline-md text-headline-md text-onyx-black tracking-tight">
                           Order {order.orderId || orderKey}
                         </span>
-                        <span className="px-2.5 py-1 rounded bg-error-container text-on-error-container font-label-caps text-label-caps tracking-widest uppercase flex items-center gap-1.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-error" /> CANCELLED
-                        </span>
-                        <span className="px-2.5 py-1 rounded bg-surface-container text-on-surface-variant font-label-caps text-label-caps uppercase">
-                          {isOnline ? 'Online Pre-paid (UPI)' : 'Cash on Delivery (COD)'}
+                        {order.cancelledBy === 'Provider' ? (
+                          <span className="px-2.5 py-1 rounded bg-rose-100 text-rose-800 border border-rose-300 font-label-caps text-label-caps tracking-wider uppercase flex items-center gap-1.5 font-bold">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-600 animate-pulse" /> DECLINED BY RESTAURANT
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded bg-error-container text-on-error-container font-label-caps text-label-caps tracking-widest uppercase flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-error" /> CANCELLED
+                          </span>
+                        )}
+                        <span className="px-2.5 py-1 rounded bg-surface-container text-on-surface-variant font-label-caps text-label-caps uppercase font-semibold">
+                          {isCod ? 'Cash on Delivery (COD)' : 'Online Pre-paid (UPI)'}
                         </span>
                       </div>
                       <div className="text-right">
@@ -3529,23 +3943,47 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                               {order.tiffinName}
                             </div>
                             <div className="font-label-caps text-label-caps text-secondary mt-1 flex items-center gap-2">
-                              <span>Gross Charged: ₹{order.totalAmount}.00</span>
+                              <span>Order Total: ₹{Number(order.totalAmount || 0).toFixed(2)}</span>
                               <span>•</span>
-                              <span>{isOnline ? `UPI: ${order.upiHandle || 'aarav@okaxis'}` : 'COD (Doorstep Handover)'}</span>
-                              <span>•</span>
-                              <span>Canister {order.canister || '#C-809'}</span>
+                              <span>{isCod ? 'Cash on Delivery (Doorstep)' : (order.upiHandle ? `UPI: ${order.upiHandle}` : 'Online Pre-paid (UPI)')}</span>
+                              {order.canister && (
+                                <>
+                                  <span>•</span>
+                                  <span>Canister {order.canister}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
 
+                        {order.cancelledBy === 'Provider' && (
+                          <div className="bg-amber-50/90 border border-amber-300/80 rounded-lg p-4 space-y-2">
+                            <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                              <span className="material-symbols-outlined text-[18px] text-amber-600">storefront</span>
+                              <span>Restaurant Explanation</span>
+                            </div>
+                            <p className="text-sm text-onyx-black italic font-medium pl-3 border-l-2 border-amber-400">
+                              &ldquo;{order.cancellationReason || 'The kitchen is at peak preparation capacity and cannot accept this order right now.'}&rdquo;
+                            </p>
+                            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded border border-emerald-200">
+                              <span className="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
+                              <span>{isCod ? 'Zero Cancellation Fee • No Payment Collected' : '100% Escrow Refund Recredited to Source Account (Zero Cancellation Fee)'}</span>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="bg-surface-container p-4 rounded space-y-3">
                           <div className="flex items-center justify-between text-on-surface-variant font-body-md text-button-text">
                             <span className="text-secondary font-label-caps text-label-caps uppercase">Ordered At:</span>
-                            <span className="text-onyx-black">{order.orderedAt || '28 Sep 2026, 11:15 AM'}</span>
+                            <span className="text-onyx-black">{order.orderedAt || order.date || 'Today'}</span>
                           </div>
                           <div className="flex items-center justify-between text-on-surface-variant font-body-md text-button-text">
-                            <span className="text-secondary font-label-caps text-label-caps uppercase">Grace Window Used:</span>
-                            <span className="text-onyx-black">{order.graceUsed || '7 mins elapsed (Cutoff threshold: 10 mins)'}</span>
+                            <span className="text-secondary font-label-caps text-label-caps uppercase">
+                              {order.cancelledBy === 'Provider' ? 'Cancellation Policy:' : 'Grace Window:'}
+                            </span>
+                            <span className="text-onyx-black font-medium">
+                              {order.cancelledBy === 'Provider' ? 'Declined by Kitchen (Zero Penalty Guarantee)' : 'Zero Cancellation Fee Applied'}
+                            </span>
                           </div>
                           <div className="flex items-start justify-between gap-4 text-on-surface-variant font-body-md text-button-text">
                             <span className="text-secondary font-label-caps text-label-caps uppercase shrink-0">Declared Cause:</span>
@@ -3560,16 +3998,29 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                             onClick={() =>
                               setExpandedDossier((prev) => ({ ...prev, [orderKey]: !prev[orderKey] }))
                             }
-                            className="bg-onyx-black text-white hover:bg-clay-earth font-button-text text-button-text px-5 py-2.5 rounded transition-colors flex items-center gap-2"
+                            className="bg-onyx-black text-white hover:bg-clay-earth font-button-text text-button-text px-5 py-2.5 rounded transition-colors flex items-center gap-2 cursor-pointer"
                           >
                             <span className="material-symbols-outlined text-[18px]">receipt_long</span>
                             <span>{expandedDossier[orderKey] ? 'Hide Complete Dossier' : 'View Complete Dossier'}</span>
                           </button>
 
+                          {order.cancelledBy === 'Provider' && (
+                            <button
+                              onClick={() => {
+                                if (onNavigate) onNavigate('#find-tiffin');
+                                else window.location.hash = '#find-tiffin';
+                              }}
+                              className="bg-clay-earth hover:bg-onyx-black text-white font-button-text text-button-text px-4 py-2.5 rounded transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">restaurant</span>
+                              <span>Find Another Kitchen</span>
+                            </button>
+                          )}
+
                           {isOnline ? (
                             <button
                               onClick={() => handleDownloadRefundReceipt(order, arn)}
-                              className="bg-surface-container hover:bg-surface-container-high text-onyx-black font-button-text text-button-text px-4 py-2.5 rounded transition-colors flex items-center gap-2"
+                              className="bg-surface-container hover:bg-surface-container-high text-onyx-black font-button-text text-button-text px-4 py-2.5 rounded transition-colors flex items-center gap-2 cursor-pointer"
                             >
                               <span className="material-symbols-outlined text-[18px]">download</span>
                               <span>Download Refund Receipt (PDF)</span>
@@ -3581,7 +4032,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                                 if (onNavigate) onNavigate('#order-tiffin');
                                 else window.location.hash = '#order-tiffin';
                               }}
-                              className="bg-surface-container hover:bg-surface-container-high text-onyx-black font-button-text text-button-text px-4 py-2.5 rounded transition-colors flex items-center gap-2"
+                              className="bg-surface-container hover:bg-surface-container-high text-onyx-black font-button-text text-button-text px-4 py-2.5 rounded transition-colors flex items-center gap-2 cursor-pointer"
                             >
                               <span className="material-symbols-outlined text-[18px]">cached</span>
                               <span>Reorder with Correct Address</span>
@@ -3593,91 +4044,83 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                               if (onNavigate) onNavigate('#order-tiffin');
                               else window.location.hash = '#order-tiffin';
                             }}
-                            className="text-onyx-black font-button-text text-button-text hover:text-secondary underline decoration-1 underline-offset-4 px-2 py-2 transition-colors"
+                            className="text-onyx-black font-button-text text-button-text hover:text-secondary underline decoration-1 underline-offset-4 px-2 py-2 transition-colors cursor-pointer"
                           >
                             Order Again →
                           </button>
                         </div>
                       </div>
 
-                      {/* Right Telemetry Panel */}
+                      {/* Right Payment & Cancellation Summary Panel */}
                       <div className="lg:col-span-5 bg-surface-container rounded-lg p-6 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between mb-4">
-                            <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider">
-                              Settlement Registry
+                            <span className="font-label-caps text-label-caps uppercase text-secondary tracking-wider font-semibold">
+                              Payment Summary
                             </span>
                             <span
-                              className={`px-3 py-1 rounded font-label-caps text-label-caps uppercase tracking-wider flex items-center gap-1.5 ${
-                                isOnline
-                                  ? 'bg-primary text-white'
-                                  : 'bg-surface-container-high text-on-surface-variant'
+                              className={`px-3 py-1 rounded font-label-caps text-label-caps uppercase tracking-wider flex items-center gap-1.5 font-bold ${
+                                isCod
+                                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                  : 'bg-emerald-600 text-white'
                               }`}
                             >
                               <span className="material-symbols-outlined text-[14px]">
-                                {isOnline ? 'check' : 'format_image_left'}
+                                {isCod ? 'payments' : 'check_circle'}
                               </span>
-                              <span>{isOnline ? 'Refunded • 100%' : 'NO REFUND REQUIRED'}</span>
+                              <span>{isCod ? 'NO PAYMENT DUE (COD)' : '100% REFUNDED'}</span>
                             </span>
                           </div>
 
                           <div className="space-y-4 my-6">
                             <div>
                               <div className="font-label-caps text-label-caps text-secondary uppercase">
-                                {isOnline ? 'Disbursed Principal' : 'Captured Payment Balance'}
+                                {isCod ? 'Amount Due' : 'Refund Disbursed'}
                               </div>
                               <div className="font-headline-md text-headline-md text-onyx-black tracking-tight">
-                                ₹{isOnline ? order.totalAmount : 0}.00
+                                {isCod ? '₹0.00' : `₹${Number(order.totalAmount || 0).toFixed(2)}`}
                               </div>
                             </div>
 
-                            <div className="bg-surface p-3 rounded space-y-2 font-body-md text-button-text">
+                            <div className="bg-surface p-3.5 rounded-lg space-y-2.5 font-body-md text-button-text">
                               <div className="flex justify-between items-center text-on-surface-variant">
                                 <span className="text-secondary font-label-caps text-label-caps uppercase">
-                                  {isOnline ? 'NPCI ARN Ref:' : 'Escrow Hold Status:'}
+                                  Payment Mode:
                                 </span>
-                                <span className="font-mono text-onyx-black font-medium select-all">
-                                  {isOnline ? arn : 'None (COD Dispatch Aborted)'}
+                                <span className="text-onyx-black font-semibold">
+                                  {isCod ? 'Cash on Delivery (Doorstep)' : 'Online Pre-paid (UPI / Card)'}
                                 </span>
                               </div>
                               <div className="flex justify-between items-center text-on-surface-variant">
                                 <span className="text-secondary font-label-caps text-label-caps uppercase">
-                                  {isOnline ? 'Dispatched Node:' : 'Cancellation Penalty:'}
+                                  Cancellation Fee:
                                 </span>
-                                <span className="text-onyx-black">
-                                  {isOnline ? 'Yes Bank Nodal Escrow' : '₹0.00 (Zero Penalty Guarantee)'}
+                                <span className="text-emerald-700 font-bold">
+                                  ₹0.00 (Zero Fee Guarantee)
                                 </span>
                               </div>
                               <div className="flex justify-between items-center text-on-surface-variant">
                                 <span className="text-secondary font-label-caps text-label-caps uppercase">
-                                  {isOnline ? 'Processing Time:' : 'Delivery Rider Queue:'}
+                                  Payment Status:
                                 </span>
-                                <span className="text-onyx-black">
-                                  {isOnline ? '2 mins (Immediate Batch)' : 'Removed from Route Batch'}
+                                <span className="text-onyx-black font-medium">
+                                  {isCod ? 'No Cash Was Collected' : 'Recredited to Source Bank'}
                                 </span>
                               </div>
                             </div>
                           </div>
                         </div>
 
-                        <div className="bg-surface-container-high p-3 rounded flex items-center justify-between text-secondary">
+                        <div className="bg-surface-container-high p-3 rounded-lg flex items-center justify-between text-secondary">
                           <div className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-emerald-700 animate-ping" />
-                            <span className="font-label-caps text-label-caps uppercase text-onyx-black">
-                              {isOnline ? 'Webhook Reconciled' : 'Zero Grievance Recorded'}
+                            <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                            <span className="font-label-caps text-label-caps uppercase text-onyx-black text-[11px] font-semibold">
+                              {isCod ? 'Zero Liability Protection' : '100% Escrow Guarantee'}
                             </span>
                           </div>
-                          {isOnline && (
-                            <svg className="w-24 h-6 text-clay-earth" fill="none" viewBox="0 0 100 24">
-                              <path
-                                d="M0 12h20l5-8 10 16 10-14 8 10 7-4h40"
-                                stroke="currentColor"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="1.75"
-                              />
-                            </svg>
-                          )}
+                          <span className="text-[11px] text-secondary font-medium">
+                            {isCod ? 'Zero Penalty Applied' : 'Full Reversal Confirmed'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -3685,39 +4128,39 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                     {/* Expandable Dossier Module */}
                     {expandedDossier[orderKey] && (
                       <div className="mt-8 pt-6 bg-surface-container-low p-6 rounded-lg animate-in fade-in duration-200">
-                        <div className="flex items-center justify-between pb-4">
+                        <div className="flex items-center justify-between pb-4 border-b border-sand-neutral/50 mb-4">
                           <h4 className="font-headline-md text-headline-md text-onyx-black">
-                            Escrow Vault Audit Report • #{orderKey}
+                            Cancellation &amp; Settlement Details • #{orderKey}
                           </h4>
-                          <span className="font-label-caps text-label-caps text-secondary uppercase">
-                            Digest: {isOnline ? 'SHA256-VALID' : 'COD-RELEASE-CONFIRMED'}
+                          <span className="px-2.5 py-1 rounded bg-surface-container font-label-caps text-label-caps text-secondary uppercase font-semibold">
+                            {isCod ? 'Cash on Delivery' : 'Pre-paid Online'}
                           </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-body-md text-body-md text-on-surface-variant">
                           <div>
-                            <p className="font-label-caps text-label-caps uppercase text-onyx-black mb-1">
-                              Kitchen Allocation Status
+                            <p className="font-label-caps text-label-caps uppercase text-onyx-black mb-1 font-bold">
+                              Kitchen Order Status
                             </p>
-                            <p>
-                              Stove ignited: No. Prep sheet flagged as VOID. Zero ingredients wasted or charged to provider ledger.
-                            </p>
-                          </div>
-                          <div>
-                            <p className="font-label-caps text-label-caps uppercase text-onyx-black mb-1">
-                              Eco-Canister Reassignment
-                            </p>
-                            <p>
-                              Stainless steel tiffin stack disassociated from delivery dispatch route. Returned to ready rack.
+                            <p className="text-xs text-gray-700 leading-relaxed">
+                              Order was cancelled before meal preparation started. Zero food was prepared or charged.
                             </p>
                           </div>
                           <div>
-                            <p className="font-label-caps text-label-caps uppercase text-onyx-black mb-1">
-                              Clearinghouse Trace
+                            <p className="font-label-caps text-label-caps uppercase text-onyx-black mb-1 font-bold">
+                              Delivery Logistics
                             </p>
-                            <p>
-                              {isOnline
-                                ? `Batch ID: ESCROW-${orderKey}. Direct credit acknowledgment received from remitting UPI switch.`
-                                : 'Customer COD privilege score remains 100/100 under 10-Minute Fair Use Policy.'}
+                            <p className="text-xs text-gray-700 leading-relaxed">
+                              Delivery partner assignment cancelled with zero dispatch penalty fees.
+                            </p>
+                          </div>
+                          <div>
+                            <p className="font-label-caps text-label-caps uppercase text-onyx-black mb-1 font-bold">
+                              Payment Settlement
+                            </p>
+                            <p className="text-xs text-gray-700 leading-relaxed">
+                              {isCod 
+                                ? 'No money was collected from customer on this Cash on Delivery order. Zero cancellation fee applied.' 
+                                : '100% of the total amount has been credited back to your original payment method with zero deductions.'}
                             </p>
                           </div>
                         </div>
@@ -4193,7 +4636,7 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                     </span>
                   </div>
                   <span className="font-label-caps text-label-caps text-secondary block">
-                    Culinary Escrow Protocol Ref • SEC-889102-AHM • GSTIN 24AABCT1342M1Z5
+                    Verified Digital Receipt • GSTIN 24AABCT1342M1Z5
                   </span>
                 </div>
                 <button
@@ -4326,29 +4769,39 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
       {/* 7. Review Meal Modal */}
       {activeModal === 'review' && reviewOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-onyx-black/60 backdrop-blur-sm">
-          <div className="bg-surface rounded-lg max-w-md w-full p-6 sm:p-8 space-y-5 border border-sand-neutral shadow-2xl animate-in zoom-in-95">
+          <div className="bg-surface rounded-2xl max-w-lg w-full p-6 sm:p-7 space-y-5 border border-sand-neutral shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-sand-neutral">
               <div>
                 <span className="font-label-caps text-[10px] text-secondary uppercase font-bold tracking-wider">
-                  Experience Feedback
+                  Verified Order Feedback
                 </span>
-                <h3 className="font-headline-md text-headline-md text-onyx-black mt-0.5">Rate Your Tiffin Meal</h3>
+                <h3 className="font-headline-md text-headline-md text-onyx-black mt-0.5">Rate Your Meal &amp; Delivery</h3>
               </div>
-              <button onClick={() => setActiveModal(null)} className="p-1 text-secondary hover:text-onyx-black">
+              <button onClick={() => setActiveModal(null)} className="p-1 text-secondary hover:text-onyx-black cursor-pointer">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            <div className="p-3 bg-surface-container rounded border border-sand-neutral/60 text-xs">
-              <span className="font-bold text-onyx-black block">{reviewOrder.tiffinName || 'Deluxe Thali'}</span>
-              <span className="text-secondary">{reviewOrder.providerName} • {reviewOrder.orderId || reviewOrder._id}</span>
+            <div className="p-3 bg-surface-container rounded-xl border border-sand-neutral/60 text-xs flex items-center justify-between">
+              <div>
+                <span className="font-bold text-onyx-black block">{reviewOrder.tiffinName || 'Deluxe Thali'}</span>
+                <span className="text-secondary">{reviewOrder.providerName} • {reviewOrder.orderId || reviewOrder._id}</span>
+              </div>
+              <div className="text-right">
+                <span className="font-label-caps text-[10px] text-secondary uppercase block">Courier</span>
+                <span className="font-bold text-onyx-black text-xs">{reviewOrder.deliveryPartnerName || reviewOrder.driverName || 'Express Courier'}</span>
+              </div>
             </div>
 
-            <form onSubmit={handleSubmitReview} className="space-y-4">
-              <div>
-                <label className="font-label-caps uppercase text-secondary font-semibold text-xs block mb-2">
-                  Overall Food Rating
-                </label>
+            <form onSubmit={handleSubmitReview} className="space-y-5">
+              {/* SECTION A: KITCHEN & FOOD */}
+              <div className="p-4 bg-surface-container/60 rounded-xl border border-sand-neutral/70 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-label-caps uppercase text-secondary font-semibold text-xs block">
+                    1. Kitchen &amp; Food Quality <span className="text-red-500 font-bold">*</span>
+                  </label>
+                  <span className="text-xs font-bold text-onyx-black">({reviewRating}/5 Stars)</span>
+                </div>
                 <div className="flex items-center gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -4360,38 +4813,59 @@ export default function MyOrdersView({ currentUser, onNavigate, onOpenTracking }
                       {star <= reviewRating ? '⭐' : '☆'}
                     </button>
                   ))}
-                  <span className="text-xs font-bold text-onyx-black ml-2">({reviewRating}/5 Stars)</span>
                 </div>
-              </div>
-
-              <div>
-                <label className="font-label-caps uppercase text-secondary font-semibold text-xs block mb-1">
-                  Your Honest Review &amp; Taste Notes
-                </label>
                 <textarea
-                  required
-                  rows={3}
+                  rows={2}
                   value={reviewComment}
                   onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder="How was the shaak, rotli softness, spice level and aroma? Share your feedback for the kitchen..."
-                  className="w-full bg-surface-container p-3 rounded border border-sand-neutral text-xs text-onyx-black focus:outline-none focus:border-onyx-black"
+                  placeholder="How was the taste, packaging, hygiene and rotli softness? (Optional)"
+                  className="w-full bg-surface p-2.5 rounded-lg border border-sand-neutral text-xs text-onyx-black focus:outline-none focus:border-onyx-black"
                 />
               </div>
 
-              <div className="pt-2 flex items-center gap-2">
+              {/* SECTION B: DELIVERY PARTNER */}
+              <div className="p-4 bg-surface-container/60 rounded-xl border border-sand-neutral/70 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-label-caps uppercase text-secondary font-semibold text-xs block">
+                    2. Delivery Partner ({reviewOrder.deliveryPartnerName || reviewOrder.driverName || 'Courier'}) <span className="text-red-500 font-bold">*</span>
+                  </label>
+                  <span className="text-xs font-bold text-onyx-black">({deliveryRating}/5 Stars)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setDeliveryRating(star)}
+                      className="text-2xl hover:scale-125 transition-transform cursor-pointer"
+                    >
+                      {star <= deliveryRating ? '⭐' : '☆'}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={deliveryComment}
+                  onChange={(e) => setDeliveryComment(e.target.value)}
+                  placeholder="Punctual, professional handling, friendly delivery partner... (Optional)"
+                  className="w-full bg-surface p-2.5 rounded-lg border border-sand-neutral text-xs text-onyx-black focus:outline-none focus:border-onyx-black"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
-                  className="flex-1 py-2.5 rounded bg-surface-container text-xs font-bold text-secondary hover:text-onyx-black"
+                  className="flex-1 py-2.5 rounded-lg bg-surface-container text-xs font-bold text-secondary hover:text-onyx-black cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingReview}
-                  className="flex-1 py-2.5 rounded bg-onyx-black text-white hover:bg-clay-earth text-xs font-bold transition-all disabled:opacity-50 shadow-md"
+                  className="flex-1 py-2.5 rounded-lg bg-onyx-black text-white hover:bg-clay-earth text-xs font-bold transition-all disabled:opacity-50 shadow-md cursor-pointer"
                 >
-                  {submittingReview ? 'Submitting...' : 'Post Review'}
+                  {submittingReview ? 'Submitting...' : 'Post Ratings'}
                 </button>
               </div>
             </form>

@@ -89,6 +89,15 @@ export default function ReviewsTab({ currentUser }) {
       if (showLoading) setLoading(true);
       setErrorState(false);
 
+      const pId = currentUser?.providerId || currentUser?._id || currentUser?.id || (() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('tiffinlink_user') || '{}');
+          return stored?.providerId || stored?._id || stored?.id || '';
+        } catch (e) {
+          return '';
+        }
+      })();
+
       const params = new URLSearchParams({
         search: searchQuery.trim(),
         rating: ratingFilter,
@@ -98,6 +107,10 @@ export default function ReviewsTab({ currentUser }) {
         page: currentPage,
         limit: 6
       });
+
+      if (pId) {
+        params.append('providerId', String(pId));
+      }
 
       if (dateRangeFilter === 'Custom Date Range' && customStart && customEnd) {
         params.append('startDate', customStart);
@@ -115,6 +128,12 @@ export default function ReviewsTab({ currentUser }) {
         if (json.data.pagination) {
           setPagination(json.data.pagination);
         }
+        setErrorState(false);
+      } else if (json && json.data && Array.isArray(json.data.reviews)) {
+        setReviews(json.data.reviews);
+        if (json.data.stats) setStats(prev => ({ ...prev, ...json.data.stats }));
+        if (json.data.pagination) setPagination(json.data.pagination);
+        setErrorState(false);
       } else {
         setErrorState(true);
       }
@@ -129,9 +148,7 @@ export default function ReviewsTab({ currentUser }) {
 
   // Trigger fetch when filters or pagination change
   useEffect(() => {
-    if (currentUser) {
-      fetchReviewsFromDb(true);
-    }
+    fetchReviewsFromDb(true);
   }, [
     currentUser,
     ratingFilter,
@@ -146,10 +163,8 @@ export default function ReviewsTab({ currentUser }) {
   // Debounced search query
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (currentUser) {
-        setCurrentPage(1);
-        fetchReviewsFromDb(false);
-      }
+      setCurrentPage(1);
+      fetchReviewsFromDb(false);
     }, 350);
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -181,7 +196,7 @@ export default function ReviewsTab({ currentUser }) {
   const handleLiveSync = () => {
     setIsSyncing(true);
     fetchReviewsFromDb(true);
-    showToast('Telemetry refreshed from MongoDB database.');
+    showToast('Reviews refreshed');
   };
 
   // Open Reply Modal
@@ -223,7 +238,7 @@ export default function ReviewsTab({ currentUser }) {
       }
     } catch (err) {
       console.error('Error saving review reply:', err);
-      showToast('Error communicating with database server.');
+      showToast('Unable to post reply. Please retry.');
     } finally {
       setSubmittingReply(false);
     }
@@ -328,16 +343,13 @@ export default function ReviewsTab({ currentUser }) {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#e4dfd7] pb-6">
         <div>
           <div className="text-[11px] font-mono uppercase tracking-wider text-[#8c887b] mb-1">
-            CUSTOMER EXPERIENCE // AUDIT &amp; QUALITY ASSURANCE
+            CUSTOMER EXPERIENCE • AUDIT &amp; QUALITY ASSURANCE
           </div>
           <h1 className="text-3xl md:text-4xl font-serif font-bold text-[#1a1a1a] tracking-tight">
             Ratings &amp; Reviews
           </h1>
           <p className="text-sm text-[#5a5955] mt-1.5 max-w-xl">
-            Understand customer feedback and improve your culinary service. Real-time telemetry synchronized with MongoDB collection{' '}
-            <code className="text-xs font-mono text-[#1a1a1a] bg-[#ece8e0] px-1 py-0.5 rounded">
-              reviews
-            </code>.
+            Understand customer feedback and improve your culinary service with real-time dining insights.
           </p>
         </div>
 
@@ -357,7 +369,7 @@ export default function ReviewsTab({ currentUser }) {
             className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] text-xs font-medium text-white hover:bg-neutral-800 transition-colors rounded cursor-pointer disabled:opacity-60"
           >
             <RotateCw size={15} className={isSyncing ? 'animate-spin' : ''} />
-            <span>{isSyncing ? 'Syncing...' : 'Live Sync'}</span>
+            <span>{isSyncing ? 'Refreshing...' : 'Refresh Reviews'}</span>
           </button>
         </div>
       </div>
@@ -466,7 +478,7 @@ export default function ReviewsTab({ currentUser }) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#f2efe9] pb-4 mb-5">
           <div>
             <h2 className="text-lg font-serif font-bold text-[#1a1a1a]">Rating Distribution</h2>
-            <p className="text-xs text-[#71716b]">Real-time frequency histogram aggregated from MongoDB provider records</p>
+            <p className="text-xs text-[#71716b]">Real-time frequency histogram aggregated from verified customer ratings</p>
           </div>
           <span className="text-[11px] font-mono text-[#71716b] bg-[#f7f4ee] px-2.5 py-1 rounded border border-[#e4dfd7]">
             AGGREGATION: 100% AUDITED
@@ -654,7 +666,7 @@ export default function ReviewsTab({ currentUser }) {
               : 'SHOWING 0 REVIEWS'}
           </span>
           <span>
-            PAGE {pagination.page} OF {pagination.totalPages} // SERVER-SIDE PAGINATED
+            PAGE {pagination.page} OF {pagination.totalPages} • SERVER-SIDE PAGINATED
           </span>
         </div>
 
@@ -679,14 +691,14 @@ export default function ReviewsTab({ currentUser }) {
             <AlertCircle size={32} className="mx-auto text-rose-600" />
             <h3 className="text-base font-serif font-bold text-[#1a1a1a]">Unable to Load Reviews</h3>
             <p className="text-xs text-[#71716b] max-w-md mx-auto">
-              There was an issue communicating with the MongoDB cluster. Please check connection and retry.
+              There was an issue loading customer reviews. Please check connection and retry.
             </p>
             <button
               type="button"
               onClick={() => fetchReviewsFromDb(true)}
               className="px-4 py-2 bg-[#1a1a1a] text-white text-xs rounded hover:bg-neutral-800 transition-colors cursor-pointer"
             >
-              Retry Database Fetch
+              Retry
             </button>
           </div>
         ) : reviews.length === 0 ? (
@@ -974,7 +986,7 @@ export default function ReviewsTab({ currentUser }) {
               <div className="flex items-start gap-2 text-[11px] text-[#71716b] bg-[#fbf9f5] p-2.5 rounded border border-[#e4dfd7]">
                 <AlertCircle size={16} className="text-blue-700 shrink-0 mt-0.5" />
                 <span>
-                  Your reply will be published publicly beneath the customer review on the TiffinLink marketplace and saved in MongoDB.
+                  Your reply will be published publicly beneath the customer review on the TiffinLink marketplace.
                 </span>
               </div>
 

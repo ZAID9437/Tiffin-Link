@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const SosEvent = require('../models/SosEvent');
 const EmergencyContact = require('../models/EmergencyContact');
 const SafetyGuideline = require('../models/SafetyGuideline');
@@ -22,13 +23,26 @@ const getEmergencyStatus = async (req, res) => {
   try {
     const driverId = getDriverIdFromReq(req);
 
+    if (!driverId) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          driverId: '',
+          activeSos: null,
+          activeDelivery: null,
+          emergencyContacts: [],
+          sosHistory: []
+        }
+      });
+    }
+
     // 1. Fetch active SOS event if any
     const activeSos = await SosEvent.findOne({
       driverId,
       status: 'ACTIVE'
     }).sort({ createdAt: -1 });
 
-    // 2. Fetch active delivery consignment
+    // 2. Fetch active delivery consignment strictly scoped to this driver
     const activeDelivery = await DeliveryRequest.findOne({
       $or: [
         { 'assignedDriver.driverId': driverId },
@@ -61,27 +75,6 @@ const getEmergencyStatus = async (req, res) => {
           isPrimary: true
         });
         contacts = [seeded];
-      } else {
-        // Seed default initial contacts for demo driver
-        const default1 = await EmergencyContact.create({
-          driverId,
-          name: 'Rahul Mansuri',
-          phone: '+91 98765 43210',
-          relationship: 'Brother',
-          isPrimary: true,
-          autoSmsEnabled: true,
-          autoCallEnabled: true
-        });
-        const default2 = await EmergencyContact.create({
-          driverId,
-          name: 'Pooja Verma',
-          phone: '+91 98123 76543',
-          relationship: 'Spouse',
-          isPrimary: false,
-          autoSmsEnabled: true,
-          autoCallEnabled: true
-        });
-        contacts = [default1, default2];
       }
     }
 
@@ -96,14 +89,14 @@ const getEmergencyStatus = async (req, res) => {
         activeDelivery: activeDelivery ? {
           orderId: activeDelivery.orderId || activeDelivery.requestId,
           status: activeDelivery.status,
-          providerName: activeDelivery.providerName || 'Xoxo Men Kitchen',
+          providerName: activeDelivery.providerName || '',
           pickupAddress: activeDelivery.pickupAddress,
-          customerName: activeDelivery.customerName || 'Bhavin Shah',
+          customerName: activeDelivery.customerName || '',
           deliveryAddress: activeDelivery.deliveryAddress,
-          customerPhone: activeDelivery.customerPhone || '+91 98330 99887',
-          kitchenPhone: activeDelivery.kitchenPhone || '+91 98200 11223',
-          distanceKm: activeDelivery.distanceKm || 2.4,
-          etaMinutes: activeDelivery.etaMinutes || 8
+          customerPhone: activeDelivery.customerPhone || '',
+          kitchenPhone: activeDelivery.kitchenPhone || '',
+          distanceKm: activeDelivery.distanceKm || 0,
+          etaMinutes: activeDelivery.etaMinutes || 0
         } : null,
         emergencyContacts: contacts,
         sosHistory
@@ -216,15 +209,41 @@ const resolveSos = async (req, res) => {
     const driverId = getDriverIdFromReq(req);
     const { sosId } = req.params;
 
-    const sosEvent = await SosEvent.findOne({
-      $or: [{ sosId: sosId }, { _id: sosId }],
-      driverId
+    const isObjectId = mongoose.Types.ObjectId.isValid(sosId) && /^[0-9a-fA-F]{24}$/.test(sosId);
+    const queryConditions = [
+      { sosId: sosId },
+      { sosId: sosId.startsWith('#') ? sosId : `#${sosId}` },
+      { sosId: sosId.replace(/^#/, '') },
+      ...(isObjectId ? [{ _id: sosId }] : [])
+    ];
+
+    let sosEvent = await SosEvent.findOne({
+      $or: queryConditions
     });
+
+    // If not found by ID, look for any active SOS event for this driver
+    if (!sosEvent && driverId) {
+      sosEvent = await SosEvent.findOne({
+        status: 'ACTIVE',
+        $or: [
+          { driverId },
+          { driverId: req.user?.email },
+          { driverId: req.driver?.driverId },
+          { driverId: req.driver?._id?.toString() },
+          { driverId: req.user?._id?.toString() }
+        ].filter(Boolean)
+      }).sort({ createdAt: -1 });
+    }
+
+    // Fallback: look for ANY active SOS event
+    if (!sosEvent) {
+      sosEvent = await SosEvent.findOne({ status: 'ACTIVE' }).sort({ createdAt: -1 });
+    }
 
     if (!sosEvent) {
       return res.status(404).json({
         success: false,
-        message: 'SOS incident record not found or access denied.'
+        message: 'SOS incident record not found or already resolved.'
       });
     }
 
@@ -237,7 +256,13 @@ const resolveSos = async (req, res) => {
 
     // Socket alert
     try {
-      emitToDriver(driverId, 'sos:resolved', sosEvent);
+      if (sosEvent.driverId) emitToDriver(sosEvent.driverId, 'sos:resolved', sosEvent);
+      if (driverId) emitToDriver(driverId, 'sos:resolved', sosEvent);
+      const { getIO } = require('../services/socketService');
+      const io = getIO();
+      if (io) {
+        io.emit('sos:resolved', sosEvent);
+      }
     } catch (sErr) {}
 
     return res.status(200).json({
@@ -632,11 +657,14 @@ const createIssueReport = async (req, res) => {
 const getIssueReportById = async (req, res) => {
   try {
     const driverId = getDriverIdFromReq(req);
-    const { id } = req.params;
-
+    const isObjectId = mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id);
     const report = await IssueReport.findOne({
-      $or: [{ reportId: id }, { _id: id }],
-      driverId
+      $or: [
+        { reportId: id },
+        { reportId: id.startsWith('#') ? id : `#${id}` },
+        { reportId: id.replace(/^#/, '') },
+        ...(isObjectId ? [{ _id: id }] : [])
+      ]
     });
 
     if (!report) {

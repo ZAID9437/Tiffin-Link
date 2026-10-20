@@ -55,6 +55,7 @@ const {
   deleteDriverPayoutMethod,
   getDriverPerformance,
   getDriverReviews,
+  simulateDriverReview,
   getDriverAccount,
   updateDriverAccount,
   changeDriverPassword,
@@ -82,6 +83,17 @@ router.get('/account', protect, requireDriver, getDriverAccount);
 router.get('/driver/account', protect, requireDriver, getDriverAccount);
 router.put('/account', protect, requireDriver, updateDriverAccount);
 router.put('/driver/account', protect, requireDriver, updateDriverAccount);
+
+// Vehicle & Documents Endpoints
+router.get('/vehicle', protect, requireDriver, getDriverAccount);
+router.get('/driver/vehicle', protect, requireDriver, getDriverAccount);
+router.put('/vehicle', protect, requireDriver, updateDriverAccount);
+router.put('/driver/vehicle', protect, requireDriver, updateDriverAccount);
+router.get('/documents', protect, requireDriver, getDriverAccount);
+router.get('/driver/documents', protect, requireDriver, getDriverAccount);
+router.put('/documents', protect, requireDriver, updateDriverAccount);
+router.put('/driver/documents', protect, requireDriver, updateDriverAccount);
+
 router.put('/account/password', protect, requireDriver, changeDriverPassword);
 router.put('/driver/account/password', protect, requireDriver, changeDriverPassword);
 router.post('/account/password', protect, requireDriver, changeDriverPassword);
@@ -127,6 +139,7 @@ router.get('/performance', driverAuthWithFallback, getDriverPerformance);
 router.get('/driver/performance', driverAuthWithFallback, getDriverPerformance);
 router.get('/reviews', driverAuthWithFallback, getDriverReviews);
 router.get('/driver/reviews', driverAuthWithFallback, getDriverReviews);
+router.post('/driver/reviews/simulate', driverAuthWithFallback, simulateDriverReview);
 router.get('/reviews/summary', driverAuthWithFallback, getDriverReviews);
 router.get('/driver/reviews/summary', driverAuthWithFallback, getDriverReviews);
 router.get('/earnings/overview', driverAuthWithFallback, getDriverEarningsOverview);
@@ -171,27 +184,27 @@ router.get('/payout-methods', protect, requireDriver, getDriverPayoutMethods);
 router.post('/payout-methods', protect, requireDriver, createDriverPayoutMethod);
 router.patch('/payout-methods/:id/primary', protect, requireDriver, setPrimaryPayoutMethod);
 router.delete('/payout-methods/:id', protect, requireDriver, deleteDriverPayoutMethod);
-router.get('/active-delivery', protect, requireDriver, getActiveDelivery);
-router.get('/driver/deliveries/active', protect, requireDriver, getActiveDelivery);
-router.get('/upcoming', protect, requireDriver, getUpcomingDeliveries);
-router.get('/driver/deliveries/upcoming', protect, requireDriver, getUpcomingDeliveries);
-router.get('/completed', protect, requireDriver, getCompletedDeliveries);
-router.get('/driver/deliveries/completed', protect, requireDriver, getCompletedDeliveries);
-router.get('/history', protect, requireDriver, getDeliveryHistory);
-router.get('/driver/deliveries/history', protect, requireDriver, getDeliveryHistory);
-router.get('/driver-requests', protect, requireDriver, getEligibleRequestsForDriver);
-router.post('/requests/:requestId/accept', protect, requireDriver, acceptDeliveryRequestAtomic);
-router.post('/requests/:requestId/decline', protect, requireDriver, declineDeliveryRequest);
-router.post('/status/toggle', protect, requireDriver, toggleDriverStatus);
+router.get('/active-delivery', driverAuthWithFallback, getActiveDelivery);
+router.get('/driver/deliveries/active', driverAuthWithFallback, getActiveDelivery);
+router.get('/upcoming', driverAuthWithFallback, getUpcomingDeliveries);
+router.get('/driver/deliveries/upcoming', driverAuthWithFallback, getUpcomingDeliveries);
+router.get('/completed', driverAuthWithFallback, getCompletedDeliveries);
+router.get('/driver/deliveries/completed', driverAuthWithFallback, getCompletedDeliveries);
+router.get('/history', driverAuthWithFallback, getDeliveryHistory);
+router.get('/driver/deliveries/history', driverAuthWithFallback, getDeliveryHistory);
+router.get('/driver-requests', driverAuthWithFallback, getEligibleRequestsForDriver);
+router.post('/requests/:requestId/accept', driverAuthWithFallback, acceptDeliveryRequestAtomic);
+router.post('/requests/:requestId/decline', driverAuthWithFallback, declineDeliveryRequest);
+router.post('/status/toggle', driverAuthWithFallback, toggleDriverStatus);
 router.get('/track/:id', protect, getDeliveryTrackingById);
 router.get('/requests', protect, requireProvider, getDeliveryRequests);
 router.get('/metrics', protect, requireProvider, getDeliveryMetrics);
 router.post('/dispatch', protect, requireProvider, createDeliveryRequest);
 router.post('/broadcast', protect, requireProvider, broadcastDeliveryRequest);
-router.post('/accept', protect, requireDriver, acceptDeliveryRequest);
+router.post('/accept', driverAuthWithFallback, acceptDeliveryRequest);
 router.post('/assign', protect, requireProvider, assignDriver);
-router.post('/confirm-pickup', protect, requireDriver, confirmPickup);
-router.post('/verify-otp', protect, requireDriver, verifyOtp);
+router.post('/confirm-pickup', driverAuthWithFallback, confirmPickup);
+router.post('/verify-otp', driverAuthWithFallback, verifyOtp);
 router.post('/send-otp-sms', protect, requireDriver, sendPickupOtpSms);
 router.post('/:deliveryId/pickup-otp/send', protect, requireDriver, sendPickupOtpSms);
 router.post('/:deliveryId/pickup-otp/verify', protect, requireDriver, verifyOtp);
@@ -199,10 +212,10 @@ router.post('/customer-arrival-otp/send', protect, requireProvider, sendCustomer
 router.post('/customer-arrival-otp/verify', protect, requireProvider, verifyCustomerArrivalOtp);
 router.post('/:deliveryId/customer-arrival-otp/send', protect, requireProvider, sendCustomerArrivalOtp);
 router.post('/:deliveryId/customer-arrival-otp/verify', protect, requireProvider, verifyCustomerArrivalOtp);
-router.post('/customer-handover-otp/send', protect, requireDriver, sendCustomerHandoverOtp);
-router.post('/customer-handover-otp/verify', protect, requireDriver, verifyCustomerHandoverOtp);
-router.post('/:deliveryId/customer-handover-otp/send', protect, requireDriver, sendCustomerHandoverOtp);
-router.post('/:deliveryId/customer-handover-otp/verify', protect, requireDriver, verifyCustomerHandoverOtp);
+router.post('/customer-handover-otp/send', driverAuthWithFallback, sendCustomerHandoverOtp);
+router.post('/customer-handover-otp/verify', driverAuthWithFallback, verifyCustomerHandoverOtp);
+router.post('/:deliveryId/customer-handover-otp/send', driverAuthWithFallback, sendCustomerHandoverOtp);
+router.post('/:deliveryId/customer-handover-otp/verify', driverAuthWithFallback, verifyCustomerHandoverOtp);
 router.post('/status', protect, updateDeliveryStatus);
 router.post('/location', protect, requireDriver, updateDriverLocation);
 router.get('/drivers/nearby', protect, getNearbyDrivers);

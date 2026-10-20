@@ -215,9 +215,9 @@ export default function FinanceSettlementsTab() {
   };
 
   const handleManualReconcile = async () => {
-    showToast('Force-reconciling financial records with MongoDB database...');
+    showToast('Reconciling financial records...');
     await fetchFinanceData();
-    showToast('Reconciliation complete. All ledger rows synced with database.');
+    showToast('Reconciliation complete. All ledger rows up to date.');
   };
 
   const handleInitiatePayout = () => {

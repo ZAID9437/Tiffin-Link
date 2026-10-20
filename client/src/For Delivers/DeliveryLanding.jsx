@@ -35,6 +35,16 @@ export default function DeliveryLanding({ onOpenBecomeDeliveryPartnerModal, onOp
   const [ratingCount, setRatingCount] = useState(0);
 
   useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, []);
+
+  useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -98,7 +108,9 @@ export default function DeliveryLanding({ onOpenBecomeDeliveryPartnerModal, onOp
               muted 
               playsInline 
               preload="auto"
-              className="w-full h-full object-cover parallax-img"
+              disablePictureInPicture
+              controlsList="nodownload noplaybackrate nopictureinpicture"
+              className="w-full h-full object-cover parallax-img pointer-events-none"
               data-parallax-speed="0.12"
             >
               <source src="/create_one_indain_delivery_dri.mp4" type="video/mp4" />
@@ -126,7 +138,7 @@ export default function DeliveryLanding({ onOpenBecomeDeliveryPartnerModal, onOp
               </button>
               <button 
                 onClick={onOpenDemoModal}
-                className="text-white font-button-text text-button-text border-b border-white pb-1 hover:pb-2 transition-all duration-200"
+                className="bg-bone-white text-onyx-black px-10 py-5 font-button-text text-button-text uppercase tracking-widest hover:scale-95 transition-transform duration-200 rounded-none cursor-pointer"
               >
                 Watch Demo
               </button>

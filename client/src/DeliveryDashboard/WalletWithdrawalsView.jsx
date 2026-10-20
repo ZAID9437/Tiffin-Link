@@ -279,7 +279,7 @@ const WalletWithdrawalsView = ({ currentUser, onNavigateTab, onNavigate }) => {
       fetchWalletData();
     } catch (err) {
       console.error('Error submitting withdrawal request:', err);
-      setErrorMsg('Failed to process withdrawal request: ' + err.message);
+      setErrorMsg('Failed to process withdrawal request. Please check your connection and try again.');
     } finally {
       setSubmitting(false);
     }
@@ -301,14 +301,6 @@ const WalletWithdrawalsView = ({ currentUser, onNavigateTab, onNavigate }) => {
             <span>EARNINGS &amp; PAYMENTS</span>
             <span className="text-secondary/50">/</span>
             <span className="text-onyx-black font-semibold">WALLET &amp; WITHDRAWALS</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2.5 py-0.5 border border-emerald-200 text-[10px] font-semibold tracking-wider uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-              SOCKET.IO SYNCED • INSTANT PAYOUT GATEWAY
-            </span>
-            <span className="text-secondary/50">|</span>
-            <span className="text-secondary">ESCROW LEDGER PORT: :8443</span>
           </div>
         </div>
 
@@ -352,11 +344,9 @@ const WalletWithdrawalsView = ({ currentUser, onNavigateTab, onNavigate }) => {
         {/* ================================================== */}
         <section className="space-y-3">
           <div className="flex items-center justify-between text-[11px] font-mono text-secondary">
-            <span className="font-semibold text-onyx-black uppercase tracking-wider flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-              FIRST ROW — PAYMENT COLLECTION BREAKDOWN
+            <span className="font-semibold text-onyx-black uppercase tracking-wider">
+              PAYMENT COLLECTION BREAKDOWN
             </span>
-            <span>DERIVED FROM VALID MONGODB CUSTOMER PAYMENT RECORDS</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -530,10 +520,10 @@ const WalletWithdrawalsView = ({ currentUser, onNavigateTab, onNavigate }) => {
               <div className="border-b border-sand-neutral pb-4 flex justify-between items-start">
                 <div>
                   <span className="inline-block text-[10px] font-mono uppercase tracking-widest text-emerald-900 bg-emerald-100 px-2 py-0.5 mb-1 font-semibold">
-                    Zero Escrow Wait • Direct IMPS / UPI
+                    Direct IMPS / UPI
                   </span>
                   <h3 className="font-headline-md text-2xl font-semibold text-onyx-black">Initiate Payout Transfer</h3>
-                  <p className="font-body-md text-xs text-secondary mt-0.5">Select disbursement amount and destination routing endpoint.</p>
+                  <p className="font-body-md text-xs text-secondary mt-0.5">Select withdrawal amount and destination account.</p>
                 </div>
                 <div className="text-right">
                   <span className="text-[11px] text-secondary uppercase tracking-wider block">Withdrawable Ceiling</span>
@@ -767,13 +757,15 @@ const WalletWithdrawalsView = ({ currentUser, onNavigateTab, onNavigate }) => {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-onyx-black font-bold">▪</span>
-                  <span><strong>2FA Driver Verification:</strong> Sessions bound to hardware telemetry ID: <code className="font-mono text-onyx-black">DP-HW-99201</code>.</span>
+                  <span><strong>Driver Verification:</strong> Payout requests are verified and sent to your registered account.</span>
                 </li>
               </ul>
-              <div className="p-3 bg-surface-container-lowest border border-sand-neutral space-y-1 text-[11px] font-mono">
-                <div className="text-secondary uppercase text-[10px]">Session Cryptography</div>
-                <div className="text-onyx-black truncate">JWT: eyJhbGciOiJIUzI1...4198</div>
-                <div className="text-emerald-800 font-semibold">● MONGODB ACID LOCK ACTIVE</div>
+              <div className="p-3 bg-surface-container-lowest border border-sand-neutral space-y-1 text-[11px]">
+                <div className="text-secondary uppercase text-[10px] font-semibold">Security Status</div>
+                <div className="text-emerald-800 font-semibold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
+                  Verified Escrow Protection Active
+                </div>
               </div>
             </div>
           </div>
@@ -1025,8 +1017,8 @@ const WalletWithdrawalsView = ({ currentUser, onNavigateTab, onNavigate }) => {
                       <div className="text-secondary text-[10px]">Driver requested {formatCurrency(selectedWithdrawal.amount)} via App 2FA token.</div>
                     </div>
                     <div>
-                      <div className="font-mono text-onyx-black font-semibold">DATABASE ACID RECORD CREATED</div>
-                      <div className="text-secondary text-[10px]">Withdrawal logged as REQUESTED in MongoDB.</div>
+                      <div className="font-mono text-onyx-black font-semibold">REQUEST RECORDED</div>
+                      <div className="text-secondary text-[10px]">Withdrawal logged and queued for bank settlement.</div>
                     </div>
                     <div>
                       <div className="font-mono text-emerald-800 font-semibold">
@@ -1063,35 +1055,7 @@ const WalletWithdrawalsView = ({ currentUser, onNavigateTab, onNavigate }) => {
           )}
         </section>
 
-        {/* Cryptographic Security & Verification Footer */}
-        <footer className="bg-surface-container-lowest border border-sand-neutral p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-bone-white border border-sand-neutral text-onyx-black">
-              <span className="material-symbols-outlined text-[18px]">lock</span>
-            </div>
-            <div>
-              <div className="font-semibold text-onyx-black flex items-center gap-2">
-                <span>DRIVER TELEMETRY AUTHENTICATED</span>
-                <span className="text-[10px] font-mono bg-surface-container-high border border-sand-neutral px-1 text-secondary">
-                  {walletData.driver?.driverId ? `#${walletData.driver.driverId}` : ''}
-                </span>
-              </div>
-              <p className="text-[11px] text-secondary mt-0.5">
-                Scoped directly to {walletData.driver?.name || 'Courier Partner'} ({walletData.driver?.tier || 'Tier 1 Courier'}). Wallet transactions enforce server-side JWT claims and MongoDB ACID isolation locks.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-[10.5px] font-mono text-secondary">
-            <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-              256-BIT SSL ENCRYPTED
-            </span>
-            <span className="text-secondary/40">|</span>
-            <span>MONGODB TRANSACTION ISOLATION</span>
-            <span className="text-secondary/40">|</span>
-            <span>SOCKET.IO PIPELINE v2.4</span>
-          </div>
-        </footer>
+
       </div>
 
       {/* Payout Account Info Modal */}

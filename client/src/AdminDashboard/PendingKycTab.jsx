@@ -115,7 +115,7 @@ export default function PendingKycTab({ onNavigate, onOpenDriver360 }) {
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`Courier ${cName} (#${cId}) approved! Activated in fleet database.`);
+        showToast(`Courier ${cName} (#${cId}) approved! Activated in fleet.`);
         fetchQueueData();
       } else {
         showToast(data.message || 'Approval completed');
@@ -444,7 +444,7 @@ export default function PendingKycTab({ onNavigate, onOpenDriver360 }) {
                       <div className="flex flex-col items-center justify-center">
                         <span className="material-symbols-outlined text-4xl text-[#ded9d1] mb-2">verified_user</span>
                         <p className="font-serif text-lg text-[#1a1a1a]">No Pending Driver KYC Applications</p>
-                        <p className="text-xs text-[#665d52] font-mono mt-1">All registered delivery partners in your database have been processed.</p>
+                        <p className="text-xs text-[#665d52] font-mono mt-1">All registered delivery partners have been processed.</p>
                       </div>
                     </td>
                   </tr>
@@ -952,7 +952,7 @@ export default function PendingKycTab({ onNavigate, onOpenDriver360 }) {
           <div className="bg-white border border-[#ded9d1] p-12 text-center shadow-sm">
             <span className="material-symbols-outlined text-4xl text-[#ded9d1] mb-2 inline-block">folder_open</span>
             <h3 className="font-serif text-xl font-bold text-[#1a1a1a]">No Candidate Selected For Forensic Inspection</h3>
-            <p className="font-mono text-xs text-[#665d52] mt-1">There are currently no pending unverified partner KYC records in your MongoDB database.</p>
+            <p className="font-mono text-xs text-[#665d52] mt-1">There are currently no pending unverified partner KYC records to review.</p>
           </div>
         )}
       </div>

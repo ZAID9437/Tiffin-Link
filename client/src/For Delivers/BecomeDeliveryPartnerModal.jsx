@@ -5,7 +5,29 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { saveUserSession } from '../services/api';
 
-export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSuccess }) {
+const calculateAge = (dobString) => {
+  if (!dobString) return 0;
+  const birthDate = new Date(dobString);
+  if (isNaN(birthDate.getTime())) return 0;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+const getMax18Dob = () => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSuccess, onOpenLegalModal }) {
   // Initial state structure matching all form fields
   const getInitialFormState = () => ({
     fullName: '',
@@ -172,7 +194,14 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
   }, [isOpen]);
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    let { name, value, type, checked } = e.target;
+    if (type === 'number' || ['experience'].includes(name)) {
+      if (typeof value === 'string') {
+        value = value.replace(/[^0-9]/g, '');
+      } else if (typeof value === 'number' && value < 0) {
+        value = Math.max(0, value);
+      }
+    }
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -225,7 +254,11 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
     if (!formData.fullName || !formData.fullName.trim()) missing.push("Full Name");
     if (!formData.email || !formData.email.trim()) missing.push("Email Address");
     if (!formData.mobile || !formData.mobile.trim()) missing.push("Mobile Number");
-    if (!formData.dob) missing.push("Date of Birth");
+    if (!formData.dob) {
+      missing.push("Date of Birth");
+    } else if (calculateAge(formData.dob) < 18) {
+      missing.push("Date of Birth (Applicant must be at least 18 years old to register)");
+    }
     if (!formData.gender) missing.push("Gender");
 
     if (!formData.houseNo || !formData.houseNo.trim()) missing.push("House No. / Building");
@@ -584,13 +617,23 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
                 <div className="flex flex-col">
                   <label className="font-label-caps text-label-caps mb-2">Date of Birth</label>
                   <input 
-                    className="input-underline py-2" 
+                    className={`input-underline py-2 ${
+                      formData.dob && calculateAge(formData.dob) < 18 ? 'border-red-500 text-red-600' : ''
+                    }`} 
                     type="date"
                     name="dob"
+                    max={getMax18Dob()}
+                    min="1920-01-01"
                     value={formData.dob}
                     onChange={handleInputChange}
                     required
                   />
+                  {formData.dob && calculateAge(formData.dob) < 18 && (
+                    <p className="text-red-600 text-[11px] font-semibold flex items-center gap-1 mt-1">
+                      <span className="material-symbols-outlined text-[13px]">error</span>
+                      Delivery partners must be at least 18 years old.
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col md:col-span-2">
                   <label className="font-label-caps text-label-caps mb-4">Gender</label>
@@ -712,7 +755,6 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
                       <option value="Uttarakhand">Uttarakhand</option>
                       <option value="West Bengal">West Bengal</option>
                     </select>
-                    <span className="material-symbols-outlined absolute right-2 bottom-2 text-secondary pointer-events-none select-none text-[18px]">keyboard_arrow_down</span>
                   </div>
                 </div>
                 <div className="flex flex-col">
@@ -741,7 +783,7 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
                     <label className="font-label-caps text-label-caps mb-2">Vehicle Type</label>
                     <div className="relative">
                       <select 
-                        className="input-underline py-2 w-full appearance-none pr-8 cursor-pointer" 
+                        className="input-underline py-2 w-full cursor-pointer" 
                         id="vehicle-type"
                         name="vehicleType"
                         value={formData.vehicleType}
@@ -753,7 +795,6 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
                         <option value="car">Car / Van</option>
                         <option value="e-bike">Electric Scooter</option>
                       </select>
-                      <span className="material-symbols-outlined absolute right-2 bottom-2 text-secondary pointer-events-none select-none text-[18px]">keyboard_arrow_down</span>
                     </div>
                   </div>
                   <div className="flex flex-col">
@@ -852,7 +893,7 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
                   <label className="font-label-caps text-label-caps mb-2">ID Document Type</label>
                   <div className="relative">
                     <select 
-                      className="input-underline py-2 w-full appearance-none pr-8 cursor-pointer"
+                      className="input-underline py-2 w-full cursor-pointer"
                       name="idType"
                       value={formData.idType}
                       onChange={handleInputChange}
@@ -862,7 +903,6 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
                       <option>National Identity Card</option>
                       <option>Voter ID</option>
                     </select>
-                    <span className="material-symbols-outlined absolute right-2 bottom-2 text-secondary pointer-events-none select-none text-[18px]">keyboard_arrow_down</span>
                   </div>
                 </div>
                 <div className="flex flex-col">
@@ -1088,7 +1128,7 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
                   <label className="font-label-caps text-label-caps mb-2">Time Slot</label>
                   <div className="relative">
                     <select 
-                      className="input-underline py-2 w-full appearance-none pr-8 cursor-pointer"
+                      className="input-underline py-2 w-full cursor-pointer"
                       name="timeSlot"
                       value={formData.timeSlot}
                       onChange={handleInputChange}
@@ -1098,7 +1138,6 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
                       <option>Afternoon (12 PM - 5 PM)</option>
                       <option>Full Day</option>
                     </select>
-                    <span className="material-symbols-outlined absolute right-2 bottom-2 text-secondary pointer-events-none select-none text-[18px]">keyboard_arrow_down</span>
                   </div>
                 </div>
                 <div className="flex flex-col">
@@ -1204,7 +1243,23 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
                       required
                     />
                     <span className="text-sm text-secondary group-hover:text-primary transition-colors select-none">
-                      I agree to the TiffinLink Partner Privacy Policy and Data Collection Terms.
+                      I agree to the{' '}
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenLegalModal && onOpenLegalModal('delivery-partner-agreement'); }} 
+                        className="text-onyx-black underline underline-offset-2 hover:text-clay-earth cursor-pointer inline font-medium"
+                      >
+                        Delivery Partner Agreement
+                      </button>
+                      ,{' '}
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenLegalModal && onOpenLegalModal('privacy-policy'); }} 
+                        className="text-onyx-black underline underline-offset-2 hover:text-clay-earth cursor-pointer inline font-medium"
+                      >
+                        Privacy Policy
+                      </button>
+                      , and Data Collection Terms.
                     </span>
                   </label>
                   <label className="flex items-start gap-4 cursor-pointer group">
@@ -1245,7 +1300,7 @@ export default function BecomeDeliveryPartnerModal({ isOpen, onClose, onSubmitSu
       )}
 
       {/* Website Footer */}
-      <Footer onOpenBecomeProviderModal={() => { onClose(); }} />
+      <Footer onOpenBecomeProviderModal={() => { onClose(); }} onOpenLegalModal={onOpenLegalModal} />
     </div>
   );
 }

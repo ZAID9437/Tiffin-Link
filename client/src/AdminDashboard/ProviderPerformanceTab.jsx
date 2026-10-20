@@ -574,7 +574,7 @@ export default function ProviderPerformanceTab({ onNavigate }) {
                 {filteredKitchens.length === 0 ? (
                   <tr>
                     <td colSpan={10} className="py-12 text-center text-sm font-sans text-[#665d52]">
-                      {isLoading ? 'Loading kitchen telemetry from MongoDB...' : 'No monitored kitchens found.'}
+                      {isLoading ? 'Loading kitchen performance data...' : 'No monitored kitchens found.'}
                     </td>
                   </tr>
                 ) : (

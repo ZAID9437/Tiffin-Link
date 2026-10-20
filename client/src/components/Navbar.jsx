@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Bell, User, MapPin, CreditCard, Utensils, Calendar, 
   Settings, LogOut, CheckCircle2, Truck, Clock, ShieldCheck, 
-  ChevronDown, X, ShoppingBag, LogIn
+  ChevronDown, X, ShoppingBag, LogIn, Sun, Moon, Monitor, Check
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useTheme } from '../context/ThemeContext';
 
 export default function Navbar({ 
   onOpenBecomeProviderModal, 
@@ -25,11 +26,15 @@ export default function Navbar({
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+
+  const { theme, resolvedTheme, isDark, setTheme } = useTheme();
   
   const { totalCount, setIsCartOpen } = useCart();
   const lastScrollY = useRef(0);
   const userMenuRef = useRef(null);
   const notifMenuRef = useRef(null);
+  const themeMenuRef = useRef(null);
 
   // Live notifications feed
   const [notifications, setNotifications] = useState([]);
@@ -48,6 +53,9 @@ export default function Navbar({
       }
       if (notifMenuRef.current && !notifMenuRef.current.contains(e.target)) {
         setIsNotificationsOpen(false);
+      }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target)) {
+        setIsThemeMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -89,6 +97,7 @@ export default function Navbar({
     setIsMobileMenuOpen(false);
     setIsUserMenuOpen(false);
     setIsNotificationsOpen(false);
+    setIsThemeMenuOpen(false);
   }, [currentView]);
 
   const userRole = (currentUser?.role || '').toLowerCase();
@@ -166,7 +175,8 @@ export default function Navbar({
     window.location.hash.includes('order-history') ||
     window.location.hash.includes('cancelled-orders')
   );
-  const showSolidNav = isScrolled || forceSolid || isMobileMenuOpen || isLightPage || isHashLight;
+  const isMinimalErrorNav = currentView === '500' || currentView === '503';
+  const showSolidNav = isScrolled || forceSolid || isMobileMenuOpen || isLightPage || isHashLight || isMinimalErrorNav;
 
   const handleProfileItemClick = (tab) => {
     setIsUserMenuOpen(false);
@@ -191,46 +201,148 @@ export default function Navbar({
       >
         {/* Brand Logo */}
         <div className="flex items-center gap-8">
-          <a 
-            className={`font-headline-md text-2xl md:text-headline-md tracking-tighter cursor-pointer ${
-              showSolidNav ? 'text-[#1a1a1a]' : 'text-bone-white'
-            }`} 
-            href={!currentUser ? '#' : (userRole === 'provider' ? '#provider' : ((userRole === 'delivery' || userRole === 'driver') ? '#delivery' : ((userRole === 'admin' || userRole === 'superadmin') ? '#admin' : '#')))} 
-            onClick={isFormOpen ? onCloseForm : () => setIsMobileMenuOpen(false)}
-          >
-            TiffinLink
-          </a>
+          {isMinimalErrorNav ? (
+            <span 
+              className={`font-headline-md text-2xl md:text-headline-md tracking-tighter select-none ${
+                showSolidNav ? 'text-[#1a1a1a]' : 'text-bone-white'
+              }`}
+            >
+              TiffinLink
+            </span>
+          ) : (
+            <a 
+              className={`font-headline-md text-2xl md:text-headline-md tracking-tighter cursor-pointer ${
+                showSolidNav ? 'text-[#1a1a1a]' : 'text-bone-white'
+              }`} 
+              href={!currentUser ? '#' : (userRole === 'provider' ? '#provider' : ((userRole === 'delivery' || userRole === 'driver') ? '#delivery' : ((userRole === 'admin' || userRole === 'superadmin') ? '#admin' : '#')))} 
+              onClick={isFormOpen ? onCloseForm : () => setIsMobileMenuOpen(false)}
+            >
+              TiffinLink
+            </a>
+          )}
 
-          {/* Desktop Navigation Links */}
-          <div className="hidden md:flex space-x-8 lg:space-x-10 items-center">
-            {navLinks.map((link) => {
-              const isActive = (currentView === link.id) || (link.id === 'home' && currentView === 'home') || (window.location.hash === link.href);
-              return (
-                <a 
-                  key={link.label}
-                  className={`font-label-caps text-label-caps relative transition-colors cursor-pointer ${
-                    showSolidNav 
-                      ? (isActive ? 'text-[#1a1a1a] font-bold border-b-2 border-[#a0522d] pb-1' : 'text-[#4a4238] hover:text-[#1a1a1a]') 
-                      : (isActive ? 'text-white font-bold border-b-2 border-white pb-1' : 'text-bone-white/80 hover:text-white')
-                  }`} 
-                  href={link.href}
-                  onClick={(e) => {
-                    if (isFormOpen && onCloseForm) onCloseForm();
-                    if (link.id === 'admin-login') {
-                      e.preventDefault();
-                      if (onOpenLogin) onOpenLogin('login', 'admin');
-                    }
-                  }}
-                >
-                  {link.label}
-                </a>
-              );
-            })}
-          </div>
+          {/* Desktop Navigation Links (Completely Hidden on 500 & 503) */}
+          {!isMinimalErrorNav && (
+            <div className="hidden md:flex space-x-8 lg:space-x-10 items-center">
+              {navLinks.map((link) => {
+                const isActive = (currentView === link.id) || (link.id === 'home' && currentView === 'home') || (window.location.hash === link.href);
+                return (
+                  <a 
+                    key={link.label}
+                    className={`font-label-caps text-label-caps relative transition-colors cursor-pointer ${
+                      showSolidNav 
+                        ? (isActive ? 'text-[#1a1a1a] font-bold border-b-2 border-[#a0522d] pb-1' : 'text-[#4a4238] hover:text-[#1a1a1a]') 
+                        : (isActive ? 'text-white font-bold border-b-2 border-white pb-1' : 'text-bone-white/80 hover:text-white')
+                    }`} 
+                    href={link.href}
+                    onClick={(e) => {
+                      try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch { window.scrollTo(0, 0); }
+                      if (document.documentElement) document.documentElement.scrollTop = 0;
+                      if (document.body) document.body.scrollTop = 0;
+                      if (isFormOpen && onCloseForm) onCloseForm();
+                      if (link.id === 'admin-login') {
+                        e.preventDefault();
+                        if (onOpenLogin) onOpenLogin('login', 'admin');
+                      }
+                    }}
+                  >
+                    {link.label}
+                  </a>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Right Section: Public Auth Buttons OR Role-specific Authenticated Controls */}
-        <div className="flex items-center gap-3 md:gap-4">
+        {/* Right Section: Public Auth Buttons OR Role-specific Authenticated Controls (Hidden on 500 & 503) */}
+        {!isMinimalErrorNav && (
+          <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+          
+          {/* Universal Theme Mode Quick Switcher (System Default, Light, Dark) */}
+          <div className="relative" ref={themeMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsThemeMenuOpen(!isThemeMenuOpen);
+                setIsUserMenuOpen(false);
+                setIsNotificationsOpen(false);
+              }}
+              className={`p-2 rounded-full transition-all relative cursor-pointer flex items-center justify-center ${
+                showSolidNav 
+                  ? 'hover:bg-black/5 text-[#1a1a1a] dark:text-[#F4F4F6] dark:hover:bg-white/10' 
+                  : 'hover:bg-white/10 text-bone-white'
+              }`}
+              title={`Interface Theme: ${theme === 'system' ? 'System Default (OS Auto)' : theme === 'dark' ? 'Dark Mode' : 'Light Mode'}`}
+              aria-label="Toggle Theme"
+            >
+              {theme === 'system' ? (
+                <Monitor size={18} />
+              ) : isDark ? (
+                <Moon size={18} />
+              ) : (
+                <Sun size={18} />
+              )}
+            </button>
+
+            {isThemeMenuOpen && (
+              <div className="absolute right-0 mt-3 w-56 bg-[#fbf9f5] dark:bg-[#18181B] border border-[#ded9d1] dark:border-[#2C2C34] rounded-2xl shadow-2xl p-2 text-[#1a1a1a] dark:text-[#F4F4F6] z-[120] animate-in fade-in slide-in-from-top-2">
+                <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#665d52] dark:text-[#A1A1AA] border-b border-[#ded9d1] dark:border-[#2C2C34] mb-1 flex items-center justify-between">
+                  <span>Interface Theme</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 font-mono font-bold">
+                    {theme === 'system' ? 'OS SYNC' : theme.toUpperCase()}
+                  </span>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => { setTheme('system'); setIsThemeMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                    theme === 'system' 
+                      ? 'bg-[#1a1a1a] text-white dark:bg-white dark:text-[#111113]' 
+                      : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#4a4238] dark:text-[#D4D4D8]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Monitor size={15} />
+                    <span>System Default</span>
+                  </div>
+                  {theme === 'system' && <Check size={14} />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setTheme('light'); setIsThemeMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                    theme === 'light' 
+                      ? 'bg-[#1a1a1a] text-white dark:bg-white dark:text-[#111113]' 
+                      : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#4a4238] dark:text-[#D4D4D8]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Sun size={15} />
+                    <span>Light Mode</span>
+                  </div>
+                  {theme === 'light' && <Check size={14} />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setTheme('dark'); setIsThemeMenuOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                    theme === 'dark' 
+                      ? 'bg-[#1a1a1a] text-white dark:bg-white dark:text-[#111113]' 
+                      : 'hover:bg-black/5 dark:hover:bg-white/5 text-[#4a4238] dark:text-[#D4D4D8]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Moon size={15} />
+                    <span>Dark Mode</span>
+                  </div>
+                  {theme === 'dark' && <Check size={14} />}
+                </button>
+              </div>
+            )}
+          </div>
           
           {!currentUser ? (
             /* 1. BEFORE LOGIN: Show ONLY Public Actions */
@@ -246,7 +358,20 @@ export default function Navbar({
                 Login
               </button>
               <button
-                onClick={() => onOpenLogin && onOpenLogin('signup')}
+                onClick={() => {
+                  if (currentView === 'provider') {
+                    if (onOpenBecomeProviderModal) {
+                      onOpenBecomeProviderModal();
+                      return;
+                    }
+                  } else if (currentView === 'delivery') {
+                    if (onOpenBecomeDeliveryPartnerModal) {
+                      onOpenBecomeDeliveryPartnerModal();
+                      return;
+                    }
+                  }
+                  if (onOpenLogin) onOpenLogin('signup');
+                }}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-full font-button-text text-xs uppercase tracking-wider font-bold transition-all cursor-pointer shadow-xs ${
                   showSolidNav 
                     ? 'bg-[#1a1a1a] hover:bg-[#333] text-white' 
@@ -553,10 +678,11 @@ export default function Navbar({
             )}
           </button>
         </div>
+        )}
       </nav>
 
-      {/* Mobile Off-Canvas Navigation Drawer */}
-      {isMobileMenuOpen && (
+      {/* Mobile Off-Canvas Navigation Drawer (Hidden on 500 & 503) */}
+      {!isMinimalErrorNav && isMobileMenuOpen && (
         <div className="fixed inset-0 top-[72px] bg-[#fbf9f5] text-[#1a1a1a] z-40 md:hidden flex flex-col p-6 overflow-y-auto animate-in fade-in slide-in-from-top-4 duration-200 border-b border-[#ded9d1] shadow-2xl">
           <div className="flex flex-col space-y-2 pt-2">
             
@@ -566,7 +692,12 @@ export default function Navbar({
                 <a 
                   className="text-base font-bold py-2.5 border-b border-[#ded9d1]/60 flex items-center justify-between" 
                   href="#"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch { window.scrollTo(0, 0); }
+                    if (document.documentElement) document.documentElement.scrollTop = 0;
+                    if (document.body) document.body.scrollTop = 0;
+                  }}
                 >
                   <span>Home</span>
                   <span>➔</span>
@@ -575,7 +706,12 @@ export default function Navbar({
                 <a 
                   className="text-base font-bold py-2.5 border-b border-[#ded9d1]/60 flex items-center justify-between" 
                   href="#for-diners"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch { window.scrollTo(0, 0); }
+                    if (document.documentElement) document.documentElement.scrollTop = 0;
+                    if (document.body) document.body.scrollTop = 0;
+                  }}
                 >
                   <span>For Diners</span>
                   <span>➔</span>
@@ -584,7 +720,12 @@ export default function Navbar({
                 <a 
                   className="text-base font-bold py-2.5 border-b border-[#ded9d1]/60 flex items-center justify-between" 
                   href="#for-providers"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch { window.scrollTo(0, 0); }
+                    if (document.documentElement) document.documentElement.scrollTop = 0;
+                    if (document.body) document.body.scrollTop = 0;
+                  }}
                 >
                   <span>For Providers</span>
                   <span>➔</span>
@@ -593,7 +734,12 @@ export default function Navbar({
                 <a 
                   className="text-base font-bold py-2.5 border-b border-[#ded9d1]/60 flex items-center justify-between" 
                   href="#for-deliverers"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch { window.scrollTo(0, 0); }
+                    if (document.documentElement) document.documentElement.scrollTop = 0;
+                    if (document.body) document.body.scrollTop = 0;
+                  }}
                 >
                   <span>For Deliverers</span>
                   <span>➔</span>
@@ -602,6 +748,9 @@ export default function Navbar({
                 <button 
                   onClick={() => {
                     setIsMobileMenuOpen(false);
+                    try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch { window.scrollTo(0, 0); }
+                    if (document.documentElement) document.documentElement.scrollTop = 0;
+                    if (document.body) document.body.scrollTop = 0;
                     if (onOpenLogin) onOpenLogin('login', 'admin');
                   }}
                   className="text-base font-bold py-2.5 border-b border-[#ded9d1]/60 flex items-center justify-between text-left"
@@ -623,6 +772,17 @@ export default function Navbar({
                   <button
                     onClick={() => {
                       setIsMobileMenuOpen(false);
+                      if (currentView === 'provider') {
+                        if (onOpenBecomeProviderModal) {
+                          onOpenBecomeProviderModal();
+                          return;
+                        }
+                      } else if (currentView === 'delivery') {
+                        if (onOpenBecomeDeliveryPartnerModal) {
+                          onOpenBecomeDeliveryPartnerModal();
+                          return;
+                        }
+                      }
                       if (onOpenLogin) onOpenLogin('signup');
                     }}
                     className="w-full py-3 rounded-xl bg-[#a0522d] text-white font-bold text-center"
@@ -639,7 +799,12 @@ export default function Navbar({
                     key={link.id}
                     className="text-base font-bold py-2.5 border-b border-[#ded9d1]/60 flex items-center justify-between"
                     href={link.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      try { window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); } catch { window.scrollTo(0, 0); }
+                      if (document.documentElement) document.documentElement.scrollTop = 0;
+                      if (document.body) document.body.scrollTop = 0;
+                    }}
                   >
                     <span>{link.label}</span>
                     <span>➔</span>
@@ -699,6 +864,53 @@ export default function Navbar({
                 </button>
               </>
             )}
+
+            {/* Mobile Interface Theme Switcher */}
+            <div className="mt-6 pt-5 border-t border-[#ded9d1] dark:border-[#2C2C34]">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#665d52] dark:text-[#A1A1AA] mb-3">
+                Interface Theme
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTheme('system')}
+                  className={`py-2.5 px-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition-all ${
+                    theme === 'system'
+                      ? 'bg-[#1a1a1a] text-white border-[#1a1a1a] dark:bg-white dark:text-[#111113]'
+                      : 'bg-white dark:bg-[#18181B] border-[#ded9d1] dark:border-[#2C2C34] text-[#4a4238] dark:text-[#D4D4D8]'
+                  }`}
+                >
+                  <Monitor size={16} />
+                  <span className="text-[10px]">Auto</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTheme('light')}
+                  className={`py-2.5 px-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition-all ${
+                    theme === 'light'
+                      ? 'bg-[#1a1a1a] text-white border-[#1a1a1a] dark:bg-white dark:text-[#111113]'
+                      : 'bg-white dark:bg-[#18181B] border-[#ded9d1] dark:border-[#2C2C34] text-[#4a4238] dark:text-[#D4D4D8]'
+                  }`}
+                >
+                  <Sun size={16} />
+                  <span className="text-[10px]">Light</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTheme('dark')}
+                  className={`py-2.5 px-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-1 border transition-all ${
+                    theme === 'dark'
+                      ? 'bg-[#1a1a1a] text-white border-[#1a1a1a] dark:bg-white dark:text-[#111113]'
+                      : 'bg-white dark:bg-[#18181B] border-[#ded9d1] dark:border-[#2C2C34] text-[#4a4238] dark:text-[#D4D4D8]'
+                  }`}
+                >
+                  <Moon size={16} />
+                  <span className="text-[10px]">Dark</span>
+                </button>
+              </div>
+            </div>
 
           </div>
         </div>

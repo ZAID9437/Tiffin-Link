@@ -8,6 +8,15 @@ const formatOrderRef = (ref) => {
   return `#${clean}`;
 };
 
+export const getStepperStage = (status) => {
+  const s = String(status || '').toUpperCase();
+  if (s.includes('DELIVERED') || s.includes('COMPLETED')) return 5;
+  if (s.includes('ARRIVED_CUSTOMER') || s.includes('ARRIVED AT CUSTOMER') || s.includes('AT CUSTOMER')) return 4;
+  if (s.includes('OUT_FOR_DELIVERY') || s.includes('PICKED_UP') || s.includes('IN TRANSIT') || s === 'PICKED UP' || s === 'OUT FOR DELIVERY') return 3;
+  if (s.includes('ARRIVED_PROVIDER') || s.includes('AT KITCHEN') || s.includes('KITCHEN') || s.includes('ARRIVED_AT_PICKUP')) return 2;
+  return 1;
+};
+
 export default function ActiveDeliveryView({
   activeDelivery: initialActiveDelivery = null,
   currentUser = null,
@@ -65,7 +74,7 @@ export default function ActiveDeliveryView({
       } catch (e) {}
 
       const email = currentUser?.email || storedUser?.email || localStorage.getItem('user_email') || '';
-      const driverId = currentUser?.id || currentUser?._id || storedUser?.id || storedUser?._id || localStorage.getItem('driver_id') || '';
+      const driverId = currentUser?.driverId || currentUser?.id || currentUser?._id || storedUser?.driverId || storedUser?.id || storedUser?._id || localStorage.getItem('driver_id') || '';
       const phone = currentUser?.phone || storedUser?.phone || '';
 
       const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || '';
@@ -81,10 +90,12 @@ export default function ActiveDeliveryView({
       if (json.success && json.activeDelivery) {
         setActiveDelivery(json.activeDelivery);
       } else {
-        setActiveDelivery(null);
+        // If query failed or returned no active delivery, do not overwrite if we already have initialActiveDelivery or active state
+        setActiveDelivery(prev => prev || initialActiveDelivery || null);
       }
     } catch (err) {
       console.error('Error fetching active delivery:', err);
+      setActiveDelivery(prev => prev || initialActiveDelivery || null);
     } finally {
       setLoading(false);
     }
@@ -92,12 +103,18 @@ export default function ActiveDeliveryView({
 
   useEffect(() => {
     fetchActiveDelivery();
-  }, [currentUser]);
+  }, [currentUser, initialActiveDelivery]);
 
-  // Sync with prop updates
+  // Sync with prop updates without downgrading local active state
   useEffect(() => {
     if (initialActiveDelivery) {
-      setActiveDelivery(initialActiveDelivery);
+      setActiveDelivery(prev => {
+        if (!prev) return initialActiveDelivery;
+        const prevStage = getStepperStage(prev.status);
+        const nextStage = getStepperStage(initialActiveDelivery.status);
+        if (nextStage < prevStage) return prev;
+        return initialActiveDelivery;
+      });
       setLoading(false);
     }
   }, [initialActiveDelivery]);
@@ -106,17 +123,25 @@ export default function ActiveDeliveryView({
   useEffect(() => {
     const unsubscribe = subscribeToDeliveryLifecycle({
       onStatusUpdate: () => fetchActiveDelivery(),
-      onPickup: () => fetchActiveDelivery(),
-      onCompleted: () => {
+      onPickup: () => {
+        setActiveDelivery(prev => prev ? { ...prev, status: 'Picked Up', pickupOtpVerified: true } : prev);
+        setOtpModalOpen(false);
         fetchActiveDelivery();
+      },
+      onCompleted: () => {
+        setOtpModalOpen(false);
+        setActiveDelivery(prev => prev ? { ...prev, status: 'Delivered', deliveryOtpVerified: true, customerHandoverOtpVerified: true } : prev);
         showToast('🎉 Delivery Completed! Great job on your handover.');
+        setTimeout(() => {
+          if (onNavigateTab) onNavigateTab('completed-deliveries');
+        }, 1200);
       }
     });
 
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [onNavigateTab]);
 
   // Watch Driver GPS position & transmit to Socket.IO room
   useEffect(() => {
@@ -295,7 +320,7 @@ export default function ActiveDeliveryView({
           requestId: reqId,
           orderId: activeDelivery.orderId || reqId,
           status: nextStatus,
-          driverId: currentUser?.id || currentUser?._id || 'TL-8041'
+          driverId: currentUser?.driverId || currentUser?.id || currentUser?._id || ''
         })
       });
 
@@ -433,31 +458,37 @@ export default function ActiveDeliveryView({
       const nextStatus = otpType === 'pickup' ? 'Picked Up' : 'Delivered';
 
       // Optimistically update local activeDelivery state immediately so UI transitions instantly
-      setActiveDelivery(prev => prev ? { ...prev, status: nextStatus } : prev);
+      setActiveDelivery(prev => prev ? { 
+        ...prev, 
+        status: nextStatus,
+        ...(otpType === 'pickup' ? { pickupOtpVerified: true } : { deliveryOtpVerified: true, customerHandoverOtpVerified: true })
+      } : prev);
 
       setOtpModalOpen(false);
       setOtpInput('');
       setOtpSentNotice('');
+      setOtpError('');
       showToast(otpType === 'pickup' ? '✓ Kitchen pickup verified successfully!' : '🎉 Customer handover verified! Delivery completed.');
       
-      if (onStatusUpdate) onStatusUpdate();
-      await fetchActiveDelivery();
+      if (otpType === 'delivery') {
+        if (onStatusUpdate) onStatusUpdate();
+        setTimeout(() => {
+          if (onNavigateTab) {
+            onNavigateTab('completed-deliveries');
+          } else {
+            setActiveDelivery(null);
+          }
+        }, 1200);
+      } else {
+        if (onStatusUpdate) onStatusUpdate();
+        await fetchActiveDelivery();
+      }
     } catch (err) {
       console.error('OTP error:', err);
       setOtpError('Server connection error verifying code.');
     } finally {
       setIsUpdatingStatus(false);
     }
-  };
-
-  // Calculate current stepper active stage
-  const getStepperStage = (status) => {
-    const s = String(status || '').toUpperCase();
-    if (s.includes('DELIVERED') || s.includes('COMPLETED')) return 5;
-    if (s.includes('ARRIVED_CUSTOMER') || s.includes('ARRIVED AT CUSTOMER') || s.includes('AT CUSTOMER')) return 4;
-    if (s.includes('OUT_FOR_DELIVERY') || s.includes('PICKED_UP') || s.includes('IN TRANSIT') || s === 'PICKED UP' || s === 'OUT FOR DELIVERY') return 3;
-    if (s.includes('ARRIVED_PROVIDER') || s.includes('AT KITCHEN') || s.includes('KITCHEN') || s.includes('ARRIVED_AT_PICKUP')) return 2;
-    return 1;
   };
 
   const currentStage = getStepperStage(activeDelivery?.status);
@@ -523,10 +554,9 @@ export default function ActiveDeliveryView({
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <span className="font-label-caps text-[11px] tracking-widest text-secondary uppercase font-semibold">
-              Live Dispatch Route
+              Delivery Route
             </span>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container-high text-onyx-black font-label-caps text-[10px] tracking-wider font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
               {activeDelivery.status || 'EN ROUTE'}
             </span>
           </div>
@@ -581,7 +611,7 @@ export default function ActiveDeliveryView({
             currentStage >= 1 ? 'bg-surface-container-low' : 'bg-surface-container-lowest opacity-50'
           }`}>
             <div className="flex items-center justify-between">
-              <span className="font-label-caps text-[10px] text-secondary uppercase font-semibold">01 // Confirmation</span>
+              <span className="font-label-caps text-[10px] text-secondary uppercase font-semibold">01 • Confirmation</span>
               <span className="material-symbols-outlined text-onyx-black text-[18px]">check_circle</span>
             </div>
             <div className="font-button-text text-xs text-onyx-black font-bold">Accepted</div>
@@ -598,7 +628,7 @@ export default function ActiveDeliveryView({
           }`}>
             <div className="flex items-center justify-between">
               <span className={`font-label-caps text-[10px] uppercase font-semibold ${currentStage === 2 ? 'text-sand-neutral' : 'text-secondary'}`}>
-                02 // Kitchen
+                02 • Kitchen
               </span>
               <span className={`material-symbols-outlined text-[18px] ${currentStage === 2 ? 'text-on-primary animate-pulse' : 'text-onyx-black'}`}>
                 inventory_2
@@ -622,7 +652,7 @@ export default function ActiveDeliveryView({
           }`}>
             <div className="flex items-center justify-between">
               <span className={`font-label-caps text-[10px] uppercase font-semibold ${currentStage === 3 ? 'text-sand-neutral' : 'text-secondary'}`}>
-                03 // In Transit
+                03 • In Transit
               </span>
               <span className={`material-symbols-outlined text-[20px] ${currentStage === 3 ? 'text-on-primary animate-pulse' : 'text-onyx-black'}`}>
                 local_shipping
@@ -643,7 +673,7 @@ export default function ActiveDeliveryView({
               : 'bg-surface-container-lowest opacity-60'
           }`}>
             <div className="flex items-center justify-between">
-              <span className="font-label-caps text-[10px] text-secondary uppercase font-semibold">04 // Delivery</span>
+              <span className="font-label-caps text-[10px] text-secondary uppercase font-semibold">04 • Delivery</span>
               <span className="material-symbols-outlined text-secondary text-[18px]">home</span>
             </div>
             <div className="font-button-text text-xs text-secondary font-bold">Delivered to Customer</div>
@@ -772,7 +802,7 @@ export default function ActiveDeliveryView({
                 </button>
               )}
 
-              {currentStage === 2 && (
+              {currentStage === 2 && !activeDelivery?.pickupOtpVerified && activeDelivery?.status !== 'Picked Up' && (
                 <button
                   type="button"
                   disabled={isUpdatingStatus}
@@ -787,7 +817,7 @@ export default function ActiveDeliveryView({
                 </button>
               )}
 
-              {currentStage === 3 && (
+              {(currentStage === 3 || activeDelivery?.pickupOtpVerified || activeDelivery?.status === 'Picked Up') && currentStage < 4 && (
                 <button
                   type="button"
                   disabled={isUpdatingStatus}
@@ -799,7 +829,7 @@ export default function ActiveDeliveryView({
                 </button>
               )}
 
-              {currentStage >= 4 && (
+              {currentStage === 4 && !activeDelivery?.deliveryOtpVerified && activeDelivery?.status !== 'Delivered' && (
                 <button
                   type="button"
                   disabled={isUpdatingStatus}
@@ -812,6 +842,13 @@ export default function ActiveDeliveryView({
                   <span className="material-symbols-outlined text-[20px]">task_alt</span>
                   <span>{isUpdatingStatus ? 'Updating...' : 'Verify Customer Handover OTP'}</span>
                 </button>
+              )}
+
+              {currentStage >= 5 && (
+                <div className="w-full bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800 py-3.5 px-4 font-bold text-center text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-[20px] text-emerald-600">check_circle</span>
+                  <span>Delivery Handover Verified & Completed</span>
+                </div>
               )}
 
               <div className="grid grid-cols-2 gap-3">
@@ -1006,7 +1043,7 @@ export default function ActiveDeliveryView({
       </div>
 
       {/* OTP VERIFICATION MODAL (KITCHEN PICKUP OR CUSTOMER HANDOVER) */}
-      {otpModalOpen && (
+      {otpModalOpen && activeDelivery && activeDelivery.status !== 'Delivered' && (
         <div className="fixed inset-0 bg-onyx-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-surface-container-lowest border-2 border-onyx-black p-6 max-w-md w-full space-y-4 shadow-2xl animate-in fade-in zoom-in duration-200">
             <div>

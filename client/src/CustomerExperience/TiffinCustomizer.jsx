@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiRequest } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import OrderConfirmation from './OrderConfirmation';
 
 export default function TiffinCustomizer({
@@ -12,6 +13,8 @@ export default function TiffinCustomizer({
   customerAddress,
   onOpenLogin
 }) {
+  const { currentUser: authUser } = useAuth();
+  const user = currentUser || authUser;
   const [dbItems, setDbItems] = useState([]);
   const [dbProvider, setDbProvider] = useState(provider || null);
   const [dbTiffin, setDbTiffin] = useState(tiffin || null);
@@ -19,6 +22,7 @@ export default function TiffinCustomizer({
 
   // Map of itemId -> selected quantity
   const [quantities, setQuantities] = useState({});
+  const [standardQuantity, setStandardQuantity] = useState(1);
   const [instructions, setInstructions] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState(
     customerAddress || currentUser?.currentLocation?.address || currentUser?.address || ''
@@ -33,6 +37,24 @@ export default function TiffinCustomizer({
 
   // Checkout review step: null = customizer, 'review' = OrderConfirmation screen
   const [checkoutView, setCheckoutView] = useState(null);
+
+  useEffect(() => {
+    if (!user) {
+      if (typeof onOpenLogin === 'function') {
+        onOpenLogin('login');
+      }
+    }
+  }, [user, onOpenLogin]);
+
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, [checkoutView]);
 
   const targetTiffinId = tiffin?._id || tiffin?.id;
   const targetProviderId = provider?._id || provider?.id || tiffin?.providerId;
@@ -193,8 +215,25 @@ export default function TiffinCustomizer({
     return Math.max(25, Math.round(25 + distanceKm * 8));
   }, [distanceKm]);
 
-  // Financial Calculations: 100% Dynamic Item-Based Meal Pricing
+  // Financial Calculations: 100% Dynamic Item-Based Meal Pricing (with standard tray fallback)
   const { mealSubtotal, totalCustomizedCount, activeReceiptItems } = useMemo(() => {
+    // Fallback if no sub-items are defined for this tiffin in DB: allow ordering standard whole meal tray
+    if (!dbItems || dbItems.length === 0) {
+      const basePrice = Number(dbTiffin?.price !== undefined ? dbTiffin.price : (tiffin?.price || 120));
+      const sub = basePrice * standardQuantity;
+      return {
+        mealSubtotal: sub,
+        totalCustomizedCount: standardQuantity,
+        activeReceiptItems: standardQuantity > 0 ? [{
+          id: 'standard_tray',
+          name: dbTiffin?.name || tiffin?.name || 'Standard Batch Tiffin',
+          unitPrice: basePrice,
+          qty: standardQuantity,
+          lineTotal: sub
+        }] : []
+      };
+    }
+
     let subtotal = 0;
     let count = 0;
     const receipt = [];
@@ -221,7 +260,7 @@ export default function TiffinCustomizer({
       totalCustomizedCount: count,
       activeReceiptItems: receipt
     };
-  }, [dbItems, quantities]);
+  }, [dbItems, quantities, standardQuantity, dbTiffin, tiffin]);
 
   const finalTotal = mealSubtotal + deliveryFee;
   const grandTotal = finalTotal;
@@ -263,6 +302,51 @@ export default function TiffinCustomizer({
   const activeTiffinDesc = dbTiffin?.description || tiffin?.description || '';
   const activeTiffinImg = dbTiffin?.image || tiffin?.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
   const availableSlots = dbTiffin?.available !== undefined ? dbTiffin.available : (dbTiffin?.capacity || 0);
+
+  // Authentication barrier: guest users must sign in to customize and configure meals
+  if (!user) {
+    return (
+      <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a] pt-28 pb-16 items-center justify-center px-4">
+        <div className="bg-white border border-[#ded9d1] p-8 sm:p-10 max-w-md w-full text-center shadow-lg space-y-5">
+          <div className="w-16 h-16 bg-[#1a1a1a] text-white flex items-center justify-center mx-auto rounded-full shadow-md">
+            <span className="material-symbols-outlined text-[32px]">lock</span>
+          </div>
+          <span className="font-label-caps text-xs text-[#665d52] uppercase tracking-wider block font-bold">
+            Authentication Required
+          </span>
+          <h2 style={{ fontFamily: "'EB Garamond', serif" }} className="text-3xl text-[#1a1a1a] leading-tight">
+            Please Log In to Continue
+          </h2>
+          <p className="font-body-md text-xs sm:text-sm text-[#665d52] leading-relaxed">
+            You must be logged in to customize dishes, view pricing breakdown, and place an order with our verified home kitchens.
+          </p>
+          <div className="space-y-3 pt-2">
+            <button
+              type="button"
+              onClick={() => onOpenLogin && onOpenLogin('login')}
+              className="w-full py-3.5 bg-[#1a1a1a] hover:bg-[#4a4238] text-white font-button-text text-xs uppercase tracking-wider font-bold transition-all cursor-pointer shadow-sm"
+            >
+              Log In to Your Account
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenLogin && onOpenLogin('signup')}
+              className="w-full py-3 bg-[#f5f3ef] hover:bg-[#eae6de] text-[#1a1a1a] font-button-text text-xs uppercase tracking-wider font-bold border border-[#ded9d1] transition-all cursor-pointer"
+            >
+              Create New Account
+            </button>
+            <button
+              type="button"
+              onClick={onBack}
+              className="w-full py-2 text-[#665d52] hover:text-[#1a1a1a] font-button-text text-xs uppercase tracking-wider transition-all cursor-pointer font-semibold"
+            >
+              ← Back to Kitchen
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Render OrderConfirmation review step
   if (checkoutView === 'review') {
@@ -425,7 +509,7 @@ export default function TiffinCustomizer({
                 <span>Back to Kitchen</span>
               </button>
               <span className="font-label-caps text-xs text-[#665d52] uppercase tracking-widest">
-                Culinary Atelier // {activeProviderName}
+                Culinary Atelier • {activeProviderName}
               </span>
               <span className="w-4 h-[1px] bg-[#ded9d1]"></span>
               <span className="font-label-caps text-xs text-[#4a4238] font-medium uppercase">
@@ -482,9 +566,43 @@ export default function TiffinCustomizer({
                 <p className="font-label-caps text-xs uppercase text-[#665d52]">Loading authentic tiffin items...</p>
               </div>
             ) : categories.length === 0 ? (
-              <div className="p-12 text-center bg-white border border-[#ded9d1] space-y-2">
-                <p className="text-[#1a1a1a] font-medium">Standard Tiffin Tray</p>
-                <p className="text-xs text-[#665d52]">All seasonal preparations are included in standard batch allocation.</p>
+              <div className="p-8 bg-white border border-[#ded9d1] flex flex-col sm:flex-row items-center justify-between gap-5 rounded-xl shadow-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#1b5e20]"></span>
+                    <span className="font-label-caps text-xs text-[#a0522d] font-bold uppercase tracking-wider">Complete Chef Batch</span>
+                  </div>
+                  <h4 style={{ fontFamily: "'EB Garamond', serif" }} className="text-2xl text-[#1a1a1a] font-semibold mt-1">
+                    {activeTiffinName}
+                  </h4>
+                  <p className="text-xs text-[#665d52] mt-1 max-w-md leading-relaxed">
+                    All seasonal rotis, sabzi, dal, rice, and accompaniments prepared fresh in standard kitchen run.
+                  </p>
+                  <span className="text-sm font-bold text-[#1a1a1a] mt-2 block font-mono">
+                    ₹{Number(dbTiffin?.price !== undefined ? dbTiffin.price : (tiffin?.price || 120))} / tiffin
+                  </span>
+                </div>
+                <div className="flex items-center bg-[#f5f3ef] border border-[#ded9d1] rounded-lg overflow-hidden shrink-0">
+                  <button
+                    type="button"
+                    disabled={standardQuantity <= 1}
+                    onClick={() => setStandardQuantity(q => Math.max(1, q - 1))}
+                    className="w-11 h-11 flex items-center justify-center text-[#1a1a1a] hover:bg-[#ded9d1] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">remove</span>
+                  </button>
+                  <span className="w-12 text-center font-button-text text-base text-[#1a1a1a] font-bold">
+                    {standardQuantity}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={standardQuantity >= 10}
+                    onClick={() => setStandardQuantity(q => Math.min(10, q + 1))}
+                    className="w-11 h-11 flex items-center justify-center text-[#1a1a1a] hover:bg-[#ded9d1] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                  </button>
+                </div>
               </div>
             ) : (
               categories.map((category, catIdx) => (
@@ -520,11 +638,19 @@ export default function TiffinCustomizer({
                               : 'bg-white border-[#ded9d1] hover:border-[#1a1a1a]/60'
                           }`}
                         >
-                          <div className="flex-1">
-                            <div className="flex items-baseline gap-2.5">
-                              <span className={`font-body-lg text-base sm:text-lg font-medium ${isOutOfStock ? 'line-through text-[#665d52]' : 'text-[#1a1a1a]'}`}>
-                                {item.name}
-                              </span>
+                          <div className="flex items-start gap-3.5 flex-1">
+                            {item.image && (
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover border border-[#ded9d1] shrink-0 shadow-xs mt-0.5"
+                              />
+                            )}
+                            <div className="flex-1">
+                              <div className="flex items-baseline gap-2.5">
+                                <span className={`font-body-lg text-base sm:text-lg font-medium ${isOutOfStock ? 'line-through text-[#665d52]' : 'text-[#1a1a1a]'}`}>
+                                  {item.name}
+                                </span>
                               <span className="font-label-caps text-xs text-[#4a4238]">
                                 ₹{unitPrice} / {item.unit || 'portion'}
                               </span>
@@ -554,6 +680,7 @@ export default function TiffinCustomizer({
                               )}
                             </div>
                           </div>
+                        </div>
 
                           {/* Stepper & Line Price */}
                           <div className="flex items-center justify-between sm:justify-end gap-6 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#ded9d1]/50">
@@ -762,16 +889,16 @@ export default function TiffinCustomizer({
                 </div>
               </div>
 
-              {/* Escrow Quality Lock Note */}
-              <div className="bg-[#f5f3ef] p-5 border border-[#ded9d1]">
+              {/* Quality & Freshness Guarantee Note */}
+              <div className="bg-[#f5f3ef] p-5 border border-[#ded9d1] rounded-xl">
                 <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-[#4a4238] text-[24px]">verified_user</span>
+                  <span className="material-symbols-outlined text-[#1b5e20] text-[24px]">verified_user</span>
                   <div>
                     <span className="font-label-caps text-xs text-[#1a1a1a] uppercase tracking-wider block font-bold">
-                      Escrow Quality Lock
+                      100% Quality &amp; Freshness Guarantee
                     </span>
                     <p className="font-body-md text-xs text-[#665d52] mt-0.5">
-                      Payment is held securely until canister temperature and hygiene seal are verified upon delivery.
+                      Your meal is prepared fresh on order with food-grade packaging and complete buyer protection.
                     </p>
                   </div>
                 </div>

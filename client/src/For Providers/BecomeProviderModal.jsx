@@ -4,7 +4,29 @@ import confetti from 'canvas-confetti';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
-export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }) {
+const calculateAge = (dobString) => {
+  if (!dobString) return 0;
+  const birthDate = new Date(dobString);
+  if (isNaN(birthDate.getTime())) return 0;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+const getMax18Dob = () => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess, onOpenLegalModal }) {
   const getInitialFormState = () => ({
     fullName: '',
     email: '',
@@ -31,6 +53,8 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
     idType: 'Aadhar Card',
     fssaiCert: null,
     fssaiCertName: '',
+    kitchenPhoto: null,
+    kitchenPhotoName: '',
     kitchenPhotos: null,
     kitchenPhotosName: '',
     ownerId: null,
@@ -45,6 +69,8 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
     mealIngredients: '',
     mealPrice: '',
     mealPrepTime: '',
+    mealPhoto: null,
+    mealPhotoName: '',
     deliveryPreference: 'TiffinLink Partner',
     languagesSpoken: '',
     hearSource: 'Instagram',
@@ -64,6 +90,7 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
   const fssaiInputRef = useRef(null);
   const photosInputRef = useRef(null);
   const ownerIdInputRef = useRef(null);
+  const mealPhotoInputRef = useRef(null);
 
   // Real-time animated number counter effect using requestAnimationFrame
   const [animatedProgress, setAnimatedProgress] = useState(0);
@@ -197,7 +224,17 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
   const [detectingGps, setDetectingGps] = useState(false);
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    let { name, value, type, checked } = e.target;
+
+    // Prevent negative numbers on all numeric fields
+    if (type === 'number' || ['experience', 'staffCount', 'maxMeals', 'mealPrice', 'mealPrepTime'].includes(name)) {
+      if (typeof value === 'string') {
+        value = value.replace(/[^0-9]/g, '');
+      } else if (typeof value === 'number' && value < 0) {
+        value = Math.max(0, value);
+      }
+    }
+
     setFormData(prev => {
       const updated = {
         ...prev,
@@ -215,6 +252,19 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
 
       return updated;
     });
+
+    if (name === 'dob') {
+      const age = calculateAge(value);
+      if (value && age < 18) {
+        setValidationErrors(prev => ({ ...prev, dob: true }));
+      } else {
+        setValidationErrors(prev => {
+          const next = { ...prev };
+          delete next.dob;
+          return next;
+        });
+      }
+    }
   };
 
   const handleAutoDetectGpsLocation = () => {
@@ -298,11 +348,21 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
           ctx.drawImage(img, 0, 0, width, height);
           const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
 
-          setFormData(prev => ({
-            ...prev,
-            [field]: compressedDataUrl,
-            [`${field}Name`]: file.name
-          }));
+          if (field === 'kitchenPhotos' || field === 'kitchenPhoto') {
+            setFormData(prev => ({
+              ...prev,
+              kitchenPhotos: compressedDataUrl,
+              kitchenPhoto: compressedDataUrl,
+              kitchenPhotosName: file.name,
+              kitchenPhotoName: file.name
+            }));
+          } else {
+            setFormData(prev => ({
+              ...prev,
+              [field]: compressedDataUrl,
+              [`${field}Name`]: file.name
+            }));
+          }
         };
         img.src = event.target.result;
       };
@@ -310,11 +370,21 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
     } else {
       const reader = new FileReader();
       reader.onload = (event) => {
-        setFormData(prev => ({
-          ...prev,
-          [field]: event.target.result,
-          [`${field}Name`]: file.name
-        }));
+        if (field === 'kitchenPhotos' || field === 'kitchenPhoto') {
+          setFormData(prev => ({
+            ...prev,
+            kitchenPhotos: event.target.result,
+            kitchenPhoto: event.target.result,
+            kitchenPhotosName: file.name,
+            kitchenPhotoName: file.name
+          }));
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            [field]: event.target.result,
+            [`${field}Name`]: file.name
+          }));
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -337,6 +407,30 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
     setFormData(prev => ({ ...prev, skipMenu: !prev.skipMenu }));
   };
 
+  const handleRemoveKitchenPhoto = () => {
+    setFormData(prev => ({
+      ...prev,
+      kitchenPhotos: null,
+      kitchenPhoto: null,
+      kitchenPhotosName: '',
+      kitchenPhotoName: ''
+    }));
+    if (photosInputRef.current) {
+      photosInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveMealPhoto = () => {
+    setFormData(prev => ({
+      ...prev,
+      mealPhoto: null,
+      mealPhotoName: ''
+    }));
+    if (mealPhotoInputRef.current) {
+      mealPhotoInputRef.current.value = '';
+    }
+  };
+
   const [validationErrors, setValidationErrors] = useState({});
 
   const handleSubmit = async (e) => {
@@ -347,8 +441,13 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
 
     if (!formData.fullName || !formData.fullName.trim()) { missing.push("Full Name"); errs.fullName = true; }
     if (!formData.email || !formData.email.trim()) { missing.push("Email Address"); errs.email = true; }
-    if (!formData.mobile || !formData.mobile.trim()) { missing.push("Mobile Number"); errs.mobile = true; }
-    if (!formData.dob) { missing.push("Date of Birth"); errs.dob = true; }
+    if (!formData.dob) { 
+      missing.push("Date of Birth"); 
+      errs.dob = true; 
+    } else if (calculateAge(formData.dob) < 18) {
+      missing.push("Date of Birth (Applicant must be at least 18 years old to register)");
+      errs.dob = true;
+    }
     if (!formData.gender || formData.gender === 'Select') { missing.push("Gender"); errs.gender = true; }
 
     if (!formData.businessName || !formData.businessName.trim()) { missing.push("Business Name"); errs.businessName = true; }
@@ -370,7 +469,7 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
 
     if (!formData.fssaiNumber || !formData.fssaiNumber.trim()) { missing.push("FSSAI Number"); errs.fssaiNumber = true; }
     if (!formData.fssaiCert) { missing.push("Upload FSSAI Certificate"); errs.fssaiCert = true; }
-    if (!formData.kitchenPhotos) { missing.push("Upload Kitchen Photos (Min 3)"); errs.kitchenPhotos = true; }
+    if (!formData.kitchenPhotos && !formData.kitchenPhoto) { missing.push("Upload Kitchen Photo"); errs.kitchenPhotos = true; }
     if (!formData.ownerId) { missing.push("Upload Owner Identification"); errs.ownerId = true; }
 
     if (!formData.accountHolderName || !formData.accountHolderName.trim()) { missing.push("Account Holder Name"); errs.accountHolderName = true; }
@@ -531,6 +630,7 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
 
         // Update local session user object to provider role
         const savedUser = localStorage.getItem('tiffinlink_user');
+        const kPhoto = formData.kitchenPhoto || formData.kitchenPhotos || data.data?.kitchenPhoto || data.data?.kitchenPhotos || data.data?.image || '';
         if (savedUser) {
           try {
             const userObj = JSON.parse(savedUser);
@@ -538,10 +638,21 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
             if (data.user) {
               Object.assign(userObj, data.user);
             }
+            if (kPhoto) {
+              userObj.kitchenPhoto = kPhoto;
+              userObj.image = kPhoto;
+            }
             localStorage.setItem('tiffinlink_user', JSON.stringify(userObj));
+            localStorage.setItem('user', JSON.stringify(userObj));
           } catch(err) {}
         } else if (data.user) {
-          localStorage.setItem('tiffinlink_user', JSON.stringify(data.user));
+          const userObj = { ...data.user };
+          if (kPhoto) {
+            userObj.kitchenPhoto = kPhoto;
+            userObj.image = kPhoto;
+          }
+          localStorage.setItem('tiffinlink_user', JSON.stringify(userObj));
+          localStorage.setItem('user', JSON.stringify(userObj));
         }
 
         if (onSubmitSuccess) {
@@ -776,32 +887,41 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                   <div className="flex flex-col space-y-2">
                     <label className="font-label-caps text-label-caps text-secondary text-[10px]">Date of Birth</label>
                     <input 
-                      className="bg-transparent border-0 border-b border-sand-neutral py-3 font-body-lg text-secondary focus:ring-0 focus:border-onyx-black transition-colors form-input-line" 
+                      className={`bg-transparent border-0 border-b py-3 font-body-lg focus:ring-0 focus:border-onyx-black transition-colors form-input-line ${
+                        validationErrors.dob || (formData.dob && calculateAge(formData.dob) < 18)
+                          ? 'border-red-500 text-red-600'
+                          : 'border-sand-neutral text-secondary'
+                      }`} 
                       type="date"
                       name="dob"
+                      max={getMax18Dob()}
+                      min="1920-01-01"
                       value={formData.dob}
                       onChange={handleInputChange}
                       required
                     />
+                    {formData.dob && calculateAge(formData.dob) < 18 && (
+                      <p className="text-red-600 text-[11px] font-semibold flex items-center gap-1 mt-1">
+                        <span className="material-symbols-outlined text-[13px]">error</span>
+                        Kitchen providers must be at least 18 years old.
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-col space-y-2">
                     <label className="font-label-caps text-label-caps text-secondary text-[10px]">Gender</label>
-                    <div className="relative">
-                      <select 
-                        className="bg-transparent border-0 border-b border-sand-neutral py-3 font-body-lg text-secondary focus:ring-0 focus:border-onyx-black transition-colors appearance-none cursor-pointer w-full pr-8"
-                        name="gender"
-                        value={formData.gender}
-                        onChange={handleGenderChange}
-                        required
-                      >
-                        <option value="Select">Select</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Non-binary">Non-binary</option>
-                        <option value="Prefer not to say">Prefer not to say</option>
-                      </select>
-                      <span className="material-symbols-outlined absolute right-2 bottom-3 text-secondary pointer-events-none select-none text-[18px]">keyboard_arrow_down</span>
-                    </div>
+                    <select 
+                      className="bg-transparent border-0 border-b border-sand-neutral py-3 font-body-lg text-secondary focus:ring-0 focus:border-onyx-black transition-colors cursor-pointer w-full"
+                      name="gender"
+                      value={formData.gender}
+                      onChange={handleGenderChange}
+                      required
+                    >
+                      <option value="Select">Select</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Non-binary">Non-binary</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -830,20 +950,17 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                   </div>
                   <div className="flex flex-col space-y-2">
                     <label className="font-label-caps text-label-caps text-secondary text-[10px]">Business Type</label>
-                    <div className="relative">
-                      <select 
-                        className="bg-transparent border-0 border-b border-sand-neutral py-3 font-body-lg text-secondary focus:ring-0 focus:border-onyx-black transition-colors appearance-none cursor-pointer w-full pr-8"
-                        name="businessType"
-                        value={formData.businessType}
-                        onChange={handleInputChange}
-                        required
-                      >
-                        <option>Home Kitchen</option>
-                        <option>Cloud Kitchen</option>
-                        <option>Commercial Bistro</option>
-                      </select>
-                      <span className="material-symbols-outlined absolute right-2 bottom-3 text-secondary pointer-events-none select-none text-[18px]">keyboard_arrow_down</span>
-                    </div>
+                    <select 
+                      className="bg-transparent border-0 border-b border-sand-neutral py-3 font-body-lg text-secondary focus:ring-0 focus:border-onyx-black transition-colors cursor-pointer w-full"
+                      name="businessType"
+                      value={formData.businessType}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option>Home Kitchen</option>
+                      <option>Cloud Kitchen</option>
+                      <option>Commercial Bistro</option>
+                    </select>
                   </div>
                 </div>
                 <div className="flex flex-col space-y-2">
@@ -865,6 +982,8 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                       className="bg-transparent border-0 border-b border-sand-neutral py-3 font-body-lg placeholder:text-sand-neutral focus:ring-0 focus:border-onyx-black transition-colors form-input-line" 
                       placeholder="5" 
                       type="number"
+                      min="0"
+                      onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                       name="experience"
                       value={formData.experience}
                       onChange={handleInputChange}
@@ -877,6 +996,8 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                       className="bg-transparent border-0 border-b border-sand-neutral py-3 font-body-lg placeholder:text-sand-neutral focus:ring-0 focus:border-onyx-black transition-colors form-input-line" 
                       placeholder="2" 
                       type="number"
+                      min="0"
+                      onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                       name="staffCount"
                       value={formData.staffCount}
                       onChange={handleInputChange}
@@ -1068,6 +1189,8 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                         className="bg-transparent border-0 border-b border-sand-neutral py-2 focus:ring-0 focus:border-onyx-black form-input-line" 
                         placeholder="20" 
                         type="number"
+                        min="1"
+                        onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                         name="maxMeals"
                         value={formData.maxMeals}
                         onChange={handleInputChange}
@@ -1145,20 +1268,17 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                   </div>
                   <div className="space-y-4">
                     <label className="font-label-caps text-label-caps text-secondary uppercase text-[10px]">ID Type</label>
-                    <div className="relative">
-                      <select 
-                        className="w-full bg-transparent border-0 border-b border-sand-neutral py-3 focus:ring-0 focus:border-onyx-black appearance-none cursor-pointer pr-8 font-body-lg"
-                        name="idType"
-                        value={formData.idType}
-                        onChange={handleInputChange}
-                        required
-                      >
-                        <option>Aadhar Card</option>
-                        <option>Passport</option>
-                        <option>Driver's License</option>
-                      </select>
-                      <span className="material-symbols-outlined absolute right-2 bottom-3 text-secondary pointer-events-none select-none text-[18px]">keyboard_arrow_down</span>
-                    </div>
+                    <select 
+                      className="w-full bg-transparent border-0 border-b border-sand-neutral py-3 focus:ring-0 focus:border-onyx-black cursor-pointer font-body-lg text-secondary"
+                      name="idType"
+                      value={formData.idType}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option>Aadhar Card</option>
+                      <option>Passport</option>
+                      <option>Driver's License</option>
+                    </select>
                   </div>
                 </div>
 
@@ -1223,19 +1343,37 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                         : 'bg-surface-container-low border-sand-neutral hover:border-onyx-black'
                     }`}
                   >
-                    {formData.kitchenPhotos ? (
+                    {(formData.kitchenPhotos || formData.kitchenPhoto) ? (
                       <>
-                        <img src={formData.kitchenPhotos} alt="Kitchen Preview" className="absolute inset-0 w-full h-full object-cover" />
+                        <img 
+                          src={formData.kitchenPhotos || formData.kitchenPhoto} 
+                          alt="Kitchen Photo" 
+                          className="absolute inset-0 w-full h-full object-cover" 
+                        />
                         <div className="absolute inset-0 bg-onyx-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                           <span className="material-symbols-outlined text-white mb-1">edit</span>
-                          <span className="text-[10px] text-white font-label-caps">Change Photo</span>
+                          <span className="text-[10px] text-white font-label-caps">Change Kitchen Photo</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveKitchenPhoto();
+                          }}
+                          className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-onyx-black/80 hover:bg-red-600 text-white flex items-center justify-center transition-colors shadow-md"
+                          title="Remove photo"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">close</span>
+                        </button>
+                        <div className="absolute bottom-2 left-2 right-2 bg-black/75 backdrop-blur-xs text-white text-[10px] font-medium px-2 py-1 rounded truncate pointer-events-none">
+                          ✓ {formData.kitchenPhotosName || formData.kitchenPhotoName || 'Kitchen Photo'}
                         </div>
                       </>
                     ) : (
                       <>
                         <span className={`material-symbols-outlined text-4xl mb-3 ${validationErrors.kitchenPhotos ? 'text-red-500' : 'text-secondary group-hover:text-onyx-black'}`}>add_a_photo</span>
                         <span className={`font-label-caps text-xs ${validationErrors.kitchenPhotos ? 'text-red-600 font-bold' : 'text-secondary group-hover:text-onyx-black'}`}>
-                          Kitchen Photos (Min 3) *
+                          Kitchen Photo (Customer Display) *
                         </span>
                         {validationErrors.kitchenPhotos && (
                           <span className="text-[10px] text-red-600 font-bold uppercase tracking-wider mt-2 flex items-center gap-1">
@@ -1376,6 +1514,84 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                 formData.skipMenu ? 'opacity-30 pointer-events-none' : ''
               }`}>
                 <div className="space-y-8">
+                  {/* Dish Photo File Input (hidden) */}
+                  <input
+                    type="file"
+                    ref={mealPhotoInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, 'mealPhoto')}
+                  />
+
+                  {/* Dish Photo Showcase / Upload Card */}
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="font-label-caps text-label-caps text-secondary text-[10px]">
+                        Dish Presentation Photo
+                      </label>
+                      {formData.mealPhoto && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveMealPhoto}
+                          className="font-label-caps text-[10px] text-red-600 hover:text-red-800 uppercase tracking-wider flex items-center gap-1 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">delete</span>
+                          Remove Photo
+                        </button>
+                      )}
+                    </div>
+
+                    <div
+                      onClick={() => mealPhotoInputRef.current && mealPhotoInputRef.current.click()}
+                      className={`relative border-2 border-dashed rounded-lg transition-all duration-300 cursor-pointer overflow-hidden group ${
+                        formData.mealPhoto
+                          ? 'border-onyx-black bg-surface-container-low h-64 shadow-inner'
+                          : 'border-sand-neutral hover:border-onyx-black bg-surface-container-low/40 hover:bg-surface-container-low min-h-[170px] flex flex-col items-center justify-center p-6 text-center'
+                      }`}
+                    >
+                      {formData.mealPhoto ? (
+                        <>
+                          <img
+                            src={formData.mealPhoto}
+                            alt={formData.mealTitle || "Dish preview"}
+                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-onyx-black/50 backdrop-blur-[1px] flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <span className="material-symbols-outlined text-white text-3xl mb-1">add_a_photo</span>
+                            <span className="text-xs text-white font-label-caps tracking-widest font-semibold uppercase">Change Dish Photo</span>
+                            {formData.mealPhotoName && (
+                              <span className="text-[10px] text-white/80 mt-1 max-w-[240px] truncate">{formData.mealPhotoName}</span>
+                            )}
+                          </div>
+                          <div className="absolute bottom-3 left-3 bg-black/80 backdrop-blur-md px-3 py-1 rounded text-white text-[11px] font-label-caps uppercase tracking-wider flex items-center gap-1.5 shadow-md">
+                            <span className="material-symbols-outlined text-[15px] text-emerald-400">check_circle</span>
+                            <span>Photo Added</span>
+                          </div>
+                          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2.5 py-1 rounded text-onyx-black text-[10px] font-label-caps uppercase tracking-wider font-bold shadow-md">
+                            Click to replace
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 rounded-full bg-sand-neutral/30 group-hover:bg-sand-neutral/60 flex items-center justify-center mb-2.5 transition-colors">
+                            <span className="material-symbols-outlined text-2xl text-secondary group-hover:text-onyx-black transition-colors">
+                              restaurant
+                            </span>
+                          </div>
+                          <span className="font-label-caps text-xs text-onyx-black font-semibold group-hover:text-clay-earth transition-colors uppercase tracking-wider">
+                            Upload Photo of Dish
+                          </span>
+                          <p className="text-[11px] text-secondary mt-1 max-w-sm">
+                            Show diners the vibrant presentation of your culinary dish.
+                          </p>
+                          <span className="text-[10px] text-secondary/70 mt-1.5 font-mono uppercase tracking-wider">
+                            PNG, JPG, WebP up to 15MB
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="flex flex-col space-y-2">
                     <label className="font-label-caps text-label-caps text-secondary text-[10px]">Meal Title</label>
                     <input 
@@ -1408,6 +1624,8 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                         <input 
                           className="w-full bg-transparent border-0 border-b border-sand-neutral py-3 pl-6 font-body-lg focus:ring-0 focus:border-onyx-black" 
                           type="number"
+                          min="0"
+                          onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                           name="mealPrice"
                           value={formData.mealPrice}
                           onChange={handleInputChange}
@@ -1421,6 +1639,8 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                         className="bg-transparent border-0 border-b border-sand-neutral py-3 font-body-lg focus:ring-0 focus:border-onyx-black" 
                         placeholder="45" 
                         type="number"
+                        min="1"
+                        onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault(); }}
                         name="mealPrepTime"
                         value={formData.mealPrepTime}
                         onChange={handleInputChange}
@@ -1505,21 +1725,18 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                     </div>
                     <div className="space-y-4">
                       <label className="font-label-caps text-label-caps text-secondary uppercase text-[10px]">How did you hear about us?</label>
-                      <div className="relative">
-                        <select 
-                          className="w-full bg-transparent border-0 border-b border-sand-neutral py-3 focus:ring-0 focus:border-onyx-black font-body-lg appearance-none pr-8 cursor-pointer"
-                          name="hearSource"
-                          value={formData.hearSource}
-                          onChange={handleInputChange}
-                          required
-                        >
-                          <option>Instagram</option>
-                          <option>Friend/Family</option>
-                          <option>Culinary Blog</option>
-                          <option>Event</option>
-                        </select>
-                        <span className="material-symbols-outlined absolute right-2 bottom-3 text-secondary pointer-events-none select-none text-[18px]">keyboard_arrow_down</span>
-                      </div>
+                      <select 
+                        className="w-full bg-transparent border-0 border-b border-sand-neutral py-3 focus:ring-0 focus:border-onyx-black font-body-lg cursor-pointer text-secondary"
+                        name="hearSource"
+                        value={formData.hearSource}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option>Instagram</option>
+                        <option>Friend/Family</option>
+                        <option>Culinary Blog</option>
+                        <option>Event</option>
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -1553,7 +1770,30 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
                       required
                     />
                     <span className="font-body-md text-secondary group-hover:text-primary transition-colors select-none text-sm leading-relaxed">
-                      I have read and accepted the <span className="text-onyx-black underline underline-offset-2">Terms of Service</span> and <span className="text-onyx-black underline underline-offset-2">Privacy Policy</span>.
+                      I have read and accepted the{' '}
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenLegalModal && onOpenLegalModal('terms'); }} 
+                        className="text-onyx-black underline underline-offset-2 hover:text-clay-earth cursor-pointer inline font-medium"
+                      >
+                        Terms of Service
+                      </button>
+                      ,{' '}
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenLegalModal && onOpenLegalModal('provider-agreement'); }} 
+                        className="text-onyx-black underline underline-offset-2 hover:text-clay-earth cursor-pointer inline font-medium"
+                      >
+                        Provider Agreement & FSSAI Standards
+                      </button>
+                      , and{' '}
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenLegalModal && onOpenLegalModal('privacy-policy'); }} 
+                        className="text-onyx-black underline underline-offset-2 hover:text-clay-earth cursor-pointer inline font-medium"
+                      >
+                        Privacy Policy
+                      </button>.
                     </span>
                   </label>
                 </div>
@@ -1594,7 +1834,7 @@ export default function BecomeProviderModal({ isOpen, onClose, onSubmitSuccess }
       )}
 
       {/* Website Footer */}
-      <Footer onOpenBecomeProviderModal={() => { onClose(); }} />
+      <Footer onOpenBecomeProviderModal={() => { onClose(); }} onOpenLegalModal={onOpenLegalModal} />
     </div>
   );
 }

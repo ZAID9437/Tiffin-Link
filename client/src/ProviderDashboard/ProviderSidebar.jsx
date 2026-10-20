@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from '../services/i18n';
 
 /**
  * ProviderSidebar Component
@@ -19,14 +20,15 @@ export default function ProviderSidebar({
   setActiveTab,
   isMobileSidebarOpen = false,
   setIsMobileSidebarOpen,
-  badgeCounts = { liveRequests: 4, newOrders: 0, notifications: 3 },
+  badgeCounts = { liveRequests: 0, newOrders: 0, notifications: 0 },
   currentUser,
   isKitchenOnline = true,
   onToggleKitchenOnline,
   onLogout
 }) {
-  const providerName = currentUser?.name || currentUser?.businessName || 'Xoxo Men';
-  const providerId = currentUser?.id || currentUser?._id || 'PROV-XOXO-991';
+  const { t } = useTranslation();
+  const providerName = currentUser?.name || currentUser?.businessName || (currentUser?.email ? currentUser.email.split('@')[0] : 'Partner Kitchen');
+  const providerId = currentUser?.providerId || currentUser?.id || currentUser?._id || 'PROV-ACTIVE';
 
   // Section Accordion Collapsible States
   const [openSections, setOpenSections] = useState({
@@ -113,17 +115,21 @@ export default function ProviderSidebar({
         <div className="p-4 pb-3 border-b border-sand-neutral/30 space-y-3 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-onyx-black flex items-center justify-center text-bone-white shadow-sm">
-                <span className="material-symbols-outlined text-[20px]">lunch_dining</span>
-              </div>
-              <div>
-                <span className="font-label-caps text-label-caps text-on-surface uppercase block font-bold tracking-wider">
+              <a
+                href="#"
+                className="flex items-baseline gap-2 group cursor-pointer no-underline select-none"
+                title="TiffinLink Home"
+              >
+                <span
+                  className="font-headline-md text-2xl tracking-tighter text-[#1a1a1a] group-hover:text-clay-earth transition-colors"
+                  style={{ fontFamily: "'EB Garamond', serif" }}
+                >
                   TiffinLink
                 </span>
-                <span className="font-label-caps text-[10px] tracking-widest uppercase px-1.5 py-0.5 rounded bg-surface-container text-clay-earth font-semibold">
-                  Provider Partner
+                <span className="font-label-caps text-[9px] tracking-widest uppercase px-1.5 py-0.5 rounded bg-surface-container text-clay-earth font-bold border border-sand-neutral/40">
+                  {t('partner', 'Partner')}
                 </span>
-              </div>
+              </a>
             </div>
 
             {setIsMobileSidebarOpen && (
@@ -145,7 +151,7 @@ export default function ProviderSidebar({
                   {providerName}
                 </div>
                 <div className="font-label-caps text-[10px] text-secondary truncate">
-                  Home Kitchen Provider
+                  {t('home_kitchen_provider', 'Home Kitchen Provider')}
                 </div>
               </div>
             </div>
@@ -163,7 +169,7 @@ export default function ProviderSidebar({
             <div onClick={() => handleNavClick('dashboard')} className={singleClass('dashboard')}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">dashboard</span>
-                <span className="font-button-text text-button-text">Dashboard</span>
+                <span className="font-button-text text-button-text">{t('dashboard', 'Dashboard')}</span>
               </div>
             </div>
           </div>
@@ -173,7 +179,7 @@ export default function ProviderSidebar({
             <div onClick={() => handleNavClick('requests')} className={singleClass('requests')}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">flash_on</span>
-                <span className="font-button-text text-button-text">Live Requests</span>
+                <span className="font-button-text text-button-text">{t('live_requests', 'Live Requests')}</span>
               </div>
               {badgeCounts.liveRequests > 0 && (
                 <span className="font-label-caps text-[10px] bg-secondary-container text-on-secondary-fixed-variant px-1.5 py-0.5 rounded font-bold">
@@ -191,7 +197,7 @@ export default function ProviderSidebar({
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">receipt_long</span>
-                <span className="font-button-text text-button-text font-bold">Orders</span>
+                <span className="font-button-text text-button-text font-bold">{t('orders', 'Orders')}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 {badgeCounts.newOrders > 0 && (
@@ -208,10 +214,10 @@ export default function ProviderSidebar({
             {openSections.orders && (
               <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
                 <div onClick={() => handleNavClick('orders')} className={childClass('orders')}>
-                  <span>All Orders</span>
+                  <span>{t('all_orders', 'All Orders')}</span>
                 </div>
                 <div onClick={() => handleNavClick('orders-new')} className={childClass('orders-new')}>
-                  <span>New Orders</span>
+                  <span>{t('new_orders', 'New Orders')}</span>
                   {badgeCounts.newOrders > 0 && (
                     <span className="font-label-caps text-[9px] bg-onyx-black text-bone-white px-1 rounded font-bold">
                       {badgeCounts.newOrders}
@@ -219,19 +225,19 @@ export default function ProviderSidebar({
                   )}
                 </div>
                 <div onClick={() => handleNavClick('orders-preparing')} className={childClass('orders-preparing')}>
-                  <span>Preparing</span>
+                  <span>{t('preparing', 'Preparing')}</span>
                 </div>
                 <div onClick={() => handleNavClick('orders-ready')} className={childClass('orders-ready')}>
-                  <span>Ready</span>
+                  <span>{t('ready', 'Ready')}</span>
                 </div>
                 <div onClick={() => handleNavClick('delivery')} className={childClass('delivery')}>
-                  <span>Delivery</span>
+                  <span>{t('delivery', 'Delivery')}</span>
                 </div>
                 <div onClick={() => handleNavClick('orders-completed')} className={childClass('orders-completed')}>
-                  <span>Completed</span>
+                  <span>{t('completed', 'Completed')}</span>
                 </div>
                 <div onClick={() => handleNavClick('orders-cancelled')} className={childClass('orders-cancelled')}>
-                  <span>Cancelled</span>
+                  <span>{t('cancelled', 'Cancelled')}</span>
                 </div>
               </div>
             )}
@@ -245,7 +251,7 @@ export default function ProviderSidebar({
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">lunch_dining</span>
-                <span className="font-button-text text-button-text font-bold">My Tiffins</span>
+                <span className="font-button-text text-button-text font-bold">{t('my_tiffins', 'My Tiffins')}</span>
               </div>
               <span className="material-symbols-outlined text-[18px] text-secondary transition-transform duration-200" style={{ transform: openSections.tiffins ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                 expand_more
@@ -255,19 +261,19 @@ export default function ProviderSidebar({
             {openSections.tiffins && (
               <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
                 <div onClick={() => handleNavClick('tiffins')} className={childClass('tiffins')}>
-                  <span>All Tiffins</span>
+                  <span>{t('all_tiffins', 'All Tiffins')}</span>
                 </div>
                 <div onClick={() => handleNavClick('categories')} className={childClass('categories')}>
-                  <span>Tiffin Categories</span>
+                  <span>{t('tiffin_categories', 'Tiffin Categories')}</span>
                 </div>
                 <div onClick={() => handleNavClick('add-tiffin')} className={childClass('add-tiffin')}>
-                  <span>Add Tiffin</span>
+                  <span>{t('add_tiffin', 'Add Tiffin')}</span>
                 </div>
                 <div onClick={() => handleNavClick('tiffin-items')} className={childClass('tiffin-items')}>
-                  <span>Tiffin Items</span>
+                  <span>{t('tiffin_items', 'Tiffin Items')}</span>
                 </div>
                 <div onClick={() => handleNavClick('availability')} className={childClass('availability')}>
-                  <span>Availability</span>
+                  <span>{t('availability', 'Availability')}</span>
                 </div>
               </div>
             )}
@@ -278,7 +284,7 @@ export default function ProviderSidebar({
             <div onClick={() => handleNavClick('delivery-management')} className={singleClass('delivery-management')}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">moped</span>
-                <span className="font-button-text text-button-text">Delivery Management</span>
+                <span className="font-button-text text-button-text">{t('delivery_management', 'Delivery Management')}</span>
               </div>
             </div>
           </div>
@@ -291,7 +297,7 @@ export default function ProviderSidebar({
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">payments</span>
-                <span className="font-button-text text-button-text font-bold">Earnings & Payments</span>
+                <span className="font-button-text text-button-text font-bold">{t('earnings_payments', 'Earnings & Payments')}</span>
               </div>
               <span className="material-symbols-outlined text-[18px] text-secondary transition-transform duration-200" style={{ transform: openSections.earnings ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                 expand_more
@@ -301,19 +307,19 @@ export default function ProviderSidebar({
             {openSections.earnings && (
               <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
                 <div onClick={() => handleNavClick('earnings')} className={childClass('earnings')}>
-                  <span>Earnings Overview</span>
+                  <span>{t('earnings_overview', 'Earnings Overview')}</span>
                 </div>
                 <div onClick={() => handleNavClick('transactions')} className={childClass('transactions')}>
-                  <span>Transactions</span>
+                  <span>{t('transactions', 'Transactions')}</span>
                 </div>
                 <div onClick={() => handleNavClick('incentives')} className={childClass('incentives')}>
-                  <span>Incentives</span>
+                  <span>{t('incentives', 'Incentives')}</span>
                 </div>
                 <div onClick={() => handleNavClick('wallet')} className={childClass('wallet')}>
-                  <span>Wallet</span>
+                  <span>{t('wallet', 'Wallet')}</span>
                 </div>
                 <div onClick={() => handleNavClick('bank-payout')} className={childClass('bank-payout')}>
-                  <span>Bank & Payout</span>
+                  <span>{t('bank_payout', 'Bank & Payout')}</span>
                 </div>
               </div>
             )}
@@ -327,7 +333,7 @@ export default function ProviderSidebar({
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">monitoring</span>
-                <span className="font-button-text text-button-text font-bold">Performance</span>
+                <span className="font-button-text text-button-text font-bold">{t('performance', 'Performance')}</span>
               </div>
               <span className="material-symbols-outlined text-[18px] text-secondary transition-transform duration-200" style={{ transform: openSections.performance ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                 expand_more
@@ -337,10 +343,10 @@ export default function ProviderSidebar({
             {openSections.performance && (
               <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
                 <div onClick={() => handleNavClick('performance')} className={childClass('performance')}>
-                  <span>Performance</span>
+                  <span>{t('performance', 'Performance')}</span>
                 </div>
                 <div onClick={() => handleNavClick('reviews')} className={childClass('reviews')}>
-                  <span>Ratings & Reviews</span>
+                  <span>{t('ratings_reviews', 'Ratings & Reviews')}</span>
                 </div>
               </div>
             )}
@@ -351,7 +357,7 @@ export default function ProviderSidebar({
             <div onClick={() => handleNavClick('notifications')} className={singleClass('notifications')}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">notifications</span>
-                <span className="font-button-text text-button-text">Notifications</span>
+                <span className="font-button-text text-button-text">{t('notifications', 'Notifications')}</span>
               </div>
               {badgeCounts.notifications > 0 && (
                 <span className="font-label-caps text-[10px] bg-secondary-container text-on-secondary-fixed-variant px-1.5 py-0.5 rounded font-bold">
@@ -366,7 +372,7 @@ export default function ProviderSidebar({
             <div onClick={() => handleNavClick('help')} className={singleClass('help')}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">help</span>
-                <span className="font-button-text text-button-text">Help & Support</span>
+                <span className="font-button-text text-button-text">{t('help_support', 'Help & Support')}</span>
               </div>
             </div>
           </div>
@@ -379,7 +385,7 @@ export default function ProviderSidebar({
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[18px]">settings</span>
-                <span className="font-button-text text-button-text font-bold">Settings</span>
+                <span className="font-button-text text-button-text font-bold">{t('settings', 'Settings')}</span>
               </div>
               <span className="material-symbols-outlined text-[18px] text-secondary transition-transform duration-200" style={{ transform: openSections.settings ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                 expand_more
@@ -389,16 +395,16 @@ export default function ProviderSidebar({
             {openSections.settings && (
               <div className="border-l-2 border-sand-neutral/50 ml-5 pl-2.5 space-y-1 mt-1 animate-slide-down">
                 <div onClick={() => handleNavClick('settings-account')} className={childClass('settings-account')}>
-                  <span>Account</span>
+                  <span>{t('account', 'Account')}</span>
                 </div>
                 <div onClick={() => handleNavClick('settings-notifications')} className={childClass('settings-notifications')}>
-                  <span>Notifications</span>
+                  <span>{t('notifications', 'Notifications')}</span>
                 </div>
                 <div onClick={() => handleNavClick('settings-privacy')} className={childClass('settings-privacy')}>
-                  <span>Privacy & Security</span>
+                  <span>{t('privacy_security', 'Privacy & Security')}</span>
                 </div>
                 <div onClick={() => handleNavClick('settings-preferences')} className={childClass('settings-preferences')}>
-                  <span>App Preferences</span>
+                  <span>{t('app_preferences', 'App Preferences')}</span>
                 </div>
               </div>
             )}
@@ -413,7 +419,7 @@ export default function ProviderSidebar({
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${isKitchenOnline ? 'bg-onyx-black animate-pulse' : 'bg-gray-400'}`}></span>
                 <span className="font-label-caps text-[11px] font-bold text-on-surface uppercase">
-                  {isKitchenOnline ? 'ONLINE' : 'OFFLINE'}
+                  {isKitchenOnline ? t('online', 'ONLINE') : t('offline', 'OFFLINE')}
                 </span>
               </div>
               <button
@@ -421,12 +427,12 @@ export default function ProviderSidebar({
                 onClick={onToggleKitchenOnline}
                 className="font-label-caps text-[10px] text-secondary hover:text-on-surface underline uppercase tracking-wider font-semibold cursor-pointer"
               >
-                {isKitchenOnline ? 'Go Offline' : 'Go Online'}
+                {isKitchenOnline ? t('go_offline', 'Go Offline') : t('go_online', 'Go Online')}
               </button>
             </div>
             <div className="font-label-caps text-[10px] text-secondary leading-tight flex items-center gap-1">
               <span className="material-symbols-outlined text-[12px] text-on-surface">check_circle</span>
-              {isKitchenOnline ? 'Accepting customer orders in real-time' : 'Kitchen currently paused'}
+              {isKitchenOnline ? t('accepting_orders', 'Accepting customer orders in real-time') : t('kitchen_paused', 'Kitchen paused • Not accepting orders')}
             </div>
           </div>
 
@@ -437,7 +443,7 @@ export default function ProviderSidebar({
               className="flex items-center gap-2 px-2 py-1 font-label-caps text-label-caps font-semibold text-error hover:text-on-error-container transition-colors cursor-pointer w-full"
             >
               <span className="material-symbols-outlined text-[16px]">logout</span>
-              Log Out
+              {t('log_out', 'Log Out')}
             </button>
           )}
         </div>

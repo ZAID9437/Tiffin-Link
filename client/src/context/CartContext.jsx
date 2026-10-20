@@ -98,7 +98,7 @@ export function CartProvider({ children }) {
         provider: {
           _id: provider._id,
           name: provider.name || provider.businessName || 'Artisan Kitchen',
-          image: provider.image || '/assets/provider_1.png',
+          image: provider.kitchenPhoto || provider.kitchenPhotos || provider.image || '/assets/provider_1.png',
           address: provider.address?.locality ? `${provider.address.locality}, Ahmedabad` : 'Ahmedabad',
           price: provider.price || 120
         },
@@ -125,7 +125,7 @@ export function CartProvider({ children }) {
         provider: {
           _id: newProvider._id,
           name: newProvider.name || newProvider.businessName || 'Artisan Kitchen',
-          image: newProvider.image || '/assets/provider_1.png',
+          image: newProvider.kitchenPhoto || newProvider.kitchenPhotos || newProvider.image || '/assets/provider_1.png',
           address: newProvider.address?.locality ? `${newProvider.address.locality}, Ahmedabad` : 'Ahmedabad',
           price: newProvider.price || 120
         },

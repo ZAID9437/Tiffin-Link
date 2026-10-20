@@ -20,10 +20,10 @@ export default function HelpSupportView({ currentUser, onNavigateTab, onShowToas
   // Form State
   const [formOrderRef, setFormOrderRef] = useState('none');
   const [formCategory, setFormCategory] = useState('payment');
-  const [formPriority, setFormPriority] = useState('high');
-  const [formSubject, setFormSubject] = useState('Payout discrepancy on weekend monsoon surge bonus');
-  const [formDescription, setFormDescription] = useState('Completed 6 consecutive deliveries during Sunday dinner monsoon peak between 07:00 PM and 10:30 PM in Bandra West Sector 4, but the 25% surge incentive ledger entry (#TXN-90214) has not reflected in my available wallet balance. Attached trip completion receipts.');
-  const [formAttachment, setFormAttachment] = useState({ name: 'trip_summary_slip_sep22.pdf', size: '1.2 MB' });
+  const [formPriority, setFormPriority] = useState('medium');
+  const [formSubject, setFormSubject] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formAttachment, setFormAttachment] = useState(null);
   const [formContactChannel, setFormContactChannel] = useState('phone');
 
   // Ticket Detail Modal State
@@ -186,7 +186,10 @@ export default function HelpSupportView({ currentUser, onNavigateTab, onShowToas
 
     } catch (err) {
       console.error('Error creating ticket:', err);
-      alert(`Ticket Creation Failed: ${err.message}`);
+      const friendlyMsg = err.message && !err.message.includes('fetch') && !err.message.includes('Mongo')
+        ? err.message
+        : 'Unable to submit ticket. Please check your connection and try again.';
+      alert(friendlyMsg);
     } finally {
       setSubmitting(false);
     }
@@ -309,10 +312,9 @@ export default function HelpSupportView({ currentUser, onNavigateTab, onShowToas
             <span className="text-on-surface-variant">Support</span>
             <span className="text-sand-neutral text-xs">/</span>
             <span className="text-onyx-black font-semibold">Help &amp; Support</span>
-            <span className="inline-block w-1 h-1 bg-clay-earth rounded-full mx-1"></span>
-            <span className="text-on-surface-variant text-[11px]">MongoDB FAQ &amp; Tickets Synced</span>
+            <span className="text-on-surface-variant text-[11px]">Support Desk Connected</span>
             <span className="text-sand-neutral text-xs">•</span>
-            <span className="text-on-surface-variant text-[11px]">Socket.IO SLA v4.2</span>
+            <span className="text-on-surface-variant text-[11px]">Real-Time Helpdesk Active</span>
           </div>
           <div className="flex items-center gap-2 bg-bone-white px-3 py-1 text-on-surface-variant font-label-caps text-[11px] uppercase tracking-wider">
             <span className="w-1.5 h-1.5 rounded-full bg-onyx-black"></span>
@@ -656,8 +658,10 @@ export default function HelpSupportView({ currentUser, onNavigateTab, onShowToas
                     />
                     <span className={`w-full h-full flex items-center justify-center text-xs font-label-caps uppercase transition-colors ${
                       formPriority === pri
-                        ? pri === 'critical' ? 'bg-error text-white' : 'bg-onyx-black text-white'
-                        : 'bg-surface-container-lowest text-clay-earth'
+                        ? pri === 'critical'
+                          ? 'bg-error text-white font-bold shadow-xs'
+                          : 'bg-onyx-black text-white dark:bg-[#E5C158] dark:text-[#111113] font-bold shadow-xs'
+                        : 'bg-surface-container-lowest text-clay-earth dark:bg-[#1A1A1E] dark:text-[#DFB76C] dark:border dark:border-[#2C2C34] hover:bg-surface-container'
                     }`}>
                       {pri === 'critical' ? 'SOS' : pri.charAt(0).toUpperCase() + pri.slice(1, 3)}
                     </span>
@@ -791,19 +795,19 @@ export default function HelpSupportView({ currentUser, onNavigateTab, onShowToas
 
       {/* Section 4: My Support Tickets (Strictly Scoped Incident Ledger) */}
       <section className="flex flex-col space-y-4" id="ticket-ledger">
-        {/* Header with courier tenant scoping notice */}
+        {/* Header with courier support notice */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-2 pb-2">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-label-caps text-[10px] uppercase tracking-widest text-clay-earth">Incident Ledger &amp; SLA Tracking</span>
+              <span className="font-label-caps text-[10px] uppercase tracking-widest text-clay-earth">Support Tickets &amp; Resolutions</span>
               <span className="w-1 h-1 bg-clay-earth rounded-full"></span>
-              <span className="font-label-caps text-[10px] text-clay-earth tracking-wider uppercase">Strict Scoped View</span>
+              <span className="font-label-caps text-[10px] text-clay-earth tracking-wider uppercase">Active Inquiries</span>
             </div>
             <h2 className="font-headline-md text-2xl text-onyx-black">My Support Tickets</h2>
           </div>
           <div className="text-right">
-            <span className="font-label-caps text-[10px] text-clay-earth uppercase tracking-widest block">Principal: #{driverCode} ({driverName})</span>
-            <span className="font-label-caps text-[10px] text-on-surface-variant/70 uppercase">Zero cross-tenant visibility enforced</span>
+            <span className="font-label-caps text-[10px] text-clay-earth uppercase tracking-widest block">Courier Partner: {driverName}</span>
+            <span className="font-label-caps text-[10px] text-on-surface-variant/70 uppercase">Dedicated Hub Assistance</span>
           </div>
         </div>
 
@@ -836,11 +840,11 @@ export default function HelpSupportView({ currentUser, onNavigateTab, onShowToas
           {loading ? (
             <div className="py-12 text-center text-clay-earth">
               <span className="w-6 h-6 border-2 border-onyx-black border-t-transparent rounded-full animate-spin inline-block mb-2"></span>
-              <p className="font-body-md text-sm">Fetching authenticated driver support tickets from MongoDB...</p>
+              <p className="font-body-md text-sm">Loading your support tickets...</p>
             </div>
           ) : filteredTickets.length === 0 ? (
             <div className="py-12 text-center bg-bone-white/50 border border-dashed border-sand-neutral">
-              <span className="material-symbols-outlined text-3xl text-clay-earth mb-2">confirmation_number_off</span>
+              <span className="material-symbols-outlined text-3xl text-clay-earth mb-2">support_agent</span>
               <p className="font-headline-md text-base text-onyx-black">No Support Tickets Found</p>
               <p className="font-body-md text-xs text-clay-earth mt-1">No support tickets match your current status filter.</p>
             </div>
@@ -929,7 +933,7 @@ export default function HelpSupportView({ currentUser, onNavigateTab, onShowToas
             <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-bone-white mb-4 border border-sand-neutral">
               <div className="bg-surface-container-lowest p-3 border-l-2 border-onyx-black">
                 <div className="flex justify-between items-center mb-1 text-[11px] font-label-caps">
-                  <span className="font-bold text-onyx-black">{selectedTicket.providerId || driverCode} (Courier)</span>
+                  <span className="font-bold text-onyx-black">You (Courier)</span>
                   <span className="text-clay-earth">{selectedTicket.createdAt ? new Date(selectedTicket.createdAt).toLocaleString() : ''}</span>
                 </div>
                 <p className="font-body-md text-xs leading-relaxed text-onyx-black">{selectedTicket.description}</p>
@@ -968,21 +972,6 @@ export default function HelpSupportView({ currentUser, onNavigateTab, onShowToas
           </div>
         </div>
       )}
-
-      {/* Section 5: Provenance & Cryptographic Security Footer */}
-      <footer className="pt-6 mt-4 flex flex-col md:flex-row items-center justify-between gap-4 text-clay-earth font-label-caps text-[11px] uppercase tracking-wider border-t border-sand-neutral/60">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-onyx-black"></span>
-          <span>Scoped Principal: {driverName} (#{driverCode})</span>
-          <span className="text-sand-neutral">•</span>
-          <span>Bandra West Hub 12</span>
-        </div>
-        <div className="flex items-center gap-4 text-clay-earth">
-          <span>TLS 1.3 End-to-End Encrypted Support Gateway</span>
-          <span>•</span>
-          <span>Asia/Kolkata (IST)</span>
-        </div>
-      </footer>
 
     </div>
   );

@@ -8,7 +8,8 @@ export default function LoginModal({
   initialMode = 'login',
   onOpenBecomeProviderModal,
   onOpenBecomeDeliveryPartnerModal,
-  onLoginSuccess
+  onLoginSuccess,
+  onOpenLegalModal
 }) {
   // Active Role Tab: 'customer' | 'provider' | 'delivery'
   const [activeRole, setActiveRole] = useState(initialRole);
@@ -63,11 +64,46 @@ export default function LoginModal({
     };
   }, [resendCooldown]);
 
+  // Intercept and redirect provider/delivery signups to their official full registration modals
+  useEffect(() => {
+    if (isOpen && (mode === 'signup' || initialMode === 'signup')) {
+      if (activeRole === 'provider' || initialRole === 'provider') {
+        onClose();
+        if (onOpenBecomeProviderModal) {
+          onOpenBecomeProviderModal();
+        }
+        return;
+      }
+      if (activeRole === 'delivery' || initialRole === 'delivery') {
+        onClose();
+        if (onOpenBecomeDeliveryPartnerModal) {
+          onOpenBecomeDeliveryPartnerModal();
+        }
+        return;
+      }
+    }
+  }, [isOpen, mode, initialMode, activeRole, initialRole, onClose, onOpenBecomeProviderModal, onOpenBecomeDeliveryPartnerModal]);
+
   // Update activeRole when initialRole prop changes or modal opens
   useEffect(() => {
     if (isOpen) {
+      if (initialMode === 'signup' && initialRole === 'provider') {
+        onClose();
+        if (onOpenBecomeProviderModal) onOpenBecomeProviderModal();
+        return;
+      }
+      if (initialMode === 'signup' && initialRole === 'delivery') {
+        onClose();
+        if (onOpenBecomeDeliveryPartnerModal) onOpenBecomeDeliveryPartnerModal();
+        return;
+      }
+
       setActiveRole(initialRole);
       setMode(initialMode || 'login');
+      if (initialRole === 'admin') {
+        setAuthMethod('password');
+        setEmail('admin@tiffinlink.com');
+      }
       document.body.style.overflow = 'hidden';
       const timer = setTimeout(() => {
         setIsActive(true);
@@ -94,15 +130,37 @@ export default function LoginModal({
       setSubmitStatus('idle');
       setResendCooldown(0);
     }
-  }, [isOpen, initialRole, initialMode]);
+  }, [isOpen, initialRole, initialMode, onClose, onOpenBecomeProviderModal, onOpenBecomeDeliveryPartnerModal]);
 
   // Handle switching role tabs
   const handleRoleTabChange = (role) => {
+    if (mode === 'signup' && role === 'provider') {
+      onClose();
+      if (onOpenBecomeProviderModal) {
+        onOpenBecomeProviderModal();
+      }
+      return;
+    }
+    if (mode === 'signup' && role === 'delivery') {
+      onClose();
+      if (onOpenBecomeDeliveryPartnerModal) {
+        onOpenBecomeDeliveryPartnerModal();
+      }
+      return;
+    }
+
     setActiveRole(role);
     setErrors({});
     setOtpMessage('');
     setPassword('');
     setStep('form');
+    if (role === 'admin') {
+      setAuthMethod('password');
+      setEmail('admin@tiffinlink.com');
+    } else if (email === 'admin@tiffinlink.com') {
+      setEmail('');
+      setAuthMethod('otp');
+    }
   };
 
   // Real-time Field Validation Helper
@@ -667,18 +725,14 @@ export default function LoginModal({
               {step === 'otp' 
                 ? 'Verify your Key.' 
                 : (mode === 'signup' 
-                    ? (activeRole === 'provider' ? 'Become a Provider' : activeRole === 'delivery' ? 'Become a Partner' : activeRole === 'admin' ? 'Create Super Admin Account' : 'Create Diner Account') 
+                    ? (activeRole === 'admin' ? 'Create Super Admin Account' : 'Create Diner Account') 
                     : `${roleLabels[activeRole]?.title}`)}
             </h2>
             <p className="font-body-md text-body-md text-on-surface-variant max-w-[440px] mx-auto text-[14px]">
               {step === 'otp' 
                 ? `We've sent a one-time verification key to ${email}.`
                 : (mode === 'signup' 
-                    ? (activeRole === 'provider' 
-                        ? 'Register your kitchen brand to serve homemade thalis to diners.' 
-                        : activeRole === 'delivery'
-                        ? 'Join our local delivery fleet to deliver thalis and earn.'
-                        : activeRole === 'admin'
+                    ? (activeRole === 'admin'
                         ? 'Create a Super Admin operational account with root privileges.'
                         : 'Join TiffinLink to explore home-cooked thalis and tiffin subscriptions.') 
                     : `Authenticate access for ${roleLabels[activeRole]?.tag}.`)
@@ -762,40 +816,79 @@ export default function LoginModal({
                   </div>
                 )}
 
-                {/* Email Address Input */}
-                <div className="relative group">
-                  <label 
-                    className="font-label-caps text-label-caps text-on-surface-variant block mb-1" 
-                    htmlFor="email"
-                  >
-                    {activeRole === 'provider' ? 'KITCHEN / PROVIDER EMAIL *' : activeRole === 'delivery' ? 'DELIVERY PARTNER EMAIL *' : activeRole === 'admin' ? 'SUPER ADMIN EMAIL *' : 'DINER EMAIL ADDRESS *'}
-                  </label>
-                  <input 
-                    className={`w-full bg-transparent border-t-0 border-x-0 border-b px-0 py-1.5 text-body-md text-primary placeholder-outline transition-all focus:ring-0 ${
-                      errors.email ? 'border-red-500 text-red-600' : 'border-outline-variant focus:border-primary'
-                    }`} 
-                    id="email" 
-                    name="email" 
-                    placeholder="yourname@domain.com" 
-                    required 
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      validateField('email', e.target.value);
-                    }}
-                    disabled={submitStatus !== 'idle'}
-                  />
-                  {errors.email && (
-                    <p className="text-red-600 text-[11px] mt-1 font-semibold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[13px]">error</span>
-                      {errors.email}
+                {/* Direct Action for Provider / Delivery Signup (Disabled the redundant first signup form) */}
+                {mode === 'signup' && activeRole === 'provider' && (
+                  <div className="py-4 text-center space-y-4 bg-surface-container-low p-4 rounded-md border border-outline-variant/30">
+                    <p className="font-body-md text-on-surface-variant text-[14px]">
+                      Register your kitchen brand to serve homemade thalis to diners directly via our official onboarding application.
                     </p>
-                  )}
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        if (onOpenBecomeProviderModal) onOpenBecomeProviderModal();
+                      }}
+                      className="w-full bg-onyx-black text-white font-button-text text-button-text py-3.5 px-6 uppercase tracking-[0.2em] hover:bg-clay-earth transition-colors duration-500 cursor-pointer"
+                    >
+                      Open Provider Application
+                    </button>
+                  </div>
+                )}
 
-                {/* PASSWORD INPUT (Shown for Password Login OR Signup) */}
-                {((mode === 'login' && authMethod === 'password') || mode === 'signup') && (
+                {mode === 'signup' && activeRole === 'delivery' && (
+                  <div className="py-4 text-center space-y-4 bg-surface-container-low p-4 rounded-md border border-outline-variant/30">
+                    <p className="font-body-md text-on-surface-variant text-[14px]">
+                      Join our local delivery fleet to deliver homemade thalis directly via our delivery partner onboarding.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        if (onOpenBecomeDeliveryPartnerModal) onOpenBecomeDeliveryPartnerModal();
+                      }}
+                      className="w-full bg-onyx-black text-white font-button-text text-button-text py-3.5 px-6 uppercase tracking-[0.2em] hover:bg-clay-earth transition-colors duration-500 cursor-pointer"
+                    >
+                      Open Delivery Application
+                    </button>
+                  </div>
+                )}
+
+                {/* Email Address Input (Hidden for Provider/Delivery Signup) */}
+                {!(mode === 'signup' && (activeRole === 'provider' || activeRole === 'delivery')) && (
+                  <div className="relative group">
+                    <label 
+                      className="font-label-caps text-label-caps text-on-surface-variant block mb-1" 
+                      htmlFor="email"
+                    >
+                      {activeRole === 'provider' ? 'KITCHEN / PROVIDER EMAIL *' : activeRole === 'delivery' ? 'DELIVERY PARTNER EMAIL *' : activeRole === 'admin' ? 'SUPER ADMIN EMAIL *' : 'DINER EMAIL ADDRESS *'}
+                    </label>
+                    <input 
+                      className={`w-full bg-transparent border-t-0 border-x-0 border-b px-0 py-1.5 text-body-md text-primary placeholder-outline transition-all focus:ring-0 ${
+                        errors.email ? 'border-red-500 text-red-600' : 'border-outline-variant focus:border-primary'
+                      }`} 
+                      id="email" 
+                      name="email" 
+                      placeholder="yourname@domain.com" 
+                      required 
+                      type="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        validateField('email', e.target.value);
+                      }}
+                      disabled={submitStatus !== 'idle'}
+                    />
+                    {errors.email && (
+                      <p className="text-red-600 text-[11px] mt-1 font-semibold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[13px]">error</span>
+                        {errors.email}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* PASSWORD INPUT (Shown for Password Login OR Diner/Admin Signup) */}
+                {((mode === 'login' && authMethod === 'password') || (mode === 'signup' && (activeRole === 'customer' || activeRole === 'admin'))) && (
                   <div className="relative group">
                     <label 
                       className="font-label-caps text-label-caps text-on-surface-variant block mb-1" 
@@ -910,14 +1003,16 @@ export default function LoginModal({
 
             {/* Action Buttons & Navigation */}
             <div className="space-y-3 pt-2">
-              <button 
-                className="w-full bg-onyx-black text-on-primary font-button-text text-button-text py-3.5 px-8 uppercase tracking-[0.2em] hover:bg-clay-earth transition-colors duration-500 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" 
-                type="submit"
-                disabled={isButtonDisabledFinal}
-                style={buttonStyle}
-              >
-                {buttonText}
-              </button>
+              {!(mode === 'signup' && (activeRole === 'provider' || activeRole === 'delivery')) && (
+                <button 
+                  className="w-full bg-onyx-black text-on-primary font-button-text text-button-text py-3.5 px-8 uppercase tracking-[0.2em] hover:bg-clay-earth transition-colors duration-500 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" 
+                  type="submit"
+                  disabled={isButtonDisabledFinal}
+                  style={buttonStyle}
+                >
+                  {buttonText}
+                </button>
+              )}
 
               {step === 'form' ? (
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-0 w-full text-center">
@@ -1024,11 +1119,29 @@ export default function LoginModal({
               <p>By continuing, you agree to our</p>
             </div>
             <div className="flex justify-center gap-4 text-[11px] font-label-caps text-primary">
-              <a className="underline-animate text-[11px]" href="#terms">Terms of service</a>
+              <button 
+                type="button" 
+                onClick={() => onOpenLegalModal ? onOpenLegalModal(activeRole === 'provider' ? 'provider-agreement' : (activeRole === 'delivery' ? 'delivery-partner-agreement' : 'customer-terms')) : null}
+                className="underline-animate text-[11px] cursor-pointer bg-transparent border-none p-0 text-primary font-semibold"
+              >
+                Terms of Service
+              </button>
               <span className="opacity-40">|</span>
-              <a className="underline-animate text-[11px]" href="#privacy">Privacy Policy</a>
+              <button 
+                type="button" 
+                onClick={() => onOpenLegalModal ? onOpenLegalModal('privacy-policy') : null}
+                className="underline-animate text-[11px] cursor-pointer bg-transparent border-none p-0 text-primary font-semibold"
+              >
+                Privacy Policy
+              </button>
               <span className="opacity-40">|</span>
-              <a className="underline-animate text-[11px]" href="#conduct">Code of Conduct</a>
+              <button 
+                type="button" 
+                onClick={() => onOpenLegalModal ? onOpenLegalModal('community-guidelines') : null}
+                className="underline-animate text-[11px] cursor-pointer bg-transparent border-none p-0 text-primary font-semibold"
+              >
+                Community Standards
+              </button>
             </div>
           </div>
         </div>

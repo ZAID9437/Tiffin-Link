@@ -1,5 +1,5 @@
 <!doctype html>
-<html class="scroll-smooth" lang="en">
+<html lang="en">
 
 <head>
   <meta charset="utf-8" />
@@ -12,68 +12,152 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
     rel="stylesheet" />
+  <script>
+    (function () {
+      try {
+        var theme = localStorage.getItem('tiffinlink_theme') || 'light';
+        var isDark = false;
+        if (theme === 'dark') {
+          isDark = true;
+        } else if (theme === 'system') {
+          isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        var root = document.documentElement;
+        if (isDark) {
+          root.classList.add('dark');
+          root.setAttribute('data-theme', 'dark');
+        } else {
+          root.classList.remove('dark');
+          root.setAttribute('data-theme', 'light');
+        }
+        if (localStorage.getItem('tiffinlink_compact') === 'true') {
+          root.classList.add('compact-density');
+        }
+        if (localStorage.getItem('tiffinlink_reduce_motion') === 'true') {
+          root.classList.add('reduce-motion');
+        }
+      } catch (e) {}
+    })();
+
+    // ─── COMPLETE DEVTOOLS & INSPECT MODE SHIELD ───
+    (function blockInspectMode() {
+      // 1. Block Mouse Right-Click (Context Menu across all browsers)
+      document.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }, { capture: true });
+
+      // 2. Block Keyboard Shortcuts (Windows, Linux, macOS)
+      document.addEventListener('keydown', function (e) {
+        var key = (e.key || '').toUpperCase();
+        var code = e.keyCode || e.which;
+        var isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+        // F12 key (Windows, Linux, macOS)
+        if (key === 'F12' || code === 123) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+
+        // Ctrl + Shift + [I, C, J, K, Z, F] or Cmd + Option + [I, C, J, K, Z, F] or Cmd + Shift + [C, I, K, Z]
+        if (isCtrlOrCmd && (e.shiftKey || e.altKey)) {
+          if (['I', 'C', 'J', 'K', 'Z', 'F'].includes(key) || [73, 67, 74, 75, 90, 70].includes(code)) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }
+
+        // View Page Source: Ctrl + U / Cmd + U / Cmd + Option + U
+        if (isCtrlOrCmd && (key === 'U' || code === 85)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+
+        // Save Page Source: Ctrl + S / Cmd + S
+        if (isCtrlOrCmd && (key === 'S' || code === 83)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      }, { capture: true });
+
+      // 3. Block Drag-to-Inspect / Dropping media into browser tabs
+      document.addEventListener('dragstart', function (e) {
+        if (e.target && (e.target.nodeName === 'IMG' || e.target.nodeName === 'VIDEO')) {
+          e.preventDefault();
+        }
+      }, { capture: true });
+    })();
+  </script>
   <script id="tailwind-config">
     tailwind.config = {
       darkMode: "class",
       theme: {
         extend: {
           "colors": {
-            "on-secondary": "#ffffff",
-            "onyx-black": "#1A1A1A",
-            "surface-container": "#f0eeea",
-            "on-secondary-fixed": "#211b12",
-            "bone-white": "#F5F3EF",
-            "error-container": "#ffdad6",
-            "inverse-on-surface": "#f2f0ec",
+            "on-secondary": "var(--color-on-secondary, #ffffff)",
+            "onyx-black": "var(--color-onyx-black, #18181B)",
+            "surface-container": "var(--color-surface-container, #F5F2EB)",
+            "on-secondary-fixed": "var(--color-on-secondary-fixed, #18181B)",
+            "bone-white": "var(--color-bone-white, #FAF8F5)",
+            "error-container": "#fee2e2",
+            "inverse-on-surface": "var(--color-inverse-on-surface, #FAF8F5)",
             "inverse-primary": "#c8c6c5",
-            "on-secondary-fixed-variant": "#4e453b",
-            "tertiary": "#000000",
-            "outline-variant": "#c4c7c7",
-            "secondary-fixed": "#eee0d2",
-            "surface-variant": "#e4e2de",
-            "secondary": "#665d52",
-            "on-tertiary-container": "#868382",
+            "on-secondary-fixed-variant": "var(--color-on-secondary-fixed-variant, #3F3D38)",
+            "tertiary": "var(--color-tertiary, #18181B)",
+            "outline-variant": "var(--color-outline-variant, #ECE7DE)",
+            "secondary-fixed": "var(--color-secondary-fixed, #F5F2EB)",
+            "surface-variant": "var(--color-surface-variant, #F5F2EB)",
+            "secondary": "var(--color-secondary, #3F3D38)",
+            "on-tertiary-container": "var(--color-on-tertiary-container, #3F3D38)",
             "primary-fixed-dim": "#c8c6c5",
-            "on-primary-container": "#858383",
-            "tertiary-container": "#1c1b1a",
-            "sand-neutral": "#DED9D1",
-            "secondary-container": "#eee0d2",
-            "on-primary-fixed-variant": "#474746",
-            "error": "#ba1a1a",
-            "on-tertiary-fixed-variant": "#484645",
-            "secondary-fixed-dim": "#d1c5b7",
-            "surface-container-highest": "#e4e2de",
-            "primary": "#000000",
-            "surface-bright": "#fbf9f5",
-            "on-surface-variant": "#444748",
+            "on-primary-container": "var(--color-on-primary-container, #18181B)",
+            "tertiary-container": "var(--color-tertiary-container, #18181B)",
+            "sand-neutral": "var(--color-sand-neutral, #ECE7DE)",
+            "secondary-container": "var(--color-secondary-container, #F5F2EB)",
+            "on-primary-fixed-variant": "var(--color-on-primary-fixed-variant, #3F3D38)",
+            "error": "#dc2626",
+            "on-tertiary-fixed-variant": "var(--color-on-tertiary-fixed-variant, #3F3D38)",
+            "secondary-fixed-dim": "var(--color-secondary-fixed-dim, #ECE7DE)",
+            "surface-container-highest": "var(--color-surface-container-highest, #EAE5DB)",
+            "primary": "var(--color-primary, #18181B)",
+            "surface-bright": "var(--color-surface-bright, #FAF8F5)",
+            "on-surface-variant": "var(--color-on-surface-variant, #3F3D38)",
             "on-error": "#ffffff",
-            "primary-container": "#1c1b1b",
-            "surface-dim": "#dbdad6",
-            "surface-container-low": "#f5f3ef",
-            "surface-container-high": "#eae8e4",
-            "on-background": "#1b1c1a",
-            "inverse-surface": "#30312e",
-            "on-error-container": "#93000a",
-            "tertiary-fixed": "#e6e2df",
-            "surface-container-lowest": "#fbf9f5",
-            "on-primary": "#ffffff",
-            "on-secondary-container": "#6c6358",
-            "outline": "#747878",
-            "on-tertiary-fixed": "#1c1b1a",
-            "on-surface": "#1b1c1a",
-            "background": "#fbf9f5",
-            "on-primary-fixed": "#1c1b1b",
-            "clay-earth": "#4A4238",
-            "surface": "#fbf9f5",
+            "primary-container": "var(--color-primary-container, #18181B)",
+            "surface-dim": "var(--color-surface-dim, #EAE5DB)",
+            "surface-container-low": "var(--color-surface-container-low, #FAF8F5)",
+            "surface-container-high": "var(--color-surface-container-high, #F5F2EB)",
+            "on-background": "var(--color-on-background, #18181B)",
+            "inverse-surface": "var(--color-inverse-surface, #27272A)",
+            "on-error-container": "#991b1b",
+            "tertiary-fixed": "var(--color-tertiary-fixed, #F5F2EB)",
+            "surface-container-lowest": "var(--color-surface-container-lowest, #FFFFFF)",
+            "on-primary": "var(--color-on-primary, #ffffff)",
+            "on-secondary-container": "var(--color-on-secondary-container, #3F3D38)",
+            "outline": "var(--color-outline, #D5D0C5)",
+            "on-tertiary-fixed": "var(--color-on-tertiary-fixed, #18181B)",
+            "on-surface": "var(--color-on-surface, #18181B)",
+            "background": "var(--color-background, #FAF8F5)",
+            "on-primary-fixed": "var(--color-on-primary-fixed, #18181B)",
+            "clay-earth": "var(--color-clay-earth, #3F3D38)",
+            "surface": "var(--color-surface, #FAF8F5)",
             "on-tertiary": "#ffffff",
-            "primary-fixed": "#e5e2e1",
-            "surface-tint": "#5f5e5e",
-            "tertiary-fixed-dim": "#cac6c4"
+            "primary-fixed": "var(--color-primary-fixed, #F5F2EB)",
+            "surface-tint": "var(--color-surface-tint, #3F3D38)",
+            "tertiary-fixed-dim": "var(--color-tertiary-fixed-dim, #ECE7DE)"
           },
           "borderRadius": {
-            "DEFAULT": "0px",
-            "lg": "0px",
-            "xl": "0px",
+            "DEFAULT": "6px",
+            "sm": "4px",
+            "md": "6px",
+            "lg": "8px",
+            "xl": "12px",
+            "2xl": "16px",
             "full": "9999px"
           },
           "spacing": {
@@ -108,10 +192,74 @@
     }
   </script>
   <style>
+    :root {
+      --color-bone-white: #FAF7F2;
+      --color-onyx-black: #181512;
+      --color-surface: #FAF7F2;
+      --color-surface-container: #FAF7F2;
+      --color-surface-container-low: #F5F1E8;
+      --color-surface-container-lowest: #FFFFFF;
+      --color-surface-container-high: #EDE7DC;
+      --color-surface-container-highest: #E5DEC0;
+      --color-surface-bright: #FFFFFF;
+      --color-surface-dim: #EDE7DC;
+      --color-sand-neutral: #D8CEBE;
+      --color-clay-earth: #4B3621;
+      --color-on-surface: #181512;
+      --color-on-surface-variant: #54483C;
+      --color-outline: #C4B9A7;
+      --color-outline-variant: #D8CEBE;
+      --color-background: #FAF7F2;
+      --color-on-background: #181512;
+      --color-secondary: #54483C;
+      --color-secondary-container: #F5F1E8;
+      --color-secondary-fixed: #F5F1E8;
+      --color-secondary-fixed-dim: #D8CEBE;
+      --color-primary: #181512;
+      --color-primary-container: #181512;
+      --color-on-primary: #ffffff;
+      --color-tertiary: #8C6239;
+      --color-inverse-surface: #27272A;
+      --color-inverse-on-surface: #FAF7F2;
+    }
+
+    html.dark,
+    [data-theme="dark"] {
+      --color-bone-white: #FAF8F5;
+      --color-onyx-black: #F4F4F6;
+      --color-surface: #121214;
+      --color-surface-container: #1A1A1E;
+      --color-surface-container-low: #151518;
+      --color-surface-container-lowest: #16161A;
+      --color-surface-container-high: #24242A;
+      --color-surface-container-highest: #2E2E38;
+      --color-surface-bright: #222226;
+      --color-surface-dim: #0E0E10;
+      --color-sand-neutral: #3F3F4A;
+      --color-clay-earth: #DFB76C;
+      --color-on-surface: #FAF8F5;
+      --color-on-surface-variant: #D4D0C8;
+      --color-outline: #4B4B58;
+      --color-outline-variant: #3F3F4A;
+      --color-background: #0E0E10;
+      --color-on-background: #FAF8F5;
+      --color-secondary: #DFB76C;
+      --color-secondary-container: #222228;
+      --color-secondary-fixed: #222228;
+      --color-secondary-fixed-dim: #3F3F4A;
+      --color-primary: #E5C158;
+      --color-primary-container: #27272E;
+      --color-on-primary: #111113;
+      --color-tertiary: #E5C158;
+      --color-inverse-surface: #FAF8F5;
+      --color-inverse-on-surface: #18181B;
+      color-scheme: dark;
+    }
+
     .reveal-on-scroll {
-      opacity: 0;
-      transform: translateY(30px);
-      transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity: 1;
+      transform: translateY(0);
+      transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .reveal-on-scroll.active {
@@ -144,6 +292,13 @@
     .custom-cursor.cursor-hidden {
       transform: translate(-50%, -50%) scale(0) !important;
       opacity: 0 !important;
+    }
+
+    .dashboard-view .custom-cursor,
+    .dashboard-view .custom-cursor-follower,
+    body.in-dashboard .custom-cursor,
+    body.in-dashboard .custom-cursor-follower {
+      display: none !important;
     }
 
     .custom-cursor-follower {
@@ -310,11 +465,162 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+
+    /* Complete Anti-Inspect & Protected Touch Styles */
+    html, body {
+      -webkit-touch-callout: none !important;
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      user-select: none !important;
+    }
+
+    input, textarea, select, [contenteditable="true"], .allow-select {
+      -webkit-touch-callout: default !important;
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+      user-select: text !important;
+    }
+
+    img, a {
+      -webkit-user-drag: none !important;
+    }
   </style>
+
+  <!-- Complete Anti-Inspect & DevTools Shield (PC, Laptop, Tablet, Mobile) -->
+  <script>
+    (function () {
+      // 1. Disable Right-Click Context Menu Everywhere
+      function blockContextMenu(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      window.addEventListener('contextmenu', blockContextMenu, true);
+      document.addEventListener('contextmenu', blockContextMenu, true);
+
+      // 2. Disable Keyboard Shortcuts for Inspect, Console, Source, and Saving
+      function blockDevToolsKeys(e) {
+        // F12
+        if (e.key === 'F12' || e.keyCode === 123) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+
+        var isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+        // Ctrl/Cmd + Shift + (I, J, C, K, E, S)
+        if (isCtrlOrCmd && e.shiftKey) {
+          var k = (e.key || '').toUpperCase();
+          var c = e.keyCode;
+          if (k === 'I' || k === 'J' || k === 'C' || k === 'K' || k === 'E' || k === 'S' ||
+              c === 73 || c === 74 || c === 67 || c === 75 || c === 69 || c === 83) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }
+
+        // Ctrl/Cmd + (U = View Source, S = Save Page)
+        if (isCtrlOrCmd && !e.shiftKey) {
+          var k2 = (e.key || '').toUpperCase();
+          var c2 = e.keyCode;
+          if (k2 === 'U' || k2 === 'S' || c2 === 85 || c2 === 83) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }
+
+        // Ctrl/Cmd + (C = Copy, V = Paste, X = Cut, A = Select All)
+        if (isCtrlOrCmd && !e.shiftKey && !e.altKey) {
+          var kCopy = (e.key || '').toUpperCase();
+          var cCopy = e.keyCode;
+          if (kCopy === 'C' || kCopy === 'V' || kCopy === 'X' || kCopy === 'A' ||
+              cCopy === 67 || cCopy === 86 || cCopy === 88 || cCopy === 65) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }
+
+        // Windows alternate Copy/Paste (Ctrl+Insert / Shift+Insert)
+        if ((e.ctrlKey || e.shiftKey) && (e.key === 'Insert' || e.keyCode === 45)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+
+        // macOS Alt + Cmd + (I, J, C)
+        if (e.altKey && (e.metaKey || e.ctrlKey)) {
+          var k3 = (e.key || '').toUpperCase();
+          var c3 = e.keyCode;
+          if (k3 === 'I' || k3 === 'J' || k3 === 'C' || c3 === 73 || c3 === 74 || c3 === 67) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }
+      }
+
+      window.addEventListener('keydown', blockDevToolsKeys, true);
+      document.addEventListener('keydown', blockDevToolsKeys, true);
+
+      // 3. Prevent dragging to inspect source or drag images
+      window.addEventListener('dragstart', function (e) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+          return true;
+        }
+        e.preventDefault();
+        return false;
+      }, true);
+
+      // 4. Mobile multi-finger developer tap shield
+      window.addEventListener('touchstart', function (e) {
+        if (e.touches && e.touches.length > 2) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      // 5. Turn off copy, cut, paste, and text selecting website-wide
+      var blockCopyPaste = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      };
+      window.addEventListener('copy', blockCopyPaste, true);
+      document.addEventListener('copy', blockCopyPaste, true);
+      window.addEventListener('cut', blockCopyPaste, true);
+      document.addEventListener('cut', blockCopyPaste, true);
+      window.addEventListener('paste', blockCopyPaste, true);
+      document.addEventListener('paste', blockCopyPaste, true);
+
+      window.addEventListener('selectstart', function (e) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+          return true;
+        }
+        e.preventDefault();
+        return false;
+      }, true);
+      document.addEventListener('selectstart', function (e) {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+          return true;
+        }
+        e.preventDefault();
+        return false;
+      }, true);
+    })();
+  </script>
 </head>
 
 <body
-  class="bg-bone-white text-onyx-black font-body-md overflow-x-hidden selection:bg-onyx-black selection:text-bone-white">
+  oncopy="return false;"
+  oncut="return false;"
+  onpaste="return false;"
+  onselectstart="return false;"
+  class="bg-bone-white text-onyx-black font-body-md overflow-x-hidden select-none selection:bg-transparent selection:text-inherit dark:bg-[#111113] dark:text-[#F4F4F6] transition-colors duration-200">
   <div class="custom-cursor hidden md:block" id="cursor"></div>
   <div class="custom-cursor-follower hidden md:block" id="cursor-follower">
     <span class="custom-cursor-text" id="cursor-text"></span>

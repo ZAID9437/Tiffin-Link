@@ -1,25 +1,37 @@
 const express = require('express');
 const router = express.Router();
-const { protect, requireProvider } = require('../middleware/authMiddleware');
+const { protect, requireProvider, providerAuthWithFallback } = require('../middleware/authMiddleware');
 const { 
   createRequest, 
   getRequests, 
+  getMyRequests,
   updateRequest, 
   deleteRequest,
   acceptRequest,
   declineRequest,
-  simulateLiveRequest
+  simulateLiveRequest,
+  submitOffer,
+  selectOffer,
+  getOffersForRequest,
+  withdrawOffer,
+  getProviderOffers
 } = require('../controllers/requestController');
 
-router.get('/', protect, getRequests);
+router.get('/', providerAuthWithFallback, getRequests);
+router.get('/my-requests', getMyRequests);
+router.get('/provider/my-offers', providerAuthWithFallback, getProviderOffers);
 router.post('/', createRequest);
-router.post('/simulate', protect, simulateLiveRequest);
-router.post('/:id/accept', protect, requireProvider, acceptRequest);
-router.put('/:id/accept', protect, requireProvider, acceptRequest);
-router.post('/:id/decline', protect, requireProvider, declineRequest);
-router.put('/:id/decline', protect, requireProvider, declineRequest);
-router.put('/:id', protect, requireProvider, updateRequest);
-router.delete('/:id', protect, requireProvider, deleteRequest);
+router.post('/simulate', providerAuthWithFallback, simulateLiveRequest);
+router.post('/:id/accept', providerAuthWithFallback, acceptRequest);
+router.put('/:id/accept', providerAuthWithFallback, acceptRequest);
+router.post('/:id/decline', providerAuthWithFallback, declineRequest);
+router.put('/:id/decline', providerAuthWithFallback, declineRequest);
+router.post('/:id/offers', providerAuthWithFallback, submitOffer);
+router.get('/:id/offers', getOffersForRequest);
+router.post('/:id/offers/:offerId/select', selectOffer);
+router.post('/:id/offers/:offerId/withdraw', providerAuthWithFallback, withdrawOffer);
+router.put('/:id', providerAuthWithFallback, updateRequest);
+router.delete('/:id', providerAuthWithFallback, deleteRequest);
 
 module.exports = router;
 

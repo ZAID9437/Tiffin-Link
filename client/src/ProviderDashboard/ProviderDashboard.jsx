@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 
 import ProviderSidebar from './ProviderSidebar';
+import { playKitchenOrderSound, playKitchenAlertLoop, stopKitchenAlertSound, isSoundEnabled, setSoundEnabled } from '../services/soundNotifier';
 import DashboardOverviewTab from './DashboardOverviewTab';
 import LiveRequestsTab from './LiveRequestsTab';
 import MyTiffinsTab from './MyTiffinsTab';
@@ -54,6 +55,9 @@ import SettingsTab from './SettingsTab';
 import DeliveryManagementTab from './DeliveryManagementTab';
 import HelpSupportTab from './HelpSupportTab';
 import PerformanceTab from './PerformanceTab';
+import { useTranslation } from '../services/i18n';
+import { apiRequest } from '../services/api';
+import { getSocket } from '../services/socket';
 
 const getProviderTabFromHash = (rawHash) => {
   const hash = (rawHash || (typeof window !== 'undefined' ? window.location.hash : '') || '').toLowerCase().trim();
@@ -147,6 +151,7 @@ const getHashFromProviderTab = (tab) => {
 };
 
 export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser }) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTabState] = useState(() => {
     return getProviderTabFromHash(typeof window !== 'undefined' ? window.location.hash : '');
   });
@@ -181,6 +186,10 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isKitchenOnline, setIsKitchenOnline] = useState(true);
   const [statusToast, setStatusToast] = useState('');
+  const [soundActive, setSoundActive] = useState(isSoundEnabled());
+  const [newOrderAlert, setNewOrderAlert] = useState(null);
+  const [isAcceptingAlert, setIsAcceptingAlert] = useState(false);
+  const [isDecliningAlert, setIsDecliningAlert] = useState(false);
 
   // Dynamic Sidebar & Header Badge Counts from MongoDB Database
   const [badgeCounts, setBadgeCounts] = useState({
@@ -196,40 +205,232 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
     }));
   };
 
-  useEffect(() => {
-    const fetchSidebarBadges = async () => {
-      try {
-        const dashRes = await apiRequest('/providers/dashboard');
-        const dashJson = typeof dashRes?.json === 'function' ? await dashRes.json() : dashRes;
-        if (dashJson && dashJson.success && dashJson.data) {
-          if (dashJson.data.acceptingOrders !== undefined) {
-            setIsKitchenOnline(Boolean(dashJson.data.acceptingOrders));
-          }
-          setBadgeCounts(prev => ({
-            ...prev,
-            liveRequests: dashJson.data.liveRequestsCount || 0,
-            newOrders: dashJson.data.newOrdersCount || 0
-          }));
+  const fetchSidebarBadges = async () => {
+    try {
+      const dashRes = await apiRequest('/providers/dashboard');
+      const dashJson = typeof dashRes?.json === 'function' ? await dashRes.json() : dashRes;
+      if (dashJson && dashJson.success && dashJson.data) {
+        if (dashJson.data.acceptingOrders !== undefined) {
+          setIsKitchenOnline(Boolean(dashJson.data.acceptingOrders));
         }
+        setBadgeCounts(prev => ({
+          ...prev,
+          liveRequests: dashJson.data.liveRequestsCount || 0,
+          newOrders: dashJson.data.newOrdersCount || 0
+        }));
 
-        // Fetch real unread notification count
-        const notifRes = await apiRequest('/notifications?limit=1');
-        const notifJson = typeof notifRes?.json === 'function' ? await notifRes.json() : notifRes;
-        if (notifJson && notifJson.success && notifJson.summary) {
-          setBadgeCounts(prev => ({
-            ...prev,
-            notifications: notifJson.summary.unread || 0
-          }));
+        // If there are live requests and no alert is active, surface the latest pending request
+        if (dashJson.data.liveRequestsCount > 0) {
+          try {
+            const reqRes = await apiRequest('/requests');
+            const reqJson = typeof reqRes?.json === 'function' ? await reqRes.json() : reqRes;
+            if (reqJson && reqJson.success && Array.isArray(reqJson.data) && reqJson.data.length > 0) {
+              const pendingReq = reqJson.data.find(r => r.status === 'pending');
+              if (pendingReq) {
+                setNewOrderAlert(prev => {
+                  if (prev) return prev;
+                  playKitchenAlertLoop();
+                  return pendingReq;
+                });
+              }
+            }
+          } catch (e) {}
         }
-      } catch (err) {
-        console.error('Error fetching sidebar badge counts from MongoDB:', err);
       }
-    };
 
+      // Fetch real unread notification count
+      const notifRes = await apiRequest('/notifications?limit=1');
+      const notifJson = typeof notifRes?.json === 'function' ? await notifRes.json() : notifRes;
+      if (notifJson && notifJson.success && notifJson.summary) {
+        setBadgeCounts(prev => ({
+          ...prev,
+          notifications: notifJson.summary.unread || 0
+        }));
+      }
+    } catch (err) {
+      console.error('Error fetching sidebar badge counts from MongoDB:', err);
+    }
+  };
+
+  useEffect(() => {
     if (currentUser) {
       fetchSidebarBadges();
     }
+
+    const interval = setInterval(() => {
+      if (currentUser) fetchSidebarBadges();
+    }, 4000);
+
+    let socket;
+    try {
+      socket = getSocket();
+      if (socket && currentUser) {
+        const pId = currentUser?.providerId || currentUser?.id || currentUser?._id;
+        if (pId) {
+          socket.emit('join:provider', { providerId: String(pId) });
+        }
+
+        const handleNewOrderIncoming = (data) => {
+          if (data?.providerId && pId && String(data.providerId) !== String(pId)) return;
+          fetchSidebarBadges();
+          playKitchenAlertLoop();
+          if (data) {
+            // Keep request showing on provider dashboard until provider explicitly accepts or declines
+            setNewOrderAlert(data);
+          }
+          window.dispatchEvent(new CustomEvent('tiffinlink:new-order', { detail: data }));
+        };
+
+        const handleBadgeSync = (data) => {
+          if (data?.providerId && pId && String(data.providerId) !== String(pId)) return;
+          fetchSidebarBadges();
+          window.dispatchEvent(new CustomEvent('tiffinlink:new-order', { detail: data }));
+        };
+
+        const handleRequestResolved = (data) => {
+          if (data?.requestId || data?.orderId || data?.id) {
+            const resolvedId = String(data.requestId || data.orderId || data.id || '').replace(/^#/, '');
+            setNewOrderAlert(prev => {
+              if (!prev) return null;
+              const prevId = String(prev._id || prev.id || prev.requestId || prev.orderId || '').replace(/^#/, '');
+              if (prevId === resolvedId) {
+                stopKitchenAlertSound();
+                return null;
+              }
+              return prev;
+            });
+          }
+          fetchSidebarBadges();
+        };
+
+        const handleWindowOrderAccepted = () => {
+          stopKitchenAlertSound();
+          setNewOrderAlert(null);
+          fetchSidebarBadges();
+        };
+
+        const handleWindowRequestDeclined = () => {
+          stopKitchenAlertSound();
+          setNewOrderAlert(null);
+          fetchSidebarBadges();
+        };
+
+        window.addEventListener('tiffinlink:order-accepted', handleWindowOrderAccepted);
+        window.addEventListener('tiffinlink:request-declined', handleWindowRequestDeclined);
+
+        socket.on('order:created', handleNewOrderIncoming);
+        socket.on('order:new', handleNewOrderIncoming);
+        socket.on('request:new', handleNewOrderIncoming);
+        socket.on('order:status:updated', handleBadgeSync);
+        socket.on('request:accepted', handleRequestResolved);
+        socket.on('request:declined', handleRequestResolved);
+        socket.on('request:cancelled', handleRequestResolved);
+        socket.on('notification:new', handleBadgeSync);
+
+        return () => {
+          clearInterval(interval);
+          stopKitchenAlertSound();
+          window.removeEventListener('tiffinlink:order-accepted', handleWindowOrderAccepted);
+          window.removeEventListener('tiffinlink:request-declined', handleWindowRequestDeclined);
+          socket.off('order:created', handleNewOrderIncoming);
+          socket.off('order:new', handleNewOrderIncoming);
+          socket.off('request:new', handleNewOrderIncoming);
+          socket.off('order:status:updated', handleBadgeSync);
+          socket.off('request:accepted', handleRequestResolved);
+          socket.off('request:declined', handleRequestResolved);
+          socket.off('request:cancelled', handleRequestResolved);
+          socket.off('notification:new', handleBadgeSync);
+        };
+      }
+    } catch (e) {}
+
+    return () => clearInterval(interval);
   }, [currentUser]);
+
+  // Live countdown ticker for newOrderAlert if secondsLeft exists
+  useEffect(() => {
+    if (!newOrderAlert) return;
+    const timer = setInterval(() => {
+      setNewOrderAlert(prev => {
+        if (!prev) return null;
+        if (typeof prev.secondsLeft === 'number') {
+          if (prev.secondsLeft <= 1) {
+            stopKitchenAlertSound();
+            return null;
+          }
+          return { ...prev, secondsLeft: prev.secondsLeft - 1 };
+        }
+        return prev;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [newOrderAlert]);
+
+  const handleAcceptIncomingAlert = async (alertItem) => {
+    if (!alertItem || isAcceptingAlert || isDecliningAlert) return;
+    setIsAcceptingAlert(true);
+    stopKitchenAlertSound();
+
+    const rawId = alertItem._id || alertItem.id || alertItem.requestId || alertItem.orderId;
+    const cleanId = String(rawId || '').replace(/^#/, '').trim();
+    const isOrder = Boolean(alertItem.orderId && !alertItem.requestId && !alertItem.mealType);
+
+    try {
+      const endpoint = isOrder ? `/orders/${encodeURIComponent(cleanId)}/accept` : `/requests/${encodeURIComponent(cleanId)}/accept`;
+      const res = await apiRequest(endpoint, { method: 'POST' });
+      const json = typeof res?.json === 'function' ? await res.json() : res;
+
+      if (json && json.success) {
+        setStatusToast('✓ Request accepted! Order created in Kitchen Prep Queue.');
+        setNewOrderAlert(null);
+        window.dispatchEvent(new CustomEvent('tiffinlink:order-accepted', { detail: { id: cleanId } }));
+      } else {
+        setStatusToast(`⚠️ ${json?.message || 'Request is no longer available.'}`);
+        setNewOrderAlert(null);
+      }
+    } catch (err) {
+      console.error('Error accepting incoming request:', err);
+      setStatusToast('⚠️ Failed to accept request. Please try again.');
+    } finally {
+      setIsAcceptingAlert(false);
+      setTimeout(() => setStatusToast(''), 4000);
+      fetchSidebarBadges();
+    }
+  };
+
+  const handleDeclineIncomingAlert = async (alertItem) => {
+    if (!alertItem || isAcceptingAlert || isDecliningAlert) return;
+    setIsDecliningAlert(true);
+    stopKitchenAlertSound();
+
+    const rawId = alertItem._id || alertItem.id || alertItem.requestId || alertItem.orderId;
+    const cleanId = String(rawId || '').replace(/^#/, '').trim();
+    const isOrder = Boolean(alertItem.orderId && !alertItem.requestId && !alertItem.mealType);
+
+    try {
+      if (isOrder) {
+        await apiRequest(`/orders/${encodeURIComponent(cleanId)}/reject`, {
+          method: 'POST',
+          body: JSON.stringify({ reason: 'Declined by kitchen provider' })
+        }).catch(() => {});
+      } else {
+        await apiRequest(`/requests/${encodeURIComponent(cleanId)}/decline`, {
+          method: 'POST'
+        }).catch(() => {});
+      }
+
+      setStatusToast('Request declined and removed.');
+      setNewOrderAlert(null);
+      window.dispatchEvent(new CustomEvent('tiffinlink:request-declined', { detail: { id: cleanId } }));
+    } catch (err) {
+      console.error('Error declining incoming request:', err);
+      setNewOrderAlert(null);
+    } finally {
+      setIsDecliningAlert(false);
+      setTimeout(() => setStatusToast(''), 3500);
+      fetchSidebarBadges();
+    }
+  };
 
   const handleToggleKitchenOnline = async () => {
     const nextStatus = !isKitchenOnline;
@@ -351,7 +552,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
   };
 
   return (
-    <div className="min-h-screen bg-surface font-body-md text-body-md text-on-surface antialiased">
+    <div className="min-h-screen bg-surface font-body-md text-body-md text-on-surface antialiased" style={{ fontFamily: "'Hanken Grotesk', sans-serif" }}>
 
       {/* LEFT FIXED SIDEBAR */}
       <ProviderSidebar
@@ -380,11 +581,24 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
               <Menu size={20} />
             </button>
 
+            <a
+              href="#"
+              className="lg:hidden flex items-center shrink-0 cursor-pointer no-underline mr-1"
+              title="TiffinLink"
+            >
+              <span
+                className="font-headline-md text-xl tracking-tighter text-[#1a1a1a]"
+                style={{ fontFamily: "'EB Garamond', serif" }}
+              >
+                TiffinLink
+              </span>
+            </a>
+
             <div className="w-full flex items-center bg-surface-container-low rounded-lg px-3 py-2 border border-sand-neutral/30">
               <span className="material-symbols-outlined text-secondary text-[20px] mr-2.5">search</span>
               <input
                 type="text"
-                placeholder="Search orders, tiffins, customers... (Order ID, Name, Phone)"
+                placeholder={t('search_placeholder', 'Search orders, tiffins, customers... (Order ID, Name, Phone)')}
                 className="bg-transparent w-full text-sm placeholder:text-secondary focus:outline-none text-on-surface font-body-md"
               />
               <kbd className="hidden sm:inline-block font-label-caps text-[10px] bg-surface-container text-on-surface-variant px-1.5 py-0.5 rounded border border-sand-neutral">
@@ -398,9 +612,29 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
             <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface-container-low border border-sand-neutral/30">
               <span className={`w-2 h-2 rounded-full ${isKitchenOnline ? 'bg-onyx-black animate-pulse' : 'bg-gray-400'}`}></span>
               <span className="font-label-caps text-[11px] font-bold uppercase text-on-surface tracking-wider">
-                {isKitchenOnline ? 'ONLINE' : 'OFFLINE'}
+                {isKitchenOnline ? t('online', 'ONLINE') : t('offline', 'OFFLINE')}
               </span>
             </div>
+
+            {/* Audio Alerts Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextVal = !soundActive;
+                setSoundActive(nextVal);
+                setSoundEnabled(nextVal);
+                if (nextVal) playKitchenOrderSound();
+              }}
+              title={soundActive ? 'Order Alert Chimes: Active (Click to mute)' : 'Order Alert Chimes: Muted (Click to enable)'}
+              className={`p-2 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${soundActive ? 'text-onyx-black hover:bg-surface-container-low' : 'text-neutral-400 hover:bg-surface-container-low'}`}
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {soundActive ? 'volume_up' : 'volume_off'}
+              </span>
+              <span className="hidden md:inline font-label-caps text-[10px] uppercase font-bold tracking-wider">
+                {soundActive ? 'Chime On' : 'Muted'}
+              </span>
+            </button>
 
             <button
               type="button"
@@ -441,10 +675,10 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                 </div>
                 <div className="hidden md:block text-left">
                   <div className="font-label-caps text-[11px] font-bold text-on-surface leading-tight">
-                    {currentUser?.name || currentUser?.businessName || 'Xoxo Men'}
+                    {currentUser?.kitchenName || currentUser?.businessName || currentUser?.name || 'Kitchen Partner'}
                   </div>
                   <div className="font-label-caps text-[9px] text-secondary leading-tight">
-                    Home Kitchen Provider
+                    {t('home_kitchen_provider', 'Home Kitchen Provider')}
                   </div>
                 </div>
                 <span className="material-symbols-outlined text-secondary text-[16px]">expand_more</span>
@@ -455,10 +689,10 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                 <div className="absolute right-0 mt-2 w-56 bg-surface-container-lowest border border-sand-neutral rounded-2xl shadow-xl py-2 z-50 animate-scale-in">
                   <div className="px-4 py-2 border-b border-sand-neutral/40">
                     <p className="font-button-text font-bold text-on-surface text-[13px]">
-                      {currentUser?.name || currentUser?.businessName || 'Xoxo Men'}
+                      {currentUser?.kitchenName || currentUser?.businessName || currentUser?.name || 'Kitchen Partner'}
                     </p>
                     <p className="font-label-caps text-[10px] text-secondary truncate">
-                      {currentUser?.email || 'menxoxo50@gmail.com'}
+                      {currentUser?.email || ''}
                     </p>
                   </div>
 
@@ -468,7 +702,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                     className="w-full text-left px-4 py-2 text-on-surface hover:bg-surface-container-low font-button-text text-[13px] flex items-center gap-2.5 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[18px]">settings</span>
-                    <span>Account Settings</span>
+                    <span>{t('account_settings', 'Account Settings')}</span>
                   </button>
 
                   <button
@@ -477,7 +711,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                     className="w-full text-left px-4 py-2 text-on-surface hover:bg-surface-container-low font-button-text text-[13px] flex items-center gap-2.5 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[18px]">help</span>
-                    <span>Help Concierge</span>
+                    <span>{t('help_support', 'Help & Support')}</span>
                   </button>
 
                   <div className="my-1 border-t border-sand-neutral/40" />
@@ -489,7 +723,7 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
                       className="w-full text-left px-4 py-2 text-error hover:bg-error-container/20 font-button-text text-[13px] flex items-center gap-2.5 cursor-pointer font-bold"
                     >
                       <span className="material-symbols-outlined text-[18px]">logout</span>
-                      <span>Log Out</span>
+                      <span>{t('log_out', 'Log Out')}</span>
                     </button>
                   )}
                 </div>
@@ -505,6 +739,118 @@ export default function ProviderDashboard({ currentUser, onLogout, onUpdateUser 
           </div>
         </main>
       </div>
+
+      {/* Real-Time Incoming Request / Order Persistent Modal Banner */}
+      {newOrderAlert && (
+        <div className="fixed top-20 right-4 sm:right-8 z-[9999] animate-in slide-in-from-top-4 duration-300 max-w-lg w-[calc(100vw-2rem)] sm:w-full bg-white text-stone-900 p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.25)] border-2 border-stone-800 space-y-4">
+          {/* Header Row */}
+          <div className="flex items-start justify-between gap-3 border-b border-stone-200 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center animate-pulse shrink-0 border border-emerald-300">
+                <span className="material-symbols-outlined text-[24px]">notifications_active</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-sans font-bold text-base text-stone-900 tracking-tight">
+                    {newOrderAlert.orderId ? '🛎️ New Customer Order' : '🚨 New Incoming Live Request'}
+                  </span>
+                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider animate-pulse">
+                    PENDING ACTION
+                  </span>
+                </div>
+                <div className="text-xs text-stone-600 mt-0.5 font-medium">
+                  Action required • Remains on screen until Accepted or Declined
+                </div>
+              </div>
+            </div>
+
+            <div className="text-right shrink-0">
+              <span className="text-[10px] text-stone-500 uppercase tracking-wider font-bold block">Order Value</span>
+              <span className="text-xl font-black text-emerald-700 font-mono">
+                ₹{newOrderAlert.totalAmount || (newOrderAlert.quantity || 1) * (newOrderAlert.budget || 0) || newOrderAlert.budget || newOrderAlert.amount || '0'}
+              </span>
+            </div>
+          </div>
+
+          {/* Details Card */}
+          <div className="bg-stone-50 border border-stone-200 rounded-xl p-3.5 text-xs space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-stone-600 font-semibold text-xs">Meal Item:</span>
+              <span className="font-bold text-stone-900 truncate text-right text-xs">
+                {newOrderAlert.mealType || newOrderAlert.tiffinName || (newOrderAlert.items && newOrderAlert.items[0]?.name) || 'Homestyle Tiffin'} • {newOrderAlert.quantity || 1} Box(es)
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-stone-600 font-semibold text-xs">Customer:</span>
+              <span className="font-bold text-stone-900 truncate text-right text-xs">
+                {newOrderAlert.customerName || 'Direct Customer'} {newOrderAlert.customerPhone ? `(${newOrderAlert.customerPhone})` : ''}
+              </span>
+            </div>
+
+            <div className="flex items-start justify-between gap-2">
+              <span className="text-stone-600 font-semibold text-xs shrink-0">Delivery Location:</span>
+              <span className="font-medium text-stone-800 text-right truncate max-w-[280px] text-xs">
+                {newOrderAlert.customerAddress || newOrderAlert.location || newOrderAlert.deliveryAddress?.street || 'Customer address on file'}
+              </span>
+            </div>
+
+            {newOrderAlert.specialInstructions && (
+              <div className="pt-2 border-t border-stone-200 text-stone-700 italic text-[11px] flex items-center gap-1.5 font-medium">
+                <span className="material-symbols-outlined text-[15px] text-amber-600">info</span>
+                <span>Note: "{newOrderAlert.specialInstructions}"</span>
+              </div>
+            )}
+
+            {typeof newOrderAlert.secondsLeft === 'number' && (
+              <div className="flex items-center justify-between pt-2 border-t border-stone-200 text-xs">
+                <span className="text-stone-600 font-medium">Auto-expires in:</span>
+                <span className="text-amber-700 font-black font-mono">
+                  {Math.floor(newOrderAlert.secondsLeft / 60)}:{(newOrderAlert.secondsLeft % 60).toString().padStart(2, '0')}s
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Action Decision Buttons */}
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="button"
+              disabled={isAcceptingAlert || isDecliningAlert}
+              onClick={() => handleAcceptIncomingAlert(newOrderAlert)}
+              className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-sans font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[18px]">check_circle</span>
+              <span>{isAcceptingAlert ? 'Accepting...' : 'Accept Request'}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isAcceptingAlert || isDecliningAlert}
+              onClick={() => handleDeclineIncomingAlert(newOrderAlert)}
+              className="py-3 px-5 bg-stone-100 hover:bg-rose-100 hover:border-rose-400 hover:text-rose-800 text-stone-800 border border-stone-300 font-sans font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[18px]">cancel</span>
+              <span>{isDecliningAlert ? 'Declining...' : 'Decline'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (newOrderAlert.orderId) {
+                  setActiveTab('orders-all');
+                } else {
+                  setActiveTab('live-requests');
+                }
+              }}
+              className="p-3 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300 rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center"
+              title="View full details in dashboard tab"
+            >
+              <span className="material-symbols-outlined text-[20px]">open_in_new</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Status Toast Banner */}
       {statusToast && (

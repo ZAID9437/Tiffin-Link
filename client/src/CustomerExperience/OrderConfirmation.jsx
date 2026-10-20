@@ -607,7 +607,7 @@ export default function OrderConfirmation({
                   <div>
                     <span>Grand Total</span>
                     <span className="block font-label-caps text-[10px] text-[#665d52] font-normal">
-                      Verified Authoritative Escrow Amount
+                      Inclusive of all taxes &amp; delivery
                     </span>
                   </div>
                   <span style={{ fontFamily: "'EB Garamond', serif" }} className="text-2xl">
@@ -935,9 +935,9 @@ export default function OrderConfirmation({
                 <div className="flex items-start gap-3">
                   <span className="material-symbols-outlined text-[#4a4238] text-[22px] shrink-0">verified_user</span>
                   <div>
-                    <span className="font-label-caps text-xs text-[#1a1a1a] uppercase tracking-wider block font-bold">Escrow Quality Lock</span>
+                    <span className="font-label-caps text-xs text-[#1a1a1a] uppercase tracking-wider block font-bold">Quality &amp; Freshness Guarantee</span>
                     <p className="font-body-md text-[11px] text-[#665d52] mt-0.5 leading-relaxed">
-                      Payment held securely until canister temperature and hygiene seal are verified upon delivery.
+                      Your payment is protected and only settled when your hot, fresh meal is delivered safely to your door.
                     </p>
                   </div>
                 </div>

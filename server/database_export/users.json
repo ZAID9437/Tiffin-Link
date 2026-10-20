@@ -96,5 +96,29 @@
     "refreshToken": null,
     "role": "delivery",
     "updatedAt": "2026-09-14T08:04:45.381Z"
+  },
+  {
+    "_id": "6acbb7dfa3e54a25fd2178c2",
+    "name": "Super Admin",
+    "email": "admin@tiffinlink.com",
+    "phone": "",
+    "password": "$2b$10$J.a0PrZkkaJTRnrAlWClcu.WYwAL5ErtVas940D5gLbfylTSJ8qZe",
+    "role": "admin",
+    "isActive": true,
+    "isVerified": true,
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YWNiYjdkZmEzZTU0YTI1ZmQyMTc4YzIiLCJpYXQiOjE3OTE3MzU3ODUsImV4cCI6MTc5MjM0MDU4NX0.X9e-fpV8GzHZPa-ivJ35uif80LilT5oXwsLMv4b0YW0",
+    "currentLocation": {
+      "address": "",
+      "city": "",
+      "state": "",
+      "country": "",
+      "timestamp": "2026-10-11T16:22:55.637Z",
+      "updatedAt": "2026-10-11T16:22:55.637Z"
+    },
+    "lastLogin": "2026-10-11T16:23:05.270Z",
+    "savedAddresses": [],
+    "createdAt": "2026-10-11T16:22:55.639Z",
+    "updatedAt": "2026-10-11T16:23:05.276Z",
+    "__v": 0
   }
 ]

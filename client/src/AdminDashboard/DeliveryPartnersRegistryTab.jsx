@@ -359,7 +359,7 @@ export default function DeliveryPartnersRegistryTab({ onOpenDriver360, onNavigat
 
   const handleRefresh = async () => {
     await fetchDriversFromDb();
-    showToast(`Live database sync complete: ${stats.registeredFleet} driver(s) registered`);
+    showToast(`Fleet refresh complete: ${stats.registeredFleet} driver(s) registered`);
   };
 
   return (
@@ -425,7 +425,7 @@ export default function DeliveryPartnersRegistryTab({ onOpenDriver360, onNavigat
               <div className="font-serif text-3xl text-[#1a1a1a] leading-none">
                 {String(stats.registeredFleet).padStart(2, '0')}
               </div>
-              <div className="font-mono text-[10px] text-[#665d52] mt-1 tracking-tight">MongoDB drivers</div>
+              <div className="font-mono text-[10px] text-[#665d52] mt-1 tracking-tight">Active Verified</div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1a1a1a]" />
           </div>
@@ -701,13 +701,13 @@ export default function DeliveryPartnersRegistryTab({ onOpenDriver360, onNavigat
                   {loading ? (
                     <tr>
                       <td colSpan="8" className="py-8 text-center font-mono text-sm text-[#665d52]">
-                        <span className="inline-block animate-spin mr-2">🔄</span> Loading couriers from database...
+                        <span className="inline-block animate-spin mr-2">🔄</span> Loading couriers...
                       </td>
                     </tr>
                   ) : filteredPartners.length === 0 ? (
                     <tr>
                       <td colSpan="8" className="py-8 text-center font-mono text-sm text-[#665d52]">
-                        No couriers found matching filters in MongoDB.
+                        No couriers found matching filters.
                       </td>
                     </tr>
                   ) : (
@@ -1121,7 +1121,7 @@ export default function DeliveryPartnersRegistryTab({ onOpenDriver360, onNavigat
                 <button
                   onClick={handleOpenReassignModal}
                   className="w-full py-2 bg-[#f0eeea] hover:bg-[#eae8e4] text-[#1a1a1a] text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors border border-[#ded9d1]"
-                  title="Assign an active order from database to this courier"
+                  title="Assign an active order to this courier"
                 >
                   <span className="material-symbols-outlined text-[14px]">alt_route</span>
                   <span>Reassign Order</span>
@@ -1282,7 +1282,7 @@ export default function DeliveryPartnersRegistryTab({ onOpenDriver360, onNavigat
                   {isOnboarding ? (
                     <>
                       <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
-                      <span>Saving to MongoDB...</span>
+                      <span>Saving Partner...</span>
                     </>
                   ) : (
                     <>
@@ -1316,17 +1316,17 @@ export default function DeliveryPartnersRegistryTab({ onOpenDriver360, onNavigat
 
             <div className="space-y-3 font-mono text-xs">
               <p className="text-[#665d52]">
-                Select an active order from MongoDB to assign to <strong>{selectedPartner.name}</strong> (#{selectedPartner.driverId || selectedPartner.id}):
+                Select an active order to assign to <strong>{selectedPartner.name}</strong> (#{selectedPartner.driverId || selectedPartner.id}):
               </p>
 
               {isLoadingOrders ? (
                 <div className="p-8 text-center text-[#665d52]">
                   <span className="material-symbols-outlined animate-spin text-2xl">progress_activity</span>
-                  <p className="mt-2 text-xs">Loading database dispatch requests...</p>
+                  <p className="mt-2 text-xs">Loading dispatch requests...</p>
                 </div>
               ) : availableOrders.length === 0 ? (
                 <div className="p-6 bg-white border border-[#ded9d1] text-center text-[#665d52]">
-                  No pending dispatch orders found in MongoDB.
+                  No pending dispatch orders available.
                 </div>
               ) : (
                 <div className="max-h-60 overflow-y-auto space-y-2 pr-1">

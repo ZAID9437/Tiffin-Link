@@ -315,10 +315,163 @@ const sendKitchenPickupOtpEmail = async ({ email, otp, orderRef, providerName, u
   }
 };
 
+// Real-time Contact Inquiry Dispatch: Notifies Concierge Admin and sends instant receipt to customer
+const sendContactInquiryEmails = async ({ name, email, phone, subject, message, ticketId }) => {
+  const emailUser = process.env.EMAIL_USER || process.env.SMTP_USER;
+  const emailPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '';
+  
+  if (!emailUser || !emailPass) {
+    console.warn('[EmailService] Missing email credentials, skipping contact email delivery');
+    return { success: false, reason: 'No email credentials' };
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: emailUser, pass: emailPass },
+    tls: { rejectUnauthorized: false }
+  });
+
+  const refCode = ticketId || `INQ-${Math.floor(1000 + Math.random() * 9000)}`;
+  const dateFormatted = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  // 1. Notification Email to TiffinLink Team / Concierge
+  const adminMailOptions = {
+    from: `"TiffinLink Concierge" <${emailUser}>`,
+    to: emailUser,
+    replyTo: email,
+    subject: `📬 [TiffinLink Contact #${refCode}] ${subject || 'New Inquiry'} from ${name}`,
+    html: `
+      <div style="font-family: 'Hanken Grotesk', Helvetica, Arial, sans-serif; background-color: #FAF7F2; color: #181512; padding: 40px; border-radius: 8px; max-width: 640px; margin: auto; border: 1px solid #DED9D1;">
+        <div style="text-align: center; border-bottom: 2px solid #4B3621; padding-bottom: 20px; margin-bottom: 25px;">
+          <h1 style="font-family: 'EB Garamond', Georgia, serif; font-size: 32px; color: #181512; margin: 0; letter-spacing: -0.5px;">TiffinLink</h1>
+          <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 3px; color: #4B3621; margin: 6px 0 0; font-weight: 700;">Customer Concierge Dispatch Desk</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 8px; padding: 24px; margin-bottom: 24px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #F0ECE4; padding-bottom: 12px;">
+            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #8C653E;">TICKET ID</span>
+            <span style="font-family: monospace; font-size: 13px; font-weight: 700; color: #181512;">#${refCode}</span>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <tr>
+              <td style="padding: 6px 0; color: #665D52; width: 120px; font-weight: 600;">Sender:</td>
+              <td style="padding: 6px 0; color: #181512; font-weight: 700;">${name}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #665D52; font-weight: 600;">Email:</td>
+              <td style="padding: 6px 0;"><a href="mailto:${email}" style="color: #4B3621; font-weight: 700; text-decoration: underline;">${email}</a></td>
+            </tr>
+            ${phone ? `
+            <tr>
+              <td style="padding: 6px 0; color: #665D52; font-weight: 600;">Phone:</td>
+              <td style="padding: 6px 0; color: #181512; font-weight: 600;">${phone}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 6px 0; color: #665D52; font-weight: 600;">Subject:</td>
+              <td style="padding: 6px 0; color: #181512; font-weight: 700;">${subject || 'General Inquiry'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #665D52; font-weight: 600;">Timestamp:</td>
+              <td style="padding: 6px 0; color: #665D52; font-size: 13px;">${dateFormatted} (IST)</td>
+            </tr>
+          </table>
+
+          <div style="margin-top: 20px; padding-top: 16px; border-top: 1px dashed #DED9D1;">
+            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #8C653E; display: block; margin-bottom: 8px;">MESSAGE</span>
+            <div style="background-color: #FAF7F2; padding: 16px; border-radius: 6px; font-size: 14px; line-height: 1.7; color: #181512; white-space: pre-wrap; border-left: 3px solid #D4AF37;">${message}</div>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+          <a href="mailto:${email}?subject=Re:%20[TiffinLink%20%23${refCode}]%20${encodeURIComponent(subject || 'Inquiry')}" style="display: inline-block; background-color: #181512; color: #FAF7F2; text-decoration: none; padding: 12px 28px; border-radius: 4px; font-weight: 700; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;">Reply to ${name}</a>
+        </div>
+
+        <p style="font-size: 11px; color: #8C653E; text-align: center; margin-top: 25px; border-top: 1px solid #E5E0D8; padding-top: 15px;">
+          TiffinLink Artisanal Dining &bull; Automated Real-Time Dispatch Concierge &bull; Confidential
+        </p>
+      </div>
+    `
+  };
+
+  // 2. Instant Confirmation Receipt to Customer
+  const customerMailOptions = {
+    from: `"TiffinLink Concierge" <${emailUser}>`,
+    to: email,
+    subject: `We have received your inquiry #${refCode} — TiffinLink Concierge`,
+    html: `
+      <div style="font-family: 'Hanken Grotesk', Helvetica, Arial, sans-serif; background-color: #FAF7F2; color: #181512; padding: 40px; border-radius: 8px; max-width: 640px; margin: auto; border: 1px solid #DED9D1;">
+        <div style="text-align: center; border-bottom: 2px solid #4B3621; padding-bottom: 20px; margin-bottom: 25px;">
+          <h1 style="font-family: 'EB Garamond', Georgia, serif; font-size: 32px; color: #181512; margin: 0; letter-spacing: -0.5px;">TiffinLink</h1>
+          <p style="font-size: 11px; text-transform: uppercase; letter-spacing: 3px; color: #4B3621; margin: 6px 0 0; font-weight: 700;">Artisanal Dining Concierge</p>
+        </div>
+
+        <p style="font-size: 16px; line-height: 1.6; margin-bottom: 12px;">Hello <strong>${name}</strong>,</p>
+        
+        <p style="font-size: 15px; line-height: 1.7; color: #4A4238; margin-bottom: 20px;">
+          Thank you for reaching out to TiffinLink. Your inquiry has been routed to our culinary concierge team under Reference <strong>#${refCode}</strong>.
+        </p>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E5E0D8; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+          <h3 style="font-family: 'EB Garamond', serif; font-size: 18px; color: #4B3621; margin: 0 0 12px 0;">Summary of Your Submission</h3>
+          <p style="font-size: 13px; color: #665D52; margin: 4px 0;"><strong>Subject:</strong> ${subject || 'Artisanal Culinary Inquiry'}</p>
+          <p style="font-size: 13px; color: #665D52; margin: 4px 0;"><strong>Date:</strong> ${dateFormatted} (IST)</p>
+          <div style="background-color: #FAF7F2; padding: 14px; border-radius: 6px; font-size: 13px; line-height: 1.6; color: #181512; margin-top: 12px; border-left: 3px solid #D4AF37;">
+            "${message}"
+          </div>
+        </div>
+
+        <div style="background-color: #F5EFEB; border-radius: 8px; padding: 16px; margin-bottom: 24px; border: 1px solid #E2D7CC;">
+          <p style="font-size: 13px; color: #4B3621; margin: 0; font-weight: 600;">
+            ⏳ Response Expectation: Our culinary advisors review and reply to every message within 2 to 4 hours during kitchen operating hours (07:00 AM – 10:00 PM IST).
+          </p>
+        </div>
+
+        <p style="font-size: 14px; color: #4A4238; line-height: 1.6;">
+          If this is an urgent matter regarding an active order in transit, you may also track your courier live directly from your TiffinLink dashboard.
+        </p>
+
+        <p style="font-size: 14px; color: #181512; margin-top: 25px; font-weight: 600;">
+          Warm regards,<br/>
+          <span style="color: #4B3621;">The TiffinLink Concierge Team</span>
+        </p>
+
+        <p style="font-size: 11px; color: #8C653E; text-align: center; margin-top: 30px; border-top: 1px solid #E5E0D8; padding-top: 15px;">
+          &copy; 2026 TiffinLink. Handcrafted meals delivered fresh from ancestral kitchens.
+        </p>
+      </div>
+    `
+  };
+
+  try {
+    const [adminResult, customerResult] = await Promise.allSettled([
+      transporter.sendMail(adminMailOptions),
+      transporter.sendMail(customerMailOptions)
+    ]);
+
+    const adminOk = adminResult.status === 'fulfilled';
+    const customerOk = customerResult.status === 'fulfilled';
+
+    console.log(`[EmailService] Contact inquiry #${refCode} emails: Admin=${adminOk ? 'OK' : 'ERR'}, Customer=${customerOk ? 'OK' : 'ERR'}`);
+
+    return {
+      success: adminOk || customerOk,
+      adminSent: adminOk,
+      customerSent: customerOk,
+      ticketId: refCode
+    };
+  } catch (err) {
+    console.error('[EmailService Error] Failed to send contact emails:', err);
+    return { success: false, error: err.message };
+  }
+};
+
 module.exports = {
   sendOtpEmail,
   sendKitchenPickupOtpEmail,
   sendDeliveryVerificationSuccessEmail,
-  sendDeliveryDocumentRejectionEmail
+  sendDeliveryDocumentRejectionEmail,
+  sendContactInquiryEmails
 };
 

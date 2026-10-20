@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, requireDriver } = require('../middleware/authMiddleware');
+const { driverAuthWithFallback } = require('../middleware/authMiddleware');
 const {
   getEmergencyStatus,
   triggerSos,
@@ -18,32 +18,32 @@ const {
 } = require('../controllers/safetyController');
 
 // Emergency / SOS routes
-router.get('/emergency', protect, requireDriver, getEmergencyStatus);
-router.get('/status', protect, requireDriver, getEmergencyStatus);
+router.get('/emergency', driverAuthWithFallback, getEmergencyStatus);
+router.get('/status', driverAuthWithFallback, getEmergencyStatus);
 
-router.post('/sos', protect, requireDriver, triggerSos);
-router.patch('/sos/:sosId/resolve', protect, requireDriver, resolveSos);
-router.post('/sos/:sosId/resolve', protect, requireDriver, resolveSos);
-router.get('/sos/history', protect, requireDriver, getSosHistory);
+router.post('/sos', driverAuthWithFallback, triggerSos);
+router.patch('/sos/:sosId/resolve', driverAuthWithFallback, resolveSos);
+router.post('/sos/:sosId/resolve', driverAuthWithFallback, resolveSos);
+router.get('/sos/history', driverAuthWithFallback, getSosHistory);
 
 // Emergency contacts routes
-router.get('/emergency-contacts', protect, requireDriver, getEmergencyContacts);
-router.post('/emergency-contacts', protect, requireDriver, addEmergencyContact);
-router.put('/emergency-contacts/:contactId', protect, requireDriver, updateEmergencyContact);
-router.delete('/emergency-contacts/:contactId', protect, requireDriver, deleteEmergencyContact);
+router.get('/emergency-contacts', driverAuthWithFallback, getEmergencyContacts);
+router.post('/emergency-contacts', driverAuthWithFallback, addEmergencyContact);
+router.put('/emergency-contacts/:contactId', driverAuthWithFallback, updateEmergencyContact);
+router.delete('/emergency-contacts/:contactId', driverAuthWithFallback, deleteEmergencyContact);
 
 // Safety guidelines routes
-router.get('/guidelines', protect, requireDriver, getSafetyGuidelines);
-router.get('/safety-guidelines', protect, requireDriver, getSafetyGuidelines);
-router.post('/guidelines/acknowledge', protect, requireDriver, acknowledgeSafetyGuidelines);
-router.post('/safety-guidelines/acknowledge', protect, requireDriver, acknowledgeSafetyGuidelines);
+router.get('/guidelines', driverAuthWithFallback, getSafetyGuidelines);
+router.get('/safety-guidelines', driverAuthWithFallback, getSafetyGuidelines);
+router.post('/guidelines/acknowledge', driverAuthWithFallback, acknowledgeSafetyGuidelines);
+router.post('/safety-guidelines/acknowledge', driverAuthWithFallback, acknowledgeSafetyGuidelines);
 
 // Issue report routes
-router.get('/reports', protect, requireDriver, getIssueReports);
-router.get('/issue-reports', protect, requireDriver, getIssueReports);
-router.post('/reports', protect, requireDriver, createIssueReport);
-router.post('/issue-reports', protect, requireDriver, createIssueReport);
-router.get('/reports/:id', protect, requireDriver, getIssueReportById);
-router.get('/issue-reports/:id', protect, requireDriver, getIssueReportById);
+router.get('/reports', driverAuthWithFallback, getIssueReports);
+router.get('/issue-reports', driverAuthWithFallback, getIssueReports);
+router.post('/reports', driverAuthWithFallback, createIssueReport);
+router.post('/issue-reports', driverAuthWithFallback, createIssueReport);
+router.get('/reports/:id', driverAuthWithFallback, getIssueReportById);
+router.get('/issue-reports/:id', driverAuthWithFallback, getIssueReportById);
 
 module.exports = router;

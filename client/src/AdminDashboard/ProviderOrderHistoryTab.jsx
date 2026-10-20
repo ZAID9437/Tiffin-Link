@@ -408,7 +408,7 @@ export default function ProviderOrderHistoryTab({ onNavigate }) {
               <button
                 onClick={fetchRealTimeData}
                 disabled={isLoading}
-                title="Refresh Real-Time Database"
+                title="Refresh Order History"
                 className="p-2.5 bg-[#efeeea] text-[#1a1a1a] border border-[#ded9d1] hover:bg-[#eae8e4] transition-colors flex items-center justify-center"
               >
                 <span className={`material-symbols-outlined text-[18px] ${isLoading ? 'animate-spin' : ''}`}>

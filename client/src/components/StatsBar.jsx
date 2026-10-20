@@ -123,11 +123,11 @@ export default function StatsBar() {
     >
       <div className="px-4 sm:px-6 md:px-margin-desktop max-w-[1440px] mx-auto relative flex flex-col items-center">
         
-        {/* Sleek Horizontal Supporting Rod */}
-        <div className="absolute top-0 left-4 right-4 h-[3px] bg-gradient-to-r from-clay-earth/20 via-clay-earth/60 to-clay-earth/20 rounded z-20 shadow-sm" />
+        {/* Solid Dark Brown Supporting Rod (matching screenshot) */}
+        <div className="absolute top-0 left-2 right-2 h-[2.5px] bg-[#4B3621] dark:bg-[#D4AF37] rounded-full z-20" />
 
         {/* Hanging Signboards Grid */}
-        <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-12 sm:gap-y-16 items-start justify-items-center pt-3">
+        <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-12 sm:gap-y-16 items-start justify-items-center">
           {STATS_ITEMS.map((item) => {
             const isHovered = hoveredId === item.id;
             
@@ -140,9 +140,9 @@ export default function StatsBar() {
                   zIndex: isHovered ? 30 : 10
                 }}
               >
-                {/* Dual hanging rings at the rod */}
-                <div className="absolute top-0 left-8 -mt-[9px] w-2.5 h-2.5 rounded-full border-2 border-clay-earth/60 bg-surface-container z-20" />
-                <div className="absolute top-0 right-8 -mt-[9px] w-2.5 h-2.5 rounded-full border-2 border-clay-earth/60 bg-surface-container z-20" />
+                {/* Dual hanging rings at the rod (hooked directly onto rod) */}
+                <div className="absolute top-0 left-8 -mt-[6px] w-3.5 h-3.5 rounded-full border-2 border-[#4B3621] dark:border-[#D4AF37] bg-[#DFD3C3] dark:bg-[#2A2016] z-20" />
+                <div className="absolute top-0 right-8 -mt-[6px] w-3.5 h-3.5 rounded-full border-2 border-[#4B3621] dark:border-[#D4AF37] bg-[#DFD3C3] dark:bg-[#2A2016] z-20" />
 
                 {/* Swaying Rig */}
                 <div
@@ -157,7 +157,7 @@ export default function StatsBar() {
                   onMouseEnter={() => setHoveredId(item.id)}
                   onMouseLeave={() => setHoveredId(null)}
                 >
-                  {/* Dual Ropes Container */}
+                  {/* Dual Ropes Container (clean solid cords matching screenshot) */}
                   <div 
                     className="relative w-28 flex justify-between transition-all duration-[1200ms] cubic-bezier(0.175, 0.885, 0.32, 1.275)" 
                     style={{ 
@@ -166,18 +166,14 @@ export default function StatsBar() {
                     }}
                   >
                     {/* Left Rope */}
-                    <div className="w-[1.5px] bg-gradient-to-b from-clay-earth to-secondary/80 h-full relative">
-                      <div className="absolute inset-0 border-l border-dashed border-sand-neutral/30" />
-                    </div>
+                    <div className="w-[2px] bg-[#4B3621] dark:bg-[#D4AF37] h-full relative rounded-full" />
                     {/* Right Rope */}
-                    <div className="w-[1.5px] bg-gradient-to-b from-clay-earth to-secondary/80 h-full relative">
-                      <div className="absolute inset-0 border-l border-dashed border-sand-neutral/30" />
-                    </div>
+                    <div className="w-[2px] bg-[#4B3621] dark:bg-[#D4AF37] h-full relative rounded-full" />
                   </div>
 
                   {/* Hanging Stat Card */}
                   <div 
-                    className="relative bg-surface-bright border border-clay-earth/20 rounded-xl p-4 sm:p-5 w-40 sm:w-44 md:w-48 shadow-md hover:shadow-xl hover:border-clay-earth/35 transition-all duration-[1200ms] cubic-bezier(0.175, 0.885, 0.32, 1.275) flex flex-col items-center text-center -mt-[1px] z-10"
+                    className="relative bg-white dark:bg-[#1E1E22] border border-[#4B3621]/20 dark:border-[#D4AF37]/30 rounded-xl p-4 sm:p-5 w-40 sm:w-44 md:w-48 shadow-[0_10px_30px_rgba(75,54,33,0.08)] hover:shadow-xl hover:border-[#4B3621]/50 transition-all duration-[1200ms] cubic-bezier(0.175, 0.885, 0.32, 1.275) flex flex-col items-center text-center -mt-[1px] z-10"
                     style={{
                       transform: isHovered ? 'scale(1.05)' : 'scale(1)',
                       opacity: hasStarted ? 1 : 0,
@@ -185,18 +181,18 @@ export default function StatsBar() {
                     }}
                   >
                     {/* Inset Border Line for menu look */}
-                    <div className="absolute inset-1.5 border border-clay-earth/10 pointer-events-none rounded-lg" />
+                    <div className="absolute inset-1.5 border border-[#4B3621]/10 dark:border-[#D4AF37]/15 pointer-events-none rounded-lg" />
                     
                     {/* Stat Icon */}
-                    <item.icon size={16} className="text-clay-earth/70 mb-2.5 z-10" />
+                    <item.icon size={18} className="text-[#8C6239] dark:text-[#D4AF37] mb-2.5 z-10" />
 
                     {/* Numerical Value */}
-                    <p className="font-display-lg text-3xl md:text-4xl text-onyx-black mb-1 z-10 font-medium">
+                    <p className="font-display-lg text-3xl md:text-4xl text-[#181512] dark:text-white mb-1.5 z-10 font-serif font-bold">
                       {item.value}
                     </p>
                     
                     {/* Description Label */}
-                    <p className="font-label-caps text-[8px] md:text-[9px] tracking-wider text-secondary z-10 whitespace-nowrap">
+                    <p className="font-label-caps text-[10px] md:text-[11px] font-bold tracking-[0.2em] text-[#8C6239] dark:text-[#F3E5AB] z-10 whitespace-nowrap uppercase">
                       {item.label}
                     </p>
                   </div>

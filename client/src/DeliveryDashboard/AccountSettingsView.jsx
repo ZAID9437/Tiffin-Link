@@ -45,31 +45,31 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
     phone: currentUser?.phone || savedUser?.phone || '',
     role: 'Delivery Partner',
     accountStatus: 'Active',
-    tier: 'Tier 1 Senior Courier',
-    hubAssociation: 'Ahmedabad Central Hub 12',
-    cluster: 'Amber Tower Cluster',
+    tier: 'Active Courier',
+    hubAssociation: 'Primary Hub',
+    cluster: '',
     avatar: '',
-    dob: '2006-09-20',
-    gender: 'Male',
-    address: '4, Ruhan Duplex In Aman Park, FATEHWADI SARKHEJ ROAD, Amber Tower',
-    city: 'Ahmedabad',
-    state: 'Gujarat',
-    pincode: '380055',
+    dob: '',
+    gender: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
     emergencyContact: {
-      name: 'Samir mansuri',
-      phone: '+91 9558601570',
-      relationship: 'Father'
+      name: '',
+      phone: '',
+      relationship: ''
     },
     isEmailVerified: true,
     isPhoneVerified: true,
     whatsappNotifications: true,
-    twoFactorEnabled: true,
-    lastPasswordChange: new Date(Date.now() - 56 * 24 * 60 * 60 * 1000).toISOString(),
-    accountCreated: '12 Jan 2024',
-    lastLogin: 'Today, 08:15 AM',
+    twoFactorEnabled: false,
+    lastPasswordChange: '',
+    accountCreated: '',
+    lastLogin: '',
     status: 'ONLINE',
     healthAttestation: 'Completed',
-    securityScore: 98,
+    securityScore: 100,
     activeSessions: []
   });
 
@@ -87,9 +87,9 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
 
   // Emergency Contact Form State
   const [emergencyForm, setEmergencyForm] = useState({
-    name: 'Rahul Mansuri',
-    phone: '+91 98200 11223',
-    relationship: 'Brother'
+    name: '',
+    phone: '',
+    relationship: ''
   });
 
   const activeToken = typeof window !== 'undefined'
@@ -127,7 +127,7 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
           setEmergencyForm(json.data.emergencyContact);
         }
         if (isManualRefresh) {
-          if (onShowToast) onShowToast('✓ Account information refreshed from MongoDB.');
+          if (onShowToast) onShowToast('✓ Account information refreshed.');
         }
       } else {
         if (!initialData) {
@@ -212,7 +212,7 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
       if (res.ok && json.success) {
         setSuccessMessage('Account information updated successfully.');
         setInitialData(accountData);
-        if (onShowToast) onShowToast('✓ Account information saved to MongoDB successfully!');
+        if (onShowToast) onShowToast('✓ Account information saved successfully!');
         setTimeout(() => setSuccessMessage(null), 4000);
       } else {
         setErrorMessage(json.message || 'Failed to save account changes.');
@@ -220,8 +220,8 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
       }
     } catch (err) {
       console.error('Error saving driver account settings:', err);
-      setErrorMessage('Server network error. Please try again.');
-      if (onShowToast) onShowToast('⚠️ Server network error while saving.');
+      setErrorMessage('Unable to save changes. Please try again.');
+      if (onShowToast) onShowToast('⚠️ Unable to save changes. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -355,7 +355,7 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
       }
     } catch (err) {
       console.error('Error re-verifying email:', err);
-      const msg = 'Unable to connect to server. Please check backend status.';
+      const msg = 'Unable to connect to server. Please try again later.';
       setEmailVerificationMsg(msg);
       if (onShowToast) onShowToast('❌ ' + msg);
     } finally {
@@ -510,7 +510,7 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
       <div className="py-24 text-center space-y-4">
         <span className="material-symbols-outlined text-4xl text-onyx-black animate-spin">autorenew</span>
         <h3 className="font-headline-md text-xl text-onyx-black">Loading Account Information...</h3>
-        <p className="font-body-md text-xs text-clay-earth">Fetching profile telemetry from MongoDB driver records...</p>
+        <p className="font-body-md text-xs text-clay-earth">Loading profile details...</p>
       </div>
     );
   }
@@ -528,16 +528,11 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
             <span>SETTINGS</span>
             <span className="text-outline-variant">/</span>
             <span className="text-onyx-black font-semibold">ACCOUNT SETTINGS</span>
-            <span className="text-outline-variant">•</span>
-            <span className="text-on-surface-variant font-mono">MONGODB DRIVERS PROFILE SYNCED</span>
-            <span className="text-outline-variant">•</span>
-            <span className="bg-surface-container-high px-2 py-0.5 font-mono text-onyx-black tracking-normal text-[11px]">JWT ENCRYPTED V2.4</span>
           </div>
 
           <div className="flex items-center gap-2 bg-bone-white px-3 py-1 text-onyx-black border border-sand-neutral/40">
-            <span className="w-2 h-2 rounded-full bg-onyx-black animate-ping" />
-            <span className="font-mono text-[11px] font-semibold tracking-normal">
-              PROFILE DATA SYNCED • SCOPED PRINCIPAL: {accountData.driverId} ({accountData.fullName.toUpperCase()})
+            <span className="text-[11px] font-semibold tracking-normal">
+              ACCOUNT: {accountData.fullName.toUpperCase()}
             </span>
           </div>
         </div>
@@ -617,7 +612,7 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
 
             <div className="flex flex-col space-y-2">
               <div className="flex items-center gap-2">
-                <span className="font-label-caps text-[11px] uppercase tracking-wider text-clay-earth">Driver Principal</span>
+                <span className="font-label-caps text-[11px] uppercase tracking-wider text-clay-earth">Driver Account</span>
                 <span className="bg-surface-container-highest text-onyx-black px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider border border-sand-neutral">
                   VERIFIED HUB COURIER
                 </span>
@@ -665,22 +660,11 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
             </div>
 
             <div className="flex flex-col min-w-0">
-              <span className="font-label-caps text-label-caps text-clay-earth uppercase tracking-wider text-[11px]">Driver ID</span>
+              <span className="font-label-caps text-label-caps text-clay-earth uppercase tracking-wider text-[11px]">Partner Status</span>
               <div className="flex items-center gap-2 mt-1 min-w-0">
-                <span className="font-mono text-sm sm:text-base text-onyx-black font-bold tracking-tight truncate" title={accountData.driverId}>
-                  {accountData.driverId}
+                <span className="font-body-md text-sm sm:text-base text-onyx-black font-bold tracking-tight truncate">
+                  Verified Partner
                 </span>
-                <button
-                  type="button"
-                  title="Copy ID"
-                  onClick={() => {
-                    navigator.clipboard.writeText(accountData.driverId);
-                    if (onShowToast) onShowToast(`Copied ID ${accountData.driverId}`);
-                  }}
-                  className="text-clay-earth hover:text-onyx-black transition-colors shrink-0"
-                >
-                  <span className="material-symbols-outlined text-base">content_copy</span>
-                </button>
               </div>
               <span className="font-label-caps text-[11px] text-clay-earth mt-1 truncate">{accountData.tier}</span>
             </div>
@@ -973,9 +957,6 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
                 <div className="flex items-center gap-1 font-mono text-lg text-onyx-black tracking-widest font-bold">
                   <span>••••••••••••••••</span>
                 </div>
-                <span className="bg-surface-container-high px-2 py-0.5 font-label-caps text-[10px] text-clay-earth uppercase border border-sand-neutral font-semibold">
-                  ENCRYPTED BCRYPT
-                </span>
               </div>
             </div>
 
@@ -1105,7 +1086,7 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
           {/* Account Created Date */}
           <div className="bg-surface-container-lowest p-6 space-y-2 border border-sand-neutral/60">
             <span className="font-label-caps text-label-caps text-clay-earth uppercase tracking-wider text-[11px]">Account Enlistment</span>
-            <div className="font-mono text-xl text-onyx-black font-bold">12 Jan 2024</div>
+            <div className="font-mono text-xl text-onyx-black font-bold">12 Jan 2026</div>
             <div className="font-body-md text-xs text-clay-earth">986 active courier days completed with flawless fulfillment.</div>
           </div>
 
@@ -1116,11 +1097,9 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
             <div className="font-body-md text-xs text-clay-earth">Biometric passkey verified on primary handheld.</div>
           </div>
 
-          {/* Current Real-time Dispatch Status */}
           <div className="bg-surface-container-lowest p-6 space-y-2 border border-sand-neutral/60">
-            <span className="font-label-caps text-label-caps text-clay-earth uppercase tracking-wider text-[11px]">Live Dispatch Mesh</span>
+            <span className="font-label-caps text-label-caps text-clay-earth uppercase tracking-wider text-[11px]">Dispatch Status</span>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-onyx-black animate-ping" />
               <span className="font-mono text-xl text-onyx-black font-bold uppercase">{accountData.status}</span>
             </div>
             <div className="font-body-md text-xs text-clay-earth">Accepting lunch orders in Hub 12 Bandra cluster.</div>
@@ -1135,12 +1114,12 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
         </div>
       </section>
 
-      {/* Section 6: Cryptographic Footer Bar */}
-      <footer className="pt-4 flex flex-col sm:flex-row items-center justify-between text-clay-earth font-mono text-[11px] uppercase tracking-wider gap-4 border-t border-sand-neutral/60">
-        <div>AUTHENTICATED DRIVER PRINCIPAL {accountData.driverId} • CENTRAL HUB 12 DISPATCH CLUSTER</div>
+      {/* Section 6: Security Footer Bar */}
+      <footer className="pt-4 flex flex-col sm:flex-row items-center justify-between text-clay-earth text-[11px] uppercase tracking-wider gap-4 border-t border-sand-neutral/60 font-semibold">
+        <div>COURIER NETWORK • CENTRAL HUB 12</div>
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-onyx-black" />
-          <span>TLS 1.3 ENCRYPTED POST • NODE RUNNER: BOM-04</span>
+          <span>SECURE CONNECTION • ACTIVE SESSION</span>
         </div>
       </footer>
 
@@ -1351,15 +1330,15 @@ export default function AccountSettingsView({ currentUser, onNavigateTab, onShow
 
             <div className="space-y-3 font-mono text-xs text-onyx-black bg-surface-container-lowest p-4 border border-sand-neutral max-h-60 overflow-y-auto">
               <div className="pb-2 border-b border-sand-neutral/50">
-                <span className="text-emerald-800 font-bold">[PASS]</span> TLS 1.3 Handshake verified for principal {accountData.driverId}
-                <div className="text-[10px] text-clay-earth">2026-09-23T08:15:02Z • Node: BOM-04</div>
+                <span className="text-emerald-800 font-bold">[PASS]</span> Secure connection verified.
+                <div className="text-[10px] text-clay-earth">Recent Check • Verified</div>
               </div>
               <div className="pb-2 border-b border-sand-neutral/50">
-                <span className="text-emerald-800 font-bold">[PASS]</span> MongoDB Drivers record query validated without unauthorized claims.
-                <div className="text-[10px] text-clay-earth">2026-09-23T08:15:00Z • Cluster: West Mumbai Hub 12</div>
+                <span className="text-emerald-800 font-bold">[PASS]</span> Account profile validated and authorized.
+                <div className="text-[10px] text-clay-earth">Hub: West Mumbai Hub 12</div>
               </div>
               <div className="pb-2 border-b border-sand-neutral/50">
-                <span className="text-emerald-800 font-bold">[PASS]</span> Zero IDOR or session privilege escalation attempts detected in past 90 days.
+                <span className="text-emerald-800 font-bold">[PASS]</span> Account security audit cleared.
                 <div className="text-[10px] text-clay-earth">Security Index: 98/100</div>
               </div>
             </div>

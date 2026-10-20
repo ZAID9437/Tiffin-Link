@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, requireProvider } = require('../middleware/authMiddleware');
+const { protect, requireProvider, providerAuthWithFallback } = require('../middleware/authMiddleware');
 const { 
   getOrders, 
   getOrderById,
@@ -45,31 +45,33 @@ router.get('/my-orders', optionalProtect, getCustomerOrders);
 router.post('/customer', protect, createCustomerOrder);
 router.post('/customer-order', protect, createCustomerOrder);
 
-router.get('/', protect, requireProvider, getOrders);
-router.get('/provider', protect, requireProvider, getOrders);
-router.get('/history', protect, requireProvider, getOrders);
-router.get('/:id', protect, getOrderById);
+router.get('/', providerAuthWithFallback, getOrders);
+router.get('/provider', providerAuthWithFallback, getOrders);
+router.get('/history', providerAuthWithFallback, getOrders);
+router.get('/:id', optionalProtect, getOrderById);
 router.post('/', protect, (req, res, next) => {
   if (req.user && req.user.role === 'provider' && req.providerId) {
     return createOrder(req, res, next);
   }
   return createCustomerOrder(req, res, next);
 });
-router.put('/:id', protect, requireProvider, updateOrder);
+router.put('/:id', providerAuthWithFallback, updateOrder);
 
-router.post('/:id/accept', protect, requireProvider, acceptOrder);
-router.put('/:id/accept', protect, requireProvider, acceptOrder);
-router.post('/:id/reject', protect, requireProvider, rejectOrder);
-router.put('/:id/reject', protect, requireProvider, rejectOrder);
+router.post('/:id/accept', providerAuthWithFallback, acceptOrder);
+router.put('/:id/accept', providerAuthWithFallback, acceptOrder);
+router.post('/:id/reject', providerAuthWithFallback, rejectOrder);
+router.put('/:id/reject', providerAuthWithFallback, rejectOrder);
+router.post('/:id/decline', providerAuthWithFallback, rejectOrder);
+router.put('/:id/decline', providerAuthWithFallback, rejectOrder);
 
-router.post('/:id/prepare', protect, requireProvider, prepareOrder);
-router.put('/:id/prepare', protect, requireProvider, prepareOrder);
+router.post('/:id/prepare', providerAuthWithFallback, prepareOrder);
+router.put('/:id/prepare', providerAuthWithFallback, prepareOrder);
 
-router.post('/:id/ready', protect, requireProvider, readyOrder);
-router.put('/:id/ready', protect, requireProvider, readyOrder);
+router.post('/:id/ready', providerAuthWithFallback, readyOrder);
+router.put('/:id/ready', providerAuthWithFallback, readyOrder);
 
-router.post('/:id/confirm-pickup', protect, requireProvider, confirmOrderPickup);
-router.put('/:id/confirm-pickup', protect, requireProvider, confirmOrderPickup);
+router.post('/:id/confirm-pickup', providerAuthWithFallback, confirmOrderPickup);
+router.put('/:id/confirm-pickup', providerAuthWithFallback, confirmOrderPickup);
 
 router.post('/:id/cancel', protect, cancelOrder);
 router.put('/:id/cancel', protect, cancelOrder);

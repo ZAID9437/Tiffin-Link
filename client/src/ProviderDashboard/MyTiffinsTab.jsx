@@ -466,6 +466,42 @@ export default function MyTiffinsTab({
     setShowItemModal(true);
   };
 
+  const handleItemPhotoUpload = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (file.size > 12 * 1024 * 1024) {
+      showToast('⚠️ Image file must be under 12MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 800;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+        setItemForm(prev => ({ ...prev, image: dataUrl }));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveItem = async (e) => {
     if (e) e.preventDefault();
     if (!selectedTiffinId) {
@@ -566,7 +602,7 @@ export default function MyTiffinsTab({
         })
       });
       if (res.success) {
-        showToast('✓ Availability schedule updated in database!');
+        showToast('✓ Availability schedule updated successfully!');
         fetchTiffins();
       } else {
         showToast('⚠️ Failed to update availability');
@@ -1746,9 +1782,17 @@ export default function MyTiffinsTab({
                         <tr key={item.id} className="hover:bg-surface-container-low/50 transition-colors">
                           <td className="py-4 px-6 font-button-text text-button-text text-primary">
                             <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded bg-surface-container flex items-center justify-center text-primary shrink-0">
-                                <span className="material-symbols-outlined text-[18px]">restaurant</span>
-                              </div>
+                              {item.image ? (
+                                <img
+                                  src={item.image}
+                                  alt={item.name}
+                                  className="w-10 h-10 rounded-lg object-cover border border-sand-neutral/60 shrink-0 shadow-xs"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+                                  <span className="material-symbols-outlined text-[18px]">restaurant</span>
+                                </div>
+                              )}
                               <div>
                                 <div className="font-semibold text-primary">{item.name}</div>
                                 {item.description && (
@@ -1831,6 +1875,58 @@ export default function MyTiffinsTab({
                     <span className="font-button-text font-bold text-primary">
                       {currentSelectedTiffin?.name || 'Selected Tiffin'}
                     </span>
+                  </div>
+
+                  {/* Dish Photo Upload */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block font-label-caps text-label-caps uppercase text-primary tracking-wider">
+                        Dish Photo
+                      </label>
+                      {itemForm.image && (
+                        <button
+                          type="button"
+                          onClick={() => setItemForm({ ...itemForm, image: '' })}
+                          className="text-[10px] text-error font-bold hover:underline cursor-pointer flex items-center gap-0.5"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">close</span>
+                          Remove Photo
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {itemForm.image ? (
+                        <div className="w-16 h-16 rounded-lg overflow-hidden border border-sand-neutral shrink-0">
+                          <img src={itemForm.image} alt="Dish Preview" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-surface-container flex flex-col items-center justify-center text-secondary shrink-0 border border-dashed border-sand-neutral">
+                          <span className="material-symbols-outlined text-[20px]">add_a_photo</span>
+                          <span className="text-[9px] uppercase font-bold mt-0.5">No Photo</span>
+                        </div>
+                      )}
+
+                      <div className="flex-1 space-y-1.5">
+                        <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-container text-primary rounded text-xs font-bold hover:bg-surface-container-high transition-colors cursor-pointer border border-sand-neutral/50">
+                          <span className="material-symbols-outlined text-[15px]">upload_file</span>
+                          <span>Upload Dish Photo</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleItemPhotoUpload}
+                          />
+                        </label>
+                        <input
+                          type="text"
+                          value={itemForm.image && !itemForm.image.startsWith('data:') ? itemForm.image : ''}
+                          onChange={e => setItemForm({ ...itemForm, image: e.target.value })}
+                          placeholder="Or image URL (https://...)"
+                          className="w-full bg-surface-container-low px-3 py-1 rounded text-xs font-mono border border-sand-neutral/50 focus:outline-none"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Item Name */}

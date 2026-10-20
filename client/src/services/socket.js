@@ -6,6 +6,7 @@ let socket = null;
 let currentJoinedDeliveryRoom = null;
 let currentProviderRoom = null;
 let currentDriverRoom = null;
+let currentCustomerRoom = null;
 
 export const initSocket = () => {
   if (socket && socket.connected) return socket;
@@ -38,6 +39,9 @@ export const initSocket = () => {
     }
     if (currentDriverRoom) {
       socket.emit('join:driver', { driverId: currentDriverRoom });
+    }
+    if (currentCustomerRoom) {
+      socket.emit('join:customer', currentCustomerRoom);
     }
   });
 
@@ -87,6 +91,13 @@ export const joinDriverRoom = (driverId) => {
   const s = getSocket();
   currentDriverRoom = driverId;
   s.emit('join:driver', { driverId });
+};
+
+export const joinCustomerRoom = (customerId, email) => {
+  if (!customerId && !email) return;
+  const s = getSocket();
+  currentCustomerRoom = { customerId: customerId ? String(customerId) : '', email: email || '' };
+  s.emit('join:customer', currentCustomerRoom);
 };
 
 export const sendDriverPresence = (isOnline) => {
@@ -190,22 +201,71 @@ export const subscribeToEarnings = (callback) => {
   };
 };
 
-export const subscribeToConnectionStatus = (onConnect, onDisconnect) => {
+export const subscribeToDriverReviews = (callback) => {
   const s = getSocket();
-  
-  const connectHandler = () => onConnect && onConnect();
-  const disconnectHandler = () => onDisconnect && onDisconnect();
+  const handler = (data) => callback && callback(data);
 
-  if (s && s.connected && onConnect) {
-    onConnect();
-  }
-
-  s.on('connect', connectHandler);
-  s.on('disconnect', disconnectHandler);
+  s.on('review:new', handler);
+  s.on('review:updated', handler);
+  s.on('review:replied', handler);
+  s.on('driver:rating:updated', handler);
+  s.on('delivery:status:updated', handler);
+  s.on('delivery:completed', handler);
+  s.on('delivery:dashboard:refresh', handler);
 
   return () => {
-    s.off('connect', connectHandler);
-    s.off('disconnect', disconnectHandler);
+    s.off('review:new', handler);
+    s.off('review:updated', handler);
+    s.off('review:replied', handler);
+    s.off('driver:rating:updated', handler);
+    s.off('delivery:status:updated', handler);
+    s.off('delivery:completed', handler);
+    s.off('delivery:dashboard:refresh', handler);
+  };
+};
+
+export const subscribeToConnectionStatus = (onConnectOrStatus, onDisconnect) => {
+  const s = getSocket();
+  const isSingleCallback = typeof onConnectOrStatus === 'function' && typeof onDisconnect !== 'function';
+
+  const connectHandler = () => {
+    if (isSingleCallback) {
+      onConnectOrStatus(true);
+    } else if (typeof onConnectOrStatus === 'function') {
+      onConnectOrStatus();
+    }
+  };
+
+  const disconnectHandler = () => {
+    if (isSingleCallback) {
+      onConnectOrStatus(false);
+    } else if (typeof onDisconnect === 'function') {
+      onDisconnect();
+    }
+  };
+
+  // Immediate state synchronization on subscription
+  const isCurrentlyConnected = Boolean(s && s.connected);
+  if (isSingleCallback) {
+    onConnectOrStatus(isCurrentlyConnected);
+  } else if (isCurrentlyConnected && typeof onConnectOrStatus === 'function') {
+    onConnectOrStatus();
+  } else if (!isCurrentlyConnected && typeof onDisconnect === 'function') {
+    onDisconnect();
+  }
+
+  if (s) {
+    s.on('connect', connectHandler);
+    s.on('disconnect', disconnectHandler);
+    s.on('connect_error', disconnectHandler);
+  }
+
+  return () => {
+    if (s) {
+      s.off('connect', connectHandler);
+      s.off('disconnect', disconnectHandler);
+      s.off('connect_error', disconnectHandler);
+    }
   };
 };
 

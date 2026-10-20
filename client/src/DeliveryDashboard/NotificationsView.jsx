@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getSocket } from '../services/socket';
 
-const API_BASE_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
+const API_BASE_URL = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:5000' : '';
 
 export default function NotificationsView({ currentUser, onNavigateTab, onShowToast }) {
   const [loading, setLoading] = useState(true);
@@ -83,7 +83,7 @@ export default function NotificationsView({ currentUser, onNavigateTab, onShowTo
       }
     } catch (err) {
       console.error('Error fetching driver notifications:', err);
-      setError(err.message);
+      setError('Unable to load notifications right now. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -235,13 +235,6 @@ export default function NotificationsView({ currentUser, onNavigateTab, onShowTo
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-clay-earth">SUPPORT / NOTIFICATIONS</span>
-            <span className="inline-block w-1 h-1 rounded-full bg-clay-earth"></span>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-sand-neutral/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-onyx-black animate-ping"></span>
-              <span className="font-label-caps text-[10px] tracking-wider uppercase text-onyx-black font-semibold">
-                MongoDB Notifications Stream Synced • Socket.IO v3.2
-              </span>
-            </div>
           </div>
           <div className="flex items-center gap-2 text-clay-earth">
             <button
@@ -281,22 +274,6 @@ export default function NotificationsView({ currentUser, onNavigateTab, onShowTo
               <span className="material-symbols-outlined text-sm">tune</span>
               <span className="font-button-text text-button-text">Notification Settings</span>
             </button>
-          </div>
-        </div>
-
-        {/* Active Driver Context Banner */}
-        <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-2.5 bg-bone-white">
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-clay-earth text-base">verified_user</span>
-            <span className="font-label-caps text-label-caps uppercase tracking-wider text-onyx-black">
-              Authenticated Driver Context: <strong className="font-semibold">{driverName} (#{driverCode})</strong>
-            </span>
-            <span className="text-clay-earth">•</span>
-            <span className="font-label-caps text-label-caps text-clay-earth uppercase">Tier 1 Senior Courier</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-onyx-black"></span>
-            <span className="font-label-caps text-label-caps text-clay-earth uppercase tracking-widest">Bandra West Hub 12</span>
           </div>
         </div>
       </section>
@@ -436,7 +413,7 @@ export default function NotificationsView({ currentUser, onNavigateTab, onShowTo
           {loading ? (
             <div className="p-12 text-center text-clay-earth bg-bone-white">
               <span className="w-6 h-6 border-2 border-onyx-black border-t-transparent rounded-full animate-spin inline-block mb-3"></span>
-              <p className="font-headline-md text-base text-onyx-black font-normal">Loading notifications from MongoDB...</p>
+              <p className="font-headline-md text-base text-onyx-black font-normal">Loading notifications...</p>
             </div>
           ) : error ? (
             <div className="p-8 bg-error/10 border border-error text-error text-center">
@@ -643,38 +620,9 @@ export default function NotificationsView({ currentUser, onNavigateTab, onShowTo
             </button>
           </div>
 
-          {/* Card 3: Mark All Read Confirmation Rule & Scope Notice */}
-          <div className="flex flex-col p-6 bg-sand-neutral/30">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="material-symbols-outlined text-base text-onyx-black">policy</span>
-              <span className="font-label-caps text-label-caps uppercase tracking-wider font-semibold text-onyx-black">Scoped Isolation Rule</span>
-            </div>
-            <p className="font-body-md text-xs text-clay-earth leading-relaxed">
-              Actions executed through this dashboard are strictly scoped to authenticated driver <strong>#{driverCode}</strong> (Bandra West Hub). Triggers zero cascading modifications on peer courier accounts or kitchen dispatcher queues.
-            </p>
-            <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-sand-neutral/60">
-              <span className="w-1.5 h-1.5 rounded-full bg-onyx-black"></span>
-              <span className="font-label-caps text-[10px] uppercase tracking-widest text-clay-earth">Zero Side-Effects Enforced</span>
-            </div>
-          </div>
-
         </aside>
 
       </div>
-
-      {/* Telemetry & Session Audit Footer */}
-      <footer className="mt-16 pt-6 border-t border-sand-neutral/60 flex flex-wrap items-center justify-between gap-4 text-clay-earth font-label-caps text-label-caps uppercase tracking-widest text-[11px]">
-        <div className="flex items-center gap-3">
-          <span>SEC-TOKEN: SHA256-{driverCode}-TLINK-SESSION-OK</span>
-          <span>•</span>
-          <span>Socket.IO Live Gateway (Port 8443)</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span>Timezone: Asia/Kolkata (IST)</span>
-          <span>•</span>
-          <span>Build: v4.12-PROD</span>
-        </div>
-      </footer>
 
     </div>
   );

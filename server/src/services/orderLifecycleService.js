@@ -39,9 +39,11 @@ const ALLOWED_STATUS_TRANSITIONS = {
   'accepted': ['preparing', 'ready', 'cancelled'],
   'preparing': ['ready', 'delivery', 'cancelled'],
   'in prep': ['ready', 'delivery', 'cancelled'],
-  'ready': ['delivery', 'cancelled'],
-  'ready_for_pickup': ['delivery', 'cancelled'],
-  'delivery': ['delivery', 'out for delivery', 'completed'],
+  'ready': ['delivery', 'at kitchen', 'cancelled'],
+  'ready_for_pickup': ['delivery', 'at kitchen', 'cancelled'],
+  'at kitchen': ['ready', 'delivery', 'out for delivery', 'completed', 'cancelled'],
+  'arrived at provider': ['ready', 'delivery', 'out for delivery', 'completed', 'cancelled'],
+  'delivery': ['delivery', 'at kitchen', 'out for delivery', 'completed'],
   'dispatched': ['out for delivery', 'completed'],
   'in transit': ['out for delivery', 'completed'],
   'out for delivery': ['completed'],
@@ -138,11 +140,19 @@ const transitionOrderStatus = async ({
   } else if (targetStatusNorm === 'ready') {
     updates.status = 'Ready';
     if (!existingOrder.readyAt) updates.readyAt = now;
-  } else if (targetStatusNorm === 'delivery') {
+    if (!existingOrder.pickupOtp || !/^\d{4}$/.test(String(existingOrder.pickupOtp).trim())) {
+      updates.pickupOtp = String(Math.floor(1000 + Math.random() * 9000));
+    }
+  } else if (targetStatusNorm === 'delivery' || targetStatusNorm === 'at kitchen' || targetStatusNorm === 'arrived at provider') {
     updates.status = 'Delivery';
-    if (!existingOrder.deliveryRequestedAt) updates.deliveryRequestedAt = now;
-    if (!existingOrder.deliveryStatus || existingOrder.deliveryStatus === 'Unassigned') {
+    if (targetStatusNorm === 'at kitchen' || targetStatusNorm === 'arrived at provider') {
+      updates.deliveryStatus = 'At Kitchen';
+    } else if (!existingOrder.deliveryStatus || existingOrder.deliveryStatus === 'Unassigned') {
       updates.deliveryStatus = 'Searching';
+    }
+    if (!existingOrder.deliveryRequestedAt) updates.deliveryRequestedAt = now;
+    if (!existingOrder.pickupOtp || !/^\d{4}$/.test(String(existingOrder.pickupOtp).trim())) {
+      updates.pickupOtp = String(Math.floor(1000 + Math.random() * 9000));
     }
   } else if (targetStatusNorm === 'completed' || targetStatusNorm === 'delivered') {
     updates.status = 'Completed';

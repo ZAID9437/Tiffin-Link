@@ -47,7 +47,7 @@ export default function PlatformOverviewTab({ data, loading, onRefresh, onNaviga
           <span className="absolute inset-0 flex items-center justify-center font-bold text-[10px] text-[#1a1a1a]">TL</span>
         </div>
         <p className="font-sans text-sm font-semibold text-[#665d52] tracking-wide">
-          Connecting to TiffinLink Database &amp; Telemetry Engine...
+          Loading TiffinLink Platform Overview...
         </p>
       </div>
     );
@@ -246,7 +246,7 @@ export default function PlatformOverviewTab({ data, loading, onRefresh, onNaviga
               </div>
             </div>
             <div className="pt-3 border-t border-[#ded9d1]/60 flex items-center justify-between font-mono text-[11px] text-[#665d52]">
-              <span>Query: <code className="text-[10px] text-[#1a1a1a]">db.users.count()</code></span>
+              <span>Audit: <span className="text-[10px] text-[#1a1a1a] font-semibold">Verified Users</span></span>
               <span className="text-[#1a1a1a] font-medium">{totalUsers > 0 ? '100% Verified' : '0 Records'}</span>
             </div>
           </div>
@@ -784,7 +784,7 @@ export default function PlatformOverviewTab({ data, loading, onRefresh, onNaviga
                   {topProviders.length === 0 ? (
                     <tr>
                       <td colSpan="5" className="py-6 text-center text-[#665d52] font-mono">
-                        No commercial providers registered in database yet.
+                        No commercial providers registered yet.
                       </td>
                     </tr>
                   ) : (
@@ -1079,7 +1079,7 @@ export default function PlatformOverviewTab({ data, loading, onRefresh, onNaviga
             <div className="divide-y divide-[#ded9d1]/60 mt-2">
               {filteredRecentOrders.length === 0 ? (
                 <div className="py-6 text-center text-[#665d52] font-mono text-xs">
-                  No orders recorded in database for this period.
+                  No orders recorded for this period.
                 </div>
               ) : (
                 filteredRecentOrders.map((ord, idx) => (
@@ -1115,8 +1115,8 @@ export default function PlatformOverviewTab({ data, loading, onRefresh, onNaviga
           </div>
 
           <div className="pt-4 border-t border-[#ded9d1] mt-4 flex items-center justify-between text-xs font-mono text-[#665d52]">
-            <span>Automatic Webhook Syncing Active</span>
-            <span className="text-[#1a1a1a]">Polling Live Database</span>
+            <span>Real-Time Updates Active</span>
+            <span className="text-[#1a1a1a]">Live System Status</span>
           </div>
         </div>
 

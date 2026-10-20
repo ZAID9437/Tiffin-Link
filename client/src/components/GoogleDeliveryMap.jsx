@@ -205,7 +205,7 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
           map: mapInstanceRef.current,
           suppressMarkers: true, // Custom HTML SVG markers used instead
           polylineOptions: {
-            strokeColor: '#0A8B5F',
+            strokeColor: '#18181B',
             strokeOpacity: 0.95,
             strokeWeight: 6
           }
@@ -530,7 +530,7 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
         {!mapLoaded && (
           <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex items-center justify-center z-10">
             <div className="text-center space-y-2">
-              <RefreshCw size={24} className="animate-spin text-[#0A8B5F]" />
+              <RefreshCw size={24} className="animate-spin text-onyx-black" />
               <p className="text-xs font-black text-[#111827]">Loading Navigation Map...</p>
             </div>
           </div>
@@ -540,15 +540,15 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
   }
 
   return (
-    <div className={`bg-[#F9FBF9] rounded-2xl border-2 border-[#0A8B5F]/40 p-4 space-y-3 relative overflow-hidden shadow-xs ${
+    <div className={`bg-[#F9FBF9] rounded-2xl border border-sand-neutral/60 p-4 space-y-3 relative overflow-hidden shadow-xs ${
       height === '100%' ? 'h-full flex flex-col justify-between' : ''
     }`}>
       
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5ECE8] pb-3 shrink-0">
         <div>
-          <div className="flex items-center gap-2 text-xs font-black text-[#0A8B5F] uppercase tracking-wider">
-            <Radio size={15} className={`text-[#0A8B5F] ${isConnected ? 'animate-pulse' : 'text-amber-500'}`} />
+          <div className="flex items-center gap-2 text-xs font-black text-onyx-black uppercase tracking-wider">
+            <Radio size={15} className={`text-onyx-black ${isConnected ? 'animate-pulse' : 'text-amber-500'}`} />
             <span>REAL GOOGLE MAPS LIVE NAVIGATION</span>
           </div>
           <div className="text-xs font-black text-[#111827] mt-0.5">
@@ -575,7 +575,7 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
           <button
             type="button"
             onClick={handleRecenter}
-            className="bg-white hover:bg-emerald-50 text-[#0A8B5F] px-2.5 py-1 rounded-xl border border-[#0A8B5F]/30 text-xs font-extrabold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+            className="bg-white hover:bg-surface-container text-onyx-black px-2.5 py-1 rounded-xl border border-sand-neutral/40 text-xs font-extrabold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
             title="Recenter Map View"
           >
             <Target size={13} />
@@ -588,7 +588,7 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
               type="button"
               onClick={() => setMapLayer('roadmap')}
               className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
-                mapLayer === 'roadmap' ? 'bg-[#0A8B5F] text-white shadow-2xs' : 'text-[#4B5563] hover:text-[#111827]'
+                mapLayer === 'roadmap' ? 'bg-onyx-black text-white shadow-2xs' : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
               🗺️ Roadmap
@@ -597,7 +597,7 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
               type="button"
               onClick={() => setMapLayer('satellite')}
               className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
-                mapLayer === 'satellite' ? 'bg-[#0A8B5F] text-white shadow-2xs' : 'text-[#4B5563] hover:text-[#111827]'
+                mapLayer === 'satellite' ? 'bg-onyx-black text-white shadow-2xs' : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
               🛰️ Satellite
@@ -609,7 +609,7 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
               href={googleNavUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-[#0A8B5F] hover:bg-[#08734e] text-white px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs"
+              className="bg-onyx-black hover:bg-neutral-800 text-bone-white px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-xs"
             >
               <ExternalLink size={13} />
               <span>OPEN IN GOOGLE MAPS</span>
@@ -621,22 +621,22 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
       {/* Main Interactive Google Map View Container */}
       <div 
         style={height === '100%' ? { flex: 1, minHeight: '380px' } : { height }} 
-        className="w-full bg-[#E5ECE8] rounded-xl border-2 border-[#0A8B5F]/30 relative overflow-hidden shadow-inner flex flex-col justify-between"
+        className="w-full bg-[#E5ECE8] rounded-xl border border-sand-neutral/40 relative overflow-hidden shadow-inner flex flex-col justify-between"
       >
         <div ref={mapRef} className="w-full h-full z-0" />
 
         {!mapLoaded && (
           <div className="absolute inset-0 bg-white/90 backdrop-blur-xs flex items-center justify-center z-10">
             <div className="text-center space-y-2">
-              <RefreshCw size={24} className="animate-spin mx-auto text-[#0A8B5F]" />
+              <RefreshCw size={24} className="animate-spin mx-auto text-onyx-black" />
               <p className="text-xs font-black text-[#111827]">Loading Google Maps Navigation...</p>
             </div>
           </div>
         )}
 
         {isCalculatingRoute && (
-          <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-3 py-1.5 rounded-lg border border-[#E5ECE8] text-[10px] font-black text-[#0A8B5F] flex items-center gap-1.5 shadow-md z-10">
-            <RefreshCw size={12} className="animate-spin text-[#0A8B5F]" />
+          <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-3 py-1.5 rounded-lg border border-[#E5ECE8] text-[10px] font-black text-onyx-black flex items-center gap-1.5 shadow-md z-10">
+            <RefreshCw size={12} className="animate-spin text-onyx-black" />
             <span>Calculating navigation route...</span>
           </div>
         )}
@@ -669,8 +669,8 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
 
         {/* Live Route Mode Indicator Badge */}
         <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-[#E5ECE8] text-[10px] font-extrabold text-[#111827] flex items-center gap-2 shadow-md z-10">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#0A8B5F] animate-ping" />
-          <span className="text-[#0A8B5F] font-black uppercase">Navigation Route:</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-onyx-black animate-ping" />
+          <span className="text-onyx-black font-black uppercase">Navigation Route:</span>
           <span>{routeMode === 'road' ? 'Road Network Route' : 'Live Tracking Line'}</span>
         </div>
       </div>
@@ -691,8 +691,8 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
             <span>Customer</span>
           </div>
           <div className="flex items-center gap-1.5 border-l border-gray-200 pl-3">
-            <span className="w-6 h-1.5 rounded bg-[#0A8B5F] shadow-2xs inline-block" />
-            <span className="text-[#0A8B5F]">Active Route Line</span>
+            <span className="w-6 h-1.5 rounded bg-onyx-black shadow-2xs inline-block" />
+            <span className="text-onyx-black">Active Route Line</span>
           </div>
         </div>
 
@@ -713,8 +713,8 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
           )}
 
           {realEta && (
-            <span className="bg-emerald-50 text-emerald-900 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs">
-              <Clock size={12} className="text-[#0A8B5F]" />
+            <span className="bg-surface-container text-onyx-black border border-sand-neutral/40 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs">
+              <Clock size={12} className="text-onyx-black" />
               <span>ETA: {realEta}</span>
             </span>
           )}
@@ -726,18 +726,7 @@ export default function GoogleDeliveryMap({ delivery, height = '24rem', activeRo
             </span>
           )}
 
-          {/* Socket Connection Status */}
-          {isConnected ? (
-            <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-300 font-extrabold flex items-center gap-1.5 shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              <span>● LIVE</span>
-            </span>
-          ) : (
-            <span className="text-[10px] text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-300 font-extrabold flex items-center gap-1.5 shadow-2xs animate-pulse">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              <span>● RECONNECTING</span>
-            </span>
-          )}
+
         </div>
       </div>
     </div>

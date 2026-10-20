@@ -14,8 +14,9 @@ import {
 } from 'lucide-react';
 
 import { apiRequest } from '../services/api';
+import { getSocket } from '../services/socket';
 
-export default function OrderHistoryTab() {
+export default function OrderHistoryTab({ currentUser }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,12 +25,47 @@ export default function OrderHistoryTab() {
   const [statusFilter, setStatusFilter] = useState('All');
 
   useEffect(() => {
-    fetchHistoryOrders();
-  }, []);
+    fetchHistoryOrders(true);
 
-  const fetchHistoryOrders = async () => {
+    const interval = setInterval(() => {
+      fetchHistoryOrders(false);
+    }, 6000);
+
+    let socket;
     try {
-      setLoading(true);
+      socket = getSocket();
+      if (socket && currentUser) {
+        const pId = currentUser?.providerId || currentUser?.id || currentUser?._id;
+        if (pId) {
+          socket.emit('join:provider', { providerId: String(pId) });
+        }
+        const handleOrderUpdate = (data) => {
+          if (data?.providerId && pId && String(data.providerId) !== String(pId)) return;
+          fetchHistoryOrders(false);
+        };
+        socket.on('order:created', handleOrderUpdate);
+        socket.on('order:updated', handleOrderUpdate);
+        socket.on('order:status:updated', handleOrderUpdate);
+        socket.on('delivery:status:updated', handleOrderUpdate);
+
+        return () => {
+          clearInterval(interval);
+          socket.off('order:created', handleOrderUpdate);
+          socket.off('order:updated', handleOrderUpdate);
+          socket.off('order:status:updated', handleOrderUpdate);
+          socket.off('delivery:status:updated', handleOrderUpdate);
+        };
+      }
+    } catch (e) {
+      console.warn('Socket notice in OrderHistoryTab:', e);
+    }
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  const fetchHistoryOrders = async (isInitial = true) => {
+    try {
+      if (isInitial) setLoading(true);
       const json = await apiRequest('/orders');
       const rawList = Array.isArray(json?.orders) ? json.orders : Array.isArray(json?.data) ? json.data : [];
       const seenIds = new Set();
@@ -157,7 +193,7 @@ export default function OrderHistoryTab() {
 
           <button 
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+            className="px-4 py-2 bg-onyx-black hover:bg-neutral-800 text-bone-white text-xs font-button-text font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
           >
             <Download size={14} />
             <span>Export CSV</span>
@@ -176,7 +212,7 @@ export default function OrderHistoryTab() {
             placeholder="Search orders, customers, or tiffins..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-[#F7FAF8] border border-[#E5ECE8] rounded-xl text-xs font-semibold text-[#1A2E26] focus:outline-none focus:border-[#0A8B5F]"
+            className="w-full pl-10 pr-4 py-2.5 bg-[#F7FAF8] border border-[#E5ECE8] rounded-xl text-xs font-semibold text-[#1A2E26] focus:outline-none focus:border-onyx-black"
           />
         </div>
 
@@ -201,7 +237,7 @@ export default function OrderHistoryTab() {
               <tbody className="divide-y divide-[#E5ECE8] text-[#1A2E26] font-medium">
                 {filteredOrders.map(order => (
                   <tr key={order._id || order.orderId} className="hover:bg-[#F9FBF9] transition-colors">
-                    <td className="py-4 px-3 font-bold text-[#0A8B5F]">{order.orderId}</td>
+                    <td className="py-4 px-3 font-bold text-onyx-black">{order.orderId}</td>
                     <td className="py-4 px-3 text-[#5B7067] font-bold">
                       {formatDateDisplay(order.createdAt || order.date)}
                     </td>

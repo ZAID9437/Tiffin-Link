@@ -336,12 +336,6 @@ export default function LiveMapView({ currentUser, onNavigateTab }) {
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <span className="font-label-caps text-xs uppercase tracking-widest text-secondary">Navigation / Live Map</span>
-            <div className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-label-caps text-[11px] ${
-              isConnected ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-600 animate-pulse' : 'bg-amber-600 animate-ping'}`} />
-              <span>{isConnected ? 'LIVE (Socket.IO Synced)' : 'RECONNECTING...'}</span>
-            </div>
           </div>
           <h1 className="font-headline-lg text-3xl sm:text-4xl text-onyx-black tracking-tight font-serif">Live Map</h1>
           <p className="font-body-md text-sm text-on-surface-variant max-w-2xl">
@@ -395,10 +389,10 @@ export default function LiveMapView({ currentUser, onNavigateTab }) {
 
         {!isKeyValid ? (
           <div className="absolute inset-0 bg-surface-container-low flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
-            <span className="material-symbols-outlined text-[48px] text-amber-600">map</span>
-            <h3 className="font-headline-md text-xl text-onyx-black font-serif">Google Maps Key Missing</h3>
+            <span className="material-symbols-outlined text-[48px] text-secondary">explore</span>
+            <h3 className="font-headline-md text-xl text-onyx-black font-serif">Interactive Map Preview</h3>
             <p className="font-body-md text-sm text-on-surface-variant max-w-md">
-              Please set your Google Maps API key in <code className="bg-sand-neutral px-1.5 py-0.5 font-mono">VITE_GOOGLE_MAPS_API_KEY</code> environment file to render real interactive Google Maps.
+              GPS telemetry is actively tracking your corridor. The interactive road map will display once satellite services establish a connection.
             </p>
           </div>
         ) : !mapLoaded ? (

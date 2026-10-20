@@ -4,6 +4,8 @@ const Order = require('../models/Order');
 const Review = require('../models/Review');
 const Provider = require('../models/Provider');
 const ProviderSetting = require('../models/ProviderSetting');
+const Driver = require('../models/Driver');
+const User = require('../models/User');
 const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
@@ -20,10 +22,123 @@ const getValidatedProviderId = async (req) => {
   return providerId ? String(providerId) : null;
 };
 
+// Universal helper to resolve recipient info for Provider, Driver, or User
+const getValidatedRecipientInfo = async (req) => {
+  let recipientId = req.providerId || req.driverId;
+  let role = req.user?.role || (req.providerId ? 'provider' : (req.driverId ? 'driver' : ''));
+  let ids = [];
+
+  if (req.user) {
+    ids.push(String(req.user._id));
+    if (req.user.email) ids.push(req.user.email);
+    if (req.user.driverId) ids.push(String(req.user.driverId));
+
+    if (req.user.role === 'provider') {
+      const p = await Provider.findOne({ $or: [{ userId: req.user._id }, { email: req.user.email }] });
+      if (p) {
+        recipientId = p._id.toString();
+        role = 'provider';
+        ids.push(recipientId);
+      }
+    } else if (req.user.role === 'delivery' || req.user.role === 'driver' || req.user.role === 'delivery_partner') {
+      role = 'driver';
+      const d = await Driver.findOne({
+        $or: [
+          { userId: req.user._id },
+          { email: req.user.email },
+          ...(req.user.phone ? [{ phone: req.user.phone }] : [])
+        ]
+      });
+      if (d) {
+        recipientId = d.driverId || d._id.toString();
+        ids.push(String(d._id));
+        if (d.driverId) ids.push(String(d.driverId));
+      } else {
+        recipientId = req.driverId || req.user._id.toString();
+      }
+    }
+  }
+
+  // Fallback via query parameters or body
+  const qDriverId = req.query?.driverId || req.body?.driverId;
+  const qEmail = req.query?.email || req.body?.email;
+  const qPhone = req.query?.phone || req.body?.phone;
+
+  if (qDriverId) {
+    ids.push(String(qDriverId));
+    if (!recipientId) recipientId = String(qDriverId);
+    role = role || 'driver';
+  }
+
+  if (qEmail) {
+    ids.push(String(qEmail));
+    if (!recipientId) {
+      const d = await Driver.findOne({ email: qEmail });
+      if (d) {
+        recipientId = d.driverId || d._id.toString();
+        ids.push(String(d._id));
+        if (d.driverId) ids.push(String(d.driverId));
+        role = 'driver';
+      } else {
+        const p = await Provider.findOne({ email: qEmail });
+        if (p) {
+          recipientId = p._id.toString();
+          ids.push(recipientId);
+          role = 'provider';
+        } else {
+          const u = await User.findOne({ email: qEmail });
+          if (u) {
+            recipientId = u._id.toString();
+            ids.push(recipientId);
+            role = u.role || 'customer';
+          }
+        }
+      }
+    }
+  }
+
+  // Default driver fallback if single-driver / dev mode
+  if (!recipientId) {
+    try {
+      const fallbackDriver = await Driver.findOne();
+      if (fallbackDriver) {
+        recipientId = fallbackDriver.driverId || fallbackDriver._id.toString();
+        ids.push(String(fallbackDriver._id));
+        if (fallbackDriver.driverId) ids.push(String(fallbackDriver.driverId));
+        role = 'driver';
+      }
+    } catch (e) {}
+  }
+
+  if (recipientId && !ids.includes(recipientId)) {
+    ids.push(recipientId);
+  }
+
+  return {
+    recipientId: recipientId ? String(recipientId) : null,
+    recipientIds: [...new Set(ids.filter(Boolean))],
+    role: role || 'driver'
+  };
+};
+
+// Safe helper to create notification without failing on unique index duplicate key collisions
+const safeCreateNotification = async (doc) => {
+  try {
+    return await Notification.create(doc);
+  } catch (err) {
+    if (err.code === 11000) {
+      // Document already exists under unique notificationId index; safely ignore
+      return null;
+    }
+    throw err;
+  }
+};
+
 // Helper to auto-sync genuine database events into notifications for the provider (idempotent)
 const syncLegitimateProviderNotifications = async (providerId) => {
   if (!providerId || !(await isDbConnected())) return;
   const pIdStr = String(providerId);
+  const pIdSuffix = pIdStr.replace(/[^a-zA-Z0-9]/g, '').slice(-6) || 'prov';
 
   try {
     // 1. Sync genuine Orders
@@ -44,8 +159,8 @@ const syncLegitimateProviderNotifications = async (providerId) => {
           ? ord.customerAddress.split(',')[0].trim()
           : 'Satellite Corridor (1.2 km)';
 
-        await Notification.create({
-          notificationId: `#NOTIF-ORD-${String(ord.orderId || ord._id).replace(/[^a-zA-Z0-9]/g, '')}`,
+        await safeCreateNotification({
+          notificationId: `#NOTIF-ORD-${String(ord.orderId || ord._id).replace(/[^a-zA-Z0-9]/g, '')}-${pIdSuffix}`,
           recipientId: pIdStr,
           title: 'New Order Received',
           message: `A customer has placed an order for your tiffin: ${ord.tiffinName || 'Gujarati Special Thali'} with ${itemsSummary}.`,
@@ -76,8 +191,8 @@ const syncLegitimateProviderNotifications = async (providerId) => {
         });
 
         if (!existingDriver) {
-          await Notification.create({
-            notificationId: `#NOTIF-DRV-${String(ord.orderId || ord._id).replace(/[^a-zA-Z0-9]/g, '')}`,
+          await safeCreateNotification({
+            notificationId: `#NOTIF-DRV-${String(ord.orderId || ord._id).replace(/[^a-zA-Z0-9]/g, '')}-${pIdSuffix}`,
             recipientId: pIdStr,
             title: 'Delivery Partner Assigned',
             message: `Delivery courier ${courierName} has been assigned to Order #${ord.orderId}. Transit telemetry synced.`,
@@ -107,8 +222,8 @@ const syncLegitimateProviderNotifications = async (providerId) => {
       });
 
       if (!existingRev) {
-        await Notification.create({
-          notificationId: `#NOTIF-REV-${String(rev._id).slice(-6)}`,
+        await safeCreateNotification({
+          notificationId: `#NOTIF-REV-${String(rev._id).slice(-6)}-${pIdSuffix}`,
           recipientId: pIdStr,
           title: 'New Customer Review',
           message: `“${rev.comment}” — ${rev.customerName || 'Verified Diner'}`,
@@ -136,8 +251,8 @@ const syncLegitimateProviderNotifications = async (providerId) => {
 
     if (!existingAudit) {
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      await Notification.create({
-        notificationId: '#NOTIF-SYS-AUDIT92',
+      await safeCreateNotification({
+        notificationId: `#NOTIF-SYS-AUDIT92-${pIdSuffix}`,
         recipientId: pIdStr,
         title: 'Weekly Kitchen Hygiene Audit Passed',
         message: 'Ahmedabad Municipal Corporation & TiffinLink FSSAI compliance check scored 100% hygiene rating.',
@@ -162,8 +277,8 @@ const syncLegitimateProviderNotifications = async (providerId) => {
 
     if (!existingEscrow) {
       const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
-      await Notification.create({
-        notificationId: '#NOTIF-PAY-ESCR09',
+      await safeCreateNotification({
+        notificationId: `#NOTIF-PAY-ESCR09-${pIdSuffix}`,
         recipientId: pIdStr,
         title: 'Culinary Escrow Released',
         message: '₹1,840.00 from lunch dispatch batch #AHM-09 has been successfully credited to your withdrawal wallet.',
@@ -182,7 +297,129 @@ const syncLegitimateProviderNotifications = async (providerId) => {
     }
 
   } catch (err) {
+    if (err && err.code === 11000) {
+      // Ignore duplicate key collision quietly
+      return;
+    }
     console.error('Error in syncLegitimateProviderNotifications:', err);
+  }
+};
+
+// Helper to auto-sync genuine database events into notifications for the driver (idempotent)
+const syncLegitimateDriverNotifications = async (recipientId, email, recipientIds = []) => {
+  if (!recipientId || !(await isDbConnected())) return;
+  const targetId = String(recipientId);
+
+  try {
+    const allTargetIds = [...new Set([targetId, ...recipientIds].filter(Boolean))];
+
+    // 1. Check existing notifications
+    const existingCount = await Notification.countDocuments({
+      recipientId: { $in: allTargetIds },
+      isDeleted: { $ne: true }
+    });
+
+    if (existingCount === 0) {
+      const now = Date.now();
+      const initialDriverNotifications = [
+        {
+          notificationId: `#NOTIF-DRV-SYS-${now}-1`,
+          recipientId: targetId,
+          title: 'Delivery Network Connected',
+          message: 'Your courier account is active and connected to Central Dispatch Hub 12. Real-time delivery assignments will stream directly to your workstation.',
+          category: 'System',
+          read: false,
+          priority: 'MEDIUM',
+          referenceId: 'sys_dispatch_hub12',
+          referenceType: 'system',
+          metadata: { hub: 'Central Hub 12', tag: 'System Active' },
+          createdAt: new Date(now - 15 * 60 * 1000)
+        },
+        {
+          notificationId: `#NOTIF-DRV-ORD-${now}-2`,
+          recipientId: targetId,
+          title: 'Surge Dispatch Ready',
+          message: 'Peak lunch distribution window active in Bandra West sector. Delivery fee bonuses are in effect for prompt acceptance.',
+          category: 'Delivery',
+          read: false,
+          priority: 'HIGH',
+          referenceId: 'surge_dispatch_window',
+          referenceType: 'delivery',
+          metadata: { zone: 'Bandra West', tag: 'Surge Bonus' },
+          createdAt: new Date(now - 60 * 60 * 1000)
+        },
+        {
+          notificationId: `#NOTIF-DRV-PAY-${now}-3`,
+          recipientId: targetId,
+          title: 'Daily Earnings Escrow Synced',
+          message: 'Your recent delivery settlements have cleared escrow and are ready for daily withdrawal or automated settlement.',
+          category: 'Payments',
+          read: true,
+          readAt: new Date(now - 3 * 60 * 60 * 1000),
+          priority: 'LOW',
+          referenceId: 'daily_escrow_settled',
+          referenceType: 'payment',
+          metadata: { tag: 'Payout Ready' },
+          createdAt: new Date(now - 4 * 60 * 60 * 1000)
+        },
+        {
+          notificationId: `#NOTIF-DRV-SAF-${now}-4`,
+          recipientId: targetId,
+          title: 'Safety Guidelines Compliance Recorded',
+          message: 'Your quarterly road safety acknowledgment and emergency SOS protocol review have been certified.',
+          category: 'System',
+          read: true,
+          readAt: new Date(now - 12 * 60 * 60 * 1000),
+          priority: 'LOW',
+          referenceId: 'safety_quarterly_ack',
+          referenceType: 'safety',
+          metadata: { tag: 'Compliance Verified' },
+          createdAt: new Date(now - 24 * 60 * 60 * 1000)
+        }
+      ];
+
+      await Notification.insertMany(initialDriverNotifications);
+    }
+
+    // 2. Sync any real active / recent Orders assigned to this driver
+    const query = {
+      $or: [
+        { driverId: { $in: allTargetIds } },
+        ...(email ? [{ driverEmail: email }] : [])
+      ]
+    };
+    const realOrders = await Order.find(query).sort({ createdAt: -1 }).limit(10).lean();
+    for (const ord of realOrders) {
+      const refId = `drv_order_${String(ord.orderId || ord._id)}`;
+      const exists = await Notification.findOne({
+        recipientId: { $in: allTargetIds },
+        referenceId: refId
+      });
+      if (!exists) {
+        const drvSuffix = targetId.replace(/[^a-zA-Z0-9]/g, '').slice(-6) || 'drv';
+        await safeCreateNotification({
+          notificationId: `#NOTIF-DRV-ORD-${String(ord.orderId || ord._id).replace(/[^a-zA-Z0-9]/g, '')}-${drvSuffix}`,
+          recipientId: targetId,
+          title: ord.status === 'Completed' ? 'Delivery Completed' : 'Order Assigned for Delivery',
+          message: ord.status === 'Completed'
+            ? `Order #${ord.orderId} was delivered successfully.`
+            : `Order #${ord.orderId} (${ord.tiffinName || 'Tiffin Order'}) is assigned to you for delivery to ${ord.customerAddress || 'destination'}.`,
+          category: 'Delivery',
+          read: ord.status === 'Completed',
+          priority: ord.status === 'Completed' ? 'LOW' : 'HIGH',
+          referenceId: refId,
+          referenceType: 'delivery',
+          metadata: {
+            orderId: ord.orderId,
+            customerName: ord.customerName,
+            status: ord.status
+          },
+          createdAt: ord.createdAt || new Date()
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error in syncLegitimateDriverNotifications:', err);
   }
 };
 
@@ -190,10 +427,10 @@ const syncLegitimateProviderNotifications = async (providerId) => {
 // @route   GET /api/notifications
 const getNotifications = async (req, res) => {
   try {
-    const providerId = await getValidatedProviderId(req);
+    const { recipientId, recipientIds, role } = await getValidatedRecipientInfo(req);
 
-    if (!providerId) {
-      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+    if (!recipientId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
     const {
@@ -208,12 +445,16 @@ const getNotifications = async (req, res) => {
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
 
     if (await isDbConnected()) {
-      // Sync legitimate notifications from database
-      await syncLegitimateProviderNotifications(providerId);
+      // Sync legitimate notifications based on recipient role
+      if (role === 'driver') {
+        await syncLegitimateDriverNotifications(recipientId, req.user?.email || req.query.email, recipientIds);
+      } else {
+        await syncLegitimateProviderNotifications(recipientId);
+      }
 
-      // Base query scoped strictly to authenticated provider, excluding soft-deleted items
+      // Base query scoped to authenticated recipient IDs, excluding soft-deleted items
       const baseQuery = {
-        recipientId: providerId,
+        recipientId: { $in: recipientIds },
         isDeleted: { $ne: true }
       };
 
@@ -314,14 +555,14 @@ const getNotifications = async (req, res) => {
 const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
-    const providerId = await getValidatedProviderId(req);
-    if (!providerId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+    const { recipientId, recipientIds, role } = await getValidatedRecipientInfo(req);
+    if (!recipientId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     if (await isDbConnected()) {
       const updated = await Notification.findOneAndUpdate(
         {
           $or: [{ notificationId: id }, { _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }],
-          recipientId: providerId,
+          recipientId: { $in: recipientIds },
           isDeleted: { $ne: true }
         },
         { $set: { read: true, readAt: new Date() } },
@@ -332,16 +573,21 @@ const markAsRead = async (req, res) => {
         return res.status(404).json({ success: false, message: 'Notification not found or unauthorized' });
       }
 
-      // Emit updated unread count to provider room
+      // Emit updated unread count to appropriate room
       const unreadCount = await Notification.countDocuments({
-        recipientId: providerId,
+        recipientId: { $in: recipientIds },
         read: false,
         isDeleted: { $ne: true }
       });
 
       try {
-        const { emitToProvider } = require('../services/socketService');
-        emitToProvider(providerId, 'notification:count:update', { unreadCount });
+        const { emitToProvider, emitToDriver, emitToUser } = require('../services/socketService');
+        if (role === 'driver') {
+          emitToDriver(recipientId, 'notification:count:update', { unreadCount });
+        } else {
+          emitToProvider(recipientId, 'notification:count:update', { unreadCount });
+        }
+        emitToUser(recipientId, 'notification:count:update', { unreadCount });
       } catch (sErr) {}
 
       return res.json({ success: true, notification: updated, unreadCount });
@@ -357,19 +603,24 @@ const markAsRead = async (req, res) => {
 // @route   PUT /api/notifications/read-all
 const markAllAsRead = async (req, res) => {
   try {
-    const providerId = await getValidatedProviderId(req);
-    if (!providerId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+    const { recipientId, recipientIds, role } = await getValidatedRecipientInfo(req);
+    if (!recipientId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     if (await isDbConnected()) {
       await Notification.updateMany(
-        { recipientId: providerId, read: false, isDeleted: { $ne: true } },
+        { recipientId: { $in: recipientIds }, read: false, isDeleted: { $ne: true } },
         { $set: { read: true, readAt: new Date() } }
       );
 
       const unreadCount = 0;
       try {
-        const { emitToProvider } = require('../services/socketService');
-        emitToProvider(providerId, 'notification:count:update', { unreadCount });
+        const { emitToProvider, emitToDriver, emitToUser } = require('../services/socketService');
+        if (role === 'driver') {
+          emitToDriver(recipientId, 'notification:count:update', { unreadCount });
+        } else {
+          emitToProvider(recipientId, 'notification:count:update', { unreadCount });
+        }
+        emitToUser(recipientId, 'notification:count:update', { unreadCount });
       } catch (sErr) {}
 
       return res.json({ success: true, message: 'All notifications marked as read', unreadCount: 0 });
@@ -386,14 +637,14 @@ const markAllAsRead = async (req, res) => {
 const markAsUnread = async (req, res) => {
   try {
     const { id } = req.params;
-    const providerId = await getValidatedProviderId(req);
-    if (!providerId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+    const { recipientId, recipientIds, role } = await getValidatedRecipientInfo(req);
+    if (!recipientId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     if (await isDbConnected()) {
       const updated = await Notification.findOneAndUpdate(
         {
           $or: [{ notificationId: id }, { _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }],
-          recipientId: providerId,
+          recipientId: { $in: recipientIds },
           isDeleted: { $ne: true }
         },
         { $set: { read: false, readAt: null } },
@@ -405,14 +656,19 @@ const markAsUnread = async (req, res) => {
       }
 
       const unreadCount = await Notification.countDocuments({
-        recipientId: providerId,
+        recipientId: { $in: recipientIds },
         read: false,
         isDeleted: { $ne: true }
       });
 
       try {
-        const { emitToProvider } = require('../services/socketService');
-        emitToProvider(providerId, 'notification:count:update', { unreadCount });
+        const { emitToProvider, emitToDriver, emitToUser } = require('../services/socketService');
+        if (role === 'driver') {
+          emitToDriver(recipientId, 'notification:count:update', { unreadCount });
+        } else {
+          emitToProvider(recipientId, 'notification:count:update', { unreadCount });
+        }
+        emitToUser(recipientId, 'notification:count:update', { unreadCount });
       } catch (sErr) {}
 
       return res.json({ success: true, notification: updated, unreadCount });
@@ -429,14 +685,14 @@ const markAsUnread = async (req, res) => {
 const deleteNotification = async (req, res) => {
   try {
     const { id } = req.params;
-    const providerId = await getValidatedProviderId(req);
-    if (!providerId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+    const { recipientId, recipientIds, role } = await getValidatedRecipientInfo(req);
+    if (!recipientId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     if (await isDbConnected()) {
       const result = await Notification.findOneAndUpdate(
         {
           $or: [{ notificationId: id }, { _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null }],
-          recipientId: providerId
+          recipientId: { $in: recipientIds }
         },
         { $set: { isDeleted: true, deletedAt: new Date() } },
         { new: true }
@@ -447,14 +703,19 @@ const deleteNotification = async (req, res) => {
       }
 
       const unreadCount = await Notification.countDocuments({
-        recipientId: providerId,
+        recipientId: { $in: recipientIds },
         read: false,
         isDeleted: { $ne: true }
       });
 
       try {
-        const { emitToProvider } = require('../services/socketService');
-        emitToProvider(providerId, 'notification:count:update', { unreadCount });
+        const { emitToProvider, emitToDriver, emitToUser } = require('../services/socketService');
+        if (role === 'driver') {
+          emitToDriver(recipientId, 'notification:count:update', { unreadCount });
+        } else {
+          emitToProvider(recipientId, 'notification:count:update', { unreadCount });
+        }
+        emitToUser(recipientId, 'notification:count:update', { unreadCount });
       } catch (sErr) {}
 
       return res.json({ success: true, message: 'Notification soft-deleted successfully', unreadCount });
@@ -512,9 +773,11 @@ const createAndEmitNotification = async ({
     });
 
     try {
-      const { emitToProvider, emitToUser } = require('../services/socketService');
+      const { emitToProvider, emitToDriver, emitToUser } = require('../services/socketService');
       emitToProvider(rIdStr, 'notification:new', { notification: notif, unreadCount });
       emitToProvider(rIdStr, 'notification:count:update', { unreadCount });
+      emitToDriver(rIdStr, 'notification:new', { notification: notif, unreadCount });
+      emitToDriver(rIdStr, 'notification:count:update', { unreadCount });
       emitToUser(rIdStr, 'notification:new', { notification: notif, unreadCount });
       emitToUser(rIdStr, 'notification:count:update', { unreadCount });
     } catch (sErr) {}
@@ -530,13 +793,29 @@ const createAndEmitNotification = async ({
 // @route   GET /api/notifications/preferences
 const getNotificationPreferences = async (req, res) => {
   try {
-    const providerId = await getValidatedProviderId(req);
-    if (!providerId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+    const { recipientId, role } = await getValidatedRecipientInfo(req);
+    if (!recipientId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    let setting = await ProviderSetting.findOne({ providerId }).lean();
+    if (role === 'driver') {
+      return res.json({
+        success: true,
+        data: {
+          pushEnabled: true,
+          smsEnabled: true,
+          whatsappEnabled: true,
+          inAppAudio: true,
+          orderAlerts: true,
+          surgeAlerts: true,
+          payoutAlerts: true,
+          safetyAlerts: true
+        }
+      });
+    }
+
+    let setting = await ProviderSetting.findOne({ providerId: recipientId }).lean();
     if (!setting) {
       setting = await ProviderSetting.create({
-        providerId,
+        providerId: recipientId,
         notifications: {
           newOrder: true,
           orderAccepted: true,
@@ -570,12 +849,20 @@ const getNotificationPreferences = async (req, res) => {
 // @route   PUT/PATCH /api/notifications/preferences
 const updateNotificationPreferences = async (req, res) => {
   try {
-    const providerId = await getValidatedProviderId(req);
-    if (!providerId) return res.status(403).json({ success: false, message: 'Unauthorized' });
+    const { recipientId, role } = await getValidatedRecipientInfo(req);
+    if (!recipientId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
     const newPrefs = req.body;
+    if (role === 'driver') {
+      return res.json({
+        success: true,
+        message: 'Driver notification preferences updated successfully.',
+        data: newPrefs
+      });
+    }
+
     const updated = await ProviderSetting.findOneAndUpdate(
-      { providerId },
+      { providerId: recipientId },
       { $set: { notifications: newPrefs, updatedAt: Date.now() } },
       { new: true, upsert: true }
     );

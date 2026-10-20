@@ -89,13 +89,13 @@ export default function OfflineTelemetryTab({ onNavigate, onOpenDriver360 }) {
   // Actions
   const handleForceFleetPing = async () => {
     setIsPingingFleet(true);
-    showToast(`Broadcasting SYN_HEARTBEAT probe to all ${stats.totalInactive || couriers.length} offline sockets...`);
+    showToast(`Checking status of ${stats.totalInactive || couriers.length} offline couriers...`);
     try {
       await fetch('http://localhost:5000/api/admin/drivers/ping-all-offline', { method: 'POST' });
       await fetchTelemetryData();
-      showToast('Heartbeat sweep completed across disconnected sockets.');
+      showToast('Status check completed across offline couriers.');
     } catch (err) {
-      showToast('Heartbeat sweep completed.');
+      showToast('Status check completed.');
     } finally {
       setIsPingingFleet(false);
     }
@@ -184,7 +184,7 @@ export default function OfflineTelemetryTab({ onNavigate, onOpenDriver360 }) {
                 Offline Telemetry & Fleet Heartbeat Surveillance
               </h1>
               <p className="text-sm text-[#665d52] leading-relaxed">
-                Real-time diagnostic surveillance of disconnected, out-of-range, and inactive couriers based on WebSocket heartbeats and PostGIS telemetry logs.
+                Real-time diagnostic monitoring of disconnected, out-of-range, and inactive couriers across the regional fleet.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
@@ -319,7 +319,7 @@ export default function OfflineTelemetryTab({ onNavigate, onOpenDriver360 }) {
                 </span>
               </div>
               <p className="text-xs text-[#eae8e4]/80 mt-0.5 font-mono">
-                Surveillance Node: <span className="text-white font-bold">BOM-WR-NODE-409</span> • Dropped Heartbeat Threshold: <span className="text-white font-bold">180s</span> • WebSocket Cluster: <span className="text-white font-bold">12/12 Nodes Up</span>
+                Regional Hub: <span className="text-white font-bold">AMD-HUB-409</span> • Inactivity Threshold: <span className="text-white font-bold">180s</span> • Fleet Gateway: <span className="text-white font-bold">All Services Active</span>
               </p>
             </div>
           </div>
@@ -328,7 +328,7 @@ export default function OfflineTelemetryTab({ onNavigate, onOpenDriver360 }) {
             <div>Active Quorum: <span className="text-white font-semibold">93.2%</span></div>
             <div className="flex items-center gap-1.5 text-white">
               <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
-              <span>Auto-polling (60s)</span>
+              <span>Auto-refresh (60s)</span>
             </div>
           </div>
         </div>
@@ -355,7 +355,7 @@ export default function OfflineTelemetryTab({ onNavigate, onOpenDriver360 }) {
                 className="w-full bg-[#f5f3ef] text-[#1a1a1a] text-xs px-3.5 py-2 border border-[#ded9d1] focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All Disconnect Causes</option>
-                <option value="TIMEOUT">Socket Heartbeat Timeout</option>
+                <option value="TIMEOUT">Connection Inactivity Timeout</option>
                 <option value="BATTERY">Low Battery (&lt;15%)</option>
                 <option value="MANUAL">Manual Go Offline</option>
                 <option value="GEOFENCE">Geofence Out of Corridor</option>
@@ -428,7 +428,7 @@ export default function OfflineTelemetryTab({ onNavigate, onOpenDriver360 }) {
                     <tr>
                       <td colSpan={7} className="py-12 text-center text-[#665d52]">
                         <span className="material-symbols-outlined text-4xl text-[#ded9d1] mb-2 block">wifi_tethering</span>
-                        <p className="font-serif text-lg text-[#1a1a1a]">No Offline Couriers In Database</p>
+                        <p className="font-serif text-lg text-[#1a1a1a]">No Offline Couriers Found</p>
                         <p className="text-xs text-[#665d52] font-mono mt-1">All active drivers are online or ready for dispatch.</p>
                       </td>
                     </tr>

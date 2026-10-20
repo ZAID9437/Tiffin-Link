@@ -99,7 +99,7 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
         setSecurityData(json.data);
         setInitialData(json.data);
         if (isManualRefresh && onShowToast) {
-          onShowToast('✓ Privacy & Security telemetry refreshed from MongoDB.');
+          onShowToast('✓ Privacy & Security settings refreshed.');
         }
       } else {
         if (!initialData) {
@@ -109,7 +109,7 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
     } catch (err) {
       console.error('Error fetching security settings:', err);
       if (isManualRefresh && onShowToast) {
-        onShowToast('⚠️ Server connection error while fetching security telemetry.');
+        onShowToast('⚠️ Unable to fetch security settings. Please check your connection.');
       }
     } finally {
       setLoading(false);
@@ -179,9 +179,9 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
 
       const json = await res.json();
       if (res.ok && json.success) {
-        setSuccessMessage('Security & Privacy preferences committed to MongoDB.');
+        setSuccessMessage('Security & Privacy preferences saved successfully.');
         setInitialData(securityData);
-        if (onShowToast) onShowToast('✓ Privacy & Security settings saved to MongoDB!');
+        if (onShowToast) onShowToast('✓ Privacy & Security settings saved successfully!');
         fetchSecurityData();
         setTimeout(() => setSuccessMessage(null), 4000);
       } else {
@@ -190,8 +190,8 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
       }
     } catch (err) {
       console.error('Error saving security settings:', err);
-      setErrorMessage('Network connection error while saving preferences.');
-      if (onShowToast) onShowToast('⚠️ Server connection error while saving.');
+      setErrorMessage('Unable to save preferences. Please check your connection.');
+      if (onShowToast) onShowToast('⚠️ Unable to save preferences. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -275,7 +275,7 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
 
         const json = await res.json();
         if (res.ok && json.success) {
-          if (onShowToast) onShowToast('✓ All other active sessions revoked. Session revocation logged in MongoDB.');
+          if (onShowToast) onShowToast('✓ All other active sessions have been revoked.');
           fetchSecurityData();
         }
       } catch (err) {
@@ -327,7 +327,7 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
       <div className="py-24 text-center space-y-4">
         <span className="material-symbols-outlined text-4xl text-onyx-black animate-spin">autorenew</span>
         <h3 className="font-headline-md text-xl text-onyx-black">Loading Security Settings...</h3>
-        <p className="font-body-md text-xs text-clay-earth">Fetching cryptographic credentials &amp; session telemetry from MongoDB...</p>
+        <p className="font-body-md text-xs text-clay-earth">Loading security preferences and session history...</p>
       </div>
     );
   }
@@ -345,16 +345,11 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
             <span>SETTINGS</span>
             <span className="text-outline-variant">/</span>
             <span className="text-onyx-black font-semibold">PRIVACY &amp; SECURITY</span>
-            <span className="text-outline-variant">•</span>
-            <span className="text-on-surface-variant font-mono">MONGODB SECURITY_LOGS SYNCED</span>
-            <span className="text-outline-variant">•</span>
-            <span className="bg-surface-container-high px-2 py-0.5 font-mono text-onyx-black tracking-normal text-[11px]">TLS 1.3 HARDENED</span>
           </div>
 
           <div className="flex items-center gap-2 bg-bone-white px-3 py-1 text-onyx-black border border-sand-neutral/40">
-            <span className="w-2 h-2 rounded-full bg-onyx-black animate-ping" />
             <span className="font-mono text-[11px] font-semibold tracking-normal">
-              COURIER: {driverName.toUpperCase()} ({displayDriverId})
+              COURIER: {driverName.toUpperCase()}
             </span>
           </div>
         </div>
@@ -376,13 +371,13 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
               className="inline-flex items-center gap-2 bg-surface-container px-4 py-2.5 text-on-surface hover:bg-surface-container-highest transition-colors font-button-text text-button-text shadow-xs border border-sand-neutral text-xs font-semibold"
             >
               <span className="material-symbols-outlined text-base">sync</span>
-              <span>Refresh Security Telemetry</span>
+              <span>Refresh Security Status</span>
             </button>
-            <div className="flex items-center gap-3 px-4 py-2 bg-onyx-black text-white">
-              <span className="material-symbols-outlined text-[20px] text-surface-bright">verified_user</span>
+            <div className="flex items-center gap-3 px-4 py-2 bg-onyx-black text-white dark:bg-[#1A1A1E] dark:border dark:border-[#383844]">
+              <span className="material-symbols-outlined text-[20px] text-surface-bright dark:text-[#E5C158]">verified_user</span>
               <div className="flex flex-col">
-                <span className="font-label-caps text-[10px] tracking-widest uppercase text-sand-neutral">Security Health</span>
-                <span className="font-button-text text-button-text leading-tight text-white font-semibold">{securityData.securityScore}/100 (Optimal)</span>
+                <span className="font-label-caps text-[10px] tracking-widest uppercase text-sand-neutral dark:text-[#DFB76C]">Security Health</span>
+                <span className="font-button-text text-button-text leading-tight text-white dark:text-[#FAF8F5] font-semibold">{securityData.securityScore}/100 (Optimal)</span>
               </div>
             </div>
           </div>
@@ -457,8 +452,8 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
             <span className="material-symbols-outlined text-[18px] text-onyx-black">vpn_key</span>
           </div>
           <div>
-            <span className="font-button-text text-button-text font-bold text-onyx-black font-mono">AES-256-GCM</span>
-            <p className="font-label-caps text-[11px] text-clay-earth mt-0.5">TLS 1.3 / Perfect Forward Secrecy</p>
+            <span className="font-button-text text-button-text font-bold text-onyx-black">Encrypted</span>
+            <p className="font-label-caps text-[11px] text-clay-earth mt-0.5">End-to-End Encrypted Channel</p>
           </div>
         </div>
       </section>
@@ -550,7 +545,7 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
                 <div className="flex flex-col pr-4">
                   <div className="flex items-center gap-2">
                     <span className="font-button-text text-sm text-onyx-black font-semibold">High-Precision GPS Telemetry Sharing</span>
-                    <span className="font-label-caps text-[9px] uppercase px-1.5 py-0.5 bg-onyx-black text-white font-bold">Strict Boundary</span>
+                    <span className="font-label-caps text-[9px] uppercase px-1.5 py-0.5 bg-onyx-black text-white dark:bg-[#E5C158] dark:text-[#111113] font-bold">Strict Boundary</span>
                   </div>
                   <p className="font-body-md text-xs text-clay-earth mt-1 leading-normal">
                     Stream sub-meter accuracy GPS telemetry strictly while an active meal container consignment is in progress. Location tracking terminates automatically upon delivery OTP cryptographic handshake.
@@ -598,7 +593,7 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
                   <h2 className="font-headline-md text-2xl leading-tight text-onyx-black font-serif">Password &amp; Credential Encryption</h2>
                 </div>
                 <p className="font-body-md text-xs text-clay-earth mt-1">
-                  Last rotated: {new Date(securityData.lastPasswordChange).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} • Cryptographic Hash: <span className="font-mono text-onyx-black">Bcrypt / Argon2id</span>
+                  Last rotated: {new Date(securityData.lastPasswordChange).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} • Password Protected
                 </p>
               </div>
               <span className="font-label-caps text-[10px] tracking-wider uppercase px-2 py-0.5 bg-surface-container text-clay-earth font-bold border border-sand-neutral">
@@ -691,7 +686,7 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
                     <span className="font-label-caps text-label-caps uppercase text-clay-earth text-[11px]">Strength Score:</span>
                     <span className="font-button-text text-xs font-bold text-onyx-black">{passStrength.label}</span>
                   </div>
-                  <span className="font-label-caps text-[10px] uppercase tracking-wider text-clay-earth">Argon2 / Bcrypt Validated</span>
+                  <span className="font-label-caps text-[10px] uppercase tracking-wider text-clay-earth">Security Standard</span>
                 </div>
 
                 {/* Progress Bar */}
@@ -821,7 +816,7 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
                 <span className="font-label-caps text-label-caps uppercase text-clay-earth tracking-widest text-[11px]">Multi-Factor Gateway</span>
                 <h2 className="font-headline-md text-2xl text-onyx-black leading-tight font-serif mt-0.5">Two-Factor Authentication</h2>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-onyx-black text-white text-[10px] font-label-caps uppercase tracking-wider font-bold">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-onyx-black text-white dark:bg-[#1A1A1E] dark:text-[#FAF8F5] dark:border dark:border-[#383844] text-[10px] font-label-caps uppercase tracking-wider font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                 {securityData.twoFactorEnabled ? 'Active' : 'Disabled'}
               </span>
@@ -954,10 +949,10 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
           <section className="p-6 bg-sand-neutral/40 flex flex-col space-y-3 border border-sand-neutral/60">
             <div className="flex items-center gap-2 text-onyx-black">
               <span className="material-symbols-outlined text-[18px]">verified</span>
-              <span className="font-label-caps text-label-caps uppercase tracking-wider font-semibold text-xs">TLS Hardware Attestation</span>
+              <span className="font-label-caps text-label-caps uppercase tracking-wider font-semibold text-xs">Device Security Verification</span>
             </div>
             <p className="font-body-md text-xs text-clay-earth leading-relaxed">
-              Device biometrics are physically verified against Google SafetyNet &amp; Android Hardware Keystore (Level 3 Attestation). Session tokens auto-expire upon 72 hours of telemetry silence.
+              Device biometrics and security credentials are verified to ensure authorized driver access. Session auto-expires after 72 hours of inactivity.
             </p>
             <div className="pt-1 flex items-center justify-between text-[11px] font-mono text-on-surface-variant border-t border-sand-neutral/40">
               <span>Client Thumbprint:</span>
@@ -976,7 +971,7 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
               <span className="material-symbols-outlined text-[20px] text-onyx-black">receipt_long</span>
               <h2 className="font-headline-md text-2xl leading-tight text-onyx-black font-serif">Recent Security &amp; Authentication Events</h2>
             </div>
-            <p className="font-body-md text-xs text-clay-earth mt-1">Immutable audit stream queried directly from MongoDB replica cluster.</p>
+            <p className="font-body-md text-xs text-clay-earth mt-1">Security audit events and active session history for your courier account.</p>
           </div>
 
           {/* Filter Ledger Pills */}
@@ -984,28 +979,28 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
             <button
               type="button"
               onClick={() => { setAuditFilter('ALL'); setAuditPage(1); }}
-              className={`px-3 py-1 font-button-text text-xs transition-colors ${auditFilter === 'ALL' ? 'bg-onyx-black text-white font-bold' : 'text-on-surface-variant hover:text-onyx-black'}`}
+              className={`px-3 py-1 font-button-text text-xs transition-colors cursor-pointer ${auditFilter === 'ALL' ? 'bg-onyx-black text-white dark:bg-[#E5C158] dark:text-[#111113] font-bold shadow-xs' : 'text-on-surface-variant hover:text-onyx-black'}`}
             >
               All Events
             </button>
             <button
               type="button"
               onClick={() => { setAuditFilter('LOGINS'); setAuditPage(1); }}
-              className={`px-3 py-1 font-button-text text-xs transition-colors ${auditFilter === 'LOGINS' ? 'bg-onyx-black text-white font-bold' : 'text-on-surface-variant hover:text-onyx-black'}`}
+              className={`px-3 py-1 font-button-text text-xs transition-colors cursor-pointer ${auditFilter === 'LOGINS' ? 'bg-onyx-black text-white dark:bg-[#E5C158] dark:text-[#111113] font-bold shadow-xs' : 'text-on-surface-variant hover:text-onyx-black'}`}
             >
               Logins
             </button>
             <button
               type="button"
               onClick={() => { setAuditFilter('ALERTS'); setAuditPage(1); }}
-              className={`px-3 py-1 font-button-text text-xs transition-colors ${auditFilter === 'ALERTS' ? 'bg-onyx-black text-white font-bold' : 'text-on-surface-variant hover:text-onyx-black'}`}
+              className={`px-3 py-1 font-button-text text-xs transition-colors cursor-pointer ${auditFilter === 'ALERTS' ? 'bg-onyx-black text-white dark:bg-[#E5C158] dark:text-[#111113] font-bold shadow-xs' : 'text-on-surface-variant hover:text-onyx-black'}`}
             >
               Security Alerts
             </button>
             <button
               type="button"
               onClick={() => { setAuditFilter('REVOCATIONS'); setAuditPage(1); }}
-              className={`px-3 py-1 font-button-text text-xs transition-colors ${auditFilter === 'REVOCATIONS' ? 'bg-onyx-black text-white font-bold' : 'text-on-surface-variant hover:text-onyx-black'}`}
+              className={`px-3 py-1 font-button-text text-xs transition-colors cursor-pointer ${auditFilter === 'REVOCATIONS' ? 'bg-onyx-black text-white dark:bg-[#E5C158] dark:text-[#111113] font-bold shadow-xs' : 'text-on-surface-variant hover:text-onyx-black'}`}
             >
               Session Revocations
             </button>
@@ -1094,11 +1089,7 @@ export default function PrivacySecurityView({ currentUser, onNavigateTab, onShow
 
       {/* Persistent Bottom Action Bar for Unsaved Adjustments */}
       <div className="sticky bottom-0 -mx-8 px-8 py-4 bg-surface/95 backdrop-blur-md z-30 shadow-md border-t border-sand-neutral">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-xs text-clay-earth">
-            <span className="material-symbols-outlined text-[18px] text-onyx-black">verified_user</span>
-            <span>State changes are cryptographically committed to <code className="font-mono text-onyx-black font-medium">security_audit</code> collection via TLS 1.3 channel.</span>
-          </div>
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-end gap-4">
           <div className="flex items-center gap-3 shrink-0">
             <button
               type="button"

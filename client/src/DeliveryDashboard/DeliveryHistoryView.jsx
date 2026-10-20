@@ -93,7 +93,7 @@ export default function DeliveryHistoryView({ currentUser, onNavigateTab }) {
       }
     } catch (err) {
       console.error('Error fetching delivery history:', err);
-      setError(err.message || 'Unable to load delivery history.');
+      setError('Unable to load delivery history right now. Please try again.');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -155,11 +155,6 @@ export default function DeliveryHistoryView({ currentUser, onNavigateTab }) {
             <span>My Deliveries</span>
             <span className="text-sand-neutral">/</span>
             <span className="text-onyx-black font-semibold">Delivery History</span>
-          </div>
-          <div className={`flex items-center gap-1.5 px-2.5 py-0.5 font-label-caps text-[11px] rounded-full ${isConnected ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
-            }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-600 animate-pulse' : 'bg-amber-600 animate-ping'}`} />
-            <span>{isConnected ? 'LIVE SYNC' : 'RECONNECTING...'}</span>
           </div>
         </div>
 
@@ -324,7 +319,7 @@ export default function DeliveryHistoryView({ currentUser, onNavigateTab }) {
       {loading ? (
         <div className="py-12 flex flex-col items-center justify-center space-y-3">
           <span className="material-symbols-outlined text-[36px] animate-spin text-onyx-black">progress_activity</span>
-          <p className="font-body-md text-sm text-secondary">Loading delivery history from MongoDB...</p>
+          <p className="font-body-md text-sm text-secondary">Loading delivery history...</p>
         </div>
       ) : error ? (
         <div className="p-8 bg-error-container/20 border border-error/30 text-center space-y-3 my-4">

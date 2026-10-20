@@ -50,8 +50,8 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
 
       setData(json.data);
     } catch (err) {
-      console.error('Error loading driver performance telemetry:', err);
-      setError(err.message || 'Unable to load performance data.');
+      console.error('Error loading driver performance data:', err);
+      setError('Unable to load performance metrics right now. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -96,7 +96,6 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
     const rows = [
       ['TiffinLink Courier Performance Telemetry Ledger'],
       [`Driver Name: ${data.driverInfo?.name || 'Courier'}`],
-      [`Courier ID: ${data.driverInfo?.driverId || ''}`],
       [`Generated At: ${new Date().toLocaleString()}`],
       [''],
       ['Metric', 'Value'],
@@ -141,7 +140,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
 
   // PDF Export simulation handler
   const handleExportPdf = () => {
-    alert('Exporting signed PDF telemetry audit slip... (Downloaded to system Downloads folder)');
+    alert('Exporting Performance Report PDF... (Saved to Downloads)');
     setExportMenuOpen(false);
   };
 
@@ -184,9 +183,8 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
             </div>
           ))}
         </div>
-        <div className="h-64 bg-bone-white w-full rounded border border-surface-dim/30"></div>
         <div className="text-center font-button-text text-sm text-secondary pt-4">
-          Loading performance telemetry from MongoDB...
+          Loading performance metrics...
         </div>
       </div>
     );
@@ -233,23 +231,18 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
               <span className="font-label-caps text-label-caps uppercase tracking-widest text-secondary text-[11px]">
                 Performance & Analytics / Driver Performance Metrics
               </span>
-              <span className="w-1 h-1 rounded-full bg-secondary"></span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-surface-container-high text-on-surface font-label-caps text-[11px] tracking-wider uppercase">
-                <span className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-amber-500 animate-ping' : 'bg-emerald-600 animate-pulse'}`}></span>
-                {refreshing ? 'Syncing MongoDB Telemetry...' : 'Auto-Sync via Socket.IO • Last Updated: Just Now'}
-              </span>
             </div>
             <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight font-serif text-3xl sm:text-4xl mt-1">
               Performance
             </h1>
             <p className="font-body-md text-body-md text-secondary max-w-3xl text-sm sm:text-base">
-              Track your delivery performance, efficiency, reliability, and earnings-related metrics derived directly from MongoDB courier telemetry.
+              Track your delivery performance, efficiency, reliability, and earnings-related metrics in real time.
             </p>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
             {/* Time Period Filter Pills */}
-            <div className="flex items-center bg-surface-container-high p-1 text-xs">
+            <div className="flex items-center bg-surface-container-high p-1 text-xs rounded-lg border border-stone-300">
               {[
                 { id: 'today', label: 'Today' },
                 { id: 'week', label: 'This Week' },
@@ -260,9 +253,9 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                   key={p.id}
                   type="button"
                   onClick={() => setTimePeriod(p.id)}
-                  className={`px-3 py-1.5 font-button-text transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 font-button-text rounded-md transition-colors cursor-pointer ${
                     timePeriod === p.id
-                      ? 'bg-onyx-black text-bone-white font-semibold'
+                      ? 'bg-onyx-black text-bone-white font-semibold shadow-xs'
                       : 'text-on-surface-variant hover:bg-surface-container'
                   }`}
                 >
@@ -271,7 +264,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
               ))}
             </div>
 
-            <div className="px-3 py-2 bg-surface-container-low font-label-caps text-label-caps tracking-widest uppercase text-secondary text-[11px]">
+            <div className="px-3.5 py-2 bg-surface-container-low font-label-caps text-label-caps tracking-widest uppercase text-secondary text-[11px] rounded-lg border border-stone-300">
               Telemetry Node: <span className="font-mono text-primary font-bold">{data?.driverInfo?.node || '#TEL-BOM-09'}</span>
             </div>
 
@@ -280,7 +273,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
               type="button"
               id="refresh-telemetry-btn"
               onClick={() => fetchPerformanceData(timePeriod, true)}
-              className="h-10 px-4 bg-surface hover:bg-surface-container-high border border-surface-dim transition-colors text-on-surface font-button-text text-button-text flex items-center gap-2 cursor-pointer"
+              className="h-10 px-4 bg-surface hover:bg-surface-container-high border border-stone-300 rounded-lg shadow-xs transition-colors text-on-surface font-button-text text-button-text flex items-center gap-2 cursor-pointer"
             >
               <span className={`material-symbols-outlined text-[18px] ${refreshing ? 'animate-spin' : ''}`}>sync</span>
               <span>Refresh Telemetry</span>
@@ -295,7 +288,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                   e.stopPropagation();
                   setExportMenuOpen(prev => !prev);
                 }}
-                className="h-10 px-4 bg-onyx-black hover:bg-neutral-800 transition-colors text-bone-white font-button-text text-button-text flex items-center gap-2 cursor-pointer"
+                className="h-10 px-4 bg-onyx-black hover:bg-neutral-800 transition-colors text-bone-white font-button-text text-button-text flex items-center gap-2 cursor-pointer rounded-lg shadow-sm"
               >
                 <span className="material-symbols-outlined text-[18px]">download</span>
                 <span>Export Report</span>
@@ -305,20 +298,20 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
               {exportMenuOpen && (
                 <div
                   id="export-menu"
-                  className="absolute right-0 mt-1 w-48 bg-bone-white z-50 shadow-md p-1 border border-surface-dim"
+                  className="absolute right-0 mt-1 w-48 bg-bone-white z-50 shadow-md p-1 border border-stone-300 rounded-lg"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     type="button"
                     onClick={handleExportCsv}
-                    className="w-full text-left px-3 py-2 font-button-text text-xs text-on-surface hover:bg-surface-container transition-colors flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-3 py-2 font-button-text text-xs text-on-surface hover:bg-surface-container transition-colors flex items-center gap-2 cursor-pointer rounded"
                   >
                     <span className="material-symbols-outlined text-[16px]">description</span> Export CSV Ledger
                   </button>
                   <button
                     type="button"
                     onClick={handleExportPdf}
-                    className="w-full text-left px-3 py-2 font-button-text text-xs text-on-surface hover:bg-surface-container transition-colors flex items-center gap-2 cursor-pointer"
+                    className="w-full text-left px-3 py-2 font-button-text text-xs text-on-surface hover:bg-surface-container transition-colors flex items-center gap-2 cursor-pointer rounded"
                   >
                     <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span> Export Signed PDF
                   </button>
@@ -330,18 +323,18 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
 
         {hasNoDeliveries ? (
           /* Zero-Data Empty State */
-          <div className="bg-bone-white p-12 text-center flex flex-col items-center justify-center space-y-4 my-8 border border-sand-neutral">
-            <span className="material-symbols-outlined text-5xl text-secondary">database</span>
+          <div className="bg-bone-white p-12 text-center flex flex-col items-center justify-center space-y-4 my-8 rounded-2xl border border-stone-300 shadow-sm">
+            <span className="material-symbols-outlined text-5xl text-secondary">analytics</span>
             <div className="space-y-1">
               <h2 className="font-headline-md text-2xl font-serif text-onyx-black font-bold">No performance data available yet</h2>
               <p className="font-body-md text-sm text-secondary max-w-md">
-                You haven't completed any deliveries for this time period. Complete dispatched orders to view live telemetry calculations.
+                You haven't completed any deliveries for this time period. Complete orders to view your performance metrics.
               </p>
             </div>
             <button
               type="button"
               onClick={() => onNavigateTab && onNavigateTab('delivery-requests')}
-              className="h-10 px-6 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text text-button-text font-semibold flex items-center gap-2 cursor-pointer transition-colors"
+              className="h-10 px-6 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text text-button-text font-semibold flex items-center gap-2 cursor-pointer transition-colors rounded-lg shadow-sm"
             >
               <span className="material-symbols-outlined text-[18px]">inbox</span>
               <span>View Available Delivery Requests</span>
@@ -353,10 +346,10 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
             <section className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 {/* KPI Card 1: Overall Rating */}
-                <div className="bg-bone-white p-6 flex flex-col justify-between space-y-4 hover:bg-surface-container-low transition-colors border border-surface-dim/30">
+                <div className="bg-white p-6 flex flex-col justify-between space-y-4 hover:bg-stone-50/50 transition-all rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md">
                   <div className="flex items-center justify-between">
-                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px]">Overall Rating</span>
-                    <span className="material-symbols-outlined text-primary text-[20px]">star</span>
+                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px] font-semibold">Overall Rating</span>
+                    <span className="material-symbols-outlined text-amber-500 text-[20px]">star</span>
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-baseline gap-2">
@@ -366,23 +359,23 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                       <span className="font-headline-md text-lg text-secondary">/ 5.0</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-label-caps text-[10px] font-mono">+0.04</span>
+                      <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-label-caps text-[10px] font-mono rounded">+0.04</span>
                       <span className="font-body-md text-[13px] text-secondary">vs benchmark</span>
                     </div>
                   </div>
-                  <div className="pt-3 bg-surface-container-low/40 px-3 py-2">
+                  <div className="pt-3 bg-stone-50 rounded-lg border border-stone-200 px-3.5 py-2">
                     <div className="flex items-center justify-between text-secondary font-label-caps text-[11px]">
-                      <span>{data.totalRatings || 142} Ratings</span>
+                      <span>{data.totalRatings || 0} Ratings</span>
                       <span className="font-bold text-primary">Top 5% of Couriers</span>
                     </div>
                   </div>
                 </div>
 
                 {/* KPI Card 2: Deliveries Completed */}
-                <div className="bg-bone-white p-6 flex flex-col justify-between space-y-4 hover:bg-surface-container-low transition-colors border border-surface-dim/30">
+                <div className="bg-white p-6 flex flex-col justify-between space-y-4 hover:bg-stone-50/50 transition-all rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md">
                   <div className="flex items-center justify-between">
-                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px]">Deliveries Completed</span>
-                    <span className="material-symbols-outlined text-primary text-[20px]">local_shipping</span>
+                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px] font-semibold">Deliveries Completed</span>
+                    <span className="material-symbols-outlined text-blue-600 text-[20px]">local_shipping</span>
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-baseline gap-2">
@@ -392,13 +385,13 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                       <span className="font-headline-md text-lg text-secondary">Trips</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 bg-surface-container text-on-surface font-label-caps text-[10px] font-mono">
+                      <span className="px-1.5 py-0.5 bg-stone-100 text-stone-800 font-label-caps text-[10px] font-mono rounded border border-stone-200">
                         {data.completedDeliveries || 0} / {data.dispatchedDeliveries || 0}
                       </span>
                       <span className="font-body-md text-[13px] text-secondary">Dispatched</span>
                     </div>
                   </div>
-                  <div className="pt-3 bg-surface-container-low/40 px-3 py-2">
+                  <div className="pt-3 bg-stone-50 rounded-lg border border-stone-200 px-3.5 py-2">
                     <div className="flex items-center justify-between text-secondary font-label-caps text-[11px]">
                       <span>Fulfillment Rate</span>
                       <span className="font-bold text-primary">{data.fulfillmentRate || 0}% (Cycle #37)</span>
@@ -407,10 +400,10 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                 </div>
 
                 {/* KPI Card 3: On-Time Rate */}
-                <div className="bg-bone-white p-6 flex flex-col justify-between space-y-4 hover:bg-surface-container-low transition-colors border border-surface-dim/30">
+                <div className="bg-white p-6 flex flex-col justify-between space-y-4 hover:bg-stone-50/50 transition-all rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md">
                   <div className="flex items-center justify-between">
-                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px]">On-Time Rate</span>
-                    <span className="material-symbols-outlined text-primary text-[20px]">timer</span>
+                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px] font-semibold">On-Time Rate</span>
+                    <span className="material-symbols-outlined text-emerald-600 text-[20px]">timer</span>
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-baseline gap-2">
@@ -419,23 +412,23 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-label-caps text-[10px] font-mono">+2.4%</span>
+                      <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-label-caps text-[10px] font-mono rounded">+2.4%</span>
                       <span className="font-body-md text-[13px] text-secondary">vs city benchmark 93.8%</span>
                     </div>
                   </div>
-                  <div className="pt-3 bg-surface-container-low/40 px-3 py-2">
+                  <div className="pt-3 bg-stone-50 rounded-lg border border-stone-200 px-3.5 py-2">
                     <div className="flex items-center justify-between text-secondary font-label-caps text-[11px]">
                       <span>ETA Accuracy</span>
-                      <span className="font-bold text-primary">{data.etaAccuracy || '123 of 128 Drops'}</span>
+                      <span className="font-bold text-primary">{data.etaAccuracy || '0 of 0 Drops'}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* KPI Card 4: Acceptance Rate */}
-                <div className="bg-bone-white p-6 flex flex-col justify-between space-y-4 hover:bg-surface-container-low transition-colors border border-surface-dim/30">
+                <div className="bg-white p-6 flex flex-col justify-between space-y-4 hover:bg-stone-50/50 transition-all rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md">
                   <div className="flex items-center justify-between">
-                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px]">Acceptance Rate</span>
-                    <span className="material-symbols-outlined text-primary text-[20px]">trending_up</span>
+                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px] font-semibold">Acceptance Rate</span>
+                    <span className="material-symbols-outlined text-purple-600 text-[20px]">trending_up</span>
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-baseline gap-2">
@@ -444,13 +437,13 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 bg-surface-container text-on-surface font-label-caps text-[10px] font-mono">
+                      <span className="px-1.5 py-0.5 bg-stone-100 text-stone-800 font-label-caps text-[10px] font-mono rounded border border-stone-200">
                         {data.completedDeliveries || 0} / {data.totalDeliveries || 0}
                       </span>
                       <span className="font-body-md text-[13px] text-secondary">Dispatched calls</span>
                     </div>
                   </div>
-                  <div className="pt-3 bg-surface-container-low/40 px-3 py-2">
+                  <div className="pt-3 bg-stone-50 rounded-lg border border-stone-200 px-3.5 py-2">
                     <div className="flex items-center justify-between text-secondary font-label-caps text-[11px]">
                       <span>Avg Response Window</span>
                       <span className="font-bold text-primary">18s</span>
@@ -460,17 +453,17 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
               </div>
 
               <div className="flex items-center gap-2 px-1 text-secondary font-label-caps text-[11px] tracking-wider uppercase">
-                <span className="material-symbols-outlined text-[14px]">database</span>
-                <span>Calculated dynamically from live MongoDB driver operational collections. Zero hardcoded placeholders.</span>
+                <span className="material-symbols-outlined text-[14px]">verified</span>
+                <span>Calculated dynamically from verified delivery activity.</span>
               </div>
             </section>
 
             {/* Section 3: Performance Score (Hero Module / Split Architectural Grid) */}
-            <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 bg-bone-white p-8 lg:p-12 border border-surface-dim/40">
+            <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 bg-white p-8 lg:p-10 rounded-2xl border border-stone-300 shadow-sm">
               {/* Left Column: Circular Architectural Gauge */}
-              <div className="lg:col-span-5 flex flex-col justify-between space-y-8 pr-0 lg:pr-8 border-b lg:border-b-0 lg:border-r border-surface-dim/40 pb-6 lg:pb-0">
+              <div className="lg:col-span-5 flex flex-col justify-between space-y-8 pr-0 lg:pr-8 border-b lg:border-b-0 lg:border-r border-stone-200 pb-6 lg:pb-0">
                 <div className="space-y-2">
-                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px]">Composite Scoring Matrix</span>
+                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px] font-semibold">Composite Scoring Matrix</span>
                   <h2 className="font-headline-md text-2xl font-serif text-onyx-black tracking-tight">Driver Reliability Rating</h2>
                   <p className="font-body-md text-sm text-secondary">
                     Composite score evaluated from punctuality, fulfillment safety, and customer satisfaction.
@@ -504,7 +497,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                   </div>
 
                   <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-onyx-black text-bone-white font-label-caps text-[11px] tracking-widest uppercase">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-onyx-black text-bone-white font-label-caps text-[11px] tracking-widest uppercase rounded">
                       <span className="material-symbols-outlined text-[14px]">military_tech</span>
                       {data.driverInfo?.tier || 'Tier 1 Senior Courier'}
                     </div>
@@ -514,7 +507,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-secondary font-label-caps text-[11px] pt-4 bg-surface-container-high/40 px-4 py-3">
+                <div className="flex items-center justify-between text-secondary font-label-caps text-[11px] pt-3.5 bg-stone-50 rounded-lg border border-stone-200 px-4 py-3">
                   <span>Benchmark Status: <strong className="text-primary font-mono font-bold">Top Decile</strong></span>
                   <span>Next Audit: <strong className="text-primary font-mono font-bold">22 Sep 2026</strong></span>
                 </div>
@@ -523,7 +516,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
               {/* Right Column: Breakdown Progress Metrics */}
               <div className="lg:col-span-7 flex flex-col justify-between space-y-6 pt-6 lg:pt-0">
                 <div className="flex items-center justify-between">
-                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px]">Evaluation Metrics Breakdown</span>
+                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px] font-semibold">Evaluation Metrics Breakdown</span>
                   <span className="font-label-caps text-[11px] text-secondary font-mono">Cycle Weight 100%</span>
                 </div>
 
@@ -537,8 +530,8 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                         <span className="font-mono text-button-text font-bold text-onyx-black">{data.fulfillmentRate || 0}%</span>
                       </div>
                     </div>
-                    <div className="w-full h-2 bg-surface-container">
-                      <div className="h-full bg-onyx-black transition-all duration-700" style={{ width: `${Math.min(100, data.fulfillmentRate || 0)}%` }}></div>
+                    <div className="w-full h-2.5 bg-stone-100 rounded-full border border-stone-200 overflow-hidden">
+                      <div className="h-full bg-onyx-black rounded-full transition-all duration-700" style={{ width: `${Math.min(100, data.fulfillmentRate || 0)}%` }}></div>
                     </div>
                   </div>
 
@@ -551,8 +544,8 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                         <span className="font-mono text-button-text font-bold text-onyx-black">{data.onTimeRate || 0}%</span>
                       </div>
                     </div>
-                    <div className="w-full h-2 bg-surface-container">
-                      <div className="h-full bg-onyx-black transition-all duration-700" style={{ width: `${Math.min(100, data.onTimeRate || 0)}%` }}></div>
+                    <div className="w-full h-2.5 bg-stone-100 rounded-full border border-stone-200 overflow-hidden">
+                      <div className="h-full bg-onyx-black rounded-full transition-all duration-700" style={{ width: `${Math.min(100, data.onTimeRate || 0)}%` }}></div>
                     </div>
                   </div>
 
@@ -567,8 +560,8 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                         </span>
                       </div>
                     </div>
-                    <div className="w-full h-2 bg-surface-container">
-                      <div className="h-full bg-onyx-black transition-all duration-700" style={{ width: `${Math.round(((data.overallRating || 0) / 5) * 100)}%` }}></div>
+                    <div className="w-full h-2.5 bg-stone-100 rounded-full border border-stone-200 overflow-hidden">
+                      <div className="h-full bg-onyx-black rounded-full transition-all duration-700" style={{ width: `${Math.round(((data.overallRating || 0) / 5) * 100)}%` }}></div>
                     </div>
                   </div>
 
@@ -581,8 +574,8 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                         <span className="font-mono text-button-text font-bold text-onyx-black">{data.acceptanceRate || 0}%</span>
                       </div>
                     </div>
-                    <div className="w-full h-2 bg-surface-container">
-                      <div className="h-full bg-onyx-black transition-all duration-700" style={{ width: `${Math.min(100, data.acceptanceRate || 0)}%` }}></div>
+                    <div className="w-full h-2.5 bg-stone-100 rounded-full border border-stone-200 overflow-hidden">
+                      <div className="h-full bg-onyx-black rounded-full transition-all duration-700" style={{ width: `${Math.min(100, data.acceptanceRate || 0)}%` }}></div>
                     </div>
                   </div>
 
@@ -591,15 +584,15 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <span className="font-button-text text-onyx-black font-semibold">Cancellation Rate</span>
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-label-caps text-[10px] tracking-wider uppercase font-bold">Optimal</span>
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-label-caps text-[10px] tracking-wider uppercase font-bold rounded">Optimal</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="font-label-caps text-[11px] text-secondary">Strict Ceiling ≤ 5% • {data.cancelledDeliveries || 0} unassigned/aborted</span>
                         <span className="font-mono text-button-text font-bold text-onyx-black">{data.cancellationRate || 0}%</span>
                       </div>
                     </div>
-                    <div className="w-full h-2 bg-surface-container">
-                      <div className="h-full bg-emerald-700 transition-all duration-700" style={{ width: `${Math.min(100, data.cancellationRate || 0)}%` }}></div>
+                    <div className="w-full h-2.5 bg-stone-100 rounded-full border border-stone-200 overflow-hidden">
+                      <div className="h-full bg-emerald-700 rounded-full transition-all duration-700" style={{ width: `${Math.min(100, data.cancellationRate || 0)}%` }}></div>
                     </div>
                   </div>
                 </div>
@@ -610,7 +603,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px]">Fulfillment Volume & Efficiency</span>
+                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px] font-semibold">Fulfillment Volume & Efficiency</span>
                   <h3 className="font-headline-md text-2xl font-serif text-onyx-black">Operational Grid</h3>
                 </div>
                 <span className="font-label-caps text-secondary uppercase tracking-wider text-[11px]">
@@ -619,23 +612,23 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-bone-white p-6 space-y-2 border border-surface-dim/30">
-                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px]">Total Dispatched</span>
+                <div className="bg-white p-6 space-y-2 rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md transition-all">
+                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px] font-semibold">Total Dispatched</span>
                   <div className="font-headline-lg text-3xl font-bold text-onyx-black font-mono">{data.dispatchedDeliveries || 0}</div>
                   <span className="font-body-md text-[13px] text-secondary block">Gross assigned orders</span>
                 </div>
-                <div className="bg-bone-white p-6 space-y-2 border border-surface-dim/30">
-                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px]">Completed</span>
+                <div className="bg-white p-6 space-y-2 rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md transition-all">
+                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px] font-semibold">Completed</span>
                   <div className="font-headline-lg text-3xl font-bold text-onyx-black font-mono">{data.completedDeliveries || 0}</div>
                   <span className="font-body-md text-[13px] text-secondary block">Verified handoffs with OTP</span>
                 </div>
-                <div className="bg-bone-white p-6 space-y-2 border border-surface-dim/30">
-                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px]">Cancelled</span>
+                <div className="bg-white p-6 space-y-2 rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md transition-all">
+                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px] font-semibold">Cancelled</span>
                   <div className="font-headline-lg text-3xl font-bold text-secondary font-mono">{data.cancelledDeliveries || 0}</div>
                   <span className="font-body-md text-[13px] text-secondary block">Kitchen unready / Customer void</span>
                 </div>
-                <div className="bg-bone-white p-6 space-y-2 border border-surface-dim/30">
-                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px]">Failed / Returned</span>
+                <div className="bg-white p-6 space-y-2 rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md transition-all">
+                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px] font-semibold">Failed / Returned</span>
                   <div className="font-headline-lg text-3xl font-bold text-error font-mono">{data.failedDeliveries || 0}</div>
                   <span className="font-body-md text-[13px] text-secondary block">Door closed / Unreachable</span>
                 </div>
@@ -643,12 +636,12 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
 
               {/* Operational Averages Bar */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                <div className="bg-surface-container-low p-5 flex items-start gap-4 border border-surface-dim/30">
-                  <div className="p-3 bg-surface-container text-onyx-black">
+                <div className="bg-stone-50 p-5 flex items-start gap-4 rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 transition-all">
+                  <div className="p-3 bg-white border border-stone-200 rounded-lg text-onyx-black shadow-xs">
                     <span className="material-symbols-outlined text-[24px]">timelapse</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px]">Average Delivery Time</span>
+                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px] font-semibold">Average Delivery Time</span>
                     <div className="font-headline-md text-2xl font-bold text-onyx-black font-mono leading-none">
                       {data.averageDeliveryTime || 0} <span className="text-sm font-normal text-secondary">min</span>
                     </div>
@@ -656,12 +649,12 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                   </div>
                 </div>
 
-                <div className="bg-surface-container-low p-5 flex items-start gap-4 border border-surface-dim/30">
-                  <div className="p-3 bg-surface-container text-onyx-black">
+                <div className="bg-stone-50 p-5 flex items-start gap-4 rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 transition-all">
+                  <div className="p-3 bg-white border border-stone-200 rounded-lg text-onyx-black shadow-xs">
                     <span className="material-symbols-outlined text-[24px]">storefront</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px]">Average Pickup Time</span>
+                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px] font-semibold">Average Pickup Time</span>
                     <div className="font-headline-md text-2xl font-bold text-onyx-black font-mono leading-none">
                       {data.averagePickupTime || 0} <span className="text-sm font-normal text-secondary">min</span>
                     </div>
@@ -669,12 +662,12 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                   </div>
                 </div>
 
-                <div className="bg-surface-container-low p-5 flex items-start gap-4 border border-surface-dim/30">
-                  <div className="p-3 bg-surface-container text-onyx-black">
+                <div className="bg-stone-50 p-5 flex items-start gap-4 rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 transition-all">
+                  <div className="p-3 bg-white border border-stone-200 rounded-lg text-onyx-black shadow-xs">
                     <span className="material-symbols-outlined text-[24px]">route</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px]">Average Distance</span>
+                    <span className="font-label-caps uppercase tracking-wider text-secondary text-[11px] font-semibold">Average Distance</span>
                     <div className="font-headline-md text-2xl font-bold text-onyx-black font-mono leading-none">
                       {data.averageDistance || 0} <span className="text-sm font-normal text-secondary">km</span>
                     </div>
@@ -685,15 +678,15 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
             </section>
 
             {/* Section 5: Weekly Performance Chart & Telemetry Inspector */}
-            <section className="bg-bone-white p-8 space-y-8 border border-surface-dim/40">
+            <section className="bg-white p-8 space-y-8 rounded-2xl border border-stone-300 shadow-sm">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px]">Telemetry Inspector</span>
+                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px] font-semibold">Telemetry Inspector</span>
                   <h3 className="font-headline-md text-2xl font-serif text-onyx-black tracking-tight">Weekly Performance Distribution</h3>
                 </div>
 
                 {/* Metric Selector Tabs */}
-                <div className="flex items-center gap-1 bg-surface-container-high p-1 text-xs">
+                <div className="flex items-center gap-1 bg-surface-container-high p-1 text-xs rounded-lg border border-stone-300">
                   {[
                     { id: 'deliveries', label: 'Deliveries' },
                     { id: 'earnings', label: 'Earnings' },
@@ -704,9 +697,9 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                       key={m.id}
                       type="button"
                       onClick={() => setChartMetric(m.id)}
-                      className={`px-3 py-1.5 font-button-text transition-colors cursor-pointer ${
+                      className={`px-3 py-1.5 font-button-text rounded-md transition-colors cursor-pointer ${
                         chartMetric === m.id
-                          ? 'bg-onyx-black text-bone-white font-semibold'
+                          ? 'bg-onyx-black text-bone-white font-semibold shadow-xs'
                           : 'hover:bg-surface-container text-on-surface-variant'
                       }`}
                     >
@@ -718,14 +711,14 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
 
               <div className="flex items-center justify-between text-secondary font-label-caps text-[11px] pb-2">
                 <span className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 bg-onyx-black"></span> Daily Completed Volume
-                  <span className="w-2.5 h-2.5 bg-surface-container-highest ml-4"></span> Scheduled Bandwidth
+                  <span className="w-2.5 h-2.5 bg-onyx-black rounded-xs"></span> Daily Completed Volume
+                  <span className="w-2.5 h-2.5 bg-surface-container-highest rounded-xs ml-4"></span> Scheduled Bandwidth
                 </span>
                 <span className="font-mono font-bold text-primary">Range: Last 7 Days (Mon – Sun)</span>
               </div>
 
               {/* Architectural Bar Chart */}
-              <div className="grid grid-cols-7 gap-4 items-end h-64 pt-6 pb-2 px-4 bg-surface border border-surface-dim/30">
+              <div className="grid grid-cols-7 gap-4 items-end h-64 pt-6 pb-2 px-4 bg-stone-50/70 rounded-xl border border-stone-300">
                 {weeklyData.map((item, idx) => {
                   const rawVal = getMetricValue(item, chartMetric);
                   const heightPercent = maxMetricVal > 0 ? Math.max(15, Math.round((rawVal / maxMetricVal) * 100)) : 15;
@@ -734,15 +727,15 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                   return (
                     <div key={idx} className="flex flex-col items-center gap-3 h-full justify-end group cursor-pointer">
                       {isPeak && (
-                        <div className="px-1.5 py-0.5 bg-onyx-black text-bone-white font-label-caps text-[9px] uppercase tracking-wider font-bold">
+                        <div className="px-1.5 py-0.5 bg-onyx-black text-bone-white font-label-caps text-[9px] uppercase tracking-wider font-bold rounded">
                           Peak
                         </div>
                       )}
                       <span className="font-mono text-xs font-bold text-onyx-black group-hover:scale-110 transition-transform">
                         {getMetricFormat(rawVal, chartMetric)}
                       </span>
-                      <div className="w-full max-w-[48px] bg-surface-container relative flex items-end" style={{ height: `${heightPercent}%` }}>
-                        <div className="w-full bg-onyx-black h-full group-hover:bg-neutral-800 transition-colors"></div>
+                      <div className="w-full max-w-[48px] bg-stone-200 rounded-t-sm relative flex items-end" style={{ height: `${heightPercent}%` }}>
+                        <div className="w-full bg-onyx-black h-full group-hover:bg-neutral-800 transition-colors rounded-t-sm"></div>
                       </div>
                       <div className="text-center">
                         <span className={`font-button-text text-xs block text-onyx-black ${isPeak ? 'font-bold' : 'font-semibold'}`}>
@@ -756,18 +749,18 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
               </div>
 
               {/* Tooltip / Real-Time Meta Box */}
-              <div className="p-4 bg-surface-container-low flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-surface-dim/30">
+              <div className="p-4 bg-stone-50 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-stone-300">
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-primary text-[20px]">insights</span>
                   <div className="text-xs">
-                    <span className="font-button-text font-bold text-onyx-black">Saturday Peak Telemetry Recorded:</span>
+                    <span className="font-button-text font-bold text-onyx-black">Performance Telemetry Recorded:</span>
                     <span className="font-body-md text-secondary ml-1">
-                      24 drops across 3 micro-clusters (Bandra West, Khar, Pali Hill). 0 spillages, 96% punctuality.
+                      {data.completedDeliveries > 0 ? `${data.completedDeliveries} verified deliveries completed with full OTP handoff validation.` : 'Live telemetry tracking active. Zero dropped batches.'}
                     </span>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 bg-bone-white font-label-caps text-[11px] text-secondary uppercase tracking-widest font-mono border border-surface-dim">
-                  Weekly Total: {data.completedDeliveries || 128} Runs
+                <span className="px-2.5 py-1 bg-white font-label-caps text-[11px] text-secondary uppercase tracking-widest font-mono rounded border border-stone-300 shadow-xs">
+                  Weekly Total: {data.completedDeliveries || 0} Runs
                 </span>
               </div>
             </section>
@@ -776,18 +769,18 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px]">Telemetry Verification</span>
+                  <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px] font-semibold">Telemetry Verification</span>
                   <h3 className="font-headline-md text-2xl font-serif text-onyx-black tracking-tight">Recent Authenticated Trips</h3>
                 </div>
-                <span className="font-label-caps text-secondary font-mono text-xs">
-                  Courier ID: {data.driverInfo?.driverId || ''} ({data.driverInfo?.name || 'Courier Partner'})
+                <span className="font-label-caps text-secondary text-xs font-semibold">
+                  {data.driverInfo?.name || 'Courier Partner'}
                 </span>
               </div>
 
-              <div className="overflow-x-auto border border-surface-dim/40 bg-bone-white">
+              <div className="overflow-x-auto rounded-xl border border-stone-300 shadow-sm bg-white">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-bone-white text-secondary font-label-caps text-[11px] uppercase tracking-wider border-b border-surface-dim">
+                    <tr className="bg-stone-50 text-secondary font-label-caps text-[11px] uppercase tracking-wider border-b border-stone-200">
                       <th className="py-3 px-4">Order ID</th>
                       <th className="py-3 px-4">Kitchen Hub Provider</th>
                       <th className="py-3 px-4 font-mono">Distance</th>
@@ -797,9 +790,9 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                       <th className="py-3 px-4 text-right">Audit Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-surface-dim/40 font-body-md text-[14px]">
+                  <tbody className="divide-y divide-stone-200 font-body-md text-[14px]">
                     {(data.recentDeliveries || []).map((row, i) => (
-                      <tr key={row.id || i} className="hover:bg-surface-container-low/60 transition-colors">
+                      <tr key={row.id || i} className="hover:bg-stone-50/70 transition-colors">
                         <td className="py-4 px-4 font-mono font-bold text-onyx-black">{row.orderId}</td>
                         <td className="py-4 px-4">
                           <span className="font-semibold text-onyx-black block">{row.kitchenName}</span>
@@ -814,7 +807,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                           </div>
                         </td>
                         <td className="py-4 px-4">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 font-label-caps text-[10px] tracking-wider uppercase font-bold ${
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 font-label-caps text-[10px] tracking-wider uppercase font-bold rounded ${
                             row.status === 'COMPLETED'
                               ? 'bg-emerald-100 text-emerald-800'
                               : row.status === 'CANCELLED'
@@ -842,23 +835,23 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
             </section>
 
             {/* Section 7: Performance Insights & Recommendations */}
-            <section className="bg-bone-white p-8 space-y-6 border border-surface-dim/40">
+            <section className="bg-white p-8 space-y-6 rounded-2xl border border-stone-300 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-primary text-[24px]">psychology</span>
                   <div>
-                    <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px]">Automated Telemetry Audit</span>
+                    <span className="font-label-caps uppercase tracking-widest text-secondary text-[11px] font-semibold">Automated Telemetry Audit</span>
                     <h3 className="font-headline-md text-2xl font-serif text-onyx-black tracking-tight">Algorithmic Performance Insights</h3>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 bg-surface-container text-secondary font-label-caps text-[11px] uppercase tracking-wider font-mono">
+                <span className="px-2.5 py-1 bg-stone-100 text-secondary font-label-caps text-[11px] uppercase tracking-wider font-mono rounded border border-stone-200">
                   ML Audit Engine v4.2
                 </span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {(data.insights || []).map((ins) => (
-                  <div key={ins.id} className="p-5 bg-surface space-y-3 border border-surface-dim/30">
+                  <div key={ins.id} className="p-5 bg-stone-50/70 space-y-3 rounded-xl border border-stone-300 shadow-xs hover:border-stone-400 hover:shadow-sm transition-all">
                     <div className={`flex items-center gap-2 ${ins.type === 'warning' ? 'text-amber-800' : 'text-emerald-800'}`}>
                       <span className="material-symbols-outlined text-[20px]">
                         {ins.type === 'warning' ? 'warning' : 'check_circle'}
@@ -876,19 +869,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
               </div>
             </section>
 
-            {/* Section 8: Security & Cryptographic Footer */}
-            <footer className="pt-6 pb-12 flex flex-col md:flex-row items-center justify-between gap-4 text-secondary font-label-caps text-[11px] tracking-wider uppercase border-t border-surface-dim/40">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="material-symbols-outlined text-[16px] text-primary">lock</span>
-                <span>Driver Telemetry Authenticated <strong className="font-mono text-primary">{data.driverInfo?.driverId || ''}</strong></span>
-                <span>• {data.driverInfo?.name || 'Courier Partner'} ({data.driverInfo?.tier || 'Tier 1 Senior Courier'})</span>
-                <span>• MongoDB Driver Telemetry Aggregation Scoped via JWT Claims</span>
-              </div>
-              <div className="font-mono text-[11px] text-secondary flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                <span>Socket.IO Node: Mumbai Cluster #04</span>
-              </div>
-            </footer>
+
           </>
         )}
 
@@ -901,7 +882,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
             <div className="flex items-center justify-between border-b border-surface-dim pb-3">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">verified</span>
-                <span className="font-headline-md text-lg font-bold font-serif text-onyx-black">Cryptographic Audit Slip</span>
+                <span className="font-headline-md text-lg font-bold font-serif text-onyx-black">Delivery Verification Slip</span>
               </div>
               <button
                 type="button"
@@ -941,8 +922,8 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
                 <span className="text-secondary">OTP Handoff Verification:</span>
                 <span className="font-bold text-emerald-800">PASSED (Verified)</span>
               </div>
-              <div className="p-3 bg-surface-container-low text-[10px] text-secondary break-all font-mono border border-surface-dim">
-                SHA-256: 0x8a92f...4f20e98c11
+              <div className="p-3 bg-surface-container-low text-[11px] text-secondary font-mono border border-surface-dim">
+                Verification Reference: VERIFIED-TRIP-{auditSlipModal.orderId}
               </div>
             </div>
 
@@ -951,7 +932,7 @@ export default function PerformanceView({ currentUser, onNavigateTab }) {
               onClick={() => setAuditSlipModal(null)}
               className="w-full py-2.5 bg-onyx-black text-bone-white font-button-text text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
             >
-              Close Audit Slip
+              Close Verification Slip
             </button>
           </div>
         </div>

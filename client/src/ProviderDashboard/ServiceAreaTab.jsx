@@ -198,7 +198,7 @@ export default function ServiceAreaTab() {
       
       {/* Toast Notification Banner */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-[9999] bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
+        <div className="fixed bottom-6 right-6 z-[9999] bg-onyx-black text-bone-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
           <CheckCircle2 size={17} />
           <span className="font-extrabold">{toastMsg}</span>
         </div>
@@ -212,32 +212,28 @@ export default function ServiceAreaTab() {
             <span>/</span>
             <span>Operations</span>
             <span>/</span>
-            <span className="text-[#0A8B5F] font-extrabold">Service Area</span>
+            <span className="text-onyx-black font-extrabold">Service Area</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black text-[#111827] tracking-tight">Service Area</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-[#0A8B5F] border border-emerald-200 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              LIVE
-            </span>
+            <h1 className="text-2xl font-black text-onyx-black tracking-tight font-headline-lg">Service Area</h1>
           </div>
-          <p className="text-xs text-[#6B7280] font-medium mt-1">Manage where your kitchen delivers.</p>
+          <p className="text-xs text-secondary font-medium mt-1">Manage where your kitchen delivers and service zones.</p>
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button 
             onClick={fetchServiceAreaFromDb}
-            className="px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+            className="px-3.5 py-2.5 bg-surface-container border border-sand-neutral/40 hover:bg-surface-container-highest text-onyx-black font-button-text font-bold text-xs rounded-xl transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
           >
-            <RotateCw size={14} className="text-[#0A8B5F]" />
+            <RotateCw size={14} className="text-onyx-black" />
             <span>Refresh</span>
           </button>
 
           <button 
             onClick={handleSaveSettings}
             disabled={saving}
-            className="px-5 py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+            className="px-5 py-2.5 bg-onyx-black hover:bg-neutral-800 disabled:opacity-50 text-bone-white font-button-text font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer"
           >
             <Save size={15} />
             <span>{saving ? 'Saving...' : 'Save Changes'}</span>
@@ -257,7 +253,7 @@ export default function ServiceAreaTab() {
           <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8]">
             <div className="text-xs font-bold text-[#6B7280] mb-2 uppercase">Active Areas</div>
             <div className="text-4xl font-black text-[#111827]">{summary.activeAreasCount || areasList.length}</div>
-            <p className="text-[10px] text-[#0A8B5F] font-extrabold mt-1">● LIVE Coverage Zones</p>
+            <p className="text-[10px] text-onyx-black font-extrabold mt-1">● LIVE Coverage Zones</p>
           </div>
 
           {/* Card 2: Customers */}
@@ -270,8 +266,8 @@ export default function ServiceAreaTab() {
           {/* Card 3: Deliveries */}
           <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8]">
             <div className="text-xs font-bold text-[#6B7280] mb-2 uppercase">Deliveries</div>
-            <div className="text-4xl font-black text-[#0A8B5F]">{summary.todaysDeliveriesCount}</div>
-            <p className="text-[10px] text-[#0A8B5F] font-semibold mt-1">Today in service zone</p>
+            <div className="text-4xl font-black text-onyx-black">{summary.todaysDeliveriesCount}</div>
+            <p className="text-[10px] text-secondary font-semibold mt-1">Today in service zone</p>
           </div>
 
         </div>
@@ -284,7 +280,7 @@ export default function ServiceAreaTab() {
             <h2 className="text-sm font-black text-[#111827] uppercase tracking-wider">DELIVERY SERVICE MAP</h2>
             <p className="text-[11px] text-[#6B7280] font-medium">Real-time interactive Google / OpenStreet Map with delivery radius circle overlay.</p>
           </div>
-          <span className="px-3 py-1 bg-emerald-50 text-[#0A8B5F] border border-emerald-200 text-[10px] font-black rounded-lg">
+          <span className="px-3 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-black rounded-lg">
             📍 {kitchenLocation.locality}, {kitchenLocation.city}
           </span>
         </div>
@@ -311,7 +307,7 @@ export default function ServiceAreaTab() {
             }}
             className="px-4 py-2 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
           >
-            <Compass size={15} className="text-[#0A8B5F]" />
+            <Compass size={15} className="text-onyx-black" />
             <span>Set Radius</span>
           </button>
 
@@ -321,8 +317,8 @@ export default function ServiceAreaTab() {
               setDeliveryMode('Area Based');
               showToast('✓ Switched to Area Based Delivery Mode');
             }}
-            className={`px-4 py-2 border rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
-              deliveryMode === 'Area Based' ? 'bg-[#0A8B5F] text-white border-[#0A8B5F]' : 'bg-[#F9FBF9] border-[#E5ECE8] text-[#111827]'
+            className={`px-4 py-2 border rounded-xl text-xs font-bold font-button-text transition-colors shadow-xs flex items-center gap-2 cursor-pointer ${
+              deliveryMode === 'Area Based' ? 'bg-onyx-black text-bone-white border-onyx-black' : 'bg-surface-container border-sand-neutral/40 text-onyx-black'
             }`}
           >
             <Navigation size={15} />
@@ -362,7 +358,7 @@ export default function ServiceAreaTab() {
                   value="Radius Based"
                   checked={deliveryMode === 'Radius Based'}
                   onChange={e => setDeliveryMode(e.target.value)}
-                  className="w-4 h-4 accent-[#0A8B5F] cursor-pointer"
+                  className="w-4 h-4 accent-neutral-900 cursor-pointer"
                 />
                 <span>Radius Based</span>
               </label>
@@ -374,7 +370,7 @@ export default function ServiceAreaTab() {
                   value="Area Based"
                   checked={deliveryMode === 'Area Based'}
                   onChange={e => setDeliveryMode(e.target.value)}
-                  className="w-4 h-4 accent-[#0A8B5F] cursor-pointer"
+                  className="w-4 h-4 accent-neutral-900 cursor-pointer"
                 />
                 <span>Area Based</span>
               </label>
@@ -385,7 +381,7 @@ export default function ServiceAreaTab() {
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label className="text-xs font-black text-[#111827]">Delivery Radius</label>
-              <span className="text-sm font-black text-[#0A8B5F]">{deliveryRadius} KM</span>
+              <span className="text-sm font-black text-onyx-black">{deliveryRadius} KM</span>
             </div>
             <div className="flex items-center gap-3">
               <input 
@@ -394,7 +390,7 @@ export default function ServiceAreaTab() {
                 max="25"
                 value={deliveryRadius}
                 onChange={e => setDeliveryRadius(Number(e.target.value))}
-                className="w-32 px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-black text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+                className="w-32 px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-black text-[#111827] focus:outline-none focus:border-onyx-black"
               />
               <span className="text-xs text-[#6B7280]">KM Maximum Distance</span>
             </div>
@@ -410,7 +406,7 @@ export default function ServiceAreaTab() {
                 min="0"
                 value={minOrderAmount}
                 onChange={e => setMinOrderAmount(Number(e.target.value))}
-                className="w-36 px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-black text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+                className="w-36 px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-black text-[#111827] focus:outline-none focus:border-onyx-black"
               />
             </div>
           </div>
@@ -425,7 +421,7 @@ export default function ServiceAreaTab() {
                 min="0"
                 value={deliveryFee}
                 onChange={e => setDeliveryFee(Number(e.target.value))}
-                className="w-36 px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-black text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+                className="w-36 px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-black text-[#111827] focus:outline-none focus:border-onyx-black"
               />
             </div>
           </div>
@@ -440,7 +436,7 @@ export default function ServiceAreaTab() {
                 min="0"
                 value={freeDeliveryAbove}
                 onChange={e => setFreeDeliveryAbove(Number(e.target.value))}
-                className="w-36 px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-black text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+                className="w-36 px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-black text-[#111827] focus:outline-none focus:border-onyx-black"
               />
             </div>
           </div>
@@ -452,7 +448,7 @@ export default function ServiceAreaTab() {
                 type="checkbox"
                 checked={acceptOrdersOnlyInsideArea}
                 onChange={e => setAcceptOrdersOnlyInsideArea(e.target.checked)}
-                className="w-4 h-4 accent-[#0A8B5F] cursor-pointer"
+                className="w-4 h-4 accent-neutral-900 cursor-pointer"
               />
               <span>Accept orders only inside service area boundary</span>
             </label>
@@ -463,7 +459,7 @@ export default function ServiceAreaTab() {
           <button 
             type="submit"
             disabled={saving}
-            className="px-6 py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer"
           >
             <Save size={15} />
             <span>{saving ? 'Saving...' : 'Save Settings'}</span>
@@ -482,7 +478,7 @@ export default function ServiceAreaTab() {
           <button 
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
           >
             <Plus size={15} />
             <span>+ ADD SERVICE AREA</span>
@@ -514,7 +510,7 @@ export default function ServiceAreaTab() {
                     <tr key={item._id || item.id || item.areaName} className="hover:bg-[#F9FBF9] transition-colors">
                       <td className="p-4 font-black text-[#111827]">
                         <div className="flex items-center gap-2">
-                          <MapPin size={15} className="text-[#0A8B5F]" />
+                          <MapPin size={15} className="text-onyx-black" />
                           <span>{item.areaName}</span>
                         </div>
                       </td>
@@ -528,12 +524,12 @@ export default function ServiceAreaTab() {
                               max="30"
                               value={editAreaRadiusVal}
                               onChange={e => setEditAreaRadiusVal(Number(e.target.value))}
-                              className="w-16 px-2 py-1 bg-white border border-[#0A8B5F] rounded-lg text-xs font-black focus:outline-none"
+                              className="w-16 px-2 py-1 bg-white border border-onyx-black rounded-lg text-xs font-black focus:outline-none"
                             />
                             <span className="text-[10px] text-[#6B7280]">km</span>
                             <button 
                               onClick={() => handleSaveAreaEdit(item._id || item.id)}
-                              className="p-1 bg-[#0A8B5F] text-white rounded cursor-pointer ml-1"
+                              className="p-1 bg-onyx-black text-white rounded cursor-pointer ml-1"
                             >
                               <Check size={13} />
                             </button>
@@ -573,7 +569,7 @@ export default function ServiceAreaTab() {
                               }}
                               className="px-3 py-1.5 bg-white border border-[#E5ECE8] hover:bg-gray-50 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
                             >
-                              <Edit3 size={13} className="text-[#0A8B5F]" />
+                              <Edit3 size={13} className="text-onyx-black" />
                               <span>Edit</span>
                             </button>
                           )}
@@ -614,11 +610,11 @@ export default function ServiceAreaTab() {
               <div className="space-y-1">
                 <label className="text-xs font-bold text-[#6B7280]">Area / Locality Name</label>
                 <input 
-                  type="text"
+                  type="text" 
                   placeholder="E.g., Paldi, Prahlad Nagar, Vastrapur"
                   value={newAreaName}
                   onChange={e => setNewAreaName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+                  className="w-full px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-onyx-black"
                   required
                 />
               </div>
@@ -631,7 +627,7 @@ export default function ServiceAreaTab() {
                   max="25"
                   value={newAreaRadius}
                   onChange={e => setNewAreaRadius(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+                  className="w-full px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-onyx-black"
                 />
               </div>
 
@@ -645,7 +641,7 @@ export default function ServiceAreaTab() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer"
+                  className="px-5 py-2 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
                 >
                   Add Area
                 </button>

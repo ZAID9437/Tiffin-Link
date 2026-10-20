@@ -3,7 +3,8 @@ import { ShoppingBag, X, Trash2, Plus, Minus, ArrowRight, ShieldCheck, Clock, Ma
 import { useCart } from '../context/CartContext';
 
 export default function CartDrawer({
-  onProceedToCheckout
+  onProceedToCheckout,
+  onOpenLegalModal
 }) {
   const {
     cart,
@@ -200,8 +201,31 @@ export default function CartDrawer({
               <ArrowRight size={15} />
             </button>
 
-            <p className="text-[10px] text-center text-[#665d52] uppercase tracking-widest font-mono">
-              🔒 TiffinLink Escrow: No payment released until OTP verification
+            <p className="text-[10px] text-center text-[#665d52] font-mono flex items-center justify-center gap-1">
+              <span>🔒 Escrow Secured:</span>
+              <button 
+                type="button" 
+                onClick={() => onOpenLegalModal ? onOpenLegalModal('cancellation-refund-policy') : null}
+                className="underline hover:text-[#181512] cursor-pointer"
+              >
+                Refund Policy
+              </button>
+              <span>&bull;</span>
+              <button 
+                type="button" 
+                onClick={() => onOpenLegalModal ? onOpenLegalModal('delivery-policy') : null}
+                className="underline hover:text-[#181512] cursor-pointer"
+              >
+                Delivery SLA
+              </button>
+              <span>&bull;</span>
+              <button 
+                type="button" 
+                onClick={() => onOpenLegalModal ? onOpenLegalModal('food-safety-disclaimer') : null}
+                className="underline hover:text-[#181512] cursor-pointer"
+              >
+                Food Safety
+              </button>
             </p>
           </div>
         )}

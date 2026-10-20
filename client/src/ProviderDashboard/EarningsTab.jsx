@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../services/api';
+import { getSocket } from '../services/socket';
 
 export default function EarningsTab({ currentUser, initialSubTab = 'earnings' }) {
   // Active Sub-Tab state ('earnings' | 'transactions' | 'incentives' | 'wallet' | 'bank-payout')
@@ -213,6 +214,69 @@ export default function EarningsTab({ currentUser, initialSubTab = 'earnings' })
     }
   }, [activeSubTab]);
 
+  // Real-time Socket.IO and Auto-polling Synchronization
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+      if (socket && currentUser) {
+        const pId = currentUser?.providerId || currentUser?.id || currentUser?._id;
+        if (pId) {
+          socket.emit('join:provider', { providerId: String(pId) });
+        }
+
+        const handleRealtimeDataUpdate = (data) => {
+          if (data?.providerId && pId && String(data.providerId) !== String(pId)) return;
+          if (activeSubTab === 'earnings' || activeSubTab === 'earnings-overview') {
+            fetchEarningsOverview();
+          } else if (activeSubTab === 'transactions') {
+            fetchTransactions();
+          } else if (activeSubTab === 'wallet' || activeSubTab === 'wallet-and-withdrawals') {
+            fetchWalletAndWithdrawals();
+          }
+        };
+
+        socket.on('order:created', handleRealtimeDataUpdate);
+        socket.on('order:updated', handleRealtimeDataUpdate);
+        socket.on('order:status:updated', handleRealtimeDataUpdate);
+        socket.on('order:completed', handleRealtimeDataUpdate);
+        socket.on('delivery:status:updated', handleRealtimeDataUpdate);
+        socket.on('wallet:updated', handleRealtimeDataUpdate);
+        socket.on('withdrawal:updated', handleRealtimeDataUpdate);
+        socket.on('provider:wallet:updated', handleRealtimeDataUpdate);
+        socket.on('provider:withdrawal:processed', handleRealtimeDataUpdate);
+
+        return () => {
+          socket.off('order:created', handleRealtimeDataUpdate);
+          socket.off('order:updated', handleRealtimeDataUpdate);
+          socket.off('order:status:updated', handleRealtimeDataUpdate);
+          socket.off('order:completed', handleRealtimeDataUpdate);
+          socket.off('delivery:status:updated', handleRealtimeDataUpdate);
+          socket.off('wallet:updated', handleRealtimeDataUpdate);
+          socket.off('withdrawal:updated', handleRealtimeDataUpdate);
+          socket.off('provider:wallet:updated', handleRealtimeDataUpdate);
+          socket.off('provider:withdrawal:processed', handleRealtimeDataUpdate);
+        };
+      }
+    } catch (e) {
+      console.warn('Socket connection notice in EarningsTab:', e);
+    }
+  }, [currentUser, activeSubTab, earningsPeriod, customFrom, customTo, txnPage, txnTypeFilter, txnStatusFilter, txnSort]);
+
+  // 10s background sync interval
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      if (activeSubTab === 'earnings' || activeSubTab === 'earnings-overview') {
+        fetchEarningsOverview();
+      } else if (activeSubTab === 'transactions') {
+        fetchTransactions();
+      } else if (activeSubTab === 'wallet' || activeSubTab === 'wallet-and-withdrawals') {
+        fetchWalletAndWithdrawals();
+      }
+    }, 10000);
+    return () => clearInterval(pollInterval);
+  }, [activeSubTab, earningsPeriod, customFrom, customTo, txnPage, txnTypeFilter, txnStatusFilter, txnSort]);
+
   const handleRequestWithdrawal = async (e) => {
     e.preventDefault();
     setWithdrawFormError('');
@@ -255,7 +319,7 @@ export default function EarningsTab({ currentUser, initialSubTab = 'earnings' })
       }
     } catch (err) {
       console.error('Error requesting withdrawal:', err);
-      setWithdrawFormError('Failed to submit withdrawal request. Check backend connection.');
+      setWithdrawFormError('Failed to submit withdrawal request. Please check your network connection.');
     } finally {
       setWithdrawSubmitting(false);
     }
@@ -457,7 +521,7 @@ export default function EarningsTab({ currentUser, initialSubTab = 'earnings' })
 
         <div className="hidden md:flex items-center gap-2 pr-2 font-mono text-[11px] text-secondary">
           <span className="w-2 h-2 rounded-full bg-onyx-black animate-pulse"></span>
-          <span>LIVE MONGO LEDGER</span>
+          <span>FINANCIAL LEDGER SYNCED</span>
         </div>
       </div>
 
@@ -480,7 +544,7 @@ export default function EarningsTab({ currentUser, initialSubTab = 'earnings' })
                 Earnings Overview
               </h1>
               <p className="font-body-md text-body-md text-clay-earth max-w-2xl">
-                Real-time financial summary calculated strictly from verified MongoDB kitchen transactions.
+                Real-time financial summary calculated from verified kitchen transactions.
               </p>
             </div>
 
@@ -658,7 +722,7 @@ export default function EarningsTab({ currentUser, initialSubTab = 'earnings' })
               <div className="flex items-center justify-between pb-4 border-b border-sand-neutral">
                 <div>
                   <h3 className="font-headline-md text-headline-md text-onyx-black">Earnings Trend</h3>
-                  <p className="font-body-md text-xs text-secondary mt-1">Aggregated daily revenue from real MongoDB order settlements.</p>
+                  <p className="font-body-md text-xs text-secondary mt-1">Aggregated daily revenue from order settlements.</p>
                 </div>
                 <span className="font-mono text-xs px-2 py-1 bg-surface border border-sand-neutral text-clay-earth uppercase">
                   {earningsPeriod}
@@ -902,7 +966,7 @@ export default function EarningsTab({ currentUser, initialSubTab = 'earnings' })
 
               {txnLoading ? (
                 <div className="p-12 text-center font-mono text-xs text-secondary">
-                  Fetching verified transaction records from MongoDB...
+                  Fetching verified transaction records...
                 </div>
               ) : txns.length === 0 ? (
                 <div className="p-12 text-center space-y-2">
@@ -1082,7 +1146,7 @@ export default function EarningsTab({ currentUser, initialSubTab = 'earnings' })
                 Incentives & Bonuses
               </h1>
               <p className="font-body-md text-body-md text-clay-earth max-w-2xl">
-                Kitchen throughput rewards and milestone bonuses dynamically queried from MongoDB.
+                Kitchen throughput rewards and milestone bonuses earned through high-volume culinary excellence.
               </p>
             </div>
 

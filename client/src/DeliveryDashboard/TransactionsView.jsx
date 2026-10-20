@@ -80,7 +80,7 @@ export default function TransactionsView({ currentUser, onNavigateTab }) {
       const json = await res.json();
 
       if (!res.ok || !json.success) {
-        throw new Error(json.message || 'Failed to retrieve driver transactions telemetry');
+        throw new Error(json.message || 'Unable to retrieve transactions list.');
       }
 
       const txns = json.data?.transactions || [];
@@ -93,11 +93,11 @@ export default function TransactionsView({ currentUser, onNavigateTab }) {
       }
 
       if (isRefresh) {
-        showToast('✓ Transactions ledger synced with MongoDB!');
+        showToast('✓ Transactions updated.');
       }
     } catch (err) {
       console.error('Error fetching transactions:', err);
-      setError(err.message || 'Unable to load transaction records');
+      setError('Unable to load transaction records right now. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -249,10 +249,6 @@ export default function TransactionsView({ currentUser, onNavigateTab }) {
             <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest text-[11px]">Earnings &amp; Payments</span>
             <span className="text-secondary text-sm">/</span>
             <span className="font-label-caps text-label-caps uppercase text-onyx-black tracking-widest font-semibold text-[11px]">Transactions</span>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-container-high rounded-full ml-2">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-              <span className="font-label-caps text-[10px] text-onyx-black uppercase tracking-wider font-bold">SOCKET.IO SYNCED • LIVE LEDGER</span>
-            </div>
           </div>
           <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight mt-2 font-serif text-3xl sm:text-4xl">Transactions</h1>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-2xl mt-1 text-sm sm:text-base">
@@ -650,7 +646,6 @@ export default function TransactionsView({ currentUser, onNavigateTab }) {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-label-caps text-[10px] uppercase tracking-widest text-secondary font-bold">Transaction Details</span>
-                    <span className="px-1.5 py-0.2 bg-onyx-black text-on-primary font-label-caps text-[9px] uppercase font-semibold">Live Audit</span>
                   </div>
                   <h3 className="font-headline-md text-[22px] text-onyx-black font-serif tracking-tight mt-0.5">{selectedTxn.txnId}</h3>
                 </div>
@@ -781,13 +776,7 @@ export default function TransactionsView({ currentUser, onNavigateTab }) {
 
       </div>
 
-      {/* Security & Isolation Banner */}
-      <footer className="p-4 bg-surface-container-high/60 border border-sand-neutral flex items-center gap-3 text-secondary text-xs leading-relaxed">
-        <span className="material-symbols-outlined text-[18px] text-onyx-black shrink-0">lock</span>
-        <span>
-          <strong className="text-onyx-black font-medium">Driver Telemetry Verified:</strong> Authenticated Session for {driverName} (ID: #{driverIdStr}). Data cryptographically scoped via JWT claims to MongoDB driver records. Zero cross-driver access allowed. Instant settlement guaranteed via TiffinLink escrow contract.
-        </span>
-      </footer>
+
 
       {/* Custom Date Range Modal */}
       {isCustomDateModalOpen && (

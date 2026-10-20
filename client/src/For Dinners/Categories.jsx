@@ -143,9 +143,13 @@ export default function Categories() {
         
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12 md:mb-16 reveal-on-scroll">
-          <p className="font-label-caps text-xs md:text-label-caps text-secondary mb-4 tracking-[0.25em]">REGIONAL CULINARY HERITAGE</p>
-          <h2 className="font-headline-lg text-3xl sm:text-5xl md:text-headline-lg text-onyx-black mb-6">Artisanal Regional Tiffins</h2>
-          <div className="w-12 h-[2px] bg-clay-earth/40 mx-auto" />
+          <p className="font-label-caps text-[11px] text-[#8C6239] dark:text-[#D4AF37] font-bold tracking-[0.25em] mb-3 uppercase">
+            REGIONAL CULINARY HERITAGE
+          </p>
+          <h2 className="font-headline-lg font-serif font-bold text-3xl sm:text-5xl md:text-headline-lg text-[#181512] dark:text-white mb-6">
+            Artisanal Regional Tiffins
+          </h2>
+          <div className="w-16 h-[2.5px] bg-[#4B3621] dark:bg-[#D4AF37] rounded-full mx-auto" />
         </div>
 
         {/* Regional Navigation Tabs */}

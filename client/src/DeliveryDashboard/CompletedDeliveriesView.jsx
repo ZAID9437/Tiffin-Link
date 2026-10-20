@@ -105,7 +105,7 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
       }
     } catch (err) {
       console.error('Error fetching completed deliveries:', err);
-      setError(err.message || 'Unable to load completed deliveries.');
+      setError('Unable to load completed deliveries right now. Please try again.');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -176,11 +176,6 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
             <span className="text-sand-neutral">/</span>
             <span className="text-onyx-black font-semibold">Completed</span>
           </div>
-          <div className={`flex items-center gap-1.5 px-2.5 py-0.5 font-label-caps text-[11px] rounded-full ${isConnected ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
-            }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-600 animate-pulse' : 'bg-amber-600 animate-ping'}`} />
-            <span>{isConnected ? 'LIVE SYNC' : 'RECONNECTING...'}</span>
-          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -207,11 +202,12 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
       </div>
 
       {/* 3. Summary Statistics Cards */}
+      {/* 3. Metrics Summary Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pb-8">
         {/* Card 1: Completed Deliveries */}
-        <div className="p-6 bg-surface-container-lowest border border-sand-neutral flex flex-col justify-between h-36">
+        <div className="p-6 bg-white rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md transition-all flex flex-col justify-between h-36">
           <div className="flex items-center justify-between text-secondary mb-2">
-            <span className="font-label-caps text-xs uppercase tracking-wider">Completed</span>
+            <span className="font-label-caps text-xs uppercase tracking-wider font-semibold">Completed</span>
             <span className="material-symbols-outlined text-[20px] text-emerald-700">task_alt</span>
           </div>
           <div>
@@ -226,10 +222,10 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
         </div>
 
         {/* Card 2: Total Earnings */}
-        <div className="p-6 bg-surface-container-lowest border border-sand-neutral flex flex-col justify-between h-36">
+        <div className="p-6 bg-white rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md transition-all flex flex-col justify-between h-36">
           <div className="flex items-center justify-between text-secondary mb-2">
-            <span className="font-label-caps text-xs uppercase tracking-wider">Total Earned</span>
-            <span className="material-symbols-outlined text-[20px]">payments</span>
+            <span className="font-label-caps text-xs uppercase tracking-wider font-semibold">Total Earned</span>
+            <span className="material-symbols-outlined text-[20px] text-emerald-600">payments</span>
           </div>
           <div>
             <div className="font-headline-md text-3xl text-onyx-black font-serif">
@@ -242,10 +238,10 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
         </div>
 
         {/* Card 3: This Month */}
-        <div className="p-6 bg-surface-container-lowest border border-sand-neutral flex flex-col justify-between h-36">
+        <div className="p-6 bg-white rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md transition-all flex flex-col justify-between h-36">
           <div className="flex items-center justify-between text-secondary mb-2">
-            <span className="font-label-caps text-xs uppercase tracking-wider">This Month</span>
-            <span className="material-symbols-outlined text-[20px]">calendar_month</span>
+            <span className="font-label-caps text-xs uppercase tracking-wider font-semibold">This Month</span>
+            <span className="material-symbols-outlined text-[20px] text-blue-600">calendar_month</span>
           </div>
           <div>
             <div className="font-headline-md text-3xl text-onyx-black font-serif">
@@ -258,10 +254,10 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
         </div>
 
         {/* Card 4: Avg. Rating */}
-        <div className="p-6 bg-surface-container-lowest border border-sand-neutral flex flex-col justify-between h-36">
+        <div className="p-6 bg-white rounded-xl border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md transition-all flex flex-col justify-between h-36">
           <div className="flex items-center justify-between text-secondary mb-2">
-            <span className="font-label-caps text-xs uppercase tracking-wider">Avg. Rating</span>
-            <span className="material-symbols-outlined text-[20px] text-amber-600">star</span>
+            <span className="font-label-caps text-xs uppercase tracking-wider font-semibold">Avg. Rating</span>
+            <span className="material-symbols-outlined text-[20px] text-amber-500">star</span>
           </div>
           <div>
             <div className="flex items-baseline gap-1.5">
@@ -278,7 +274,7 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
       </div>
 
       {/* 4. Search & Filter Toolbar */}
-      <div className="p-4 bg-surface-container-low border border-sand-neutral flex flex-col gap-4 mb-6">
+      <div className="p-5 bg-white rounded-xl border border-stone-300 shadow-sm flex flex-col gap-4 mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Search Input */}
           <div className="relative flex-1">
@@ -288,13 +284,13 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search order #, customer, or kitchen..."
-              className="w-full bg-surface-container-lowest border border-sand-neutral pl-10 pr-4 py-2 font-body-md text-sm text-onyx-black placeholder-secondary focus:outline-none focus:border-onyx-black transition-colors"
+              className="w-full bg-stone-50 border border-stone-300 rounded-lg pl-10 pr-4 py-2 font-body-md text-sm text-onyx-black placeholder-secondary focus:outline-none focus:border-onyx-black focus:bg-white transition-colors"
             />
           </div>
 
           {/* Date & Sort Select Controls */}
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-2 px-3 py-2 bg-surface-container-lowest border border-sand-neutral text-xs">
+            <div className="flex items-center gap-2 px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs">
               <span className="text-secondary font-medium">Date:</span>
               <select
                 value={dateFilter}
@@ -309,7 +305,7 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
               </select>
             </div>
 
-            <div className="flex items-center gap-2 px-3 py-2 bg-surface-container-lowest border border-sand-neutral text-xs">
+            <div className="flex items-center gap-2 px-3 py-2 bg-stone-50 border border-stone-300 rounded-lg text-xs">
               <span className="text-secondary font-medium">Sort:</span>
               <select
                 value={sortOption}
@@ -326,13 +322,13 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
         </div>
 
         {/* Quick Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-sand-neutral">
+        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-stone-200">
           <button
             type="button"
             onClick={() => setQuickFilter('all')}
-            className={`px-3 py-1 font-label-caps text-[11px] tracking-wide transition-colors ${quickFilter === 'all'
-                ? 'bg-onyx-black text-on-primary font-bold'
-                : 'bg-surface-container-lowest text-secondary border border-sand-neutral hover:text-onyx-black'
+            className={`px-3 py-1 font-label-caps text-[11px] tracking-wide rounded-md transition-colors ${quickFilter === 'all'
+                ? 'bg-onyx-black text-on-primary font-bold shadow-xs'
+                : 'bg-stone-50 text-secondary border border-stone-300 hover:text-onyx-black hover:bg-stone-100'
               }`}
           >
             All ({totalCount})
@@ -340,9 +336,9 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
           <button
             type="button"
             onClick={() => setQuickFilter('today')}
-            className={`px-3 py-1 font-label-caps text-[11px] tracking-wide transition-colors ${quickFilter === 'today'
-                ? 'bg-onyx-black text-on-primary font-bold'
-                : 'bg-surface-container-lowest text-secondary border border-sand-neutral hover:text-onyx-black'
+            className={`px-3 py-1 font-label-caps text-[11px] tracking-wide rounded-md transition-colors ${quickFilter === 'today'
+                ? 'bg-onyx-black text-on-primary font-bold shadow-xs'
+                : 'bg-stone-50 text-secondary border border-stone-300 hover:text-onyx-black hover:bg-stone-100'
               }`}
           >
             Today
@@ -350,9 +346,9 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
           <button
             type="button"
             onClick={() => setQuickFilter('week')}
-            className={`px-3 py-1 font-label-caps text-[11px] tracking-wide transition-colors ${quickFilter === 'week'
-                ? 'bg-onyx-black text-on-primary font-bold'
-                : 'bg-surface-container-lowest text-secondary border border-sand-neutral hover:text-onyx-black'
+            className={`px-3 py-1 font-label-caps text-[11px] tracking-wide rounded-md transition-colors ${quickFilter === 'week'
+                ? 'bg-onyx-black text-on-primary font-bold shadow-xs'
+                : 'bg-stone-50 text-secondary border border-stone-300 hover:text-onyx-black hover:bg-stone-100'
               }`}
           >
             This Week
@@ -360,9 +356,9 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
           <button
             type="button"
             onClick={() => setQuickFilter('return_credit')}
-            className={`px-3 py-1 font-label-caps text-[11px] tracking-wide transition-colors flex items-center gap-1.5 ${quickFilter === 'return_credit'
-                ? 'bg-onyx-black text-on-primary font-bold'
-                : 'bg-surface-container-lowest text-secondary border border-sand-neutral hover:text-onyx-black'
+            className={`px-3 py-1 font-label-caps text-[11px] tracking-wide rounded-md transition-colors flex items-center gap-1.5 ${quickFilter === 'return_credit'
+                ? 'bg-onyx-black text-on-primary font-bold shadow-xs'
+                : 'bg-stone-50 text-secondary border border-stone-300 hover:text-onyx-black hover:bg-stone-100'
               }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
@@ -375,23 +371,23 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
       {loading ? (
         <div className="py-12 flex flex-col items-center justify-center space-y-3">
           <span className="material-symbols-outlined text-[36px] animate-spin text-onyx-black">progress_activity</span>
-          <p className="font-body-md text-sm text-secondary">Loading completed deliveries from MongoDB...</p>
+          <p className="font-body-md text-sm text-secondary">Loading completed deliveries...</p>
         </div>
       ) : error ? (
-        <div className="p-8 bg-error-container/20 border border-error/30 text-center space-y-3 my-4">
+        <div className="p-8 bg-error-container/20 rounded-2xl border border-error/30 text-center space-y-3 my-4">
           <span className="material-symbols-outlined text-[36px] text-error">error_outline</span>
           <h3 className="font-headline-md text-lg text-onyx-black font-serif">Unable to load completed deliveries</h3>
           <p className="font-body-md text-xs text-on-surface-variant max-w-md mx-auto">{error}</p>
           <button
             type="button"
             onClick={() => fetchCompletedDeliveries(false, 1)}
-            className="px-6 py-2 bg-onyx-black text-on-primary font-button-text text-xs uppercase tracking-wider font-bold transition-colors"
+            className="px-6 py-2 bg-onyx-black text-on-primary font-button-text text-xs uppercase tracking-wider font-bold transition-colors rounded-lg shadow-sm"
           >
             Retry
           </button>
         </div>
       ) : deliveries.length === 0 ? (
-        <div className="p-12 bg-surface-container-lowest border border-sand-neutral text-center space-y-4 my-4">
+        <div className="p-12 bg-white rounded-2xl border border-stone-300 shadow-sm text-center space-y-4 my-4">
           <span className="material-symbols-outlined text-[48px] text-secondary">inventory_2</span>
           <div>
             <h3 className="font-headline-md text-xl text-onyx-black font-serif">No Completed Deliveries</h3>
@@ -402,7 +398,7 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
           <button
             type="button"
             onClick={() => onNavigateTab && onNavigateTab('delivery-requests')}
-            className="px-6 py-2.5 bg-onyx-black text-on-primary font-button-text text-xs uppercase tracking-wider font-bold hover:bg-stone-800 transition-colors inline-block"
+            className="px-6 py-2.5 bg-onyx-black text-on-primary font-button-text text-xs uppercase tracking-wider font-bold hover:bg-stone-800 transition-colors inline-block rounded-lg shadow-sm"
           >
             View Delivery Requests
           </button>
@@ -419,7 +415,7 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
                 <div
                   key={item._id || item.orderId}
                   onClick={() => handleOpenDetails(item)}
-                  className={`p-6 bg-surface-container-lowest border transition-all cursor-pointer flex flex-col justify-between ${isSelected ? 'border-2 border-onyx-black shadow-md relative' : 'border border-sand-neutral hover:border-onyx-black'
+                  className={`p-6 bg-white rounded-xl transition-all cursor-pointer flex flex-col justify-between ${isSelected ? 'border-2 border-onyx-black shadow-md relative' : 'border border-stone-300 shadow-sm hover:border-stone-400 hover:shadow-md'
                     }`}
                 >
                   {isSelected && (
@@ -482,11 +478,22 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
                   {/* Card Footer */}
                   <div className="pt-4 border-t border-sand-neutral flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3 text-secondary font-label-caps text-[11px]">
-                      <span>Order Total: ₹{item.orderTotal ? item.orderTotal.toFixed(2) : '224.00'}</span>
-                      <span>•</span>
-                      <span className="text-amber-700 flex items-center gap-0.5 font-bold">
-                        {item.rating ? `★ ${item.rating} Rating` : '★ 4.8 Rating'}
-                      </span>
+                      <span>Order Total: ₹{item.orderTotal ? item.orderTotal.toFixed(2) : '0.00'}</span>
+                      {item.rating != null ? (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-700 flex items-center gap-0.5 font-bold">
+                            ★ {Number(item.rating).toFixed(1)} Rating
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span>•</span>
+                          <span className="text-stone-400 font-medium">
+                            Not Rated Yet
+                          </span>
+                        </>
+                      )}
                     </div>
 
                     <button
@@ -634,15 +641,21 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
               <div className="p-3.5 bg-surface-container border border-sand-neutral space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-label-caps text-[10px] text-secondary uppercase tracking-wider">RATING</span>
-                  <span className="text-amber-700 font-bold">
-                    {selectedDelivery.rating ? `★★★★★ ${selectedDelivery.rating}` : '★★★★★ 4.8'}
-                  </span>
+                  {selectedDelivery.rating != null ? (
+                    <span className="text-amber-700 font-bold">
+                      {'★'.repeat(Math.round(selectedDelivery.rating))} {Number(selectedDelivery.rating).toFixed(1)} Rating
+                    </span>
+                  ) : (
+                    <span className="text-stone-400 font-medium text-xs">
+                      Customer review pending
+                    </span>
+                  )}
                 </div>
-                {selectedDelivery.reviewComment && (
+                {selectedDelivery.reviewComment ? (
                   <p className="font-headline-md italic text-sm text-onyx-black leading-snug pt-1">
                     "{selectedDelivery.reviewComment}"
                   </p>
-                )}
+                ) : null}
               </div>
 
               {/* Action Button */}
@@ -765,15 +778,21 @@ export default function CompletedDeliveriesView({ currentUser, onNavigateTab }) 
             <div className="p-3.5 bg-surface-container border border-sand-neutral space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-label-caps text-[10px] text-secondary uppercase tracking-wider">RATING</span>
-                <span className="text-amber-700 font-bold">
-                  {selectedDelivery.rating ? `★★★★★ ${selectedDelivery.rating}` : '★★★★★ 4.8'}
-                </span>
+                {selectedDelivery.rating != null ? (
+                  <span className="text-amber-700 font-bold">
+                    {'★'.repeat(Math.round(selectedDelivery.rating))} {Number(selectedDelivery.rating).toFixed(1)} Rating
+                  </span>
+                ) : (
+                  <span className="text-stone-400 font-medium text-xs">
+                    Customer review pending
+                  </span>
+                )}
               </div>
-              {selectedDelivery.reviewComment && (
+              {selectedDelivery.reviewComment ? (
                 <p className="font-headline-md italic text-sm text-onyx-black leading-snug pt-1">
                   "{selectedDelivery.reviewComment}"
                 </p>
-              )}
+              ) : null}
             </div>
 
             {/* Action Button */}

@@ -109,7 +109,7 @@ export default function WorkingScheduleView({ currentUser, onNavigateTab }) {
       }
     } catch (err) {
       console.error('Error fetching driver schedule:', err);
-      setErrorMessage('Failed to connect to backend schedule service.');
+      setErrorMessage('Unable to load schedule. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,7 @@ export default function WorkingScheduleView({ currentUser, onNavigateTab }) {
         if (json.data?.weeklySchedule) {
           setWeeklySchedule(json.data.weeklySchedule);
         }
-        setSuccessMessage('Schedule updated and synchronized to MongoDB!');
+        setSuccessMessage('Schedule updated successfully!');
         setSyncTime('Just now');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
@@ -257,10 +257,6 @@ export default function WorkingScheduleView({ currentUser, onNavigateTab }) {
                 <span className="text-[#DED9D1]">/</span>
                 <span className="text-[#1A1A1A]">Working Schedule</span>
               </div>
-              <span className="px-2 py-0.5 bg-[#E4E2DE] text-[10px] tracking-wider uppercase text-[#1A1A1A] flex items-center gap-1 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#1A1A1A]" />
-                MongoDB Recurring Dispatch Synced
-              </span>
             </div>
 
             <h1 className="font-serif text-3xl sm:text-4xl text-[#1A1A1A] tracking-tight mt-1 font-normal">
@@ -274,7 +270,7 @@ export default function WorkingScheduleView({ currentUser, onNavigateTab }) {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 shrink-0">
             <div className="flex items-center gap-2 text-[#4A4238] text-[11px] uppercase tracking-wider font-bold">
               <span className="material-symbols-outlined text-sm text-[#1A1A1A]">sync</span>
-              <span>Last synced: {syncTime} • Telemetry Valid</span>
+              <span>Updated: {syncTime}</span>
             </div>
 
             <div className="flex items-center gap-3">
@@ -384,11 +380,11 @@ export default function WorkingScheduleView({ currentUser, onNavigateTab }) {
             <div className="flex items-start justify-between">
               <div className="space-y-1">
                 <span className="text-[11px] uppercase tracking-widest text-[#4A4238] font-bold">
-                  Schedule Database
+                  Schedule Overview
                 </span>
                 <h2 className="font-serif text-2xl text-[#1A1A1A]">Weekly Recurring Roster</h2>
                 <p className="text-xs text-[#665D52]">
-                  Direct telemetry mapping to <code className="font-mono text-xs bg-[#F5F3EF] px-1 py-0.5 text-[#1A1A1A]">DriverSchedule</code> document.
+                  Configure your planned availability and working hours for dispatch routing.
                 </p>
               </div>
 
@@ -757,9 +753,8 @@ export default function WorkingScheduleView({ currentUser, onNavigateTab }) {
             <div className="bg-[#1A1A1A] text-white p-5 space-y-2 border border-[#1A1A1A] shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] uppercase tracking-wider text-[#858383] font-bold">
-                  Live Dispatch Status
+                  Dispatch Status
                 </span>
-                <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="font-serif text-2xl text-white leading-none">Available</span>
@@ -774,13 +769,13 @@ export default function WorkingScheduleView({ currentUser, onNavigateTab }) {
         {/* Security, Telemetry & Scope Notice */}
         <footer className="bg-[#F5F3EF] border border-[#DED9D1] p-4 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-3 text-[#4A4238]">
           <div className="flex items-center gap-2 text-xs">
-            <span className="material-symbols-outlined text-base text-[#1A1A1A]">security</span>
+            <span className="material-symbols-outlined text-base text-[#1A1A1A]">verified</span>
             <span>
-              Driver Recurring Schedule scoped to JWT principal <strong className="text-[#1A1A1A]">#{driverId} ({driverName})</strong>. Asia/Kolkata (IST).
+              Driver Recurring Schedule for <strong className="text-[#1A1A1A]">{driverName}</strong>. Asia/Kolkata (IST).
             </span>
           </div>
           <div className="font-mono text-[11px] tracking-wide text-[#1A1A1A]">
-            SYNC PROTOCOL: SOCKET.IO / MONGO_STREAM_V2
+            STATUS: ACTIVE
           </div>
         </footer>
 

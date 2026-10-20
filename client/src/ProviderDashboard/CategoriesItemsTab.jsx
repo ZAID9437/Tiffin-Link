@@ -27,6 +27,7 @@ const EMPTY_ITEM = {
   name: '',
   description: '',
   category: 'Breads',
+  image: '',
   unit: 'piece',
   defaultQuantity: 1,
   minQuantity: 0,
@@ -50,6 +51,42 @@ export default function CategoriesItemsTab({ tiffins = [], onToast }) {
 
   const showToast = (msg) => {
     if (onToast) onToast(msg);
+  };
+
+  const handleItemImageUpload = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (file.size > 12 * 1024 * 1024) {
+      showToast('⚠️ Image file must be under 12MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 800;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+        setFormState(prev => ({ ...prev, image: dataUrl }));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const fetchItems = useCallback(async (tiffinId) => {
@@ -180,6 +217,7 @@ export default function CategoriesItemsTab({ tiffins = [], onToast }) {
       name: item.name || '',
       description: item.description || '',
       category: item.category || 'Breads',
+      image: item.image || '',
       unit: item.unit || 'piece',
       defaultQuantity: item.defaultQuantity || 1,
       minQuantity: item.minQuantity || 0,
@@ -376,8 +414,21 @@ export default function CategoriesItemsTab({ tiffins = [], onToast }) {
                       }`}
                     >
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${item.isAvailable ? 'bg-emerald-500' : 'bg-secondary'}`} />
+                        <div className="flex items-start gap-3.5 flex-1">
+                          <div className={`w-2 h-2 rounded-full mt-2.5 flex-shrink-0 ${item.isAvailable ? 'bg-emerald-500' : 'bg-secondary'}`} />
+                          {item.image ? (
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="w-14 h-14 rounded-xl object-cover border border-sand-neutral/60 shrink-0 shadow-xs"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-xl bg-surface-container flex items-center justify-center text-secondary shrink-0 border border-sand-neutral/40">
+                              <span className="material-symbols-outlined text-[24px]">
+                                {CATEGORY_ICONS[item.category] || 'restaurant'}
+                              </span>
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-button-text text-sm font-semibold text-on-surface">{item.name}</span>
@@ -454,6 +505,61 @@ export default function CategoriesItemsTab({ tiffins = [], onToast }) {
             </div>
 
             <form onSubmit={handleSaveItem} className="p-6 space-y-5">
+              {/* Dish Photo Upload & Preview */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-label-caps text-[11px] uppercase text-secondary tracking-widest">
+                    Dish Photo
+                  </label>
+                  {formState.image && (
+                    <button
+                      type="button"
+                      onClick={() => handleFormChange('image', '')}
+                      className="text-[10px] text-rose-600 font-bold hover:underline cursor-pointer flex items-center gap-0.5"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">close</span>
+                      Remove Photo
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-4">
+                  {formState.image ? (
+                    <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-sand-neutral shrink-0 group">
+                      <img src={formState.image} alt="Dish Preview" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-onyx-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="material-symbols-outlined text-white text-[20px]">edit</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 rounded-xl bg-surface-container flex flex-col items-center justify-center text-secondary shrink-0 border border-dashed border-sand-neutral">
+                      <span className="material-symbols-outlined text-[24px]">add_a_photo</span>
+                      <span className="text-[9px] uppercase font-bold mt-0.5">No Photo</span>
+                    </div>
+                  )}
+
+                  <div className="flex-1 space-y-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-2 bg-surface-container text-on-surface rounded-lg text-xs font-bold hover:bg-surface-container-high transition-colors cursor-pointer border border-sand-neutral/50">
+                      <span className="material-symbols-outlined text-[16px]">upload_file</span>
+                      <span>Upload Dish Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleItemImageUpload}
+                      />
+                    </label>
+                    <input
+                      type="text"
+                      value={formState.image && !formState.image.startsWith('data:') ? formState.image : ''}
+                      onChange={e => handleFormChange('image', e.target.value)}
+                      placeholder="Or paste image URL (https://...)"
+                      className="w-full bg-surface-container-low px-3 py-1.5 rounded-lg text-on-surface text-xs font-mono focus:outline-none focus:bg-surface-container transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Item Name */}
               <div className="space-y-1.5">
                 <label className="font-label-caps text-[11px] uppercase text-secondary tracking-widest">Item Name *</label>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Navigation, PackageCheck, Clock, Phone, MapPin, Truck } from 'lucide-react';
+import { X, Search, Navigation, PackageCheck, Clock, Phone, MapPin, Truck, Store, AlertTriangle, ShieldCheck, ArrowRight } from 'lucide-react';
 import GoogleDeliveryMap from './GoogleDeliveryMap';
 import { apiRequest } from '../services/api';
 import { 
@@ -88,10 +88,16 @@ export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initial
         const ordRes = await apiRequest(`/orders/${encodeURIComponent(cleanId)}`);
         if (ordRes && ordRes.success && ordRes.data) {
           const ord = ordRes.data;
+          const isCancelled = String(ord.status || '').toLowerCase() === 'cancelled' || String(ord.status || '').toLowerCase() === 'rejected';
           setActiveDelivery({
             orderId: ord.orderId,
             requestId: ord.orderId,
             status: ord.deliveryStatus === 'Delivered' ? 'Delivered' : (ord.status === 'Delivery' ? (ord.deliveryStatus || 'Searching Drivers') : ord.status),
+            isCancelled,
+            cancelledBy: ord.cancelledBy || 'Provider',
+            cancellationReason: ord.cancellationReason || 'The kitchen is at peak capacity and was unable to fulfill this order.',
+            providerName: ord.providerName || 'The Kitchen Partner',
+            totalAmount: ord.totalAmount || 0,
             etaMinutes: ord.estimatedTime ? parseInt(ord.estimatedTime) || 15 : 15,
             distanceKm: ord.deliveryDistance ? parseFloat(ord.deliveryDistance) || 2.4 : 2.4,
             pickupAddress: { street: ord.pickupAddress || 'Kitchen Hub, Ahmedabad' },
@@ -126,11 +132,11 @@ export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initial
         {/* Header */}
         <div className="p-5 bg-white border-b border-[#E5ECE8] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#E8F0EC] text-[#0A8B5F] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-surface-container text-onyx-black flex items-center justify-center">
               <Truck size={20} />
             </div>
             <div>
-              <div className="text-[10px] font-black text-[#0A8B5F] uppercase tracking-wider">CUSTOMER LIVE DELIVERY TRACKER</div>
+              <div className="text-[10px] font-black text-onyx-black uppercase tracking-wider">CUSTOMER LIVE DELIVERY TRACKER</div>
               <h2 className="text-lg font-black text-[#111827]">Track Your Tiffin Order</h2>
             </div>
           </div>
@@ -152,12 +158,12 @@ export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initial
               placeholder="Enter your Order ID (e.g. REQ-1001)..."
               value={orderIdInput}
               onChange={(e) => setOrderIdInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-onyx-black"
             />
           </div>
           <button 
             onClick={() => fetchCustomerDelivery()}
-            className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734e] text-white text-xs font-black rounded-xl transition-all cursor-pointer shadow-xs"
+            className="px-4 py-2 bg-onyx-black hover:bg-neutral-800 text-bone-white text-xs font-black rounded-xl transition-all cursor-pointer shadow-xs"
           >
             Track
           </button>
@@ -167,25 +173,82 @@ export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initial
         <div className="p-6 overflow-y-auto space-y-4 flex-1">
           {loading ? (
             <div className="p-12 text-center text-gray-500 space-y-2">
-              <div className="w-8 h-8 border-4 border-[#0A8B5F] border-t-transparent rounded-full animate-spin mx-auto" />
+              <div className="w-8 h-8 border-4 border-onyx-black border-t-transparent rounded-full animate-spin mx-auto" />
               <p className="text-xs font-bold">Fetching real-time GPS tracking data...</p>
             </div>
           ) : error ? (
             <div className="p-8 text-center bg-red-50 rounded-2xl border border-red-200 space-y-2">
               <p className="text-xs font-black text-red-800">{error}</p>
             </div>
+          ) : activeDelivery?.isCancelled || String(activeDelivery?.status || '').toLowerCase() === 'cancelled' || String(activeDelivery?.status || '').toLowerCase() === 'rejected' ? (
+            <div className="space-y-4">
+              <div className="p-5 rounded-2xl bg-rose-50 border border-rose-200 text-left">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                    <Store size={22} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 bg-rose-100/70 px-2 py-0.5 rounded">
+                      Order Declined by Kitchen
+                    </span>
+                    <h3 className="text-base font-bold text-gray-900 mt-0.5">
+                      {activeDelivery.providerName || 'Kitchen Partner'}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="bg-white/90 border border-rose-200/80 rounded-xl p-3.5 mb-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 mb-1">
+                    <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                    <span>Restaurant Message</span>
+                  </div>
+                  <p className="text-xs font-medium text-gray-800 italic pl-3 border-l-2 border-amber-400">
+                    &ldquo;{activeDelivery.cancellationReason || 'The kitchen is at peak capacity and unable to prepare this order.'}&rdquo;
+                  </p>
+                </div>
+
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2.5">
+                  <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
+                  <div className="text-xs text-emerald-900 font-semibold">
+                    100% Escrow Refund Recredited to Source Account (Zero Cancellation Fee)
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2.5">
+                  <button
+                    onClick={() => {
+                      onClose();
+                      window.location.hash = '#find-tiffin';
+                    }}
+                    className="flex-1 px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Browse Other Kitchens</span>
+                    <ArrowRight size={14} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      onClose();
+                      window.location.hash = '#cancelled-orders';
+                    }}
+                    className="px-4 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  >
+                    View Refund Details
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : activeDelivery ? (
             <div className="space-y-4">
               
               {/* Status Header */}
-              <div className="p-4 rounded-2xl bg-[#E8F0EC] border border-[#0A8B5F]/30 flex items-center justify-between">
+              <div className="p-4 rounded-2xl bg-surface-container border border-sand-neutral/40 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] text-[#0A8B5F] font-black uppercase">DELIVERY STATUS</div>
+                  <div className="text-[10px] text-secondary font-black uppercase">DELIVERY STATUS</div>
                   <div className="text-base font-black text-[#111827]">{activeDelivery.status || 'Out for Delivery'}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-[10px] text-[#6B7280] font-extrabold">ESTIMATED ETA</div>
-                  <div className="text-xl font-black text-[#0A8B5F]">{activeDelivery.etaMinutes || 12} mins</div>
+                  <div className="text-xl font-black text-onyx-black">{activeDelivery.etaMinutes || 12} mins</div>
                 </div>
               </div>
 
@@ -209,7 +272,7 @@ export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initial
               {activeDelivery.assignedDriver?.name && (
                 <div className="p-4 bg-white rounded-2xl border border-[#E5ECE8] flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 text-[#0A8B5F] flex items-center justify-center font-black text-sm">
+                    <div className="w-10 h-10 rounded-full bg-surface-container text-onyx-black flex items-center justify-center font-black text-sm">
                       {activeDelivery.assignedDriver.name.charAt(0)}
                     </div>
                     <div>
@@ -221,7 +284,7 @@ export default function CustomerDeliveryTrackingModal({ isOpen, onClose, initial
                   {activeDelivery.assignedDriver.phone && (
                     <a 
                       href={`tel:${activeDelivery.assignedDriver.phone}`}
-                      className="px-4 py-2 bg-[#0A8B5F] text-white text-xs font-extrabold rounded-xl hover:bg-[#08734e] transition-all flex items-center gap-1.5 shadow-xs"
+                      className="px-4 py-2 bg-onyx-black text-bone-white text-xs font-extrabold rounded-xl hover:bg-neutral-800 transition-all flex items-center gap-1.5 shadow-xs"
                     >
                       <Phone size={13} />
                       <span>Call Driver</span>

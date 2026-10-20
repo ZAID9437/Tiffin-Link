@@ -1,92 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getSocket } from '../services/socket';
+import { playDeliveryRequestSound, stopDeliveryRequestSound } from '../services/soundNotifier';
 
 /**
- * Web Audio API 10-Second Delivery Request Alert Sound Synthesizer
+ * Unified Sound Alert Adapter for Delivery Requests
  */
-class DeliveryAlertAudio {
-  constructor() {
-    this.audioCtx = null;
-    this.timer = null;
-    this.isPlaying = false;
-  }
-
-  initContext() {
-    if (!this.audioCtx && typeof window !== 'undefined') {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        this.audioCtx = new AudioCtx();
-      }
-    }
-  }
-
-  play10SecChime(onStopCallback) {
-    try {
-      this.stop();
-      this.initContext();
-      if (!this.audioCtx) return;
-
-      if (this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume().catch(() => {});
-      }
-
-      this.isPlaying = true;
-      let iterations = 0;
-      const maxIterations = 8; // ~10 seconds total duration (every 1.2 seconds)
-
-      const playTonePair = () => {
-        if (!this.isPlaying || iterations >= maxIterations) {
-          this.stop();
-          if (onStopCallback) onStopCallback();
-          return;
-        }
-
-        iterations++;
-        const now = this.audioCtx.currentTime;
-
-        // Tone 1: A5 (880 Hz)
-        const osc1 = this.audioCtx.createOscillator();
-        const gain1 = this.audioCtx.createGain();
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(880, now);
-        gain1.gain.setValueAtTime(0.15, now);
-        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-        osc1.connect(gain1);
-        gain1.connect(this.audioCtx.destination);
-        osc1.start(now);
-        osc1.stop(now + 0.3);
-
-        // Tone 2: C6 (1046.5 Hz)
-        const osc2 = this.audioCtx.createOscillator();
-        const gain2 = this.audioCtx.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(1046.5, now + 0.15);
-        gain2.gain.setValueAtTime(0.2, now + 0.15);
-        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-        osc2.connect(gain2);
-        gain2.connect(this.audioCtx.destination);
-        osc2.start(now + 0.15);
-        osc2.stop(now + 0.5);
-
-        this.timer = setTimeout(playTonePair, 1200);
-      };
-
-      playTonePair();
-    } catch (err) {
-      console.warn('Audio play exception:', err.message);
-    }
-  }
-
-  stop() {
-    this.isPlaying = false;
-    if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
-    }
-  }
-}
-
-const deliveryAudio = new DeliveryAlertAudio();
+const deliveryAudio = {
+  stop: () => stopDeliveryRequestSound(),
+  play: (duration) => playDeliveryRequestSound(duration)
+};
 
 const isSameDeliveryHelper = (reqA, reqB) => {
   if (!reqA || !reqB) return false;
@@ -99,7 +21,7 @@ const isSameDeliveryHelper = (reqA, reqB) => {
 };
 
 const formatOrderRef = (ref) => {
-  if (!ref) return '#TL-REQ-4091';
+  if (!ref) return '';
   const clean = String(ref).trim().replace(/^#+/, '');
   return `#TL-REQ-${clean}`;
 };
@@ -163,15 +85,15 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
   useEffect(() => {
     const fetchPartnerMetrics = async () => {
       try {
-        const driverId = currentUser?.id || currentUser?._id || 'TL-8041';
+        const driverId = currentUser?.driverId || currentUser?.id || currentUser?._id || '';
         const res = await fetch(`http://localhost:5000/api/delivery/driver-dashboard?driverId=${encodeURIComponent(driverId)}`, {
           headers: getAuthHeaders()
         });
         const json = await res.json();
         if (json.success && (json.metrics || json.dashboard || json.data)) {
           const m = json.metrics || json.dashboard || json.data || {};
-          const earnings = m.todayEarnings || m.earningsToday || m.totalEarnings || 820;
-          const completed = m.completedDeliveries || m.todayDeliveries || m.completedTrips || 4;
+          const earnings = m.todayEarnings !== undefined ? m.todayEarnings : (m.earningsToday !== undefined ? m.earningsToday : (m.totalEarnings ?? 0));
+          const completed = m.completedDeliveries !== undefined ? m.completedDeliveries : (m.todayDeliveries !== undefined ? m.todayDeliveries : (m.completedTrips ?? 0));
           setMilestone(prev => ({
             ...prev,
             todayEarnings: earnings,
@@ -214,7 +136,7 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
   // Stop audio chime on component unmount
   useEffect(() => {
     return () => {
-      deliveryAudio.stop();
+      stopDeliveryRequestSound();
     };
   }, []);
 
@@ -222,7 +144,7 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
   const fetchRequests = async (showLoading = false) => {
     try {
       if (showLoading) setLoading(true);
-      const driverId = currentUser?.id || currentUser?._id || 'TL-8041';
+      const driverId = currentUser?.driverId || currentUser?.id || currentUser?._id || '';
       const lat = userCoords?.lat || 23.0280;
       const lng = userCoords?.lng || 72.5670;
 
@@ -287,20 +209,17 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
     if (!socket) return;
 
     const handleNewRequest = (data) => {
-      if (soundEnabled) {
-        deliveryAudio.play10SecChime();
-      }
-      fetchRequests();
+      fetchRequests(false);
     };
 
     const handleAccepted = (data) => {
       if (!data) return;
       const targetId = String(data.requestId || data.orderId || '');
       const winnerDriverId = String(data.assignedDriverId || '');
-      const currentDriverId = String(currentUser?.id || currentUser?._id || 'TL-8041');
+      const currentDriverId = String(currentUser?.driverId || currentUser?.id || currentUser?._id || '');
 
       if (winnerDriverId !== currentDriverId) {
-        deliveryAudio.stop();
+        stopDeliveryRequestSound();
         setRequests((prev) => prev.filter((r) => String(r.requestId || r._id) !== targetId && String(r.orderId) !== targetId));
         showToast(`⚡ Delivery Request ${data.orderId ? '#' + data.orderId : ''} was accepted by another driver.`);
       }
@@ -309,20 +228,31 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
     const handleUnavailable = (data) => {
       if (!data) return;
       const targetId = String(data.requestId || data.orderId || '');
-      deliveryAudio.stop();
+      stopDeliveryRequestSound();
       setRequests((prev) => prev.filter((r) => String(r.requestId || r._id) !== targetId && String(r.orderId) !== targetId));
     };
 
+    const handleWindowNewDelivery = () => {
+      fetchRequests(false);
+    };
+    window.addEventListener('tiffinlink:new-delivery-request', handleWindowNewDelivery);
+
     socket.on('delivery:request:new', handleNewRequest);
     socket.on('delivery:driver:live_request', handleNewRequest);
+    socket.on('delivery:new_request', handleNewRequest);
+    socket.on('delivery:new-request', handleNewRequest);
     socket.on('delivery:request:accepted', handleAccepted);
     socket.on('delivery:request:unavailable', handleUnavailable);
     socket.on('delivery:request:expired', handleUnavailable);
     socket.on('delivery:request:cancelled', handleUnavailable);
 
     return () => {
+      window.removeEventListener('tiffinlink:new-delivery-request', handleWindowNewDelivery);
+      stopDeliveryRequestSound();
       socket.off('delivery:request:new', handleNewRequest);
       socket.off('delivery:driver:live_request', handleNewRequest);
+      socket.off('delivery:new_request', handleNewRequest);
+      socket.off('delivery:new-request', handleNewRequest);
       socket.off('delivery:request:accepted', handleAccepted);
       socket.off('delivery:request:unavailable', handleUnavailable);
       socket.off('delivery:request:expired', handleUnavailable);
@@ -333,17 +263,26 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
   // Live 1-second countdown ticker
   useEffect(() => {
     const timer = setInterval(() => {
-      setRequests((prev) =>
-        prev
+      setRequests((prev) => {
+        const updated = prev
           .map((req) => ({
             ...req,
             secondsLeft: Math.max(0, (req.secondsLeft || 60) - 1)
           }))
-          .filter((req) => req.secondsLeft > 0)
-      );
+          .filter((req) => req.secondsLeft > 0);
+
+        // When all active requests expire (timer reaches 0), stop ringing immediately
+        if (prev.length > 0 && updated.length === 0) {
+          stopDeliveryRequestSound();
+        }
+        return updated;
+      });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      stopDeliveryRequestSound();
+    };
   }, []);
 
   // Filtered Cards Feed
@@ -388,6 +327,7 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
   // Atomic Accept Handler
   const handleAcceptAtomic = async (req) => {
     if (!req) return;
+    stopDeliveryRequestSound();
     deliveryAudio.stop();
 
     if (activeDelivery) {
@@ -442,7 +382,7 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
       if (err.name === 'AbortError') {
         showToast('⚠️ Request timed out. Please try again.');
       } else {
-        showToast(`⚠️ ${err.message || 'Unable to accept request. Please try again.'}`);
+        showToast('⚠️ Unable to accept request. Please check your connection and try again.');
       }
     } finally {
       setAcceptingId(null);
@@ -451,6 +391,7 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
 
   // Confirm Decline Handler
   const handleConfirmDecline = async () => {
+    stopDeliveryRequestSound();
     deliveryAudio.stop();
     if (!declineModalReq) return;
     const reqId = declineModalReq.requestId || declineModalReq._id;
@@ -459,7 +400,7 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
       await fetch(`http://localhost:5000/api/delivery/requests/${reqId}/decline`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ driverId: currentUser?.id || currentUser?._id || 'TL-8041' })
+        body: JSON.stringify({ driverId: currentUser?.driverId || currentUser?.id || currentUser?._id || '' })
       });
       showToast('Delivery request declined.');
       setRequests((prev) => prev.filter((r) => (r.requestId || r._id) !== reqId));
@@ -492,9 +433,8 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 border-b border-sand-neutral">
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-onyx-black animate-ping" />
             <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest text-[11px]">
-              Active Dispatch Matrix
+              Active Requests
             </span>
           </div>
           <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight text-3xl sm:text-4xl font-serif">
@@ -599,8 +539,12 @@ export default function DeliveryRequestsView({ activeDelivery, onAcceptDelivery,
           <button
             type="button"
             onClick={() => {
-              setSoundEnabled(!soundEnabled);
-              if (soundEnabled) deliveryAudio.stop();
+              const nextVal = !soundEnabled;
+              setSoundEnabled(nextVal);
+              if (!nextVal) {
+                stopDeliveryRequestSound();
+                deliveryAudio.stop();
+              }
             }}
             className={`w-8 h-8 flex items-center justify-center bg-bone-white border border-sand-neutral hover:bg-surface-container-high transition-colors cursor-pointer ${
               !soundEnabled ? 'opacity-50' : ''

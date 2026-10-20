@@ -1285,7 +1285,7 @@ export default function ProviderProfilesTab({ onNavigate, onOpenProvider360 }) {
                     <div className="p-3 bg-[#f5f3ef] border border-[#ded9d1]/60">
                       <span className="font-mono text-[10px] text-[#665d52] uppercase block">Node Latency</span>
                       <span className="font-mono text-xl font-bold text-[#1a1a1a]">12ms</span>
-                      <span className="font-mono text-[10px] text-emerald-800 block">WebSocket Live</span>
+                      <span className="font-mono text-[10px] text-emerald-800 block">Connection Live</span>
                     </div>
                     <div className="p-3 bg-[#f5f3ef] border border-[#ded9d1]/60">
                       <span className="font-mono text-[10px] text-[#665d52] uppercase block">Induction Station</span>

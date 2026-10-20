@@ -420,8 +420,8 @@ export default function AdminSidebar({
           defaultTab: 'health-api',
           subItems: [
             { id: 'health-api', label: 'API Health' },
-            { id: 'health-database', label: 'Database' },
-            { id: 'health-websocket', label: 'WebSocket' },
+            { id: 'health-database', label: 'Storage Health' },
+            { id: 'health-websocket', label: 'Live Gateway' },
             { id: 'health-payments', label: 'Payment Gateway' },
             { id: 'health-notifications', label: 'Notification Services' },
             { id: 'health-logs', label: 'System Logs' }

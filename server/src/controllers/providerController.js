@@ -16,7 +16,7 @@ const isDbConnected = async () => {
 };
 
 // Format user payload safely without passwords
-const formatUserPayload = (user) => ({
+const formatUserPayload = (user, provider = null) => ({
   id: user._id || user.id,
   name: user.name || (user.email ? user.email.split('@')[0] : ''),
   email: user.email,
@@ -24,7 +24,9 @@ const formatUserPayload = (user) => ({
   role: user.role || 'provider',
   isActive: user.isActive !== false,
   isVerified: user.isVerified !== false,
-  lastLogin: user.lastLogin
+  lastLogin: user.lastLogin,
+  kitchenPhoto: provider?.kitchenPhoto || provider?.kitchenPhotos || provider?.image || user.kitchenPhoto || user.image || '',
+  image: provider?.kitchenPhoto || provider?.kitchenPhotos || provider?.image || user.image || user.kitchenPhoto || ''
 });
 
 const Review = require('../models/Review');
@@ -33,6 +35,7 @@ const Order = require('../models/Order');
 const Withdrawal = require('../models/Withdrawal');
 const DeliveryRequest = require('../models/DeliveryRequest');
 const MealRequest = require('../models/MealRequest');
+const TiffinItem = require('../models/TiffinItem');
 
 // Haversine formula to compute great-circle distance in kilometers
 const haversineKm = (lat1, lon1, lat2, lon2) => {
@@ -131,7 +134,10 @@ const getProviders = async (req, res) => {
         pObj.location = { lat: pLat, lng: pLng };
 
         // Distance in km
-        const dist = haversineKm(customerLat, customerLng, pLat, pLng);
+        let dist = haversineKm(customerLat, customerLng, pLat, pLng);
+        if (!dist || dist < 0.8) {
+          dist = 1.8;
+        }
         pObj.distanceKm = dist;
         pObj.etaMinutes = Math.max(20, Math.round(15 + dist * 5));
         pObj.eta = `${pObj.etaMinutes}–${pObj.etaMinutes + 10} MIN`;
@@ -149,39 +155,61 @@ const getProviders = async (req, res) => {
           pObj.categories = Array.from(new Set(tiffins.map(t => t.category).filter(Boolean)));
         } else {
           pObj.price = pObj.price || 0;
-          pObj.categories = [];
         }
+        const dynamicKitchenPhoto = p.kitchenPhoto || p.kitchenPhotos || p.image || '';
+        pObj.kitchenPhoto = dynamicKitchenPhoto;
+        pObj.kitchenPhotos = dynamicKitchenPhoto;
+        pObj.image = dynamicKitchenPhoto;
 
         return pObj;
       }));
 
-      // Apply Filter Rules
+      // Apply Filter Rules: If searching by keyword, prioritize search matches across full database
       let matchingProviders = enrichedProviders.filter(p => {
-        // Radius filter (only apply if explicitly specified by caller)
+        // If searching explicitly by keyword/name, perform instant comprehensive search across ALL fields
+        if (search) {
+          const n = (p.name || '').toLowerCase();
+          const bn = (p.businessName || '').toLowerCase();
+          const fn = (p.fullName || '').toLowerCase();
+          const l = (p.address?.locality || p.address?.street || p.address?.city || p.address?.houseNo || '').toLowerCase();
+          const tags = (p.tags || []).join(' ').toLowerCase();
+          const cuisines = (p.cuisines || '').toLowerCase();
+          const desc = (p.description || '').toLowerCase();
+          const combined = `${tags} ${cuisines} ${desc}`;
+          const tNames = (p.tiffins || []).map(t => (t.name || '').toLowerCase()).join(' ');
+          const tItems = (p.tiffins || []).flatMap(t => t.items || []).join(' ').toLowerCase();
+          const tDesc = (p.tiffins || []).map(t => (t.description || '').toLowerCase()).join(' ');
+
+          const matchesSearch = 
+            n.includes(search) || 
+            bn.includes(search) || 
+            fn.includes(search) || 
+            l.includes(search) || 
+            combined.includes(search) || 
+            tNames.includes(search) || 
+            tItems.includes(search) ||
+            tDesc.includes(search);
+
+          return matchesSearch;
+        }
+
+        // Standard browsing filters (only apply when NOT searching by keyword)
         if (radiusKm !== null && p.distanceKm > radiusKm) return false;
+        if (p.price > 0 && maxPrice > 0 && (p.price < minPrice || p.price > maxPrice)) return false;
 
-        // Price filter
-        if (p.price < minPrice || p.price > maxPrice) return false;
-
-        // Dietary filter
         const tags = (p.tags || []).join(' ').toLowerCase();
         const cuisines = (p.cuisines || '').toLowerCase();
         const desc = (p.description || '').toLowerCase();
         const combined = `${tags} ${cuisines} ${desc}`;
 
         if (dietary === 'veg' || dietary === 'pure veg') {
-          if (!combined.includes('veg') && !combined.includes('satvik') && !combined.includes('jain')) return false;
+          const isStrictlyNonVeg = combined.includes('non-veg only') || 
+            (combined.includes('non-veg') && !combined.includes('veg & non-veg') && !combined.includes('pure veg') && !combined.includes('veg'));
+          if (isStrictlyNonVeg) return false;
         } else if (dietary === 'non-veg') {
-          if (!combined.includes('non-veg') && !combined.includes('chicken') && !combined.includes('mutton')) return false;
+          if (!combined.includes('non-veg') && !combined.includes('chicken') && !combined.includes('mutton') && !combined.includes('egg')) return false;
         } else if (dietary === 'jain' || dietary === 'jain friendly') {
           if (!combined.includes('jain') && !combined.includes('satvik')) return false;
-        }
-
-        // Search text filter
-        if (search) {
-          const n = (p.name || '').toLowerCase();
-          const l = (p.address?.locality || p.address?.city || '').toLowerCase();
-          if (!n.includes(search) && !l.includes(search) && !combined.includes(search)) return false;
         }
 
         return true;
@@ -189,15 +217,10 @@ const getProviders = async (req, res) => {
 
       let isExpandedRadius = false;
       // If strict radius returned 0 matches, gracefully provide all available active kitchens in the city
-      if (matchingProviders.length === 0 && enrichedProviders.length > 0) {
+      if (matchingProviders.length === 0 && enrichedProviders.length > 0 && !search) {
         isExpandedRadius = true;
         matchingProviders = enrichedProviders.filter(p => {
           if (p.price < minPrice || p.price > maxPrice) return false;
-          if (search) {
-            const n = (p.name || '').toLowerCase();
-            const l = (p.address?.locality || p.address?.city || '').toLowerCase();
-            if (!n.includes(search) && !l.includes(search)) return false;
-          }
           return true;
         }).map(p => ({
           ...p,
@@ -259,6 +282,10 @@ const getProviderById = async (req, res) => {
       }
 
       const pObj = provider.toObject ? provider.toObject() : { ...provider };
+      const dynamicKitchenPhoto = provider.kitchenPhoto || provider.kitchenPhotos || provider.image || '';
+      pObj.kitchenPhoto = dynamicKitchenPhoto;
+      pObj.kitchenPhotos = dynamicKitchenPhoto;
+      pObj.image = dynamicKitchenPhoto;
       const pIdStr = provider._id.toString();
 
       // Dynamic ratings
@@ -289,7 +316,34 @@ const getProviderById = async (req, res) => {
       tiffins.forEach(t => {
         if (t.category) catSet.add(t.category);
       });
-      pObj.categories = catSet.size > 0 ? Array.from(catSet) : [];
+      // Coordinates lookup & Geolocation
+      let pLat = provider.address?.lat;
+      let pLng = provider.address?.lng;
+      if (!pLat || !pLng || pLat === 0) {
+        const locStr = (provider.address?.locality || provider.address?.street || provider.name || '').toLowerCase();
+        for (const [key, coords] of Object.entries(AHMEDABAD_COORDS)) {
+          if (locStr.includes(key)) {
+            pLat = coords.lat;
+            pLng = coords.lng;
+            break;
+          }
+        }
+      }
+      if (!pLat) pLat = 23.0300;
+      if (!pLng) pLng = 72.5178;
+
+      pObj.location = { lat: pLat, lng: pLng };
+
+      const customerLat = req.query.lat ? parseFloat(req.query.lat) : 23.0300;
+      const customerLng = req.query.lng ? parseFloat(req.query.lng) : 72.5178;
+
+      let dist = haversineKm(customerLat, customerLng, pLat, pLng);
+      if (!dist || dist < 0.8) {
+        dist = 1.8;
+      }
+      pObj.distanceKm = dist;
+      pObj.etaMinutes = Math.max(20, Math.round(15 + dist * 5));
+      pObj.eta = `${pObj.etaMinutes}–${pObj.etaMinutes + 10} MIN`;
 
       return res.json({ success: true, data: pObj, source: 'database' });
     }
@@ -365,15 +419,34 @@ const registerProvider = async (req, res) => {
   try {
     const payload = req.body || {};
     
+    // Enforce minimum 18 years of age requirement
+    if (payload.dob) {
+      const birthDate = new Date(payload.dob);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        if (age < 18) {
+          return res.status(400).json({
+            success: false,
+            message: 'All kitchen providers must be at least 18 years of age to register.'
+          });
+        }
+      }
+    }
+
     // Provide sensible defaults for essential display fields if not explicitly passed
     const providerName = payload.businessName || payload.name || payload.fullName || '';
     const providerDesc = payload.description || '';
     const providerEta = (payload.opens && payload.closes) ? `${payload.opens} - ${payload.closes}` : (payload.eta || '30-40 min');
-    const providerPrice = Number(payload.mealPrice || payload.price) || 0;
+    const providerPrice = Number(payload.mealPrice || payload.price) || 120;
     const providerTags = Array.isArray(payload.tags) && payload.tags.length > 0
       ? payload.tags
-      : (payload.cuisines ? [payload.cuisines] : ['Pure Veg']);
-    const providerImage = payload.kitchenPhotos || payload.image || '';
+      : (payload.cuisines ? [payload.cuisines, 'Pure Veg'] : ['Pure Veg', 'Home Kitchen']);
+    const providerImage = payload.kitchenPhoto || payload.kitchenPhotos || payload.image || '';
 
     const providerData = {
       name: providerName,
@@ -404,8 +477,10 @@ const registerProvider = async (req, res) => {
       idType: payload.idType || 'Aadhar Card',
       fssaiCert: payload.fssaiCert || '',
       fssaiCertName: payload.fssaiCertName || '',
-      kitchenPhotos: payload.kitchenPhotos || '',
-      kitchenPhotosName: payload.kitchenPhotosName || '',
+      kitchenPhoto: payload.kitchenPhoto || payload.kitchenPhotos || '',
+      kitchenPhotoName: payload.kitchenPhotoName || payload.kitchenPhotosName || '',
+      kitchenPhotos: payload.kitchenPhoto || payload.kitchenPhotos || '',
+      kitchenPhotosName: payload.kitchenPhotoName || payload.kitchenPhotosName || '',
       ownerId: payload.ownerId || '',
       ownerIdName: payload.ownerIdName || '',
       accountHolderName: payload.accountHolderName || '',
@@ -420,6 +495,8 @@ const registerProvider = async (req, res) => {
       mealIngredients: payload.mealIngredients || '',
       mealPrice: Number(payload.mealPrice) || 0,
       mealPrepTime: payload.mealPrepTime || '',
+      mealPhoto: payload.mealPhoto || '',
+      mealPhotoName: payload.mealPhotoName || '',
       skipMenu: Boolean(payload.skipMenu),
       rating: 0,
       eta: providerEta,
@@ -444,6 +521,102 @@ const registerProvider = async (req, res) => {
 
       const newProvider = new Provider(providerData);
       await newProvider.save();
+
+      // If initial meal was provided, automatically provision initial Tiffin & TiffinItem with the dish photo
+      if (!providerData.skipMenu && providerData.mealTitle && providerData.mealTitle.trim()) {
+        try {
+          const initialDishTitle = providerData.mealTitle.trim();
+          const initialDishPrice = Number(providerData.mealPrice) || 120;
+          const initialDishPhoto = providerData.mealPhoto || providerData.kitchenPhotos || '';
+
+          const initialTiffin = new Tiffin({
+            providerId: newProvider._id.toString(),
+            name: initialDishTitle,
+            description: providerData.mealIngredients || 'Fresh daily culinary masterpiece prepared home-style.',
+            price: initialDishPrice,
+            category: providerData.cuisines ? providerData.cuisines.split(',')[0].trim() : 'Special',
+            foodType: providerData.tags && providerData.tags.some(t => t.toLowerCase().includes('non-veg')) ? 'Non-Veg' : 'Veg',
+            mealType: 'Lunch',
+            capacity: Number(providerData.maxMeals) || 30,
+            available: Number(providerData.maxMeals) || 30,
+            ingredients: providerData.mealIngredients || '',
+            items: [initialDishTitle],
+            image: initialDishPhoto,
+            status: 'Active'
+          });
+          await initialTiffin.save();
+
+          const initialItem = new TiffinItem({
+            tiffinId: initialTiffin._id,
+            providerId: newProvider._id.toString(),
+            category: 'Other',
+            name: initialDishTitle,
+            description: providerData.mealIngredients || '',
+            image: initialDishPhoto,
+            unit: 'plate',
+            defaultQuantity: 1,
+            minQuantity: 1,
+            maxQuantity: 10,
+            unitPrice: initialDishPrice,
+            price: initialDishPrice,
+            availableQuantity: Number(providerData.maxMeals) || 50,
+            isDefault: true,
+            isAvailable: true,
+            isCustomizable: true,
+            sortOrder: 0
+          });
+          await initialItem.save();
+        } catch (tiffinErr) {
+          console.warn('Could not auto-create initial tiffin for new provider:', tiffinErr.message);
+        }
+      } else {
+        // Fallback: Provision signature home thali so newly onboarded kitchen is immediately orderable
+        try {
+          const defaultDishTitle = `${providerData.name || 'Artisanal'} Special Home Thali`;
+          const defaultDishPrice = providerData.price || 120;
+          const defaultDishPhoto = providerData.kitchenPhoto || providerData.kitchenPhotos || '';
+
+          const defaultTiffin = new Tiffin({
+            providerId: newProvider._id.toString(),
+            name: defaultDishTitle,
+            description: 'Fresh daily culinary masterpiece prepared home-style with pure ingredients.',
+            price: defaultDishPrice,
+            category: providerData.cuisines ? providerData.cuisines.split(',')[0].trim() : 'Homestyle',
+            foodType: providerData.tags && providerData.tags.some(t => t.toLowerCase().includes('non-veg')) ? 'Non-Veg' : 'Veg',
+            mealType: 'Lunch',
+            capacity: Number(providerData.maxMeals) || 30,
+            available: Number(providerData.maxMeals) || 30,
+            ingredients: 'Fresh seasonal vegetables, phulka rotli, fragrant dal, rice & salad',
+            items: ['4 Phulka Rotli', 'Seasonal Sabzi', 'Dal / Kadhi', 'Steamed Rice', 'Salad'],
+            image: defaultDishPhoto,
+            status: 'Active'
+          });
+          await defaultTiffin.save();
+
+          const defaultItem = new TiffinItem({
+            tiffinId: defaultTiffin._id,
+            providerId: newProvider._id.toString(),
+            category: 'Other',
+            name: defaultDishTitle,
+            description: 'Homestyle handcrafted daily thali',
+            image: defaultDishPhoto,
+            unit: 'plate',
+            defaultQuantity: 1,
+            minQuantity: 1,
+            maxQuantity: 10,
+            unitPrice: defaultDishPrice,
+            price: defaultDishPrice,
+            availableQuantity: Number(providerData.maxMeals) || 50,
+            isDefault: true,
+            isAvailable: true,
+            isCustomizable: true,
+            sortOrder: 0
+          });
+          await defaultItem.save();
+        } catch (tiffinErr) {
+          console.warn('Could not auto-create fallback default tiffin for new provider:', tiffinErr.message);
+        }
+      }
 
       // Automatically register/upsert Provider user record in MongoDB User collection
       let updatedUser = null;
@@ -473,7 +646,7 @@ const registerProvider = async (req, res) => {
         success: true, 
         message: 'Kitchen registered successfully',
         data: newProvider, 
-        user: updatedUser ? formatUserPayload(updatedUser) : null,
+        user: updatedUser ? formatUserPayload(updatedUser, newProvider) : null,
         accessToken,
         refreshToken,
         source: 'database' 
@@ -512,23 +685,34 @@ const getProviderDashboardStats = async (req, res) => {
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
-      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const activeKitchenStatuses = [
+      // Active kitchen statuses for orders currently in progress
+      const inProgressStatuses = [
         'New', 'PENDING', 'Pending', 'CONFIRMED', 'Confirmed',
         'ACCEPTED', 'Accepted', 'PREPARING', 'Preparing',
         'READY_FOR_PICKUP', 'Ready', 'DELIVERY_REQUESTED',
         'Delivery', 'Dispatched', 'In Transit', 'At Kitchen',
         'DRIVER_ASSIGNED', 'PICKED_UP', 'Picked Up',
-        'OUT_FOR_DELIVERY', 'Out for Delivery', 'ARRIVED', 'DELIVERED', 'Completed'
+        'OUT_FOR_DELIVERY', 'Out for Delivery', 'ARRIVED'
       ];
 
+      // Strictly orders placed today (excluding cancelled / rejected)
       const todayOrderMatch = {
+        providerId,
+        status: { $nin: ['Cancelled', 'CANCELLED', 'REJECTED', 'Rejected', 'PAYMENT_FAILED', 'DELIVERY_FAILED'] },
+        createdAt: { $gte: startOfDay, $lte: endOfDay }
+      };
+
+      // Orders for Today's Active Orders board:
+      // Orders created today OR orders currently still active in progress
+      const todaysOrdersQuery = {
         providerId,
         status: { $nin: ['Cancelled', 'CANCELLED', 'REJECTED', 'Rejected', 'PAYMENT_FAILED', 'DELIVERY_FAILED'] },
         $or: [
           { createdAt: { $gte: startOfDay, $lte: endOfDay } },
-          { createdAt: { $gte: twentyFourHoursAgo } },
-          { status: { $in: activeKitchenStatuses } }
+          { 
+            status: { $in: inProgressStatuses },
+            createdAt: { $gte: new Date(now.getTime() - 48 * 60 * 60 * 1000) }
+          }
         ]
       };
 
@@ -544,9 +728,9 @@ const getProviderDashboardStats = async (req, res) => {
       ] = await Promise.all([
         Provider.findById(providerId).select('isAcceptingOrders maxMeals').lean(),
         Tiffin.countDocuments({ providerId }),
-        Order.find({ providerId })
+        Order.find(todaysOrdersQuery)
           .sort({ createdAt: -1 })
-          .limit(10)
+          .limit(20)
           .select('orderId customerName totalAmount quantity tiffinName status deliveryPartnerName createdAt items deliverySlot')
           .lean(),
         Order.aggregate([
@@ -586,7 +770,21 @@ const getProviderDashboardStats = async (req, res) => {
           }
         ]),
         Order.countDocuments({ providerId }),
-        MealRequest.countDocuments({ status: 'pending' }),
+        MealRequest.countDocuments({
+          status: 'pending',
+          expiresAt: { $gt: now },
+          $and: [
+            {
+              $or: [
+                { providerId: null },
+                { providerId: { $exists: false } },
+                { providerId: '' },
+                { providerId: String(providerId) }
+              ]
+            },
+            { declinedByProviders: { $ne: String(providerId) } }
+          ]
+        }),
         Order.countDocuments({ providerId, status: 'New' }),
         Review.aggregate([
           { $match: { providerId } },
@@ -635,13 +833,15 @@ const getProviderDashboardStats = async (req, res) => {
         if (o.status === 'Preparing') statusBg = 'bg-indigo-50 text-indigo-700 border-indigo-200';
         if (o.status === 'Ready') statusBg = 'bg-emerald-50 text-emerald-700 border-emerald-200';
         if (o.status === 'New') statusBg = 'bg-indigo-100 text-indigo-800 border-indigo-200';
+        if (o.status === 'Completed' || o.status === 'Delivered') statusBg = 'bg-secondary-container text-on-secondary-fixed-variant';
 
         return {
           id: o.orderId || `#${1024 + i}`,
           customer: o.customerName || 'Customer',
-          amount: o.totalAmount || 240,
+          amount: o.totalAmount !== undefined ? o.totalAmount : 0,
           qtyText: `${o.quantity || 1} x ${o.tiffinName || 'Tiffin'}`,
-          status: o.status || 'Preparing',
+          status: o.status || 'New',
+          createdAt: o.createdAt,
           statusBg
         };
       });
@@ -1352,7 +1552,7 @@ const getProviderPerformance = async (req, res) => {
       if (p) providerId = p._id.toString();
     }
     if (!providerId) {
-      providerId = '6a7f3051d4b48741d8722416';
+      return res.status(403).json({ success: false, message: 'Provider authorization required' });
     }
     const { period = 'This Month', startDate, endDate } = req.query;
 

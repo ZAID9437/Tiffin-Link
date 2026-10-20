@@ -118,7 +118,7 @@ export default function DriversManagementTab({ onOpenDriver360, subTab = 'driver
           className="bg-[#1b1c1a] hover:bg-neutral-800 text-white font-medium text-xs px-4 py-2 flex items-center gap-2 transition-colors shadow-sm"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          <span>Refresh Fleet Database</span>
+          <span>Refresh Fleet</span>
         </button>
       </div>
 
@@ -169,7 +169,7 @@ export default function DriversManagementTab({ onOpenDriver360, subTab = 'driver
               {loading ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-[#665d52]">
-                    Loading driver fleet database...
+                    Loading driver fleet...
                   </td>
                 </tr>
               ) : drivers.length === 0 ? (

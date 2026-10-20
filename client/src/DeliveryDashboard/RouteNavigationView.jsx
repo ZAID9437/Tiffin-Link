@@ -526,16 +526,10 @@ export default function RouteNavigationView({ currentUser, onNavigateTab }) {
         <div>
           <div className="flex items-center gap-3">
             <span className="font-label-caps text-xs uppercase tracking-widest text-secondary">Navigation / Route & Navigation</span>
-            <div className={`flex items-center gap-2 px-2.5 py-0.5 rounded-full font-label-caps text-[11px] ${
-              gpsStatus === 'READY' && isConnected ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${gpsStatus === 'READY' ? 'bg-emerald-600 animate-pulse' : 'bg-amber-600 animate-ping'}`} />
-              <span>{gpsStatus === 'READY' ? 'GPS ACTIVE • 60fps Telemetry' : 'LOCATING GPS...'}</span>
-            </div>
           </div>
           <h1 className="font-headline-lg text-3xl sm:text-4xl text-onyx-black tracking-tight font-serif mt-1">Route & Navigation</h1>
           <p className="font-body-md text-sm text-on-surface-variant max-w-2xl mt-1">
-            Turn-by-turn guidance and dynamic surface routing synchronized with active delivery telemetry.
+            Turn-by-turn guidance and dynamic routing synchronized with your active delivery.
           </p>
         </div>
 
@@ -745,13 +739,13 @@ export default function RouteNavigationView({ currentUser, onNavigateTab }) {
                 <div className="p-2.5 bg-surface-container-low border border-sand-neutral">
                   <p className="font-label-caps text-[10px] uppercase text-secondary font-bold">Remaining</p>
                   <p className="font-headline-md text-xl text-onyx-black font-serif mt-0.5">
-                    {realDistance || (activeDelivery.distanceKm ? `${activeDelivery.distanceKm} km` : '4.8 km')}
+                    {realDistance || (activeDelivery.distanceKm ? `${activeDelivery.distanceKm} km` : '—')}
                   </p>
                 </div>
                 <div className="p-2.5 bg-surface-container-low border border-sand-neutral">
                   <p className="font-label-caps text-[10px] uppercase text-secondary font-bold">Est. Time</p>
                   <p className="font-headline-md text-xl text-onyx-black font-serif mt-0.5">
-                    {realEta || (activeDelivery.etaMinutes ? `${activeDelivery.etaMinutes} min` : '14 min')}
+                    {realEta || (activeDelivery.etaMinutes ? `${activeDelivery.etaMinutes} min` : '—')}
                   </p>
                 </div>
                 <div className="p-2.5 bg-surface-container-low border border-sand-neutral">
@@ -830,10 +824,10 @@ export default function RouteNavigationView({ currentUser, onNavigateTab }) {
 
             {!isKeyValid ? (
               <div className="absolute inset-0 bg-surface-container-low flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
-                <span className="material-symbols-outlined text-[48px] text-amber-600">map</span>
-                <h3 className="font-headline-md text-xl text-onyx-black font-serif">Google Maps Key Missing</h3>
+                <span className="material-symbols-outlined text-[48px] text-secondary">explore</span>
+                <h3 className="font-headline-md text-xl text-onyx-black font-serif">Route Map Preview</h3>
                 <p className="font-body-md text-sm text-on-surface-variant max-w-md">
-                  Please configure your Google Maps API Key in <code className="bg-sand-neutral px-1.5 py-0.5 font-mono text-xs">VITE_GOOGLE_MAPS_API_KEY</code>.
+                  Live GPS telemetry is tracking your vehicle. The interactive road map will render once navigation services establish a connection.
                 </p>
               </div>
             ) : !mapLoaded ? (

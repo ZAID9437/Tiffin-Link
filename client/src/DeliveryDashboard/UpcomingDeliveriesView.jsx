@@ -97,10 +97,8 @@ export default function UpcomingDeliveriesView({
           setError('Your session has expired. Please sign in again.');
         } else if (res.status === 403) {
           setError('You are not authorized to view these deliveries.');
-        } else if (res.status >= 500) {
-          setError(json.message || 'Server error while loading upcoming deliveries.');
         } else {
-          setError(json.message || 'Unable to load upcoming deliveries');
+          setError('Unable to load upcoming deliveries right now. Please try again.');
         }
         return;
       }
@@ -119,7 +117,7 @@ export default function UpcomingDeliveriesView({
       }
     } catch (err) {
       console.error('Error fetching upcoming deliveries:', err);
-      setError('Unable to connect to the delivery server.');
+      setError('Unable to load deliveries. Please check your network connection.');
     } finally {
       setLoading(false);
     }
@@ -230,14 +228,6 @@ export default function UpcomingDeliveriesView({
               <span>MY DELIVERIES</span>
               <span>/</span>
               <span className="text-[#181816] font-semibold">UPCOMING</span>
-              <span className={`inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded border ${
-                isSocketConnected 
-                  ? 'text-[#1b8743] bg-[#eef7ee] border-[#bfe3c6]' 
-                  : 'text-amber-800 bg-amber-50 border-amber-200'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${isSocketConnected ? 'bg-[#1b8743] animate-pulse' : 'bg-amber-500'}`}></span>
-                {isSocketConnected ? 'LIVE QUEUE' : 'SYNCING'}
-              </span>
               {!isOnline && (
                 <span className="inline-flex items-center gap-1 ml-1 px-2 py-0.5 rounded border text-stone-600 bg-stone-100 border-stone-300">
                   <span className="w-1.5 h-1.5 rounded-full bg-stone-400"></span>
@@ -261,12 +251,6 @@ export default function UpcomingDeliveriesView({
               <span className="text-[10px] font-mono uppercase tracking-wider text-[#8a857b] block">Queued Trip Earnings</span>
               <span className="text-base font-semibold text-[#181816] font-mono mt-0.5 block">
                 {loading ? '₹...' : `₹${(metrics.queuedTripEarnings || 0).toFixed(2)}`}
-              </span>
-            </div>
-            <div className="pl-6 flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isSocketConnected ? 'bg-[#1b8743] animate-pulse' : 'bg-amber-500 animate-pulse'}`}></div>
-              <span className="text-[10px] font-mono text-[#706c64]">
-                {isSocketConnected ? 'Auto-synced via Socket.IO' : 'Reconnecting Socket.IO...'}
               </span>
             </div>
           </div>

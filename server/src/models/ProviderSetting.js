@@ -13,6 +13,8 @@ const providerSettingSchema = new mongoose.Schema({
     kitchenBrand: { type: String, default: '' },
     dispatchAddress: { type: String, default: '' },
     avatarUrl: { type: String, default: '' },
+    kitchenPhoto: { type: String, default: '' },
+    kitchenPhotoName: { type: String, default: '' },
     accountStatus: { type: String, default: 'Active Kitchen' },
     fssaiNo: { type: String, default: '' },
     gstinNo: { type: String, default: '' },

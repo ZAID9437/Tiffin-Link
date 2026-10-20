@@ -257,7 +257,7 @@ export default function OrdersManagementTab({ subTab = 'orders-all' }) {
           className="bg-[#1b1c1a] hover:bg-neutral-800 text-white font-medium text-xs px-4 py-2 flex items-center gap-2 transition-colors shadow-sm"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          <span>Refresh Database</span>
+          <span>Refresh Orders</span>
         </button>
       </div>
 
@@ -266,7 +266,7 @@ export default function OrdersManagementTab({ subTab = 'orders-all' }) {
         <div className="bg-white p-3.5 border border-[#ded9d1]/80 shadow-2xs flex flex-col gap-1">
           <span className="font-mono text-[10px] text-[#665d52] uppercase tracking-wider">Total Platform Orders</span>
           <span className="font-mono text-xl font-bold text-[#1a1a1a]">{stats.total}</span>
-          <span className="text-[10px] text-[#665d52]">100% MongoDB audit</span>
+          <span className="text-[10px] text-[#665d52]">100% Verified Records</span>
         </div>
 
         <div className="bg-white p-3.5 border border-[#ded9d1]/80 shadow-2xs flex flex-col gap-1">

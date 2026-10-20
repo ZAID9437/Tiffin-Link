@@ -4,7 +4,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "db:import": "node scripts/import-db.js",
+    "db:export": "node scripts/export-db.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

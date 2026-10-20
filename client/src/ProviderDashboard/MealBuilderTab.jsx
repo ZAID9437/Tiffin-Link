@@ -354,6 +354,14 @@ export default function MealBuilderTab({ tiffins = [], onToast, onNavigateTab })
                                 {isInMeal && <span className="material-symbols-outlined text-bone-white text-[13px]">check</span>}
                               </button>
 
+                              {item.image && (
+                                <img
+                                  src={item.image}
+                                  alt={item.name}
+                                  className="w-10 h-10 rounded-lg object-cover border border-sand-neutral/50 shrink-0 shadow-xs"
+                                />
+                              )}
+
                               <div className="flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <span className={`font-button-text text-sm font-semibold ${isInMeal ? 'text-on-surface' : 'text-secondary'}`}>

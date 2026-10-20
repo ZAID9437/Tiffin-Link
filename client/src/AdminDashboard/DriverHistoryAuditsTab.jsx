@@ -11,7 +11,7 @@ export default function DriverHistoryAuditsTab({ onNavigate }) {
     attestationFailures: '0 Conflicted',
     consensusState: 'Deterministic 100% Consensus',
     nodalSyncEngine: '2PC Atomic',
-    cipherSuite: 'TLS 1.3 // TLS-ECDHE-RSA',
+    cipherSuite: 'TLS 1.3 • TLS-ECDHE-RSA',
     rootBlock: '#1,489,102'
   });
 
@@ -298,7 +298,7 @@ export default function DriverHistoryAuditsTab({ onNavigate }) {
         <div className="max-w-4xl space-y-3">
           <div className="inline-flex items-center gap-2 font-mono text-[#665d52] text-xs uppercase tracking-widest">
             <span className="w-2.5 h-[1px] bg-[#665d52]" />
-            SEC-AUD-IMMUTABLE // ZERO TRUST DISPATCH ENGINE
+            SEC-AUD-IMMUTABLE • ZERO TRUST DISPATCH ENGINE
           </div>
           <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-[#1a1a1a] tracking-tight font-normal">
             Delivery Partner Immutable Audit Ledger
@@ -383,7 +383,7 @@ export default function DriverHistoryAuditsTab({ onNavigate }) {
         <div className="p-6 bg-[#efeeea] border border-[#ded9d1] flex flex-col justify-between">
           <div className="flex items-center justify-between pb-4">
             <span className="font-mono text-xs uppercase tracking-widest text-[#665d52]">Logged Sequences</span>
-            <span className="material-symbols-outlined text-[#4a4238] text-[20px]">database</span>
+            <span className="material-symbols-outlined text-[#4a4238] text-[20px]">history_edu</span>
           </div>
           <div>
             <div className="font-serif text-3xl text-[#1a1a1a] leading-none">{chainMetrics.loggedSequences}</div>
@@ -557,7 +557,7 @@ export default function DriverHistoryAuditsTab({ onNavigate }) {
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-[#1a1a1a] text-[20px]">view_timeline</span>
             <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#1a1a1a]">
-              Sequence Ledger Stream // Chronological Descending
+              Sequence Ledger Stream • Chronological Descending
             </span>
           </div>
           <div className="flex items-center gap-4 text-xs font-mono text-[#665d52]">
@@ -589,13 +589,13 @@ export default function DriverHistoryAuditsTab({ onNavigate }) {
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-[#665d52] font-mono">
                     <span className="material-symbols-outlined text-3xl animate-spin mb-2 block">sync</span>
-                    Loading immutable cryptographic sequence records from MongoDB...
+                    Loading sequence records...
                   </td>
                 </tr>
               ) : events.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-[#665d52] font-mono">
-                    <span className="material-symbols-outlined text-3xl text-stone-300 mb-2 block">database</span>
+                    <span className="material-symbols-outlined text-3xl text-stone-300 mb-2 block">history_edu</span>
                     No audit records match the applied criteria.
                   </td>
                 </tr>
@@ -850,7 +850,7 @@ export default function DriverHistoryAuditsTab({ onNavigate }) {
               {/* Merkle Tree Node Validation Flow */}
               <div className="p-4 bg-[#efeeea] border border-[#ded9d1] space-y-3">
                 <span className="block font-mono text-xs uppercase tracking-wider text-[#665d52] font-semibold">
-                  Cryptographic Node Path // Consensus Attestation
+                  Cryptographic Node Path • Consensus Attestation
                 </span>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 font-mono text-xs text-[#444748]">
                   <div className="px-2.5 py-1 bg-white border border-[#ded9d1]">

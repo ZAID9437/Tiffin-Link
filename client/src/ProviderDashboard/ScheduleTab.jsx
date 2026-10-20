@@ -222,7 +222,7 @@ export default function ScheduleTab() {
       
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-[9999] bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
+        <div className="fixed bottom-6 right-6 z-[9999] bg-onyx-black text-bone-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
           <CheckCircle2 size={17} />
           <span className="font-extrabold">{toastMsg}</span>
         </div>
@@ -236,32 +236,28 @@ export default function ScheduleTab() {
             <span>/</span>
             <span>Operations</span>
             <span>/</span>
-            <span className="text-[#0A8B5F] font-extrabold">Schedule</span>
+            <span className="text-onyx-black font-extrabold">Schedule</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black text-[#111827] tracking-tight">Schedule</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-[#0A8B5F] border border-emerald-200 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              LIVE
-            </span>
+            <h1 className="text-2xl font-black text-onyx-black tracking-tight font-headline-lg">Schedule</h1>
           </div>
-          <p className="text-xs text-[#6B7280] font-medium mt-1">Manage your kitchen hours, order windows & holidays.</p>
+          <p className="text-xs text-secondary font-medium mt-1">Manage your kitchen hours, order windows & holidays.</p>
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button 
             onClick={fetchScheduleFromDb}
-            className="px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+            className="px-3.5 py-2.5 bg-surface-container border border-sand-neutral/40 hover:bg-surface-container-highest text-onyx-black font-button-text font-bold text-xs rounded-xl transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
           >
-            <RotateCw size={14} className="text-[#0A8B5F]" />
+            <RotateCw size={14} className="text-onyx-black" />
             <span>Refresh</span>
           </button>
 
           <button 
             onClick={handleSaveAllSchedule}
             disabled={saving}
-            className="px-5 py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+            className="px-5 py-2.5 bg-onyx-black hover:bg-neutral-800 disabled:opacity-50 text-bone-white font-button-text font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer"
           >
             <Save size={15} />
             <span>{saving ? 'Saving...' : 'Save Changes'}</span>
@@ -295,13 +291,13 @@ export default function ScheduleTab() {
           <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8]">
             <div className="text-xs font-bold text-[#6B7280] mb-2 uppercase">Current Slot</div>
             <div className="text-2xl font-black text-[#111827]">{todayStatus.currentSlot}</div>
-            <p className="text-[10px] text-[#0A8B5F] font-semibold mt-1">Active Meal Window</p>
+            <p className="text-[10px] text-secondary font-semibold mt-1">Active Meal Window</p>
           </div>
 
           {/* Card 3: Orders Status & Cutoff */}
           <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8]">
             <div className="text-xs font-bold text-[#6B7280] mb-2 uppercase">Orders</div>
-            <div className="text-2xl font-black text-[#0A8B5F]">{todayStatus.ordersStatusText}</div>
+            <div className="text-2xl font-black text-onyx-black">{todayStatus.ordersStatusText}</div>
             <p className="text-[10px] text-[#6B7280] font-semibold mt-1">Order Cutoff System Enforced</p>
           </div>
 
@@ -318,7 +314,7 @@ export default function ScheduleTab() {
           <button
             type="button"
             onClick={handleSaveAllSchedule}
-            className="text-xs text-[#0A8B5F] font-black hover:underline cursor-pointer"
+            className="text-xs text-onyx-black font-black hover:underline cursor-pointer"
           >
             Save All Days
           </button>
@@ -343,7 +339,7 @@ export default function ScheduleTab() {
                         type="text" 
                         value={editOpenTime}
                         onChange={e => setEditOpenTime(e.target.value)}
-                        className="w-24 px-2.5 py-1 bg-white border border-[#0A8B5F] rounded-lg text-xs font-black"
+                        className="w-24 px-2.5 py-1 bg-white border border-onyx-black rounded-lg text-xs font-black"
                         placeholder="09:00 AM"
                       />
                       <span className="text-xs text-[#6B7280]">to</span>
@@ -351,12 +347,12 @@ export default function ScheduleTab() {
                         type="text" 
                         value={editCloseTime}
                         onChange={e => setEditCloseTime(e.target.value)}
-                        className="w-24 px-2.5 py-1 bg-white border border-[#0A8B5F] rounded-lg text-xs font-black"
+                        className="w-24 px-2.5 py-1 bg-white border border-onyx-black rounded-lg text-xs font-black"
                         placeholder="09:00 PM"
                       />
                       <button 
                         onClick={() => handleSaveDayHours(item.day)}
-                        className="p-1.5 bg-[#0A8B5F] text-white rounded-lg cursor-pointer ml-1"
+                        className="p-1.5 bg-onyx-black text-bone-white rounded-lg cursor-pointer ml-1"
                       >
                         <Check size={14} />
                       </button>
@@ -398,7 +394,7 @@ export default function ScheduleTab() {
                       }}
                       className="px-3 py-1 bg-white border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1"
                     >
-                      <Edit3 size={13} className="text-[#0A8B5F]" />
+                      <Edit3 size={13} className="text-onyx-black" />
                       <span>Edit</span>
                     </button>
                   )}
@@ -442,7 +438,7 @@ export default function ScheduleTab() {
                         type="text"
                         value={editCutoff}
                         onChange={e => setEditCutoff(e.target.value)}
-                        className="w-full px-2.5 py-1 bg-white border border-[#0A8B5F] rounded-lg text-xs font-black"
+                        className="w-full px-2.5 py-1 bg-white border border-onyx-black rounded-lg text-xs font-black"
                       />
                     </div>
                     <div>
@@ -451,7 +447,7 @@ export default function ScheduleTab() {
                         type="text"
                         value={editDeliveryStart}
                         onChange={e => setEditDeliveryStart(e.target.value)}
-                        className="w-full px-2.5 py-1 bg-white border border-[#0A8B5F] rounded-lg text-xs font-black"
+                        className="w-full px-2.5 py-1 bg-white border border-onyx-black rounded-lg text-xs font-black"
                       />
                     </div>
                     <div>
@@ -460,7 +456,7 @@ export default function ScheduleTab() {
                         type="text"
                         value={editDeliveryEnd}
                         onChange={e => setEditDeliveryEnd(e.target.value)}
-                        className="w-full px-2.5 py-1 bg-white border border-[#0A8B5F] rounded-lg text-xs font-black"
+                        className="w-full px-2.5 py-1 bg-white border border-onyx-black rounded-lg text-xs font-black"
                       />
                     </div>
 
@@ -475,7 +471,7 @@ export default function ScheduleTab() {
                       <button 
                         type="button"
                         onClick={() => handleSaveWindowEdit(win.name)}
-                        className="px-3 py-1 bg-[#0A8B5F] text-white text-xs font-bold rounded-lg cursor-pointer"
+                        className="px-3 py-1 bg-onyx-black text-bone-white text-xs font-bold rounded-lg cursor-pointer"
                       >
                         Save Window
                       </button>
@@ -502,7 +498,7 @@ export default function ScheduleTab() {
                           setEditDeliveryStart(win.deliveryStartTime);
                           setEditDeliveryEnd(win.deliveryEndTime);
                         }}
-                        className="text-xs text-[#0A8B5F] font-black hover:underline cursor-pointer flex items-center gap-1"
+                        className="text-xs text-onyx-black font-black hover:underline cursor-pointer flex items-center gap-1"
                       >
                         <Edit3 size={12} />
                         <span>Edit Window</span>
@@ -527,7 +523,7 @@ export default function ScheduleTab() {
           <button 
             type="button"
             onClick={() => setIsAddDateModalOpen(true)}
-            className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2 bg-onyx-black hover:bg-neutral-800 text-bone-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
           >
             <Plus size={15} />
             <span>+ Add Special Date</span>
@@ -606,11 +602,11 @@ export default function ScheduleTab() {
               <div className="space-y-1">
                 <label className="text-xs font-bold text-[#6B7280]">Date (E.g. 18 Aug, 25 Aug, 2026-08-20)</label>
                 <input 
-                  type="text"
+                  type="text" 
                   placeholder="18 Aug"
                   value={newDateVal}
                   onChange={e => setNewDateVal(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+                  className="w-full px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-onyx-black"
                   required
                 />
               </div>
@@ -618,11 +614,11 @@ export default function ScheduleTab() {
               <div className="space-y-1">
                 <label className="text-xs font-bold text-[#6B7280]">Reason / Occasion</label>
                 <input 
-                  type="text"
+                  type="text" 
                   placeholder="E.g., Festival, Kitchen Cleaning, Public Holiday"
                   value={newReasonVal}
                   onChange={e => setNewReasonVal(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+                  className="w-full px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-onyx-black"
                 />
               </div>
 
@@ -636,7 +632,7 @@ export default function ScheduleTab() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer"
+                  className="px-5 py-2 bg-onyx-black hover:bg-neutral-800 text-bone-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer"
                 >
                   Add Date
                 </button>

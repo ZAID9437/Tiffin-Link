@@ -134,7 +134,7 @@ export default function CapacityTab({ currentUser }) {
       
       {/* Toast Notification Banner */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-[9999] bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
+        <div className="fixed bottom-6 right-6 z-[9999] bg-onyx-black text-bone-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
           <CheckCircle2 size={17} />
           <span className="font-extrabold">{toastMsg}</span>
         </div>
@@ -148,12 +148,12 @@ export default function CapacityTab({ currentUser }) {
             <span>/</span>
             <span>Operations</span>
             <span>/</span>
-            <span className="text-[#0A8B5F] font-extrabold">Kitchen Capacity</span>
+            <span className="text-onyx-black font-extrabold">Kitchen Capacity</span>
           </div>
           
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-black text-[#111827] tracking-tight">Kitchen Capacity</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-[#0A8B5F] border border-emerald-200 flex items-center gap-1">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               LIVE
             </span>
@@ -166,14 +166,14 @@ export default function CapacityTab({ currentUser }) {
             onClick={fetchCapacityFromDb}
             className="px-3.5 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
           >
-            <RotateCw size={14} className="text-[#0A8B5F]" />
+            <RotateCw size={14} className="text-onyx-black" />
             <span>Refresh</span>
           </button>
 
           <button 
             onClick={handleSaveSettings}
             disabled={saving}
-            className="px-5 py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] disabled:opacity-50 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+            className="px-5 py-2.5 bg-onyx-black hover:bg-neutral-800 disabled:opacity-50 text-bone-white font-button-text font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer"
           >
             <Save size={15} />
             <span>{saving ? 'Saving...' : 'Save Changes'}</span>
@@ -201,8 +201,8 @@ export default function CapacityTab({ currentUser }) {
           {/* Card 2: Orders Accepted */}
           <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8]">
             <div className="text-xs font-bold text-[#6B7280] mb-2 uppercase">Orders Accepted</div>
-            <div className="text-4xl font-black text-[#0A8B5F]">{todaySummary.bookedCount}</div>
-            <p className="text-[10px] text-[#0A8B5F] font-semibold mt-1">Confirmed orders placed in DB</p>
+            <div className="text-4xl font-black text-onyx-black">{todaySummary.bookedCount}</div>
+            <p className="text-[10px] text-secondary font-semibold mt-1">Confirmed orders placed in DB</p>
           </div>
 
           {/* Card 3: Remaining Capacity */}
@@ -220,15 +220,15 @@ export default function CapacityTab({ currentUser }) {
 
         {/* Capacity Usage Progress Bar */}
         <div className="space-y-2 pt-2">
-          <div className="flex justify-between items-center text-xs font-black">
-            <span className="text-[#111827]">Capacity Usage</span>
-            <span className="text-[#0A8B5F]">{percentage}%</span>
+          <div className="flex justify-between items-center text-xs font-label-caps font-bold">
+            <span className="text-onyx-black">Capacity Usage</span>
+            <span className="text-onyx-black">{percentage}%</span>
           </div>
 
-          <div className="w-full h-4 bg-[#F4F7F5] rounded-full overflow-hidden p-0.5 border border-[#E5ECE8]">
+          <div className="w-full h-3 bg-sand-neutral/30 rounded-full overflow-hidden p-0.5 border border-sand-neutral/40">
             <div 
               className={`h-full rounded-full transition-all duration-500 ${
-                percentage >= 100 ? 'bg-red-500' : percentage >= 80 ? 'bg-amber-500' : 'bg-[#0A8B5F]'
+                percentage >= 100 ? 'bg-error' : percentage >= 80 ? 'bg-amber-600' : 'bg-onyx-black'
               }`} 
               style={{ width: `${percentage}%` }}
             />
@@ -282,11 +282,11 @@ export default function CapacityTab({ currentUser }) {
                               max="500"
                               value={editingCapacityVal}
                               onChange={(e) => setEditingCapacityVal(Number(e.target.value))}
-                              className="w-20 px-2 py-1 bg-white border border-[#0A8B5F] rounded-lg text-xs font-black text-[#111827] focus:outline-none"
+                              className="w-20 px-2 py-1 bg-white border border-onyx-black rounded-lg text-xs font-black text-[#111827] focus:outline-none"
                             />
                             <button 
                               onClick={() => handleSaveDateCapacity(item.date, editingCapacityVal)}
-                              className="p-1.5 bg-[#0A8B5F] text-white rounded-lg hover:bg-[#08734E] cursor-pointer"
+                              className="p-1.5 bg-onyx-black text-white rounded-lg hover:bg-neutral-800 cursor-pointer"
                               title="Save"
                             >
                               <Check size={14} />
@@ -304,7 +304,7 @@ export default function CapacityTab({ currentUser }) {
                         )}
                       </td>
 
-                      <td className="p-4 text-[#0A8B5F] font-black text-sm">{item.bookedCount}</td>
+                      <td className="p-4 text-onyx-black font-black text-sm">{item.bookedCount}</td>
 
                       <td className="p-4 font-black text-sm">
                         <span className={item.availableCapacity > 0 ? 'text-indigo-600' : 'text-red-600'}>
@@ -331,7 +331,7 @@ export default function CapacityTab({ currentUser }) {
                             }}
                             className="px-3 py-1.5 bg-white border border-[#E5ECE8] hover:bg-gray-50 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer ml-auto"
                           >
-                            <Edit2 size={13} className="text-[#0A8B5F]" />
+                            <Edit2 size={13} className="text-onyx-black" />
                             <span>Manage</span>
                           </button>
                         )}
@@ -365,7 +365,7 @@ export default function CapacityTab({ currentUser }) {
                 max="1000"
                 value={maxDailyOrders}
                 onChange={e => setMaxDailyOrders(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-white border border-[#E5ECE8] rounded-xl text-xs font-black text-[#111827] text-center focus:outline-none focus:border-[#0A8B5F]"
+                className="w-full px-3 py-2 bg-white border border-[#E5ECE8] rounded-xl text-xs font-black text-[#111827] text-center focus:outline-none focus:border-onyx-black"
               />
             </div>
           </div>
@@ -379,44 +379,44 @@ export default function CapacityTab({ currentUser }) {
             <button
               type="button"
               onClick={() => setAutoStopOrders(!autoStopOrders)}
-              className={`w-14 h-7 rounded-full p-1 transition-colors cursor-pointer ${autoStopOrders ? 'bg-[#0A8B5F]' : 'bg-gray-300'}`}
+              className={`w-14 h-7 rounded-full p-1 transition-colors cursor-pointer ${autoStopOrders ? 'bg-onyx-black' : 'bg-surface-container-high'}`}
             >
               <div className={`w-5 h-5 rounded-full bg-white transition-transform ${autoStopOrders ? 'translate-x-7' : 'translate-x-0'}`} />
             </button>
           </div>
 
           {/* Setting 3: Stop Accepting Indicator */}
-          <div className="flex items-center justify-between p-4 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8]">
+          <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-sand-neutral/40">
             <div>
-              <div className="text-xs font-black text-[#111827]">Stop accepting when</div>
-              <div className="text-[11px] text-[#6B7280] font-medium">Current booked ratio threshold for auto-pausing</div>
+              <div className="text-xs font-label-caps font-bold text-onyx-black">Stop accepting when</div>
+              <div className="text-[11px] text-secondary font-medium">Current booked ratio threshold for auto-pausing</div>
             </div>
-            <div className="px-4 py-2 bg-white border border-[#E5ECE8] rounded-xl text-xs font-black text-[#0A8B5F]">
+            <div className="px-4 py-2 bg-surface-container border border-sand-neutral/40 rounded-xl text-xs font-bold font-mono text-onyx-black">
               [ {todaySummary.bookedCount} / {todaySummary.totalCapacity} ]
             </div>
           </div>
 
           {/* Setting 4: Allow Overbooking */}
-          <div className="flex items-center justify-between p-4 bg-[#F9FBF9] rounded-xl border border-[#E5ECE8]">
+          <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl border border-sand-neutral/40">
             <div>
-              <div className="text-xs font-black text-[#111827]">Allow Overbooking</div>
-              <div className="text-[11px] text-[#6B7280] font-medium">Permit receiving orders even if maximum capacity limit is exceeded</div>
+              <div className="text-xs font-label-caps font-bold text-onyx-black">Allow Overbooking</div>
+              <div className="text-[11px] text-secondary font-medium">Permit receiving orders even if maximum capacity limit is exceeded</div>
             </div>
             <button
               type="button"
               onClick={() => setAllowOverbooking(!allowOverbooking)}
-              className={`w-14 h-7 rounded-full p-1 transition-colors cursor-pointer ${allowOverbooking ? 'bg-[#0A8B5F]' : 'bg-gray-300'}`}
+              className={`w-14 h-7 rounded-full p-1 transition-colors cursor-pointer ${allowOverbooking ? 'bg-onyx-black' : 'bg-surface-container-high'}`}
             >
               <div className={`w-5 h-5 rounded-full bg-white transition-transform ${allowOverbooking ? 'translate-x-7' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>
 
-        <div className="pt-4 border-t border-[#E5ECE8] flex justify-end">
+        <div className="pt-4 border-t border-sand-neutral/40 flex justify-end">
           <button 
             type="submit"
             disabled={saving}
-            className="px-6 py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer"
           >
             <Save size={15} />
             <span>{saving ? 'Saving Settings...' : 'Save Settings'}</span>

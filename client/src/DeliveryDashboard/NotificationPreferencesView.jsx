@@ -11,7 +11,7 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [successBanner, setSuccessBanner] = useState(true);
+  const [successBanner, setSuccessBanner] = useState(false);
   const [pingAlertVisible, setPingAlertVisible] = useState(false);
   const [pingLoading, setPingLoading] = useState(false);
   const [previewBannerText, setPreviewBannerText] = useState(null);
@@ -94,7 +94,7 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
       if (res.ok && json.success && json.data && json.data.notificationPreferences) {
         setPreferences(json.data.notificationPreferences);
         setInitialPreferences(json.data.notificationPreferences);
-        if (isManual && onShowToast) onShowToast('✓ Notification preferences loaded from MongoDB.');
+        if (isManual && onShowToast) onShowToast('✓ Notification preferences loaded successfully.');
       } else {
         if (!initialPreferences) {
           console.warn('Preferences fetch warning:', json.message);
@@ -102,7 +102,7 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
       }
     } catch (err) {
       console.error('Error fetching notification preferences:', err);
-      if (isManual) setErrorMessage('Unable to load notification preferences from server.');
+      if (isManual) setErrorMessage('Unable to load notification preferences. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -164,7 +164,7 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
       if (res.ok && json.success) {
         setInitialPreferences(preferences);
         setSuccessBanner(true);
-        if (onShowToast) onShowToast('✓ Notification preferences updated successfully in MongoDB!');
+        if (onShowToast) onShowToast('✓ Notification preferences updated successfully!');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         setErrorMessage(json.message || 'Failed to update preferences.');
@@ -172,8 +172,8 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
       }
     } catch (err) {
       console.error('Error saving notification preferences:', err);
-      setErrorMessage('Network error while saving notification preferences.');
-      if (onShowToast) onShowToast('⚠️ Network error while saving preferences.');
+      setErrorMessage('Unable to save notification preferences. Please try again.');
+      if (onShowToast) onShowToast('⚠️ Unable to save preferences. Please check your connection.');
     } finally {
       setSaving(false);
     }
@@ -247,7 +247,7 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
       <div className="py-24 text-center space-y-4">
         <span className="material-symbols-outlined text-4xl text-onyx-black animate-spin">autorenew</span>
         <h3 className="font-headline-md text-xl text-onyx-black font-serif">Loading Notification Preferences...</h3>
-        <p className="font-body-md text-xs text-clay-earth">Fetching real-time preferences from MongoDB driver_preferences...</p>
+        <p className="font-body-md text-xs text-clay-earth">Fetching your notification preferences...</p>
       </div>
     );
   }
@@ -271,7 +271,7 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
                 Notification preferences updated successfully
               </span>
               <span className="font-label-caps text-[11px] text-clay-earth uppercase tracking-widest mt-1">
-                Scoped to Driver Principal #{driverIdDisplay} • Synced to MongoDB driver_preferences collection
+                Notification Settings Active
               </span>
             </div>
           </div>
@@ -315,15 +315,6 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
             <span className="font-label-caps text-label-caps text-clay-earth uppercase tracking-widest text-xs">Settings</span>
             <span className="text-clay-earth text-xs font-mono">/</span>
             <span className="font-label-caps text-label-caps text-onyx-black uppercase tracking-widest font-bold text-xs">Notification Preferences</span>
-            <span className="text-clay-earth text-xs font-mono">•</span>
-            <div className="flex items-center gap-1.5 bg-sand-neutral px-2 py-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-onyx-black" />
-              <span className="font-label-caps text-[10px] text-onyx-black uppercase tracking-wider font-semibold">MongoDB driver_preferences synced</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-bone-white px-2 py-0.5 border border-sand-neutral/50">
-              <span className="w-1.5 h-1.5 rounded-full bg-clay-earth animate-pulse" />
-              <span className="font-label-caps text-[10px] text-clay-earth uppercase tracking-wider font-semibold">Client WebSocket Active</span>
-            </div>
           </div>
 
           <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-none mb-3 font-serif text-3xl sm:text-4xl">
@@ -362,7 +353,7 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
             <span className="material-symbols-outlined text-bone-white text-2xl">priority_high</span>
             <div className="flex flex-col">
               <span className="font-button-text text-sm tracking-wider uppercase font-bold text-white">Simulated Haptic &amp; 95dB Intercom Ping Sent</span>
-              <span className="font-label-caps text-[11px] text-sand-neutral uppercase tracking-widest">WebSocket event `DISPATCH_TEST_PROBE` emitted to Handset #{driverIdDisplay}</span>
+              <span className="font-label-caps text-[11px] text-sand-neutral uppercase tracking-widest">Test notification alert emitted to device</span>
             </div>
           </div>
           <span className="font-label-caps text-[10px] bg-clay-earth px-2 py-1 text-white uppercase font-bold">RTT: 14ms</span>
@@ -965,7 +956,7 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
                 </p>
               </div>
               <div className="pt-6 mt-4 flex items-center justify-between text-clay-earth border-t border-sand-neutral/40">
-                <span className="font-label-caps text-[10px] uppercase">Latency: ~35ms</span>
+                <span className="font-label-caps text-[10px] uppercase">Delivery: Instant</span>
                 <span className={`font-label-caps text-[10px] uppercase font-bold ${preferences.channels?.inApp ? 'text-onyx-black' : 'text-clay-earth'}`}>
                   {preferences.channels?.inApp ? 'Online' : 'Disabled'}
                 </span>
@@ -1366,13 +1357,13 @@ export default function NotificationPreferencesView({ currentUser, onNavigateTab
         </div>
       </div>
 
-      {/* Cryptographic Provenance Metadata Stamp */}
-      <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-3 text-clay-earth border-t border-sand-neutral/60 mt-12">
-        <span className="font-label-caps text-[10px] uppercase tracking-widest font-mono">
-          SECURITY PROTOCOL SHA-256 • SCOPED PRINCIPAL: {driverNameDisplay.toUpperCase()} (#{driverIdDisplay})
+      {/* Courier Notification Security & Provenance Footer */}
+      <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-3 text-clay-earth border-t border-sand-neutral/60 mt-12 font-semibold">
+        <span className="font-label-caps text-[10px] uppercase tracking-widest">
+          COURIER PARTNER: {driverNameDisplay.toUpperCase()}
         </span>
-        <span className="font-label-caps text-[10px] uppercase tracking-widest font-mono">
-          CLOUD-SYNC PROTOCOL V4.2 • MONGO_COLLECTION: DRIVER_PREFERENCES
+        <span className="font-label-caps text-[10px] uppercase tracking-widest">
+          NOTIFICATIONS ACTIVE • TIFFINLINK COURIER NETWORK
         </span>
       </div>
 

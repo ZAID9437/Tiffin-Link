@@ -6,6 +6,38 @@ const { ensureConnected } = require('../config/db');
 
 const isDbConnected = async () => await ensureConnected();
 
+const defaultSessions = [
+  {
+    id: 'sess_1',
+    device: 'Desktop Terminal (Windows)',
+    os: 'Windows 11',
+    browser: 'Chrome 129.0',
+    location: 'Ahmedabad, India',
+    ip: '152.58.18.94',
+    lastActive: 'Active Now',
+    tokenSig: 'sess_prov_jwt_991',
+    isCurrent: true
+  }
+];
+
+const defaultLogs = [
+  {
+    id: 'log_1',
+    event: 'Master Login Authenticated',
+    details: 'Provider session established',
+    timestamp: 'Today, 09:15 AM',
+    sig: 'sig_auth_991',
+    status: 'SUCCESS'
+  },
+  {
+    id: 'log_2',
+    event: 'Profile Credentials Synchronized',
+    details: 'Security parameters updated',
+    timestamp: 'Yesterday, 06:40 PM',
+    sig: 'sig_sync_992',
+    status: 'SUCCESS'
+  }
+];
 
 // Helper to ensure default provider settings document exists
 const getOrCreateProviderSetting = async (pId, realProvider, realUser) => {
@@ -20,7 +52,8 @@ const getOrCreateProviderSetting = async (pId, realProvider, realUser) => {
         phone: realProvider?.mobile || realUser?.phone || '',
         kitchenBrand: realProvider?.businessName || realProvider?.name || 'Kitchen Partner',
         dispatchAddress: [realProvider?.address?.houseNo, realProvider?.address?.street, realProvider?.address?.city].filter(Boolean).join(', ') || '',
-        avatarUrl: realProvider?.image || '',
+        avatarUrl: realProvider?.kitchenPhoto || realProvider?.kitchenPhotos || realProvider?.image || realUser?.kitchenPhoto || realUser?.image || '',
+        kitchenPhoto: realProvider?.kitchenPhoto || realProvider?.kitchenPhotos || realProvider?.image || realUser?.kitchenPhoto || realUser?.image || '',
         accountStatus: 'Active Kitchen',
         fssaiNo: realProvider?.fssaiLicenseNo || realProvider?.fssaiNumber || '',
         gstinNo: realProvider?.gstinNo || '',
@@ -179,12 +212,17 @@ const updateProviderSettings = async (req, res) => {
       const newEmail = updatedData.account?.email;
       const newPhone = updatedData.account?.phone;
       const newAddress = updatedData.account?.dispatchAddress || updatedData.business?.address;
+      const newKitchenPhoto = updatedData.account?.kitchenPhoto || updatedData.account?.avatarUrl;
 
       if (req.user?._id) {
         const userUpdate = {};
         if (newFullName) userUpdate.name = newFullName;
         if (newPhone) userUpdate.phone = newPhone;
         if (newEmail) userUpdate.email = newEmail.trim().toLowerCase();
+        if (newKitchenPhoto) {
+          userUpdate.kitchenPhoto = newKitchenPhoto;
+          userUpdate.image = newKitchenPhoto;
+        }
         await User.findByIdAndUpdate(req.user._id, { $set: userUpdate });
       }
 
@@ -197,6 +235,11 @@ const updateProviderSettings = async (req, res) => {
         if (newFullName) providerUpdate.fullName = newFullName;
         if (newEmail) providerUpdate.email = newEmail;
         if (newPhone) providerUpdate.mobile = newPhone;
+        if (newKitchenPhoto) {
+          providerUpdate.kitchenPhoto = newKitchenPhoto;
+          providerUpdate.kitchenPhotos = newKitchenPhoto;
+          providerUpdate.image = newKitchenPhoto;
+        }
         if (newAddress) {
           providerUpdate.address = {
             street: newAddress,
@@ -259,12 +302,17 @@ const getAccountSettings = async (req, res) => {
 const updateAccountSettings = async (req, res) => {
   try {
     const pId = req.providerId.toString();
-    const { name, email, phone, kitchenBrand, dispatchAddress, tags } = req.body;
+    const { name, email, phone, kitchenBrand, dispatchAddress, tags, kitchenPhoto, avatarUrl } = req.body;
+    const photoToSave = kitchenPhoto || avatarUrl;
 
     const setObj = {};
     if (name) setObj['account.name'] = name;
     if (email) setObj['account.email'] = email;
     if (phone) setObj['account.phone'] = phone;
+    if (photoToSave !== undefined) {
+      setObj['account.avatarUrl'] = photoToSave;
+      setObj['account.kitchenPhoto'] = photoToSave;
+    }
     if (kitchenBrand) {
       setObj['account.kitchenBrand'] = kitchenBrand;
       setObj['business.providerName'] = kitchenBrand;
@@ -288,6 +336,10 @@ const updateAccountSettings = async (req, res) => {
       if (name) uUp.name = name;
       if (email) uUp.email = email;
       if (phone) uUp.phone = phone;
+      if (photoToSave !== undefined) {
+        uUp.kitchenPhoto = photoToSave;
+        uUp.image = photoToSave;
+      }
       await User.findByIdAndUpdate(req.user._id, { $set: uUp });
     }
     if (req.provider?._id) {
@@ -300,6 +352,11 @@ const updateAccountSettings = async (req, res) => {
         pUp.businessName = kitchenBrand;
       }
       if (tags) pUp.tags = tags;
+      if (photoToSave !== undefined) {
+        pUp.kitchenPhoto = photoToSave;
+        pUp.kitchenPhotos = photoToSave;
+        pUp.image = photoToSave;
+      }
       await Provider.findByIdAndUpdate(req.provider._id, { $set: pUp });
     }
 

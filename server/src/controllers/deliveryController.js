@@ -61,6 +61,25 @@ const registerDelivery = async (req, res) => {
       understandBackgroundCheck
     } = req.body;
 
+    // Enforce minimum 18 years of age requirement for delivery partners
+    if (dob) {
+      const birthDate = new Date(dob);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        if (age < 18) {
+          return res.status(400).json({
+            success: false,
+            message: 'All delivery partners must be at least 18 years of age to register.'
+          });
+        }
+      }
+    }
+
     const resolvedFullName = (fullName || req.body.name || req.body.nameOnCard || req.user?.fullName || req.user?.name || 'Delivery Partner').trim();
     const resolvedEmail = (email || req.body.userEmail || req.user?.email || 'partner@tiffinlink.com').toLowerCase().trim();
     const resolvedMobile = (mobile || req.body.phone || req.body.phoneNumber || req.user?.phone || '+91 98765 43210').trim();

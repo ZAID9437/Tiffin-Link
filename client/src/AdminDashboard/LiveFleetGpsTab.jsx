@@ -403,7 +403,7 @@ export default function LiveFleetGpsTab({ onNavigate, onOpenDriver360 }) {
 
               {/* Cartographic District Labels */}
               <div className="absolute top-5 left-10 font-mono text-[9px] text-[#665d52] tracking-widest uppercase pointer-events-none">
-                CORRIDOR // S.G. HIGHWAY EXPRESS
+                CORRIDOR • S.G. HIGHWAY EXPRESS
               </div>
               <div className="absolute top-44 left-40 font-serif text-sm text-[#1a1a1a]/70 font-semibold tracking-wide pointer-events-none">
                 BODAKDEV SECTOR

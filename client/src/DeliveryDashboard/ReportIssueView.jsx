@@ -14,10 +14,10 @@ export default function ReportIssueView({ currentUser, onNavigateTab, onShowToas
   const [driverProfile, setDriverProfile] = useState(null);
 
   // Form State
-  const [selectedCategory, setSelectedCategory] = useState('KITCHEN_ISSUE');
+  const [selectedCategory, setSelectedCategory] = useState('DELIVERY_ISSUE');
   const [selectedOrder, setSelectedOrder] = useState('NONE');
-  const [selectedPriority, setSelectedPriority] = useState('HIGH');
-  const [description, setDescription] = useState('Upon arriving at Pali Hill Kitchen Hub for pickup, the hot-box container seal was compromised with dal spillage from container #2. Kitchen partner refused immediate repacking. Recipient customer Bhavin Shah notified via customer chat.');
+  const [selectedPriority, setSelectedPriority] = useState('MEDIUM');
+  const [description, setDescription] = useState('');
   const [contactPreference, setContactPreference] = useState('PHONE');
   const [attachment, setAttachment] = useState(null);
 
@@ -265,7 +265,10 @@ export default function ReportIssueView({ currentUser, onNavigateTab, onShowToas
 
     } catch (err) {
       console.error('Error submitting report:', err);
-      alert(`Submission Failed: ${err.message}`);
+      const friendlyMsg = err.message && !err.message.includes('fetch') && !err.message.includes('Mongo')
+        ? err.message
+        : 'Unable to submit report. Please check your connection and try again.';
+      alert(friendlyMsg);
     } finally {
       setSubmitting(false);
     }
@@ -309,7 +312,7 @@ export default function ReportIssueView({ currentUser, onNavigateTab, onShowToas
           <span className="font-label-caps text-label-caps tracking-widest text-onyx-black uppercase">Report an Issue</span>
           <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 bg-bone-white text-[11px] font-label-caps text-on-surface-variant uppercase tracking-wider ml-2">
             <span className="w-1.5 h-1.5 rounded-full bg-onyx-black"></span>
-            MongoDB issueReports Synced • Audit v2.4
+            Safety Incident Reporting • Active
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -347,7 +350,7 @@ export default function ReportIssueView({ currentUser, onNavigateTab, onShowToas
         <div className="text-left md:text-right shrink-0">
           <span className="font-label-caps text-[11px] uppercase tracking-widest text-clay-earth block">Authenticated Officer</span>
           <span className="font-headline-md text-headline-md text-onyx-black leading-tight block">{driverProfile?.name || driverName}</span>
-          <span className="font-label-caps text-label-caps text-clay-earth block">#{driverProfile?.driverId || driverCode} • {driverProfile?.vehicleType || 'Tier 1 Senior Courier'}</span>
+          <span className="font-label-caps text-label-caps text-clay-earth block">{driverProfile?.vehicleType || 'Tier 1 Senior Courier'}</span>
         </div>
       </div>
 
@@ -728,7 +731,7 @@ export default function ReportIssueView({ currentUser, onNavigateTab, onShowToas
                     {submitting ? (
                       <>
                         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        <span>Submitting to MongoDB...</span>
+                        <span>Submitting Report...</span>
                       </>
                     ) : (
                       <>
@@ -860,7 +863,7 @@ export default function ReportIssueView({ currentUser, onNavigateTab, onShowToas
           {loading ? (
             <div className="py-12 text-center text-clay-earth">
               <span className="w-6 h-6 border-2 border-onyx-black border-t-transparent rounded-full animate-spin inline-block mb-2"></span>
-              <p className="font-body-md text-sm">Fetching authenticated driver report history from MongoDB...</p>
+              <p className="font-body-md text-sm">Loading your safety reports...</p>
             </div>
           ) : filteredReports.length === 0 ? (
             <div className="py-12 text-center bg-bone-white/50 border border-dashed border-sand-neutral">
@@ -988,17 +991,17 @@ export default function ReportIssueView({ currentUser, onNavigateTab, onShowToas
         </div>
       )}
 
-      {/* Cryptographic Hardware & Compliance Signature Footer */}
+      {/* Courier Safety & Compliance Footer */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-6 border-t border-sand-neutral text-clay-earth font-label-caps text-[11px]">
         <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-sm text-onyx-black">fingerprint</span>
-          <span>Session Token: SHA-256 [0x78FA...{driverProfile?.driverId || driverCode}]</span>
-          <span className="hidden md:inline">• Carrier: Jio Mobility 5G Private APN</span>
+          <span className="material-symbols-outlined text-sm text-onyx-black">verified_user</span>
+          <span>Courier Partner: {driverProfile?.name || driverName}</span>
+          <span className="hidden md:inline">• Active Safety Dispatch</span>
         </div>
         <div className="flex items-center gap-4">
-          <span>TiffinLink Driver Safety Framework 2026</span>
+          <span>TiffinLink Courier Safety Network</span>
           <span className="w-1 h-1 rounded-full bg-sand-neutral"></span>
-          <span className="text-onyx-black">Hub 12 Security Gateway Active</span>
+          <span className="text-onyx-black">24/7 Rapid Response</span>
         </div>
       </div>
 

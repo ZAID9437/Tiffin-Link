@@ -15,8 +15,15 @@ export default function DriverSidebar({
   onLogout,
   counts = { requests: 0, active: 0, notifications: 0 }
 }) {
-  const driverName = currentUser?.name || 'Rajesh Kumar';
-  const driverId = currentUser?.id || currentUser?._id || 'TL-8041';
+  const savedUserStr = typeof window !== 'undefined' ? (localStorage.getItem('user') || localStorage.getItem('tiffinlink_user')) : null;
+  let savedUser = null;
+  try {
+    if (savedUserStr) savedUser = JSON.parse(savedUserStr);
+  } catch (e) {}
+
+  const driverName = currentUser?.fullName || currentUser?.name || savedUser?.fullName || savedUser?.name || 'Delivery Partner';
+  const rawId = currentUser?.driverId || currentUser?.driverCode || savedUser?.driverId || currentUser?.id || currentUser?._id || savedUser?.id || savedUser?._id || '';
+  const driverId = rawId ? (!/^[0-9a-fA-F]{24}$/.test(rawId) ? rawId : `TL-${String(rawId).slice(-4).toUpperCase()}`) : '';
 
   // State to track expanded sections for tree hierarchy
   const [expandedGroups, setExpandedGroups] = useState({
@@ -28,15 +35,15 @@ export default function DriverSidebar({
   });
 
   useEffect(() => {
-    if (['active-delivery', 'upcoming', 'completed'].includes(activeTab)) {
+    if (['active-delivery', 'upcoming', 'completed', 'upcoming-deliveries', 'completed-deliveries', 'delivery-history'].includes(activeTab)) {
       setExpandedGroups(prev => ({ ...prev, myDeliveries: true }));
-    } else if (['earnings-overview', 'transactions', 'incentives-bonuses', 'wallet-withdrawals', 'bank-payout'].includes(activeTab)) {
+    } else if (['partner-profile', 'profile-personal', 'profile-documents', 'profile-vehicle', 'profile-bank'].includes(activeTab)) {
       setExpandedGroups(prev => ({ ...prev, profile: true }));
-    } else if (['duty-status', 'working-schedule', 'delivery-preferences'].includes(activeTab)) {
+    } else if (['duty-status', 'working-schedule', 'availability-schedule', 'delivery-preferences'].includes(activeTab)) {
       setExpandedGroups(prev => ({ ...prev, availability: true }));
-    } else if (['safety-emergency', 'safety-guidelines', 'report-issue'].includes(activeTab)) {
+    } else if (['safety-emergency', 'safety-guidelines', 'report-issue', 'safety-report'].includes(activeTab)) {
       setExpandedGroups(prev => ({ ...prev, safety: true }));
-    } else if (['account-settings', 'notification-preferences', 'privacy-security', 'app-preferences'].includes(activeTab)) {
+    } else if (['account-settings', 'settings-account', 'notification-preferences', 'settings-notifications', 'privacy-security', 'settings-privacy', 'app-preferences', 'settings-app'].includes(activeTab)) {
       setExpandedGroups(prev => ({ ...prev, settings: true }));
     }
   }, [activeTab]);
@@ -63,23 +70,23 @@ export default function DriverSidebar({
       {/* Driver Sidebar Container */}
       <aside
         className={`
-          fixed top-0 left-0 h-screen w-80 bg-[#FBF9F5] border-r border-[#DED9D1] z-50 
+          fixed top-0 left-0 h-screen w-80 bg-[#FBF9F5] dark:bg-[#121214] border-r border-[#DED9D1] dark:border-r-[#3F3F4A] z-50 
           flex flex-col justify-between overflow-y-auto transform transition-transform duration-300 ease-in-out
           ${isMobileSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
         `}
       >
         <div className="flex flex-col">
           {/* Header Branding */}
-          <div className="p-5 border-b border-[#DED9D1] bg-[#F5F3EF] flex items-center justify-between sticky top-0 z-20">
+          <div className="p-5 border-b border-[#DED9D1] dark:border-b-[#3F3F4A] bg-[#F5F3EF] dark:bg-[#16161A] flex items-center justify-between sticky top-0 z-20">
             <a
               onClick={(e) => { e.preventDefault(); handleNav('dashboard'); }}
               className="block cursor-pointer"
               href="#"
             >
-              <span className="font-serif text-xl font-bold text-[#1A1A1A] tracking-tight block">
+              <span className="font-serif text-xl font-bold text-[#1A1A1A] dark:text-[#FAF8F5] tracking-tight block">
                 TiffinLink
               </span>
-              <span className="font-sans uppercase text-[#8C7A6B] tracking-widest block mt-0.5 text-[10px] font-bold">
+              <span className="font-sans uppercase text-[#8C7A6B] dark:text-[#DFB76C] tracking-widest block mt-0.5 text-[10px] font-bold">
                 Driver Operations Panel
               </span>
             </a>
@@ -395,7 +402,7 @@ export default function DriverSidebar({
                     onClick={(e) => { e.preventDefault(); handleNav('profile-documents'); }}
                     href="#"
                     className={`flex items-center px-3 py-1.5 rounded-md transition-colors text-xs cursor-pointer ${
-                      activeTab === 'profile-documents'
+                      activeTab === 'profile-documents' || activeTab === 'documents' || activeTab === 'kyc'
                         ? 'bg-[#1A1A1A] text-white font-medium'
                         : 'text-[#555555] hover:bg-[#EBE7DF] hover:text-[#1A1A1A]'
                     }`}
@@ -407,7 +414,7 @@ export default function DriverSidebar({
                     onClick={(e) => { e.preventDefault(); handleNav('profile-vehicle'); }}
                     href="#"
                     className={`flex items-center px-3 py-1.5 rounded-md transition-colors text-xs cursor-pointer ${
-                      activeTab === 'profile-vehicle'
+                      activeTab === 'profile-vehicle' || activeTab === 'vehicle'
                         ? 'bg-[#1A1A1A] text-white font-medium'
                         : 'text-[#555555] hover:bg-[#EBE7DF] hover:text-[#1A1A1A]'
                     }`}
@@ -419,7 +426,7 @@ export default function DriverSidebar({
                     onClick={(e) => { e.preventDefault(); handleNav('profile-bank'); }}
                     href="#"
                     className={`flex items-center px-3 py-1.5 rounded-md transition-colors text-xs cursor-pointer ${
-                      activeTab === 'profile-bank'
+                      activeTab === 'profile-bank' || activeTab === 'bank-payout-details' || activeTab === 'bank-payout' || activeTab === 'bank'
                         ? 'bg-[#1A1A1A] text-white font-medium'
                         : 'text-[#555555] hover:bg-[#EBE7DF] hover:text-[#1A1A1A]'
                     }`}
@@ -662,17 +669,17 @@ export default function DriverSidebar({
         </div>
 
         {/* BOTTOM SECTION */}
-        <div className="p-4 border-t border-[#DED9D1] bg-[#F5F3EF] space-y-3 sticky bottom-0 z-20">
+        <div className="p-4 border-t border-[#DED9D1] dark:border-t-[#3F3F4A] bg-[#F5F3EF] dark:bg-[#16161A] space-y-3 sticky bottom-0 z-20">
           
           {/* Online / Offline Status Toggle Card */}
-          <div className="p-3 bg-white border border-[#DED9D1] rounded-lg flex items-center justify-between shadow-xs">
+          <div className="p-3 bg-white dark:bg-[#1A1A1E] border border-[#DED9D1] dark:border-[#3F3F4A] rounded-xl flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2">
               <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-600 animate-pulse' : 'bg-gray-400'}`} />
               <div className="flex flex-col">
-                <span className="font-bold text-xs uppercase tracking-wide text-[#1A1A1A]">
+                <span className="font-bold text-xs uppercase tracking-wide text-[#1A1A1A] dark:text-[#FAF8F5]">
                   {isOnline ? 'ONLINE' : 'OFFLINE'}
                 </span>
-                <span className="text-[10px] text-[#666666]">
+                <span className="text-[10px] text-[#666666] dark:text-stone-400">
                   {isOnline ? 'Receiving Deliveries' : 'Shift Paused'}
                 </span>
               </div>
@@ -700,8 +707,8 @@ export default function DriverSidebar({
                 <span className="text-xs text-[#1A1A1A] font-semibold truncate">
                   {driverName}
                 </span>
-                <span className="text-[10px] font-mono text-[#8C7A6B]">
-                  ID: {driverId.substring(0, 10)}
+                <span className="text-[10px] text-[#8C7A6B] font-medium">
+                  Delivery Partner
                 </span>
               </div>
             </div>

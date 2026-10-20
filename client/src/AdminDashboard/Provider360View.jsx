@@ -138,7 +138,7 @@ export default function Provider360View({ providerId, onClose, onStatusChange })
           {loading ? (
             <div className="flex flex-col items-center justify-center py-24 space-y-4">
               <RefreshCw size={36} className="animate-spin text-[#1b1c1a]" />
-              <p className="font-mono text-xs text-[#665d52]">Loading complete 360° Provider Dossier from MongoDB...</p>
+              <p className="font-mono text-xs text-[#665d52]">Loading complete 360° Provider Dossier...</p>
             </div>
           ) : (
             <>

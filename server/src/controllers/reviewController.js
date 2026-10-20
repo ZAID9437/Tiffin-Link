@@ -42,14 +42,14 @@ const filterByDateRange = (dateObj, range, customStart, customEnd) => {
 // @route   GET /api/reviews
 const getReviews = async (req, res) => {
   try {
-    let providerId = req.providerId;
+    let providerId = req.query.providerId || req.providerId;
     if (!providerId && req.user) {
       const p = await Provider.findOne({ $or: [{ userId: req.user._id }, { email: req.user.email }] });
       if (p) providerId = p._id.toString();
     }
 
     if (!providerId) {
-      return res.status(403).json({ success: false, message: 'Provider authorization required' });
+      return res.status(400).json({ success: false, message: 'Provider authorization or providerId required' });
     }
 
     const {
@@ -328,15 +328,28 @@ const replyToReview = async (req, res) => {
 
       await reviewDoc.save();
 
-      // Emit Socket.IO event to provider room for instant UI sync
+      // Emit Socket.IO event to provider room and globally for instant UI sync
       try {
-        const { emitToProvider } = require('../services/socketService');
+        const { emitToProvider, getIO } = require('../services/socketService');
         emitToProvider(pIdStr, 'review:replied', {
           reviewId: reviewDoc._id,
           providerReply: reviewDoc.providerReply,
           repliedAt: reviewDoc.repliedAt,
           repliedBy: reviewDoc.repliedBy
         });
+        const io = getIO();
+        if (io) {
+          const replyPayload = {
+            reviewId: String(reviewDoc._id),
+            providerId: pIdStr,
+            providerReply: reviewDoc.providerReply,
+            repliedAt: reviewDoc.repliedAt,
+            repliedBy: reviewDoc.repliedBy,
+            review: reviewDoc
+          };
+          io.emit('review:replied', replyPayload);
+          io.emit('review:updated', replyPayload);
+        }
       } catch (sErr) {
         // Socket emission failure is non-fatal
       }
@@ -369,7 +382,10 @@ const createReview = async (req, res) => {
       foodQualityRating,
       packagingRating,
       tasteRating,
-      deliveryRating,
+      deliveryRating = 5,
+      deliveryComment = '',
+      driverId = '',
+      driverName = '',
       orderAmount,
       orderQuantity,
       comment
@@ -380,50 +396,230 @@ const createReview = async (req, res) => {
     const finalCustomerPhone = req.user?.phone || req.user?.mobile || customerPhone || '';
     const finalCustomerEmail = req.user?.email || '';
 
-    if (!finalCustomerName || !comment) {
-      return res.status(400).json({ success: false, message: 'Customer name and comment are required' });
+    const finalRating = Number(rating);
+    if (!finalRating || finalRating < 1 || finalRating > 5) {
+      return res.status(400).json({ success: false, message: 'Star rating is compulsory (1 to 5 stars).' });
     }
 
-    const reviewData = {
-      providerId: String(providerId),
-      orderId: String(orderId),
-      customerId,
-      customerName: finalCustomerName,
-      customerPhone: finalCustomerPhone,
-      customerEmail: finalCustomerEmail,
-      tiffinName: tiffinName || 'Tiffin Meal',
-      rating: Number(rating) || 5,
-      foodQualityRating: Number(foodQualityRating) || Number(rating) || 5,
-      packagingRating: Number(packagingRating) || Number(rating) || 5,
-      tasteRating: Number(tasteRating) || Number(rating) || 5,
-      deliveryRating: Number(deliveryRating) || Number(rating) || 5,
-      orderAmount: Number(orderAmount) || 0,
-      orderQuantity: Number(orderQuantity) || 1,
-      comment: String(comment).trim(),
-      providerReply: '',
-      createdAt: new Date()
-    };
+    if (!finalCustomerName) {
+      return res.status(400).json({ success: false, message: 'Customer name is required' });
+    }
 
     if (await isDbConnected()) {
+      const Order = require('../models/Order');
+      const DeliveryRequest = require('../models/DeliveryRequest');
+      const Driver = require('../models/Driver');
+      const Provider = require('../models/Provider');
+
+      // Resolve parent order & delivery request to ensure driver & provider links are accurate
+      const cleanOrderId = String(orderId).replace(/^#+/, '').trim();
+      const parentOrder = await Order.findOne({
+        $or: [
+          { orderId: cleanOrderId },
+          { orderId: `#${cleanOrderId}` },
+          { orderId },
+          ...(mongoose.Types.ObjectId.isValid(orderId) ? [{ _id: orderId }] : [])
+        ]
+      });
+
+      const delReq = await DeliveryRequest.findOne({
+        $or: [
+          { orderId: cleanOrderId },
+          { orderId: `#${cleanOrderId}` },
+          { orderId },
+          { requestId: orderId },
+          { requestId: `TL-REQ-${cleanOrderId}` }
+        ]
+      });
+
+      const resolvedDriverId = driverId || delReq?.assignedDriver?.driverId || parentOrder?.driverId || '';
+      const resolvedDriverName = driverName || delReq?.assignedDriver?.name || parentOrder?.deliveryPartnerName || parentOrder?.driverName || '';
+      const resolvedDriverEmail = delReq?.assignedDriver?.email || '';
+      const resolvedProviderId = providerId || parentOrder?.providerId || delReq?.providerId || '';
+
+      const reviewData = {
+        providerId: String(resolvedProviderId),
+        orderId: String(parentOrder?.orderId || orderId),
+        customerId,
+        customerName: finalCustomerName,
+        customerPhone: finalCustomerPhone,
+        customerEmail: finalCustomerEmail,
+        tiffinName: tiffinName || parentOrder?.tiffinName || 'Tiffin Meal',
+        rating: finalRating,
+        foodQualityRating: Number(foodQualityRating) || finalRating,
+        packagingRating: Number(packagingRating) || finalRating,
+        tasteRating: Number(tasteRating) || finalRating,
+        deliveryRating: Number(deliveryRating) || 5,
+        driverId: String(resolvedDriverId),
+        driverName: resolvedDriverName,
+        driverEmail: resolvedDriverEmail,
+        deliveryComment: String(deliveryComment || '').trim(),
+        orderAmount: Number(orderAmount) || parentOrder?.totalAmount || 0,
+        orderQuantity: Number(orderQuantity) || parentOrder?.quantity || 1,
+        comment: String(comment || '').trim(),
+        providerReply: '',
+        createdAt: new Date()
+      };
+
       const newRev = new Review(reviewData);
       await newRev.save();
 
-      // Update Order isReviewed flag
-      try {
-        const Order = require('../models/Order');
+      // 1. Update Order flags
+      if (parentOrder) {
+        parentOrder.isReviewed = true;
+        parentOrder.reviewRating = reviewData.rating;
+        parentOrder.deliveryRating = reviewData.deliveryRating;
+        parentOrder.reviewText = reviewData.comment;
+        parentOrder.deliveryReview = reviewData.deliveryComment;
+        await parentOrder.save();
+      } else {
+        const ordUpdateList = [{ orderId }, { orderId: `#${orderId}` }];
+        if (mongoose.Types.ObjectId.isValid(orderId)) {
+          ordUpdateList.push({ _id: orderId });
+        }
         await Order.updateMany(
-          { $or: [{ orderId }, { orderId: `#${orderId}` }, { _id: orderId }] },
-          { $set: { isReviewed: true, reviewRating: reviewData.rating } }
+          { $or: ordUpdateList },
+          {
+            $set: {
+              isReviewed: true,
+              reviewRating: reviewData.rating,
+              deliveryRating: reviewData.deliveryRating,
+              reviewText: reviewData.comment,
+              deliveryReview: reviewData.deliveryComment
+            }
+          }
         );
-      } catch (oErr) {}
+      }
 
-      return res.status(201).json({ success: true, message: '✓ Review submitted successfully', data: newRev });
+      // 2. Update DeliveryRequest rating & comment
+      if (delReq) {
+        delReq.rating = reviewData.deliveryRating;
+        delReq.reviewComment = reviewData.deliveryComment;
+        await delReq.save();
+      }
+
+      // 3. Atomically recalculate Driver's real MongoDB rating
+      if (resolvedDriverId || resolvedDriverEmail || resolvedDriverName) {
+        const driverQuery = [
+          ...(resolvedDriverId ? [{ driverId: String(resolvedDriverId) }] : []),
+          ...(resolvedDriverEmail ? [{ email: resolvedDriverEmail }] : []),
+          ...(resolvedDriverName ? [{ name: resolvedDriverName }] : [])
+        ];
+
+        // Gather all ratings for this driver from Review & DeliveryRequest collections
+        const [revList, delList] = await Promise.all([
+          Review.find({
+            $or: [
+              ...(resolvedDriverId ? [{ driverId: String(resolvedDriverId) }] : []),
+              ...(resolvedDriverEmail ? [{ driverEmail: resolvedDriverEmail }] : []),
+              ...(resolvedDriverName ? [{ driverName: resolvedDriverName }] : [])
+            ],
+            deliveryRating: { $exists: true, $ne: null }
+          }).select('deliveryRating'),
+          DeliveryRequest.find({
+            $or: [
+              ...(resolvedDriverId ? [{ 'assignedDriver.driverId': String(resolvedDriverId) }] : []),
+              ...(resolvedDriverEmail ? [{ 'assignedDriver.email': resolvedDriverEmail }] : []),
+              ...(resolvedDriverName ? [{ 'assignedDriver.name': resolvedDriverName }] : [])
+            ],
+            rating: { $exists: true, $ne: null }
+          }).select('rating')
+        ]);
+
+        const allDriverScores = [
+          ...revList.map(r => r.deliveryRating),
+          ...delList.map(d => d.rating)
+        ].filter(s => typeof s === 'number' && !isNaN(s) && s > 0);
+
+        if (allDriverScores.length > 0) {
+          const sum = allDriverScores.reduce((acc, score) => acc + score, 0);
+          const computedAvg = Number((sum / allDriverScores.length).toFixed(1));
+          await Driver.updateMany(
+            { $or: driverQuery },
+            {
+              $set: {
+                rating: computedAvg,
+                ratingCount: allDriverScores.length,
+                totalRatings: allDriverScores.length
+              }
+            }
+          );
+        }
+      }
+
+      // 4. Atomically recalculate Provider's real MongoDB rating
+      let providerRating = finalRating;
+      let providerReviewCount = 1;
+      if (resolvedProviderId) {
+        const providerReviews = await Review.find({
+          providerId: String(resolvedProviderId),
+          rating: { $exists: true, $ne: null }
+        }).select('rating');
+
+        if (providerReviews.length > 0) {
+          const pSum = providerReviews.reduce((acc, r) => acc + r.rating, 0);
+          const pAvg = Number((pSum / providerReviews.length).toFixed(1));
+          providerRating = pAvg;
+          providerReviewCount = providerReviews.length;
+          await Provider.updateMany(
+            {
+              $or: [
+                { providerId: String(resolvedProviderId) },
+                ...(mongoose.Types.ObjectId.isValid(resolvedProviderId) ? [{ _id: resolvedProviderId }] : [])
+              ]
+            },
+            {
+              $set: {
+                rating: pAvg,
+                reviewCount: providerReviews.length,
+                totalReviews: providerReviews.length
+              }
+            }
+          );
+        }
+      }
+
+      // 5. Emit real-time Socket.IO updates for live UI sync
+      try {
+        const { getIO } = require('../services/socketService');
+        const io = getIO();
+        if (io) {
+          const payload = {
+            orderId: reviewData.orderId,
+            rating: reviewData.rating,
+            deliveryRating: reviewData.deliveryRating,
+            driverId: resolvedDriverId,
+            providerId: String(resolvedProviderId),
+            review: newRev,
+            providerRating,
+            providerReviewCount
+          };
+          io.emit('review:new', payload);
+          io.emit('driver:rating:updated', payload);
+          io.emit('delivery:dashboard:refresh', payload);
+          io.emit('provider:rating:updated', {
+            providerId: String(resolvedProviderId),
+            rating: providerRating,
+            reviewCount: providerReviewCount,
+            totalReviews: providerReviewCount
+          });
+          if (resolvedDriverId) {
+            io.to(`driver:${resolvedDriverId}`).emit('driver:rating:updated', payload);
+          }
+        }
+      } catch (sErr) {}
+
+      return res.status(201).json({
+        success: true,
+        message: '✓ Review submitted successfully! Ratings updated in real time.',
+        data: newRev
+      });
     }
 
-    return res.status(201).json({ success: true, message: '✓ Review submitted', data: { _id: 'rev_' + Date.now(), ...reviewData } });
+    return res.status(201).json({ success: true, message: '✓ Review submitted' });
   } catch (error) {
     console.error('Error creating review:', error);
-    res.status(500).json({ success: false, message: 'Failed to submit review' });
+    res.status(500).json({ success: false, message: 'Failed to submit review: ' + error.message });
   }
 };
 

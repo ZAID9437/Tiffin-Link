@@ -345,7 +345,7 @@ export default function DataTable({
                 <td colSpan={columns.length} className="py-16 text-center text-[#665d52]">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <RefreshCw size={20} className="animate-spin text-[#1a1a1a]" />
-                    <span className="font-mono text-xs">Loading records from database...</span>
+                    <span className="font-mono text-xs">Loading records...</span>
                   </div>
                 </td>
               </tr>

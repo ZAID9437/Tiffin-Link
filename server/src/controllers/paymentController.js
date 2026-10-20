@@ -585,6 +585,23 @@ const verifyPayment = async (req, res) => {
     const newOrder = new Order(finalOrderData);
     await newOrder.save();
 
+    // Real-time socket notification to provider & admin
+    try {
+      const { getIO, emitToProvider } = require('../services/socketService');
+      const provIdStr = String(newOrder.providerId || '');
+      if (provIdStr) {
+        emitToProvider(provIdStr, 'order:created', newOrder);
+        emitToProvider(provIdStr, 'order:new', newOrder);
+      }
+      const io = getIO();
+      if (io) {
+        io.emit('order:created', newOrder);
+        io.emit('order:new', newOrder);
+      }
+    } catch (sErr) {
+      console.warn('Socket emit error on payment confirmation:', sErr.message);
+    }
+
     return res.json({
       success: true,
       message: 'Payment verified and order confirmed successfully.',

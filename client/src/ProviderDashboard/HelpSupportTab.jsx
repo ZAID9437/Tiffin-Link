@@ -57,7 +57,7 @@ export default function HelpSupportTab({ currentUser, onNavigateTab }) {
   const ledgerRef = useRef(null);
 
   // Station Information
-  const stationNode = currentUser?._id ? `msr-node-${String(currentUser._id).slice(-4)}` : 'msr-node-04';
+  const stationNode = currentUser?._id ? `node-${String(currentUser._id).slice(-4)}` : 'node-01';
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -128,7 +128,7 @@ export default function HelpSupportTab({ currentUser, onNavigateTab }) {
     } catch (err) {
       console.error('Error fetching tickets:', err);
       if (!isBackground) {
-        setError(err.message || 'Unable to connect to support database');
+        setError(err.message || 'Unable to load support tickets. Please check your connection.');
       }
     } finally {
       if (!isBackground) setLoading(false);
@@ -322,46 +322,46 @@ export default function HelpSupportTab({ currentUser, onNavigateTab }) {
   // Categories Definition
   const helpCategories = [
     {
-      id: 'CAT // 01',
+      id: 'CAT - 01',
       title: 'Order Management',
       icon: 'room_service',
       articleCount: '18 Articles',
       desc: 'Protocols for real-time order surges, kitchen preparation countdown adjustments, emergency cancellations, and custom allergen specifications.'
     },
     {
-      id: 'CAT // 02',
+      id: 'CAT - 02',
       title: 'Payments & Payouts',
       icon: 'account_balance_wallet',
       articleCount: '12 Articles',
       desc: 'Escrow clearance schedules, bank direct-credit settlements, UPI audit trails, platform commission reconciliation, and minimum batch thresholds.'
     },
     {
-      id: 'CAT // 03',
+      id: 'CAT - 03',
       title: 'Delivery Problems',
       icon: 'local_shipping',
       articleCount: '24 Articles',
       desc: 'Courier arrival latency, real-time rider reallocation, thermal insulated canister lock integrity, and live GPS corridor discrepancies.'
     },
     {
-      id: 'CAT // 04',
+      id: 'CAT - 04',
       title: 'Tiffin Management',
       icon: 'inventory_2',
       articleCount: '15 Articles',
       desc: 'Nutritional menu catalog parameters, seasonal rotation formulas, daily meal caps, portion variance controls, and canister inventory recovery.'
     },
     {
-      id: 'CAT // 05',
+      id: 'CAT - 05',
       title: 'Account & Profile',
       icon: 'verified_user',
       articleCount: '09 Articles',
       desc: 'Statutory FSSAI certificate upload, kitchen operating shift hours, polygon geofence mapping, and secondary kitchen manager authorizations.'
     },
     {
-      id: 'CAT // 06',
+      id: 'CAT - 06',
       title: 'Technical Issues',
       icon: 'terminal',
       articleCount: '11 Articles',
-      desc: 'Acoustic audio chime debugging, thermal kitchen ticket printer drivers, telemetry websocket dropout recovery, and dashboard latency.'
+      desc: 'Sound alerts, thermal kitchen printer setups, internet connection recovery, and app responsiveness.'
     }
   ];
 
@@ -383,13 +383,13 @@ export default function HelpSupportTab({ currentUser, onNavigateTab }) {
           <div className="flex items-center gap-3">
             <span className="w-2 h-2 rounded-full bg-onyx-black animate-pulse"></span>
             <span className="font-label-caps text-label-caps tracking-widest text-secondary uppercase">
-              COMMUNICATION &amp; OPERATIONS // PROVIDER SUPPORT DESK • Node: {stationNode} • SLA: &lt;15m Response
+              COMMUNICATION &amp; OPERATIONS • PROVIDER SUPPORT DESK • Station ID: {stationNode} • SLA: &lt;15m Response
             </span>
           </div>
           <div className="flex items-center gap-3">
             <span className="font-label-caps text-label-caps uppercase text-secondary">Escalation Desk:</span>
             <span className="font-button-text text-button-text text-onyx-black px-2 py-0.5 bg-surface-container font-semibold">
-              L3 Standby
+              Support Standby
             </span>
           </div>
         </section>

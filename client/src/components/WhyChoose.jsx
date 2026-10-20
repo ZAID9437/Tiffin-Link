@@ -129,7 +129,9 @@ export default function WhyChoose() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-white/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
 
         <div className="max-w-[1200px] mx-auto w-full relative z-10 flex flex-col flex-grow">
-          <p className="font-label-caps text-xs md:text-label-caps opacity-50 mb-4 md:mb-10 text-center tracking-[0.25em]">THE TIFFINLINK STANDARD</p>
+          <p className="font-label-caps text-xs md:text-label-caps text-[#DFB76C] font-semibold mb-4 md:mb-10 text-center tracking-[0.28em] uppercase">
+            THE TIFFINLINK STANDARD
+          </p>
           
           {/* Main Visual Layout */}
           <div className="relative flex-grow w-full flex flex-col md:flex-row items-center justify-between gap-6 md:gap-12 min-h-[350px] md:min-h-[400px]">
@@ -159,7 +161,7 @@ export default function WhyChoose() {
                 
                 {/* Dynamic Scroll Progress segment */}
                 <div 
-                  className="absolute top-0 left-0 w-full md:w-full bg-sand-neutral transition-all duration-300 origin-left md:origin-top rounded-full shadow-[0_0_10px_rgba(222,217,209,0.5)]"
+                  className="absolute top-0 left-0 w-full md:w-full bg-[#E5C158] transition-all duration-300 origin-left md:origin-top rounded-full shadow-[0_0_10px_rgba(229,193,88,0.5)]"
                   style={{ 
                     height: isMobile ? '100%' : `${progress}%`,
                     width: isMobile ? `${progress}%` : '100%'
@@ -186,15 +188,15 @@ export default function WhyChoose() {
                       {/* Outer ring */}
                       <div className={`w-full h-full rounded-full absolute inset-0 transition-all duration-500 border-2 ${
                         isCurrent 
-                          ? 'bg-[#1A1A1A] border-sand-neutral shadow-[0_0_12px_rgba(222,217,209,0.6)] scale-125' 
+                          ? 'bg-[#1A1A1A] border-[#E5C158] shadow-[0_0_12px_rgba(229,193,88,0.6)] scale-125' 
                           : isActive 
-                            ? 'bg-sand-neutral border-sand-neutral shadow-[0_0_6px_rgba(222,217,209,0.3)]'
+                            ? 'bg-[#E5C158] border-[#E5C158] shadow-[0_0_6px_rgba(229,193,88,0.3)]'
                             : 'bg-[#1A1A1A] border-white/20 hover:border-white/40'
                       }`} />
                       
                       {/* Inner core */}
                       <div className={`w-1.5 h-1.5 rounded-full z-30 transition-all duration-500 ${
-                        isCurrent ? 'bg-sand-neutral' : isActive ? 'bg-[#1A1A1A]' : 'bg-white/25'
+                        isCurrent ? 'bg-[#E5C158]' : isActive ? 'bg-[#1A1A1A]' : 'bg-white/25'
                       }`} />
                     </button>
                   );
@@ -213,8 +215,8 @@ export default function WhyChoose() {
                     onClick={() => handleDotClick(idx)}
                     className={`transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] absolute p-5 sm:p-8 md:p-10 rounded-2xl border flex flex-col justify-between cursor-pointer w-full h-[260px] sm:h-[220px] md:h-[220px] ${
                       isCurrent
-                        ? 'bg-[#1C1B1A]/90 border-white/15 text-bone-white opacity-100 scale-100 shadow-[0_20px_50px_rgba(0,0,0,0.45)] translate-y-0 z-20 pointer-events-auto backdrop-blur-md'
-                        : 'text-bone-white opacity-0 scale-95 translate-y-8 pointer-events-none z-10 border-transparent'
+                        ? 'bg-[#1C1B1A]/95 border-white/15 text-[#FAF8F5] opacity-100 scale-100 shadow-[0_20px_50px_rgba(0,0,0,0.55)] translate-y-0 z-20 pointer-events-auto backdrop-blur-md'
+                        : 'text-[#FAF8F5] opacity-0 scale-95 translate-y-8 pointer-events-none z-10 border-transparent'
                     }`}
                   >
                     {/* Luxury inner thin border */}
@@ -222,17 +224,17 @@ export default function WhyChoose() {
 
                     <div className="flex justify-between items-start mb-4 z-10">
                       {/* Pill Step Label */}
-                      <span className={`font-label-caps text-[9px] font-bold px-3 py-1 rounded-md tracking-widest transition-all duration-500 ${
+                      <span className={`font-label-caps text-[10px] font-bold px-3 py-1 rounded-md tracking-widest transition-all duration-500 ${
                         isCurrent 
-                          ? 'bg-sand-neutral text-onyx-black shadow-[0_4px_12px_rgba(222,217,209,0.3)]' 
-                          : 'bg-white/5 text-bone-white/40'
+                          ? 'bg-[#E5C158] text-[#111113] shadow-[0_4px_12px_rgba(229,193,88,0.35)]' 
+                          : 'bg-white/10 text-white/50'
                       }`}>
                         {step.label}
                       </span>
                       
                       <span 
                         className={`material-symbols-outlined text-2xl transition-colors duration-500 ${
-                          isCurrent ? 'text-sand-neutral' : 'text-white/30'
+                          isCurrent ? 'text-[#E5C158]' : 'text-white/30'
                         }`}
                         style={{ fontVariationSettings: "'FILL' 0" }}
                       >
@@ -242,12 +244,12 @@ export default function WhyChoose() {
 
                     <div className="z-10">
                       <h3 className={`font-display-lg text-2xl md:text-3xl mb-3 transition-colors duration-500 ${
-                        isCurrent ? 'text-bone-white font-medium' : 'text-bone-white/40'
+                        isCurrent ? 'text-[#E5C158] font-medium' : 'text-white/40'
                       }`}>
                         {step.title}
                       </h3>
-                      <p className={`font-body-md text-xs md:text-sm leading-relaxed text-bone-white/80 transition-opacity duration-500 ${
-                        isCurrent ? 'opacity-85' : 'opacity-30'
+                      <p className={`font-body-md text-xs md:text-sm leading-relaxed text-[#FAF8F5] transition-opacity duration-500 ${
+                        isCurrent ? 'opacity-90' : 'opacity-30'
                       }`}>
                         {step.description}
                       </p>

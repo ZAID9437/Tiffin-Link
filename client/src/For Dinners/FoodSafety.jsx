@@ -2,37 +2,42 @@ import React from 'react';
 
 export default function FoodSafety() {
   return (
-    <section className="pt-12 md:pt-section-gap pb-16 md:pb-28 px-4 sm:px-6 md:px-margin-desktop bg-bone-white" id="process">
+    <section className="py-16 md:py-20 px-4 sm:px-6 md:px-margin-desktop bg-bone-white border-b border-sand-neutral/30" id="process">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-gutter items-center">
         <div className="md:col-span-5 reveal-on-scroll">
-          <h2 className="font-headline-lg text-3xl sm:text-5xl md:text-headline-lg mb-8 md:mb-16">Four steps to absolute trust.</h2>
-          <div className="space-y-16">
+          <p className="font-label-caps text-[11px] text-[#8C6239] dark:text-[#D4AF37] font-bold tracking-[0.25em] mb-3 uppercase">
+            PURITY & COMPLIANCE
+          </p>
+          <h2 className="font-headline-lg font-serif font-bold text-3xl sm:text-5xl md:text-headline-lg text-[#181512] dark:text-white mb-8 md:mb-16">
+            Four steps to absolute trust.
+          </h2>
+          <div className="space-y-12">
             <div className="flex gap-8 group">
-              <span className="font-display-lg text-[32px] opacity-20 group-hover:opacity-100 transition-opacity duration-500">01</span>
+              <span className="font-display-lg font-serif text-[34px] text-[#8C6239] dark:text-[#D4AF37] font-bold transition-transform duration-300 group-hover:scale-110">01</span>
               <div>
-                <h4 className="font-label-caps text-label-caps mb-2">SOURCE VERIFICATION</h4>
-                <p className="font-body-md text-body-md opacity-60">Tracing the origin of every ingredient to ethical, high-quality purveyors.</p>
+                <h4 className="font-label-caps text-xs font-bold tracking-widest text-[#181512] dark:text-white uppercase mb-1.5">SOURCE VERIFICATION</h4>
+                <p className="font-body-md text-sm md:text-base text-[#54483C] dark:text-[#DDD3C5] font-normal leading-relaxed">Tracing the origin of every ingredient to ethical, high-quality purveyors.</p>
               </div>
             </div>
             <div className="flex gap-8 group">
-              <span className="font-display-lg text-[32px] opacity-20 group-hover:opacity-100 transition-opacity duration-500">02</span>
+              <span className="font-display-lg font-serif text-[34px] text-[#8C6239] dark:text-[#D4AF37] font-bold transition-transform duration-300 group-hover:scale-110">02</span>
               <div>
-                <h4 className="font-label-caps text-label-caps mb-2">HYGIENE CERTIFICATION</h4>
-                <p className="font-body-md text-body-md opacity-60">Bi-monthly physical inspections of all partner cooking facilities.</p>
+                <h4 className="font-label-caps text-xs font-bold tracking-widest text-[#181512] dark:text-white uppercase mb-1.5">HYGIENE CERTIFICATION</h4>
+                <p className="font-body-md text-sm md:text-base text-[#54483C] dark:text-[#DDD3C5] font-normal leading-relaxed">Bi-monthly physical inspections of all partner cooking facilities.</p>
               </div>
             </div>
             <div className="flex gap-8 group">
-              <span className="font-display-lg text-[32px] opacity-20 group-hover:opacity-100 transition-opacity duration-500">03</span>
+              <span className="font-display-lg font-serif text-[34px] text-[#8C6239] dark:text-[#D4AF37] font-bold transition-transform duration-300 group-hover:scale-110">03</span>
               <div>
-                <h4 className="font-label-caps text-label-caps mb-2">SENSORY AUDIT</h4>
-                <p className="font-body-md text-body-md opacity-60">Blind tastings by our culinary curators to ensure flavor and texture excellence.</p>
+                <h4 className="font-label-caps text-xs font-bold tracking-widest text-[#181512] dark:text-white uppercase mb-1.5">SENSORY AUDIT</h4>
+                <p className="font-body-md text-sm md:text-base text-[#54483C] dark:text-[#DDD3C5] font-normal leading-relaxed">Blind tastings by our culinary curators to ensure flavor and texture excellence.</p>
               </div>
             </div>
             <div className="flex gap-8 group">
-              <span className="font-display-lg text-[32px] opacity-20 group-hover:opacity-100 transition-opacity duration-500">04</span>
+              <span className="font-display-lg font-serif text-[34px] text-[#8C6239] dark:text-[#D4AF37] font-bold transition-transform duration-300 group-hover:scale-110">04</span>
               <div>
-                <h4 className="font-label-caps text-label-caps mb-2">SUSTAINABLE LOGISTICS</h4>
-                <p className="font-body-md text-body-md opacity-60">Final review of delivery paths and zero-waste packaging compliance.</p>
+                <h4 className="font-label-caps text-xs font-bold tracking-widest text-[#181512] dark:text-white uppercase mb-1.5">SUSTAINABLE LOGISTICS</h4>
+                <p className="font-body-md text-sm md:text-base text-[#54483C] dark:text-[#DDD3C5] font-normal leading-relaxed">Final review of delivery paths and zero-waste packaging compliance.</p>
               </div>
             </div>
           </div>
@@ -91,24 +96,24 @@ export default function FoodSafety() {
                   <div className="flex items-start gap-3 group/row cursor-pointer transition-all duration-300">
                     <span className="material-symbols-outlined text-clay-earth text-base mt-0.5 transform group-hover/row:scale-125 group-hover/row:rotate-12 transition-all duration-300 shrink-0">verified_user</span>
                     <div className="transform group-hover/row:translate-x-1.5 transition-transform duration-300">
-                      <p className="font-label-caps text-[9px] text-bone-white tracking-wider font-semibold group-hover/row:text-clay-earth transition-colors">FSSAI AUDITED KITCHENS</p>
-                      <p className="font-body-md text-[10px] text-bone-white/60 mt-0.5 leading-relaxed">All home chefs verified with active government safety registration.</p>
+                      <p className="font-label-caps text-[9px] text-[#FAF8F5] tracking-wider font-semibold group-hover/row:text-clay-earth transition-colors">FSSAI AUDITED KITCHENS</p>
+                      <p className="font-body-md text-[10px] text-[#D4D0C8] mt-0.5 leading-relaxed">All home chefs verified with active government safety registration.</p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3 group/row cursor-pointer transition-all duration-300">
                     <span className="material-symbols-outlined text-clay-earth text-base mt-0.5 transform group-hover/row:scale-125 group-hover/row:rotate-12 transition-all duration-300 shrink-0">sanitizer</span>
                     <div className="transform group-hover/row:translate-x-1.5 transition-transform duration-300">
-                      <p className="font-label-caps text-[9px] text-bone-white tracking-wider font-semibold group-hover/row:text-clay-earth transition-colors">HYGIENE GRADE 5/5</p>
-                      <p className="font-body-md text-[10px] text-bone-white/60 mt-0.5 leading-relaxed">Bi-monthly physical inspections matching ISO-22000 checklists.</p>
+                      <p className="font-label-caps text-[9px] text-[#FAF8F5] tracking-wider font-semibold group-hover/row:text-clay-earth transition-colors">HYGIENE GRADE 5/5</p>
+                      <p className="font-body-md text-[10px] text-[#D4D0C8] mt-0.5 leading-relaxed">Bi-monthly physical inspections matching ISO-22000 checklists.</p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3 group/row cursor-pointer transition-all duration-300">
                     <span className="material-symbols-outlined text-clay-earth text-base mt-0.5 transform group-hover/row:scale-125 group-hover/row:rotate-12 transition-all duration-300 shrink-0">eco</span>
                     <div className="transform group-hover/row:translate-x-1.5 transition-transform duration-300">
-                      <p className="font-label-caps text-[9px] text-bone-white tracking-wider font-semibold group-hover/row:text-clay-earth transition-colors">ZERO-WASTE PACKAGING</p>
-                      <p className="font-body-md text-[10px] text-bone-white/60 mt-0.5 leading-relaxed">Delivered in traditional clay, brass, or certified compostable containers.</p>
+                      <p className="font-label-caps text-[9px] text-[#FAF8F5] tracking-wider font-semibold group-hover/row:text-clay-earth transition-colors">ZERO-WASTE PACKAGING</p>
+                      <p className="font-body-md text-[10px] text-[#D4D0C8] mt-0.5 leading-relaxed">Delivered in traditional clay, brass, or certified compostable containers.</p>
                     </div>
                   </div>
                 </div>

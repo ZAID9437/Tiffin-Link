@@ -108,7 +108,7 @@ export default function SubscriptionsTab() {
         }
       }
     } catch (err) {
-      console.error('Error fetching subscriptions from DB:', err);
+      console.error('Error fetching subscriptions:', err);
     } finally {
       setLoading(false);
     }
@@ -128,7 +128,7 @@ export default function SubscriptionsTab() {
         setRealTiffins(tJson.data);
       }
     } catch (err) {
-      console.error('Error fetching real customers/tiffins for modal:', err);
+      console.error('Error fetching real customers/tiffins:', err);
     }
   };
 
@@ -143,7 +143,7 @@ export default function SubscriptionsTab() {
         })
       });
       if (json.success) {
-        showToast(`✓ Subscription status updated to ${newStatus}`);
+        showToast(`Subscription status updated to ${newStatus}`);
         if (selectedSub) {
           setSelectedSub({ ...selectedSub, status: newStatus });
         }
@@ -158,7 +158,7 @@ export default function SubscriptionsTab() {
   const handleCreateSubscription = async (e) => {
     if (e) e.preventDefault();
     if (!newCustName || !newPlanName) {
-      showToast('⚠️ Please select a valid customer and tiffin plan');
+      showToast('Please select a valid customer and tiffin plan');
       return;
     }
 
@@ -182,7 +182,7 @@ export default function SubscriptionsTab() {
         })
       });
       if (json.success) {
-        showToast(`✓ Created subscription for ${newCustName}!`);
+        showToast(`Created subscription for ${newCustName}`);
         setIsCreateModalOpen(false);
         fetchSubscriptionsFromDb();
       }
@@ -222,67 +222,61 @@ export default function SubscriptionsTab() {
   };
 
   return (
-    <div className="space-y-6 animate-slide-up text-xs font-bold text-[#111827]">
+    <div className="space-y-6 animate-slide-up">
 
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-[9999] bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
-          <CheckCircle2 size={17} />
-          <span className="font-extrabold">{toastMsg}</span>
+        <div className="fixed bottom-6 right-6 z-[9999] bg-onyx-black text-bone-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 border border-sand-neutral/30 font-button-text">
+          <CheckCircle2 size={17} className="text-emerald-500" />
+          <span className="font-bold">{toastMsg}</span>
         </div>
       )}
 
       {/* Page Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-xs border border-[#E5ECE8] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-xs border border-sand-neutral/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-[#6B7280] mb-1">
+          <div className="flex items-center gap-2 text-xs font-label-caps tracking-widest text-clay-earth uppercase font-bold mb-1">
             <span>Provider</span>
-            <span>/</span>
+            <span className="text-sand-neutral">/</span>
             <span>Customers</span>
-            <span>/</span>
-            <span className="text-[#0A8B5F] font-extrabold">Subscriptions</span>
+            <span className="text-sand-neutral">/</span>
+            <span className="text-onyx-black font-extrabold">Subscriptions</span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black text-[#111827] tracking-tight">Subscriptions</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-[#0A8B5F] border border-emerald-200 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              LIVE
-            </span>
-          </div>
-          <p className="text-xs text-[#6B7280] font-medium mt-1">Manage recurring tiffin plans, deliveries and customer subscriptions.</p>
+          <h1 className="font-headline-lg text-2xl md:text-3xl font-normal text-onyx-black tracking-tight">Subscriptions</h1>
+          <p className="font-body-md text-xs text-secondary mt-1">Manage recurring meal plans, schedules and subscriber relationships.</p>
         </div>
 
         {/* Header Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
           {/* Search Input */}
           <div className="relative min-w-[180px] sm:w-56">
-            <Search size={14} className="absolute left-3 top-2.5 text-[#6B7280]" />
+            <Search size={14} className="absolute left-3 top-2.5 text-secondary" />
             <input
               type="text"
-              placeholder="Search customer / sub..."
+              placeholder="Search subscriber..."
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-semibold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+              className="w-full pl-9 pr-3 py-2 bg-surface-container border border-sand-neutral/40 rounded-xl text-xs font-label-caps text-onyx-black focus:outline-none focus:border-onyx-black shadow-xs"
             />
           </div>
 
           {/* Export Button */}
           <button
             onClick={handleExportCSV}
-            className="px-3.5 py-2 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 bg-surface-container border border-sand-neutral/40 hover:bg-surface-container-highest text-onyx-black font-button-text font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <Download size={14} className="text-[#0A8B5F]" />
+            <Download size={14} className="text-onyx-black" />
             <span>Export</span>
           </button>
 
           {/* Create Subscription Button */}
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-4 py-2 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <Plus size={15} />
-            <span> Create Subscription</span>
+            <span>Create Subscription</span>
           </button>
         </div>
       </div>
@@ -291,46 +285,46 @@ export default function SubscriptionsTab() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
         {/* Card 1: ACTIVE SUBSCRIPTIONS */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
-          <div className="text-xs font-extrabold text-[#6B7280] uppercase tracking-wider mb-2">ACTIVE SUBSCRIPTIONS</div>
-          <div className="text-4xl font-black text-[#111827]">{metrics.activeCount || 42}</div>
+        <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs">
+          <div className="text-xs font-label-caps font-bold text-secondary uppercase tracking-wider mb-2">ACTIVE SUBSCRIPTIONS</div>
+          <div className="text-3xl font-headline-lg font-normal text-onyx-black">{metrics.activeCount || 0}</div>
         </div>
 
         {/* Card 2: EXPIRING SOON */}
-        <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
-          <div className="text-xs font-extrabold text-[#6B7280] uppercase tracking-wider mb-2">EXPIRING SOON</div>
-          <div className="text-4xl font-black text-amber-600">{metrics.expiringSoonCount || 6}</div>
+        <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs">
+          <div className="text-xs font-label-caps font-bold text-secondary uppercase tracking-wider mb-2">EXPIRING SOON</div>
+          <div className="text-3xl font-headline-lg font-normal text-amber-700">{metrics.expiringSoonCount || 0}</div>
         </div>
 
         {/* Card 3: PAUSED */}
-        <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
-          <div className="text-xs font-extrabold text-[#6B7280] uppercase tracking-wider mb-2">PAUSED</div>
-          <div className="text-4xl font-black text-[#0A8B5F]">{metrics.pausedCount || 3}</div>
+        <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs">
+          <div className="text-xs font-label-caps font-bold text-secondary uppercase tracking-wider mb-2">PAUSED</div>
+          <div className="text-3xl font-headline-lg font-normal text-clay-earth">{metrics.pausedCount || 0}</div>
         </div>
 
         {/* Card 4: MONTHLY REVENUE */}
-        <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
-          <div className="text-xs font-extrabold text-[#6B7280] uppercase tracking-wider mb-2">MONTHLY REVENUE</div>
-          <div className="text-4xl font-black text-indigo-600">₹{Number(metrics.monthlyRevenue || 24850).toLocaleString()}</div>
+        <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs">
+          <div className="text-xs font-label-caps font-bold text-secondary uppercase tracking-wider mb-2">MONTHLY REVENUE</div>
+          <div className="text-3xl font-headline-lg font-normal text-onyx-black">₹{Number(metrics.monthlyRevenue || 0).toLocaleString()}</div>
         </div>
 
       </div>
 
       {/* FILTER BAR */}
-      <div className="bg-white p-4 rounded-2xl border border-[#E5ECE8] shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs font-extrabold text-[#6B7280]">
-          <Filter size={15} className="text-[#0A8B5F]" />
+      <div className="bg-surface-container-lowest p-4 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-label-caps font-bold text-secondary">
+          <Filter size={15} className="text-clay-earth" />
           <span>Filters:</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Status Dropdown */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-[#6B7280]">Status:</span>
+            <span className="text-[11px] font-label-caps text-secondary">Status:</span>
             <select
               value={statusFilter}
               onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-1.5 bg-[#F9FBF9] border border-[#E5ECE8] text-xs font-bold text-[#111827] rounded-xl focus:outline-none cursor-pointer"
+              className="px-3 py-1.5 bg-surface-container border border-sand-neutral/40 text-xs font-label-caps font-bold text-onyx-black rounded-xl focus:outline-none cursor-pointer"
             >
               <option value="All">All Statuses</option>
               <option value="ACTIVE">ACTIVE</option>
@@ -342,11 +336,11 @@ export default function SubscriptionsTab() {
 
           {/* Plan Dropdown */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-[#6B7280]">Plan:</span>
+            <span className="text-[11px] font-label-caps text-secondary">Plan:</span>
             <select
               value={planFilter}
               onChange={e => { setPlanFilter(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-1.5 bg-[#F9FBF9] border border-[#E5ECE8] text-xs font-bold text-[#111827] rounded-xl focus:outline-none cursor-pointer"
+              className="px-3 py-1.5 bg-surface-container border border-sand-neutral/40 text-xs font-label-caps font-bold text-onyx-black rounded-xl focus:outline-none cursor-pointer"
             >
               <option value="All">All Plans</option>
               <option value="Monthly">Monthly Plans</option>
@@ -359,29 +353,29 @@ export default function SubscriptionsTab() {
       </div>
 
       {/* ACTIVE SUBSCRIPTIONS TABLE */}
-      <div className="bg-white rounded-2xl border border-[#E5ECE8] shadow-xs overflow-hidden">
-        <div className="p-5 border-b border-[#E5ECE8] bg-[#F9FBF9] flex items-center justify-between">
-          <h2 className="text-sm font-black text-[#111827] uppercase tracking-wider">ACTIVE SUBSCRIPTIONS</h2>
-          <span className="text-xs text-[#6B7280] font-bold">Page {pagination.page} of {pagination.totalPages}</span>
+      <div className="bg-surface-container-lowest rounded-2xl border border-sand-neutral/40 shadow-xs overflow-hidden">
+        <div className="p-5 border-b border-sand-neutral/30 bg-surface-container-low flex items-center justify-between">
+          <h2 className="text-xs font-bold font-label-caps text-onyx-black uppercase tracking-wider">ACTIVE SUBSCRIPTIONS</h2>
+          <span className="text-xs text-secondary font-label-caps">Page {pagination.page} of {pagination.totalPages}</span>
         </div>
 
         {loading ? (
-          <div className="p-12 text-center">
-            <div className="w-8 h-8 border-4 border-[#0A8B5F] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-[#6B7280] font-bold mt-3">Loading active subscriptions from MongoDB database...</p>
+          <div className="p-12 text-center space-y-3">
+            <span className="material-symbols-outlined text-[32px] text-onyx-black animate-spin">refresh</span>
+            <p className="font-body-md text-xs text-secondary">Loading subscriptions...</p>
           </div>
         ) : subscriptions.length === 0 ? (
           <div className="p-12 text-center space-y-3">
-            <Package size={40} className="mx-auto text-gray-400" />
-            <h3 className="text-base font-extrabold text-[#111827]">No Subscriptions Found</h3>
-            <p className="text-xs text-[#6B7280]">Try clearing or adjusting your search query or filter options.</p>
+            <Package size={40} className="mx-auto text-secondary opacity-60" />
+            <h3 className="font-headline-md text-base text-onyx-black font-normal">No Subscriptions Found</h3>
+            <p className="font-body-md text-xs text-secondary">Adjust search query or filter options.</p>
           </div>
         ) : (
           <>
             {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs text-[#111827]">
-                <thead className="bg-[#F9FBF9] border-b border-[#E5ECE8] text-[#6B7280] font-extrabold uppercase tracking-wider">
+            <div className="hidden md:block overflow-x-auto no-scrollbar">
+              <table className="w-full text-left text-xs text-onyx-black">
+                <thead className="bg-surface-container-low border-b border-sand-neutral/30 text-secondary font-label-caps font-bold uppercase tracking-wider">
                   <tr>
                     <th className="p-4">Customer</th>
                     <th className="p-4">Plan</th>
@@ -392,52 +386,53 @@ export default function SubscriptionsTab() {
                     <th className="p-4 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E5ECE8] font-bold">
+                <tbody className="divide-y divide-sand-neutral/30 font-medium">
                   {subscriptions.map(sub => (
                     <tr
                       key={sub._id || sub.subId}
                       onClick={() => setSelectedSub(sub)}
-                      className="hover:bg-[#F9FBF9] transition-colors cursor-pointer"
+                      className="hover:bg-surface-container-low transition-colors cursor-pointer"
                     >
                       {/* Customer */}
-                      <td className="p-4 font-black text-[#111827]">
+                      <td className="p-4 font-bold text-onyx-black">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-[#E8F0EC] text-[#0A8B5F] font-black text-xs flex items-center justify-center shrink-0 border border-[#C5DDD2]">
+                          <div className="w-8 h-8 rounded-full bg-surface-container text-onyx-black font-bold text-xs flex items-center justify-center shrink-0 border border-sand-neutral/40 font-label-caps">
                             {sub.customerName ? sub.customerName.slice(0, 2).toUpperCase() : 'CU'}
                           </div>
                           <div>
-                            <div className="font-extrabold text-[#111827] text-sm">{sub.customerName}</div>
-                            <div className="text-[10px] text-[#6B7280] font-medium">{sub.subId}</div>
+                            <div className="font-bold text-onyx-black text-sm">{sub.customerName}</div>
+                            <div className="text-[10px] text-secondary font-mono">{sub.subId}</div>
                           </div>
                         </div>
                       </td>
 
                       {/* Plan */}
-                      <td className="p-4 text-[#111827]">
+                      <td className="p-4 text-onyx-black font-semibold">
                         {sub.plan}
                       </td>
 
                       {/* Frequency */}
-                      <td className="p-4 text-[#6B7280]">
+                      <td className="p-4 text-secondary">
                         {sub.frequency || 'Daily'}
                       </td>
 
                       {/* Next Delivery */}
-                      <td className="p-4 text-[#0A8B5F] font-black">
+                      <td className="p-4 text-onyx-black font-semibold">
                         {sub.nextDeliveryDate || '18 Aug'}
                       </td>
 
                       {/* Amount */}
-                      <td className="p-4 text-sm font-black text-[#111827]">
+                      <td className="p-4 text-sm font-bold text-onyx-black">
                         ₹{Number(sub.amount || 3200).toLocaleString()}
                       </td>
 
                       {/* Status */}
                       <td className="p-4">
-                        <span className={`px-2.5 py-1 text-[10px] font-black rounded-md uppercase border ${sub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                          sub.status === 'PAUSED' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                            'bg-red-50 text-red-700 border-red-200'
-                          }`}>
+                        <span className={`px-2.5 py-1 text-[10px] font-label-caps font-bold rounded-md uppercase border ${
+                          sub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-900 border-emerald-200' :
+                          sub.status === 'PAUSED' ? 'bg-amber-50 text-amber-900 border-amber-200' :
+                          'bg-error-container text-on-error-container border-error/20'
+                        }`}>
                           ● {sub.status || 'ACTIVE'}
                         </span>
                       </td>
@@ -449,7 +444,7 @@ export default function SubscriptionsTab() {
                             e.stopPropagation();
                             setSelectedSub(sub);
                           }}
-                          className="px-3 py-1.5 bg-[#E8F0EC] text-[#0A8B5F] hover:bg-[#D2E4DC] text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 ml-auto"
+                          className="px-3 py-1.5 bg-surface-container hover:bg-surface-container-highest text-onyx-black border border-sand-neutral/40 text-xs font-button-text font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 ml-auto"
                         >
                           <Eye size={14} />
                           <span>View</span>
@@ -462,47 +457,48 @@ export default function SubscriptionsTab() {
             </div>
 
             {/* Mobile Card List View */}
-            <div className="block md:hidden divide-y divide-[#E5ECE8]">
+            <div className="block md:hidden divide-y divide-sand-neutral/30">
               {subscriptions.map(sub => (
                 <div
                   key={sub._id || sub.subId}
                   onClick={() => setSelectedSub(sub)}
-                  className="p-4 space-y-3 hover:bg-[#F9FBF9] transition-colors cursor-pointer"
+                  className="p-4 space-y-3 hover:bg-surface-container-low transition-colors cursor-pointer"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-[#E8F0EC] text-[#0A8B5F] font-black text-xs flex items-center justify-center shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-surface-container text-onyx-black font-bold text-xs flex items-center justify-center shrink-0 border border-sand-neutral/40">
                         {sub.customerName ? sub.customerName.slice(0, 2).toUpperCase() : 'CU'}
                       </div>
                       <div>
-                        <div className="font-extrabold text-[#111827]">{sub.customerName}</div>
-                        <div className="text-[10px] text-[#6B7280]">{sub.plan}</div>
+                        <div className="font-bold text-onyx-black">{sub.customerName}</div>
+                        <div className="text-[10px] text-secondary">{sub.plan}</div>
                       </div>
                     </div>
 
-                    <span className={`px-2 py-0.5 text-[10px] font-black rounded-md uppercase border ${sub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                      sub.status === 'PAUSED' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                        'bg-red-50 text-red-700 border-red-200'
-                      }`}>
+                    <span className={`px-2 py-0.5 text-[10px] font-label-caps font-bold rounded-md uppercase border ${
+                      sub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-900 border-emerald-200' :
+                      sub.status === 'PAUSED' ? 'bg-amber-50 text-amber-900 border-amber-200' :
+                      'bg-error-container text-on-error-container border-error/20'
+                    }`}>
                       ● {sub.status}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-[#E5ECE8] text-xs">
+                  <div className="flex items-center justify-between pt-2 border-t border-sand-neutral/30 text-xs">
                     <div>
-                      <span className="text-[#6B7280]">Next: </span>
-                      <strong className="text-[#0A8B5F]">{sub.nextDeliveryDate}</strong>
+                      <span className="text-secondary">Next: </span>
+                      <strong className="text-onyx-black">{sub.nextDeliveryDate}</strong>
                     </div>
                     <div>
-                      <span className="text-[#6B7280]">Amount: </span>
-                      <strong className="text-[#111827]">₹{sub.amount}</strong>
+                      <span className="text-secondary">Amount: </span>
+                      <strong className="text-onyx-black">₹{sub.amount}</strong>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedSub(sub);
                       }}
-                      className="px-2.5 py-1 bg-[#E8F0EC] text-[#0A8B5F] font-bold text-[11px] rounded-lg"
+                      className="px-2.5 py-1 bg-surface-container text-onyx-black font-bold text-[11px] rounded-lg border border-sand-neutral/40"
                     >
                       View
                     </button>
@@ -514,16 +510,16 @@ export default function SubscriptionsTab() {
         )}
 
         {/* Server-Side Pagination Controls */}
-        <div className="p-4 border-t border-[#E5ECE8] bg-[#F9FBF9] flex items-center justify-between text-xs font-bold text-[#6B7280]">
+        <div className="p-4 border-t border-sand-neutral/30 bg-surface-container-low flex items-center justify-between text-xs font-label-caps text-secondary">
           <div>
-            Showing <span className="text-[#111827] font-black">{subscriptions.length}</span> of <span className="text-[#111827] font-black">{pagination.total}</span> subscriptions
+            Showing <span className="text-onyx-black font-bold">{subscriptions.length}</span> of <span className="text-onyx-black font-bold">{pagination.total}</span> subscriptions
           </div>
 
           <div className="flex items-center gap-1.5">
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              className="p-1.5 rounded-lg border border-[#E5ECE8] hover:bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              className="p-1.5 rounded-lg border border-sand-neutral/40 hover:bg-surface-container disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
               <ChevronLeft size={16} />
             </button>
@@ -532,8 +528,9 @@ export default function SubscriptionsTab() {
               <button
                 key={page}
                 onClick={() => setCurrentPage(page)}
-                className={`w-8 h-8 rounded-lg text-xs font-black cursor-pointer transition-colors ${currentPage === page ? 'bg-[#0A8B5F] text-white shadow-xs' : 'hover:bg-white text-[#6B7280]'
-                  }`}
+                className={`w-8 h-8 rounded-lg text-xs font-label-caps font-bold cursor-pointer transition-colors ${
+                  currentPage === page ? 'bg-onyx-black text-bone-white shadow-xs' : 'hover:bg-surface-container text-secondary'
+                }`}
               >
                 {page}
               </button>
@@ -542,7 +539,7 @@ export default function SubscriptionsTab() {
             <button
               disabled={currentPage === pagination.totalPages}
               onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
-              className="p-1.5 rounded-lg border border-[#E5ECE8] hover:bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              className="p-1.5 rounded-lg border border-sand-neutral/40 hover:bg-surface-container disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
               <ChevronRight size={16} />
             </button>
@@ -554,91 +551,92 @@ export default function SubscriptionsTab() {
       {/* SUBSCRIPTION DETAILS SIDE DRAWER / MODAL */}
       {selectedSub && (
         <div className="fixed inset-0 z-[6000] bg-black/50 backdrop-blur-xs flex justify-end">
-          <div className="bg-white w-full max-w-md h-full shadow-2xl p-6 border-l border-[#E5ECE8] animate-slide-left space-y-5 overflow-y-auto text-xs font-bold text-[#111827]">
+          <div className="bg-surface-container-lowest w-full max-w-md h-full shadow-2xl p-6 border-l border-sand-neutral/40 animate-slide-left space-y-5 overflow-y-auto text-xs text-onyx-black">
 
             {/* Drawer Header */}
-            <div className="flex justify-between items-center border-b border-[#E5ECE8] pb-3">
-              <h2 className="text-base font-black text-[#111827]">Subscription Details</h2>
+            <div className="flex justify-between items-center border-b border-sand-neutral/30 pb-3">
+              <h2 className="text-base font-bold font-label-caps text-onyx-black">Subscription Details</h2>
               <button
                 onClick={() => setSelectedSub(null)}
-                className="p-1.5 rounded-xl border border-[#E5ECE8] hover:bg-gray-100 text-[#6B7280] cursor-pointer"
+                className="p-1.5 rounded-xl border border-sand-neutral/40 hover:bg-surface-container text-secondary cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* Profile & Status Header */}
-            <div className="flex items-center justify-between p-4 bg-[#F9FBF9] rounded-2xl border border-[#E5ECE8]">
+            <div className="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl border border-sand-neutral/40">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#0A8B5F] text-white font-black text-sm flex items-center justify-center shadow-md">
+                <div className="w-10 h-10 rounded-full bg-onyx-black text-bone-white font-bold text-sm flex items-center justify-center shadow-md">
                   <User size={18} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-[#111827]">{selectedSub.customerName}</h3>
-                  <p className="text-[10px] text-[#6B7280]">{selectedSub.customerPhone}</p>
+                  <h3 className="text-sm font-bold text-onyx-black">{selectedSub.customerName}</h3>
+                  <p className="text-[10px] text-secondary font-mono">{selectedSub.customerPhone}</p>
                 </div>
               </div>
 
-              <span className={`px-3 py-1 text-[10px] font-black rounded-full uppercase border ${selectedSub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                selectedSub.status === 'PAUSED' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                  'bg-red-50 text-red-700 border-red-200'
-                }`}>
+              <span className={`px-3 py-1 text-[10px] font-label-caps font-bold rounded-full uppercase border ${
+                selectedSub.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-900 border-emerald-200' :
+                selectedSub.status === 'PAUSED' ? 'bg-amber-50 text-amber-900 border-amber-200' :
+                'bg-error-container text-on-error-container border-error/20'
+              }`}>
                 ● {selectedSub.status || 'ACTIVE'}
               </span>
             </div>
 
             {/* Plan Info Fields */}
-            <div className="bg-[#F9FBF9] p-4 rounded-2xl border border-[#E5ECE8] space-y-3">
+            <div className="bg-surface-container-low p-4 rounded-2xl border border-sand-neutral/40 space-y-3">
               <div>
-                <label className="text-[10px] text-[#6B7280] uppercase">Plan</label>
-                <div className="text-sm font-black text-[#111827]">{selectedSub.plan}</div>
+                <label className="text-[10px] font-label-caps text-secondary uppercase">Plan</label>
+                <div className="text-sm font-bold text-onyx-black">{selectedSub.plan}</div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E5ECE8]">
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-sand-neutral/30">
                 <div>
-                  <label className="text-[10px] text-[#6B7280] uppercase">Frequency</label>
-                  <div className="text-xs font-black text-[#111827]">{selectedSub.frequency || 'Daily'}</div>
+                  <label className="text-[10px] font-label-caps text-secondary uppercase">Frequency</label>
+                  <div className="text-xs font-bold text-onyx-black">{selectedSub.frequency || 'Daily'}</div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-[#6B7280] uppercase">Meal Type</label>
-                  <div className="text-xs font-black text-[#0A8B5F]">{selectedSub.mealType || 'Lunch'}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E5ECE8]">
-                <div>
-                  <label className="text-[10px] text-[#6B7280] uppercase">Start Date</label>
-                  <div className="text-xs font-extrabold text-[#111827]">{selectedSub.startDate || '01 Aug 2026'}</div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-[#6B7280] uppercase">End Date</label>
-                  <div className="text-xs font-extrabold text-[#111827]">{selectedSub.endDate || '31 Aug 2026'}</div>
+                  <label className="text-[10px] font-label-caps text-secondary uppercase">Meal Type</label>
+                  <div className="text-xs font-bold text-onyx-black">{selectedSub.mealType || 'Lunch'}</div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E5ECE8]">
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-sand-neutral/30">
                 <div>
-                  <label className="text-[10px] text-[#6B7280] uppercase">Next Delivery</label>
-                  <div className="text-xs font-black text-[#0A8B5F]">{selectedSub.nextDeliveryDate || '18 Aug 2026'}</div>
+                  <label className="text-[10px] font-label-caps text-secondary uppercase">Start Date</label>
+                  <div className="text-xs font-bold text-onyx-black">{selectedSub.startDate || '01 Aug 2026'}</div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-[#6B7280] uppercase">Payment Status</label>
-                  <div className="text-xs font-black text-emerald-700 uppercase">{selectedSub.paymentStatus || 'PAID'}</div>
+                  <label className="text-[10px] font-label-caps text-secondary uppercase">End Date</label>
+                  <div className="text-xs font-bold text-onyx-black">{selectedSub.endDate || '31 Aug 2026'}</div>
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-[#E5ECE8] flex justify-between items-center">
-                <span className="text-xs text-[#6B7280]">Total Amount:</span>
-                <strong className="text-base font-black text-[#0A8B5F]">₹{Number(selectedSub.amount || 3200).toLocaleString()}</strong>
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-sand-neutral/30">
+                <div>
+                  <label className="text-[10px] font-label-caps text-secondary uppercase">Next Delivery</label>
+                  <div className="text-xs font-bold text-onyx-black">{selectedSub.nextDeliveryDate || '18 Aug 2026'}</div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-label-caps text-secondary uppercase">Payment Status</label>
+                  <div className="text-xs font-bold text-emerald-800 uppercase">{selectedSub.paymentStatus || 'PAID'}</div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-sand-neutral/30 flex justify-between items-center">
+                <span className="text-xs text-secondary font-label-caps">Total Amount:</span>
+                <strong className="text-base font-bold text-onyx-black">₹{Number(selectedSub.amount || 3200).toLocaleString()}</strong>
               </div>
             </div>
 
             {/* DELIVERY SCHEDULE DAYS */}
             <div className="space-y-2">
-              <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider">DELIVERY SCHEDULE</h4>
+              <h4 className="text-xs font-bold font-label-caps text-onyx-black uppercase tracking-wider">DELIVERY SCHEDULE</h4>
 
               <div className="grid grid-cols-4 gap-2 text-center">
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => {
@@ -646,8 +644,9 @@ export default function SubscriptionsTab() {
                   return (
                     <div
                       key={day}
-                      className={`p-2 rounded-xl border text-xs font-black flex items-center justify-center gap-1 ${isScheduled ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200'
-                        }`}
+                      className={`p-2 rounded-xl border text-xs font-label-caps font-bold flex items-center justify-center gap-1 ${
+                        isScheduled ? 'bg-surface-container text-onyx-black border-sand-neutral/50' : 'bg-surface-container-low text-secondary opacity-50 border-sand-neutral/30'
+                      }`}
                     >
                       <span>{isScheduled ? '✓' : '○'}</span>
                       <span>{day}</span>
@@ -658,11 +657,11 @@ export default function SubscriptionsTab() {
             </div>
 
             {/* ACTION FOOTER */}
-            <div className="pt-3 border-t border-[#E5ECE8] flex items-center gap-2">
+            <div className="pt-3 border-t border-sand-neutral/30 flex items-center gap-2">
               {selectedSub.status === 'ACTIVE' ? (
                 <button
                   onClick={() => handleUpdateStatus(selectedSub._id || selectedSub.id, 'PAUSED')}
-                  className="flex-1 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-extrabold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-button-text font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <PauseCircle size={15} />
                   <span>Pause</span>
@@ -670,27 +669,17 @@ export default function SubscriptionsTab() {
               ) : selectedSub.status === 'PAUSED' ? (
                 <button
                   onClick={() => handleUpdateStatus(selectedSub._id || selectedSub.id, 'ACTIVE')}
-                  className="flex-1 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-extrabold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 font-button-text font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Play size={15} />
                   <span>Resume</span>
                 </button>
               ) : null}
 
-              <button
-                onClick={() => {
-                  alert(`Edit modal for ${selectedSub.customerName}'s plan`);
-                }}
-                className="px-4 py-2.5 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
-              >
-                <Edit3 size={15} className="text-[#0A8B5F]" />
-                <span>Edit</span>
-              </button>
-
               {selectedSub.status !== 'CANCELLED' && (
                 <button
                   onClick={() => handleUpdateStatus(selectedSub._id || selectedSub.id, 'CANCELLED')}
-                  className="px-3 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-extrabold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  className="px-3 py-2.5 bg-error-container hover:bg-error-container/80 text-on-error-container border border-error/20 font-button-text font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <XCircle size={15} />
                   <span>Cancel</span>
@@ -705,12 +694,12 @@ export default function SubscriptionsTab() {
       {/* CREATE SUBSCRIPTION MODAL */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-[6000] bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-[#E5ECE8] animate-scale-in">
-            <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
-              <h3 className="text-base font-black text-[#111827]">Create New Subscription</h3>
+          <div className="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-sand-neutral/40 animate-scale-in">
+            <div className="flex items-center justify-between border-b border-sand-neutral/30 pb-3">
+              <h3 className="text-base font-bold font-label-caps text-onyx-black">Create New Subscription</h3>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
-                className="p-1 text-[#6B7280] hover:text-[#111827] rounded-lg cursor-pointer"
+                className="p-1 text-secondary hover:text-onyx-black rounded-lg cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -719,7 +708,7 @@ export default function SubscriptionsTab() {
             <form onSubmit={handleCreateSubscription} className="space-y-3">
               {/* Select Customer */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-[#6B7280]">Select Customer</label>
+                <label className="text-xs font-label-caps font-bold text-secondary">Select Customer</label>
                 <select
                   onChange={e => {
                     const cust = realCustomers.find(c => c.name === e.target.value);
@@ -730,7 +719,7 @@ export default function SubscriptionsTab() {
                       setNewAddress(cust.address || 'Ahmedabad');
                     }
                   }}
-                  className="w-full px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-[#0A8B5F] cursor-pointer"
+                  className="w-full px-3 py-2 bg-surface-container border border-sand-neutral/40 rounded-xl text-xs font-label-caps text-onyx-black focus:outline-none focus:border-onyx-black cursor-pointer"
                   required
                 >
                   <option value="">-- Choose Registered Customer --</option>
@@ -742,7 +731,7 @@ export default function SubscriptionsTab() {
 
               {/* Select Tiffin Plan */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-[#6B7280]">Tiffin Plan / Package</label>
+                <label className="text-xs font-label-caps font-bold text-secondary">Tiffin Plan / Package</label>
                 <select
                   onChange={e => {
                     const tif = realTiffins.find(t => t.name === e.target.value);
@@ -751,7 +740,7 @@ export default function SubscriptionsTab() {
                       setNewAmount((tif.price || 120) * 26);
                     }
                   }}
-                  className="w-full px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827] focus:outline-none focus:border-[#0A8B5F] cursor-pointer"
+                  className="w-full px-3 py-2 bg-surface-container border border-sand-neutral/40 rounded-xl text-xs font-label-caps text-onyx-black focus:outline-none focus:border-onyx-black cursor-pointer"
                   required
                 >
                   <option value="">-- Choose Tiffin Plan --</option>
@@ -763,17 +752,17 @@ export default function SubscriptionsTab() {
 
               {/* Frequency Radio Buttons */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-[#6B7280]">Frequency</label>
+                <label className="text-xs font-label-caps font-bold text-secondary">Frequency</label>
                 <div className="flex items-center gap-4 pt-1">
                   {['Daily', 'Weekly', 'Monthly'].map(freq => (
-                    <label key={freq} className="flex items-center gap-1.5 text-xs font-bold cursor-pointer">
+                    <label key={freq} className="flex items-center gap-1.5 text-xs font-label-caps cursor-pointer">
                       <input
                         type="radio"
                         name="freq"
                         value={freq}
                         checked={newFrequency === freq}
                         onChange={e => setNewFrequency(e.target.value)}
-                        className="w-3.5 h-3.5 accent-[#0A8B5F] cursor-pointer"
+                        className="w-3.5 h-3.5 accent-onyx-black cursor-pointer"
                       />
                       <span>{freq}</span>
                     </label>
@@ -784,11 +773,11 @@ export default function SubscriptionsTab() {
               {/* Meal Type & Price */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-[#6B7280]">Meal Type</label>
+                  <label className="text-xs font-label-caps font-bold text-secondary">Meal Type</label>
                   <select
                     value={newMealType}
                     onChange={e => setNewMealType(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827]"
+                    className="w-full px-3 py-2 bg-surface-container border border-sand-neutral/40 rounded-xl text-xs font-label-caps text-onyx-black"
                   >
                     <option value="Lunch">Lunch</option>
                     <option value="Dinner">Dinner</option>
@@ -797,12 +786,12 @@ export default function SubscriptionsTab() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-[#6B7280]">Total Amount (₹)</label>
+                  <label className="text-xs font-label-caps font-bold text-secondary">Total Amount (₹)</label>
                   <input
                     type="number"
                     value={newAmount}
                     onChange={e => setNewAmount(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827]"
+                    className="w-full px-3 py-2 bg-surface-container border border-sand-neutral/40 rounded-xl text-xs font-label-caps text-onyx-black"
                   />
                 </div>
               </div>
@@ -810,40 +799,40 @@ export default function SubscriptionsTab() {
               {/* Start & End Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-[#6B7280]">Start Date</label>
+                  <label className="text-xs font-label-caps font-bold text-secondary">Start Date</label>
                   <input
                     type="text"
                     placeholder="01 Aug 2026"
                     value={newStartDate}
                     onChange={e => setNewStartDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827]"
+                    className="w-full px-3 py-2 bg-surface-container border border-sand-neutral/40 rounded-xl text-xs font-label-caps text-onyx-black"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-[#6B7280]">End Date</label>
+                  <label className="text-xs font-label-caps font-bold text-secondary">End Date</label>
                   <input
                     type="text"
                     placeholder="31 Aug 2026"
                     value={newEndDate}
                     onChange={e => setNewEndDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-bold text-[#111827]"
+                    className="w-full px-3 py-2 bg-surface-container border border-sand-neutral/40 rounded-xl text-xs font-label-caps text-onyx-black"
                   />
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-[#E5ECE8] flex justify-end gap-2">
+              <div className="pt-3 border-t border-sand-neutral/30 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-[#111827] font-bold text-xs rounded-xl cursor-pointer"
+                  className="px-4 py-2 bg-surface-container hover:bg-surface-container-highest text-onyx-black font-button-text font-bold text-xs rounded-xl cursor-pointer border border-sand-neutral/40"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-md cursor-pointer"
+                  className="px-5 py-2 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text font-bold text-xs rounded-xl shadow-md cursor-pointer"
                 >
                   {saving ? 'Creating...' : 'Create Subscription'}
                 </button>

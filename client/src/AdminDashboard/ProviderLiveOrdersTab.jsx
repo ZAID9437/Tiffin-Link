@@ -167,13 +167,13 @@ export default function ProviderLiveOrdersTab({ onNavigate, onOpenProvider360 })
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2.5 px-3.5 py-2 bg-[#efeeea] text-[#1a1a1a] text-[12px] font-mono border border-[#ded9d1]/50">
               <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
-              <span className="font-medium">Real-time Socket Connected</span>
+              <span className="font-medium">Live Orders Connected</span>
               <span className="text-[#665d52]/60">•</span>
               <span className="text-[#665d52]">Hub: Ahmedabad AMD-C</span>
             </div>
 
             <div className="flex items-center gap-2 px-3 py-1.5 bg-[#f5f3ef] border border-[#ded9d1]/50">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-[#665d52]">Auto-sync</span>
+              <span className="text-[11px] font-label-caps uppercase tracking-wider text-[#665d52]">Live Feed</span>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"

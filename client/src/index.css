@@ -3,45 +3,73 @@
 /* Global text selection reset */
 @import "maplibre-gl/dist/maplibre-gl.css";
 
-body,
+/* Complete Website-wide Text Selection & Copy-Paste Restriction */
+*,
+*::before,
+*::after,
 html,
+body,
 #root {
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
   user-select: none !important;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-touch-callout: none !important;
 }
 
-/* Re-enable text selection for form inputs and textareas */
+/* Allow text typing in form inputs, but disable text selection highlighting */
 input,
 textarea,
 [contenteditable="true"] {
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  -ms-user-select: text !important;
-  user-select: text !important;
+  -webkit-user-select: auto !important;
+  -moz-user-select: auto !important;
+  -ms-user-select: auto !important;
+  user-select: auto !important;
 }
 
-/* Premium Scrollbar */
+/* Strip selection background and color everywhere */
+::selection {
+  background: transparent !important;
+  color: inherit !important;
+}
+::-moz-selection {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+/* Premium Scrollbar - Neutral Artisanal Stone */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #F4F7F5;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #C5DDD2;
+  background: #ded9d1;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #0A8B5F;
+  background: #1b1c1a;
+}
+
+/* Hide scrollbar completely on tabs, navs, and horizontal scroll containers */
+.no-scrollbar::-webkit-scrollbar,
+nav::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar,
+nav,
+.overflow-x-auto {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Visible Custom Scrollbar for Admin Sidebar Nav */
@@ -86,6 +114,15 @@ video {
   transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
   perspective: 1000px;
+}
+
+/* Suppress browser PiP and overlay controls */
+video::-webkit-media-controls-picture-in-picture-button,
+video::-webkit-media-controls-panel,
+video::-webkit-media-controls {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* ===================================================
@@ -163,16 +200,16 @@ video {
 
 .food-card-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 24px -6px rgba(10, 139, 95, 0.08), 0 4px 8px -4px rgba(0, 0, 0, 0.03);
-  border-color: #C5DDD2;
+  box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.05), 0 4px 8px -4px rgba(0, 0, 0, 0.02);
+  border-color: #ded9d1;
 }
 
 /* Premium Focus Rings */
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #0A8B5F !important;
-  box-shadow: 0 0 0 3px rgba(10, 139, 95, 0.12) !important;
+  border-color: #1b1c1a !important;
+  box-shadow: 0 0 0 2px rgba(27, 28, 26, 0.08) !important;
 }
 
 /* ===================================================
@@ -308,4 +345,1396 @@ html.reduce-motion *::after {
   animation-duration: 0.001s !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.001s !important;
+}
+
+@layer editorial-light {
+  html:not(.dark) {
+/* ===================================================
+   Provider Dashboard Typography - Landing Page Parity
+   =================================================== */
+.provider-dashboard-root {
+  font-family: 'Hanken Grotesk', sans-serif !important;
+  background-color: #FAF8F5 !important;
+}
+
+.provider-dashboard-root h1,
+.provider-dashboard-root h2,
+.provider-dashboard-root h3,
+.provider-dashboard-root h4,
+.provider-dashboard-root .font-serif,
+.provider-dashboard-root .heading-serif,
+.provider-dashboard-root .font-headline-lg,
+.provider-dashboard-root .font-headline-md,
+.provider-dashboard-root .font-display-lg {
+  font-family: 'EB Garamond', Georgia, serif !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) input,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) select,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) textarea,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) table,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .font-sans,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .font-body-md,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .font-body-lg,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .font-label-caps,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .font-button-text {
+  font-family: 'Hanken Grotesk', sans-serif !important;
+}
+
+/* ===================================================
+   TiffinLink Editorial UX/UI Theme Stylesheet
+   Pure CSS transformation matching Screenshot 1:
+   - Warm linen page background (#FAF8F5)
+   - Crisp white card surfaces (#FFFFFF) with delicate warm borders (#ECE7DE)
+   - Clean, uncluttered KPI cards (removes bottom micro-split clickable noise & bulky icon boxes)
+   - Editorial serif headings ('EB Garamond', font-normal, #18181B)
+   - Soft, readable secondary text (#716D68)
+   - Sleek minimal solid black (#18181B) and white outline buttons
+   - Refined sidebar with warm active pill (#ECE8E0) and clean typography
+   - ZERO JSX or React changes: 100% pure CSS styling
+   =================================================== */
+
+/* 1. Global Page Background & Root */
+html:not(.dark) :is(div:has(> aside), aside ~ div, .provider-dashboard-root) {
+  background-color: #FAF8F5 !important;
+  color: #18181B !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) main {
+  background-color: #FAF8F5 !important;
+}
+
+/* 2. Top Header */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) header {
+  background-color: rgba(250, 248, 245, 0.98) !important;
+  border-bottom: 1.5px solid #C4BCAD !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) header input {
+  background-color: #FFFFFF !important;
+  border: 1.5px solid #C4BCAD !important;
+  border-radius: 8px !important;
+  color: #18181B !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) header input:focus {
+  border-color: #18181B !important;
+  box-shadow: 0 0 0 2px rgba(24, 24, 27, 0.1) !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) header input::placeholder {
+  color: #8C867D !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) header .bg-surface-container-low {
+  background-color: #FFFFFF !important;
+  border: 1.5px solid #C4BCAD !important;
+  border-radius: 8px !important;
+}
+
+/* 3. Left Sidebar Clean Editorial Theme */
+aside {
+  background-color: #FAF8F5 !important;
+  border-right: 1.5px solid #C4BCAD !important;
+}
+
+aside .border-b,
+aside .border-t {
+  border-color: #D6CFBF !important;
+}
+
+/* Sidebar navigation links: High contrast and legible for inactive items */
+aside nav a:not([class*="bg-"]):not([class*="text-white"]),
+aside nav button:not([class*="bg-"]):not([class*="text-white"]),
+aside nav a:not([class*="bg-"]):not([class*="text-white"]) span,
+aside nav button:not([class*="bg-"]):not([class*="text-white"]) span {
+  color: #3F3D38;
+}
+
+aside nav div:hover > span,
+aside nav div:hover > div > span,
+aside nav a:hover:not([class*="bg-"]):not([class*="text-white"]) span,
+aside nav a:hover:not([class*="bg-"]):not([class*="text-white"]),
+aside nav button:hover:not([class*="bg-"]):not([class*="text-white"]) span,
+aside nav button:hover:not([class*="bg-"]):not([class*="text-white"]) {
+  color: #18181B;
+}
+
+/* Sidebar Partner badge cleanup */
+aside .bg-surface-container {
+  background-color: transparent !important;
+  border: 1px solid #D6CFBF !important;
+  color: #3F3D38 !important;
+}
+
+/* Sidebar active top-level item: warm pill background with bold black text */
+aside .bg-surface-container.font-bold,
+aside .bg-surface-container.font-semibold,
+aside .bg-surface-container.font-bold *,
+aside .bg-surface-container.font-semibold * {
+  background-color: #ECE8E0 !important;
+  color: #18181B !important;
+  -webkit-text-fill-color: #18181B !important;
+  border-radius: 6px !important;
+  border: none !important;
+  font-weight: 600 !important;
+}
+
+/* Sidebar inactive hover */
+aside .hover\:bg-surface-container-low:hover {
+  background-color: #F3EFE7 !important;
+  border-radius: 6px !important;
+}
+
+/* Sidebar child active item: solid black with crisp WHITE text and icons in ALL states */
+aside a.bg-\[\#1A1A1A\],
+aside a.bg-onyx-black,
+aside button.bg-\[\#1A1A1A\],
+aside button.bg-onyx-black,
+aside .bg-\[\#1A1A1A\],
+aside .bg-onyx-black {
+  background-color: #18181B !important;
+  border-radius: 6px !important;
+}
+
+aside a.bg-\[\#1A1A1A\] *,
+aside a.bg-onyx-black *,
+aside button.bg-\[\#1A1A1A\] *,
+aside button.bg-onyx-black *,
+aside .bg-\[\#1A1A1A\] *,
+aside .bg-onyx-black *,
+aside a.bg-\[\#1A1A1A\]:hover *,
+aside a.bg-onyx-black:hover * {
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+  font-weight: 500;
+}
+
+/* Sidebar active emergency SOS item */
+aside .bg-red-600,
+aside .bg-red-600 * {
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+
+/* Sidebar counter badges (e.g. amber, emerald) retain white text */
+aside nav span.bg-amber-600,
+aside nav span.bg-amber-600 *,
+aside nav span.bg-emerald-600,
+aside nav span.bg-emerald-600 * {
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+
+/* Sidebar accordion line */
+aside .border-sand-neutral\/50 {
+  border-color: #D6CFBF !important;
+}
+
+/* Sidebar bottom online box: clean & calm with crisp border */
+aside .p-3.rounded-lg.bg-surface-container-low {
+  background-color: #F8F5EE !important;
+  border: 1.5px solid #C4BCAD !important;
+  border-radius: 10px !important;
+}
+
+/* 4. Welcome / Overview Banner & Header Titles */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .bg-surface-container-lowest.p-6.rounded-2xl {
+  background-color: #FFFFFF !important;
+  border: 1.5px solid #C4BCAD !important;
+  border-radius: 14px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) h1,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) h2,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) h3,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .font-headline-lg,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .font-headline-md {
+  font-family: 'EB Garamond', Georgia, serif !important;
+  font-weight: 400 !important;
+  color: #18181B !important;
+  letter-spacing: -0.015em !important;
+}
+
+/* Telemetry & Control Bar (Orders / Cancelled Orders) */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .px-6.py-3.bg-surface-container-low {
+  background-color: #FFFFFF !important;
+  border: 1.5px solid #C4BCAD !important;
+  border-radius: 10px !important;
+}
+
+/* Report & Export Buttons: Clean outline with proper visible border */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.bg-surface-container-low,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.border-sand-neutral\/40 {
+  background-color: #FFFFFF !important;
+  border: 1.5px solid #C4BCAD !important;
+  color: #18181B !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.15s ease !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.bg-surface-container-low:hover,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.border-sand-neutral\/40:hover {
+  background-color: #F8F5EE !important;
+  border-color: #18181B !important;
+}
+
+/* Accepting Orders toggle card in banner */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .p-6 .px-3\.5.py-2.rounded-xl.bg-surface-container-low {
+  background-color: #F8F5EE !important;
+  border: 1.5px solid #C4BCAD !important;
+  border-radius: 10px !important;
+}
+
+/* 5. Four KPI Metric Cards: Crisp Distinct Borders with Subtle Hover Elevation */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.xl\:grid-cols-4 > div:not(.bg-onyx-black),
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 > div:not(.bg-onyx-black) {
+  background-color: #FFFFFF !important;
+  border: 1.5px solid #C4BCAD !important;
+  border-radius: 14px !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.2s ease !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.xl\:grid-cols-4 > div:not(.bg-onyx-black):hover,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 > div:not(.bg-onyx-black):hover {
+  border-color: #18181B !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Preserve intentionally dark KPI cards (like Active Delivery & Available Balance) */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black {
+  background-color: #18181B !important;
+  color: #FFFFFF !important;
+  border: 1.5px solid #18181B !important;
+  border-radius: 14px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Ensure headings & titles in dark KPI cards are ALWAYS crisp pure white, never overridden by .font-headline-md */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .font-headline-md,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .font-headline-lg,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .font-display-lg,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black h1,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black h2,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black h3,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black h4,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .text-on-primary,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .text-white,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .text-bone-white,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .font-headline-md *,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .font-headline-lg * {
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .text-sand-neutral,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .text-sand-neutral\/80,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .text-sand-neutral\/60,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black .font-label-caps,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black p {
+  color: #D6D1C7 !important;
+  -webkit-text-fill-color: #D6D1C7 !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black button {
+  background-color: #FFFFFF !important;
+  color: #18181B !important;
+  border: none !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+}
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid > div.bg-onyx-black button * {
+  color: #18181B !important;
+  -webkit-text-fill-color: #18181B !important;
+}
+
+/* Remove bulky gray icon container box -> bare outline icon */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.xl\:grid-cols-4 .w-10.h-10,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 .w-10.h-10 {
+  background: transparent !important;
+  width: auto !important;
+  height: auto !important;
+  color: #6B665E !important;
+}
+
+/* Hide noisy bottom micro-split footer bars (Uncluttered KPI cards) */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.xl\:grid-cols-4 .-mx-5.-mb-5,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 .-mx-5.-mb-5,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 .pt-3.border-t.border-sand-neutral\/40 {
+  display: none !important;
+}
+
+/* KPI numbers: Large, clean, elegant */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .font-display-lg,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .text-4xl.font-headline-md {
+  font-family: 'Hanken Grotesk', -apple-system, sans-serif !important;
+  font-size: 32px !important;
+  font-weight: 500 !important;
+  color: #18181B !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* Clean up badges inside KPI cards */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.xl\:grid-cols-4 .bg-secondary-container,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-4 .bg-secondary-container {
+  background: transparent !important;
+  border: 1px solid #C4BCAD !important;
+  color: #3F3D38 !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+
+/* 6. Main Content Area Cards & Lists - Proper Defined Frame */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .bg-surface-container-lowest {
+  background-color: #FFFFFF !important;
+  border: 1.5px solid #C4BCAD !important;
+  border-radius: 14px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Inner sub-containers & individual inquiry / status / quota boxes */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .bg-surface-container-low {
+  background-color: #F8F5EE !important;
+  border: 1.5px solid #D6CFBF !important;
+  border-radius: 10px !important;
+}
+
+/* Interactive inner cards hover definition */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .space-y-3 > div.bg-surface-container-low:hover,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .space-y-2 > div.bg-surface-container-low:hover {
+  border-color: #18181B !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .border-sand-neutral,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .border-sand-neutral\/30,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .border-sand-neutral\/40,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .border-sand-neutral\/50 {
+  border-color: #D6CFBF !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .divide-sand-neutral\/30 > :not([hidden]) ~ :not([hidden]),
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .divide-sand-neutral\/40 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #DDD6CB !important;
+}
+
+/* 7. Action Buttons (Clean Editorial Black & Outline) */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.bg-onyx-black,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.bg-onyx-black *,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .btn-primary,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .btn-primary * {
+  background-color: #18181B !important;
+  color: #FFFFFF !important;
+  -webkit-text-fill-color: #FFFFFF !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+  transition: background-color 0.15s ease !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.bg-onyx-black:hover,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .btn-primary:hover {
+  background-color: #2E2E33 !important;
+}
+
+/* Sub-Tab Navigation & Filter pills readability */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.text-secondary {
+  color: #3F3D38 !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.text-secondary:hover {
+  color: #18181B !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .px-3.py-1.rounded.bg-onyx-black,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .px-3.py-1\.5.rounded.bg-onyx-black {
+  background-color: #18181B !important;
+  color: #FFFFFF !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .px-3.py-1.rounded.bg-surface-container,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .px-3.py-1\.5.rounded.bg-surface-container {
+  background-color: #FFFFFF !important;
+  color: #3F3D38 !important;
+  border: 1.5px solid #C4BCAD !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .px-3.py-1.rounded.bg-surface-container:hover,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .px-3.py-1\.5.rounded.bg-surface-container:hover {
+  background-color: #F8F5EE !important;
+  border-color: #18181B !important;
+  color: #18181B !important;
+}
+
+/* Filter search & inputs */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) input[type="text"],
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) input[type="search"],
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) select {
+  background-color: #FFFFFF !important;
+  border: 1.5px solid #C4BCAD !important;
+  border-radius: 8px !important;
+  color: #18181B !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) input[type="text"]:focus,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) input[type="search"]:focus,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) select:focus {
+  border-color: #18181B !important;
+  box-shadow: 0 0 0 2px rgba(24, 24, 27, 0.1) !important;
+}
+
+/* 8. Right Column (Kitchen Capacity & Delivery Status) */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .w-full.bg-surface-container.h-3 {
+  background-color: #F0EDE6 !important;
+  border: 1px solid #D6CFBF !important;
+  height: 8px !important;
+  border-radius: 9999px !important;
+  padding: 0 !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .w-full.bg-surface-container.h-3 .bg-onyx-black {
+  background-color: #18181B !important;
+  border-radius: 9999px !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.w-full.py-2\.5.bg-surface-container {
+  background-color: #FFFFFF !important;
+  border: 1.5px solid #C4BCAD !important;
+  color: #18181B !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.15s ease !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.w-full.py-2\.5.bg-surface-container:hover {
+  background-color: #F8F5EE !important;
+  border-color: #18181B !important;
+}
+
+/* Text Colors: Crystal Clear High-Contrast Readability */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .text-on-surface {
+  color: #18181B !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .text-secondary,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .text-clay-earth,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .text-on-surface-variant {
+  color: #3F3D38 !important;
+}
+
+/* Light text on light backgrounds fixed */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) :not(.bg-onyx-black) > .text-sand-neutral,
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) :not(.bg-onyx-black) .text-sand-neutral {
+  color: #6E6960 !important;
+}
+
+/* Clean rounded corners everywhere */
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .rounded-2xl {
+  border-radius: 12px !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .rounded-xl {
+  border-radius: 10px !important;
+}
+
+:is(div:has(> aside), aside ~ div, .provider-dashboard-root) .rounded-lg {
+  border-radius: 8px !important;
+}
+
+
+  }
+}
+
+/* ========================================================
+   GLOBAL WEBSITE-WIDE DARK MODE ENGINE (Obsidian & Charcoal)
+   Featuring Regal Gold Typography (Dark Mode ONLY)
+   ======================================================== */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body,
+html.dark #root,
+html.dark .bg-surface {
+  background-color: #0E0E10 !important;
+  color: #FAF8F5 !important;
+}
+
+/* ========================================================
+   REGAL GOLD TYPOGRAPHY ENGINE (DARK MODE ONLY)
+   Pure luxury gold font hierarchy for headings, brand badges,
+   accents, section tags and highlights exclusively in dark mode.
+   ======================================================== */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-headline-lg,
+  .font-headline-md,
+  .font-display-lg,
+  .font-headline-lg-mobile
+) {
+  color: #E5C158 !important; /* Regal Sovereign Gold */
+  letter-spacing: -0.015em;
+}
+
+/* Subheadings, labels, section accents & category markers */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .font-label-caps.text-clay-earth,
+  .text-clay-earth,
+  .text-secondary,
+  aside nav div.text-\[\#8C7A6B\],
+  aside nav div.text-\[\#8c7a6b\]
+) {
+  color: #DFB76C !important; /* Warm Champagne Gold */
+}
+
+/* Brand Logos in Navbars & Sidebars */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  aside a span.font-serif,
+  header span.font-serif,
+  nav a span.font-serif
+) {
+  color: #E5C158 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  aside a span.font-sans,
+  header span.font-label-caps
+) {
+  color: #DFB76C !important;
+}
+
+/* Dashboard Header & Main Content Canvas in Dark Mode */
+html.dark main,
+html.dark div:has(> aside) ~ div,
+html.dark .lg\:pl-80 {
+  background-color: #0E0E10 !important;
+  color: #FAF8F5 !important;
+}
+
+/* Dashboard Metric Cards, Section Cards & Banners in Dark Mode */
+html.dark .bg-surface-container-lowest,
+html.dark .grid > div.bg-surface-container-lowest,
+html.dark section.bg-white,
+html.dark section.bg-\[\#F5F3EF\],
+html.dark div.bg-white:not(.w-1\.5):not(.w-3):not(.w-4) {
+  background-color: #161619 !important;
+  border-color: #282832 !important;
+}
+
+html.dark .bg-surface-container-lowest:hover,
+html.dark .grid > div.bg-surface-container-lowest:hover {
+  border-color: #E5C158 !important;
+}
+
+/* Specific KPI Metric Numbers inside Cards */
+html.dark .grid > div .font-serif.text-3xl,
+html.dark .grid > div .text-4xl.font-headline-md,
+html.dark .grid > div .font-display-lg {
+  color: #E5C158 !important;
+}
+
+/* Active Delivery Banner & Dark Option Cards in Dark Mode */
+html.dark .grid > div.bg-onyx-black,
+html.dark div.bg-onyx-black,
+html.dark section.bg-onyx-black {
+  background-color: #1A1A1E !important;
+  border-color: #2E2E38 !important;
+}
+
+html.dark .grid > div.bg-onyx-black:hover {
+  border-color: #E5C158 !important;
+}
+
+/* Subtle Labels & Section Titles */
+html.dark section h2.font-serif,
+html.dark .font-serif.text-2xl,
+html.dark .font-serif.text-3xl,
+html.dark .font-serif.text-4xl {
+  color: #E5C158 !important;
+}
+
+/* Section Header Badges & Pill Tags */
+html.dark span.bg-\[\#E4E2DE\],
+html.dark span.bg-\[\#F5F3EF\],
+html.dark div.bg-\[\#F5F3EF\] {
+  background-color: #1F1F24 !important;
+  border-color: #2E2E38 !important;
+  color: #DFB76C !important;
+}
+
+/* Inner Option Cards inside Working Schedule / Preferences (e.g. Standard Delivery card) */
+html.dark label.bg-\[\#F5F3EF\],
+html.dark div.bg-\[\#F5F3EF\]:not(.p-5) {
+  background-color: #1A1A1E !important;
+  border-color: #2E2E38 !important;
+}
+
+html.dark label.bg-\[\#F5F3EF\]:hover {
+  border-color: #E5C158 !important;
+}
+
+/* Shift Start / Shift End Dropdowns */
+html.dark .bg-\[\#1A1A1A\] select,
+html.dark select.bg-\[\#1A1A1A\],
+html.dark div.bg-\[\#1A1A1A\] select {
+  background-color: #1A1A1E !important;
+  color: #FAF8F5 !important;
+  border-color: #383844 !important;
+}
+
+/* Driver & Provider Sidebar Dark Mode Contrast Fixes */
+html.dark aside,
+html.dark aside.bg-\[\#FBF9F5\],
+html.dark aside.bg-\[\#fbf9f5\] {
+  background-color: #121214 !important;
+  border-color: #24242A !important;
+}
+
+html.dark aside > div > div:first-child,
+html.dark aside .bg-\[\#F5F3EF\],
+html.dark aside .bg-\[\#f5f3ef\],
+html.dark aside .bg-\[\#FBF9F5\],
+html.dark aside .bg-\[\#fbf9f5\] {
+  background-color: #161619 !important;
+  border-color: #24242A !important;
+}
+
+/* Sidebar navigation links */
+html.dark aside nav a,
+html.dark aside nav button {
+  color: #D4D0C8 !important;
+}
+
+html.dark aside nav a:hover,
+html.dark aside nav button:hover {
+  background-color: rgba(229, 193, 88, 0.08) !important;
+  color: #E5C158 !important;
+}
+
+/* Active sidebar item */
+html.dark aside nav a.bg-\[\#1A1A1A\],
+html.dark aside nav a.bg-\[\#1a1a1a\],
+html.dark aside nav a.bg-onyx-black {
+  background-color: #E5C158 !important;
+  color: #111113 !important;
+  font-weight: 600 !important;
+}
+
+html.dark aside nav a.bg-\[\#1A1A1A\] span,
+html.dark aside nav a.bg-\[\#1a1a1a\] span,
+html.dark aside nav a.bg-onyx-black span {
+  color: #111113 !important;
+}
+
+/* Sidebar footer toggle card */
+html.dark aside .p-4.border-t {
+  background-color: #161619 !important;
+  border-color: #24242A !important;
+}
+
+html.dark aside .p-4.border-t .bg-white {
+  background-color: #1F1F24 !important;
+  border-color: #2C2C34 !important;
+}
+
+html.dark aside .p-4.border-t .text-\[\#1A1A1A\],
+html.dark aside .p-4.border-t .text-\[\#1a1a1a\] {
+  color: #FAF8F5 !important;
+}
+
+html.dark aside .p-4.border-t .text-\[\#666666\] {
+  color: #A1A1AA !important;
+}
+
+/* Universal Background Replacements for Hardcoded Hex Colors */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .bg-white,
+  .bg-\[\#ffffff\],
+  .bg-\[\#FFFFFF\],
+  .bg-\[\#fbf9f5\],
+  .bg-\[\#FBF9F5\],
+  .bg-\[\#FAF8F5\],
+  .bg-\[\#f5f3ef\],
+  .bg-\[\#F5F3EF\],
+  .bg-\[\#efeeea\],
+  .bg-\[\#eae8e4\],
+  .bg-\[\#F4F7F5\],
+  .bg-\[\#F5F2EB\],
+  .bg-\[\#F8F6F2\],
+  .bg-surface-bright,
+  .bg-bone-white
+) {
+  background-color: #161619 !important;
+}
+
+/* Page Canvas Background Override */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .bg-\[\#FBF9F5\].min-h-screen,
+  .bg-\[\#FBF9F5\].w-full,
+  div.bg-\[\#FBF9F5\]:not(.p-4):not(.p-6):not(.p-7):not(button)
+) {
+  background-color: #0E0E10 !important;
+}
+
+/* Translucent Navbars, Sticky Headers & Glass Containers */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .bg-white\/95,
+  .bg-\[\#fbf9f5\]\/95,
+  .bg-\[\#FAF8F5\]\/95,
+  .bg-\[\#fbf9f5\]\/90,
+  .bg-\[\#FAF8F5\]\/90,
+  .bg-surface\/90,
+  .bg-surface-container-lowest\/90,
+  .bg-bone-white\/95
+) {
+  background-color: rgba(22, 22, 25, 0.94) !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .bg-white\/80,
+  .bg-\[\#fbf9f5\]\/80,
+  .bg-bone-white\/80
+) {
+  background-color: rgba(22, 22, 25, 0.86) !important;
+}
+
+/* Elevated Containers & Sub-sections */
+:is(html.dark, [data-theme="dark"], .dark) .bg-surface-container {
+  background-color: #1A1A1E !important;
+}
+:is(html.dark, [data-theme="dark"], .dark) .bg-surface-container-high {
+  background-color: #24242A !important;
+}
+:is(html.dark, [data-theme="dark"], .dark) .bg-surface-container-highest {
+  background-color: #2E2E38 !important;
+}
+:is(html.dark, [data-theme="dark"], .dark) .bg-surface-container-low {
+  background-color: #151518 !important;
+}
+:is(html.dark, [data-theme="dark"], .dark) .bg-surface-container-lowest {
+  background-color: #161619 !important;
+}
+
+/* Table Dark Mode Styling */
+:is(html.dark, [data-theme="dark"], .dark) table thead tr {
+  background-color: #1F1F24 !important;
+  border-color: #282832 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) table thead th {
+  color: #DFB76C !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) table tbody tr {
+  border-color: #282832 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) table tbody tr:hover {
+  background-color: #1E1E24 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) table tbody tr.bg-\[\#DED9D1\]\/40 {
+  background-color: #26262E !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) table tbody td {
+  color: #FAF8F5 !important;
+}
+
+/* Quick Action / Macro Buttons in Dark Mode */
+:is(html.dark, [data-theme="dark"], .dark) button.bg-white,
+:is(html.dark, [data-theme="dark"], .dark) .bg-white > button,
+:is(html.dark, [data-theme="dark"], .dark) button.bg-\[\#FBF9F5\] {
+  background-color: #1E1E24 !important;
+  color: #FAF8F5 !important;
+  border-color: #383844 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) button.bg-white:hover,
+:is(html.dark, [data-theme="dark"], .dark) button.bg-\[\#FBF9F5\]:hover {
+  background-color: #282832 !important;
+  color: #E5C158 !important;
+  border-color: #E5C158 !important;
+}
+
+/* ===================================================
+   UNIVERSAL HIGH-CONTRAST DARK MODE TYPOGRAPHY ENGINE
+   =================================================== */
+
+/* 1. Base Text Color for Dark Mode Containers (inherited fallback) */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  article,
+  section,
+  dialog,
+  main,
+  table,
+  .modal-content,
+  .bg-white,
+  .bg-\[\#ffffff\],
+  .bg-\[\#FFFFFF\],
+  .bg-\[\#fbf9f5\],
+  .bg-\[\#FBF9F5\],
+  .bg-\[\#FAF8F5\],
+  .bg-\[\#f5f3ef\],
+  .bg-\[\#F5F3EF\],
+  .bg-\[\#efeeea\],
+  .bg-\[\#eae8e4\],
+  .bg-surface-bright,
+  .bg-surface-container,
+  .bg-surface-container-low,
+  .bg-surface-container-lowest,
+  .bg-surface-container-high,
+  .bg-surface-container-highest,
+  .bg-bone-white
+) {
+  color: #FAF8F5;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  table tbody td,
+  table tbody th,
+  table tfoot td
+) {
+  color: #FAF8F5 !important;
+}
+
+/* 2. Primary High-Contrast Dark Text Replacements -> Crisp Pure Ivory (#FAF8F5) */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .text-\[\#1c1c1a\],
+  .text-\[\#1C1C1A\],
+  .text-\[\#1c1b18\],
+  .text-\[\#1a1a1a\],
+  .text-\[\#1A1A1A\],
+  .text-\[\#18181b\],
+  .text-\[\#18181B\],
+  .text-\[\#181816\],
+  .text-\[\#181512\],
+  .text-\[\#1b1c1a\],
+  .text-\[\#111827\],
+  .text-\[\#111113\],
+  .text-\[\#000000\],
+  .text-\[\#000\],
+  .text-\[\#0f172a\],
+  .text-\[\#1e293b\],
+  .text-\[\#211b12\],
+  .text-\[\#2e1e12\],
+  .text-\[\#2d2b27\],
+  .text-\[\#242424\],
+  .text-\[\#2a2a2a\],
+  .text-\[\#2e2e2e\],
+  .text-\[\#27272a\],
+  .text-\[\#262626\],
+  .text-\[\#33302a\],
+  .text-\[\#333333\],
+  .text-\[\#333\],
+  .text-\[\#374151\],
+  .text-\[\#382f28\],
+  .text-\[\#3a3a3a\],
+  .text-onyx-black,
+  .text-black,
+  .text-on-surface,
+  .text-on-background,
+  .text-stone-950,
+  .text-stone-900,
+  .text-stone-800,
+  .text-neutral-950,
+  .text-neutral-900,
+  .text-neutral-800,
+  .text-zinc-950,
+  .text-zinc-900,
+  .text-zinc-800,
+  .text-gray-950,
+  .text-gray-900,
+  .text-gray-800,
+  .text-slate-950,
+  .text-slate-900,
+  .text-slate-800,
+  .text-bone-white,
+  [class*="text-bone-white"]
+) {
+  color: #FAF8F5 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) [class*="text-bone-white/"] {
+  color: rgba(250, 248, 245, 0.9) !important;
+}
+
+/* 3. Secondary & Muted Dark Text Overrides -> Warm Soft Cream / Silver (#D4D0C8) */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .text-\[\#4a4238\],
+  .text-\[\#4A4238\],
+  .text-\[\#665d52\],
+  .text-\[\#665D52\],
+  .text-\[\#6b7280\],
+  .text-\[\#6B7280\],
+  .text-\[\#444748\],
+  .text-\[\#444444\],
+  .text-\[\#747878\],
+  .text-\[\#71716b\],
+  .text-\[\#706c64\],
+  .text-\[\#3F3D38\],
+  .text-\[\#403c35\],
+  .text-\[\#4a4a46\],
+  .text-\[\#4a5d54\],
+  .text-\[\#4b3621\],
+  .text-\[\#4b5563\],
+  .text-\[\#54483c\],
+  .text-\[\#554b3f\],
+  .text-\[\#555555\],
+  .text-\[\#59554e\],
+  .text-\[\#5a5955\],
+  .text-\[\#5f5b54\],
+  .text-\[\#666666\],
+  .text-\[\#6b4b2b\],
+  .text-\[\#6c6358\],
+  .text-\[\#828282\],
+  .text-\[\#858383\],
+  .text-\[\#8a857b\],
+  .text-\[\#8c6239\],
+  .text-\[\#8c7a6b\],
+  .text-\[\#8C7A6B\],
+  .text-\[\#8c8275\],
+  .text-\[\#8C8275\],
+  .text-\[\#8c877d\],
+  .text-\[\#8c887b\],
+  .text-\[\#999\],
+  .text-\[\#999999\],
+  .text-on-surface-variant,
+  .text-secondary,
+  .text-clay-earth,
+  .text-gray-700,
+  .text-gray-600,
+  .text-stone-700,
+  .text-neutral-700,
+  .text-zinc-700,
+  .text-slate-700
+) {
+  color: #D4D0C8 !important;
+}
+
+/* 4. Tertiary & Subtle Metadata -> Light Neutral Grey (#A1A1AA) */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .text-gray-500,
+  .text-gray-400,
+  .text-stone-500,
+  .text-stone-400,
+  .text-zinc-500,
+  .text-zinc-400,
+  .text-neutral-500,
+  .text-neutral-400
+) {
+  color: #A1A1AA !important;
+}
+
+/* 5. Hover Contrast Fixes (prevent links/buttons from going black on hover) */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .hover\:text-black:hover,
+  .hover\:text-\[\#1a1a1a\]:hover,
+  .hover\:text-\[\#1A1A1A\]:hover,
+  .hover\:text-\[\#111827\]:hover,
+  .hover\:text-\[\#18181b\]:hover,
+  .hover\:text-\[\#18181B\]:hover,
+  .hover\:text-\[\#1c1c1a\]:hover,
+  .hover\:text-\[\#1b1c1a\]:hover,
+  .hover\:text-\[\#665d52\]:hover,
+  .hover\:text-stone-900:hover,
+  .hover\:text-stone-950:hover,
+  .hover\:text-neutral-900:hover,
+  .hover\:text-neutral-950:hover,
+  .hover\:text-zinc-900:hover,
+  .hover\:text-zinc-950:hover,
+  .hover\:text-gray-900:hover,
+  .hover\:text-gray-950:hover
+) {
+  color: #E5C158 !important;
+}
+
+/* 6. Status / Alert Chips in Dark Mode (Vibrant Readability) */
+:is(html.dark, [data-theme="dark"], .dark) :is(.bg-emerald-50, .bg-emerald-100, .bg-emerald-50\/20) {
+  background-color: rgba(16, 185, 129, 0.16) !important;
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+:is(html.dark, [data-theme="dark"], .dark) :is(.bg-emerald-50, .bg-emerald-100, .bg-emerald-50\/20) :is(.text-emerald-800, .text-emerald-900, .text-emerald-700, .text-\[\#0A8B5F\], .text-\[\#1b5e20\]) {
+  color: #34D399 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) :is(.bg-amber-50, .bg-amber-100, .bg-amber-50\/20) {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+:is(html.dark, [data-theme="dark"], .dark) :is(.bg-amber-50, .bg-amber-100, .bg-amber-50\/20) :is(.text-amber-800, .text-amber-900, .text-amber-700, .text-\[\#b45309\], .text-\[\#9a6700\]) {
+  color: #FBBF24 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) :is(.bg-rose-50, .bg-rose-100, .bg-rose-50\/20, .bg-red-50, .bg-red-100) {
+  background-color: rgba(239, 68, 68, 0.16) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+:is(html.dark, [data-theme="dark"], .dark) :is(.bg-rose-50, .bg-rose-100, .bg-rose-50\/20, .bg-red-50, .bg-red-100) :is(.text-rose-800, .text-rose-900, .text-red-800, .text-red-900, .text-\[\#c62828\], .text-\[\#ba1a1a\], .text-\[\#c5221f\]) {
+  color: #FB7185 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) :is(.bg-blue-50, .bg-blue-100, .bg-blue-50\/20, .bg-sky-50, .bg-sky-100) {
+  background-color: rgba(56, 189, 248, 0.16) !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
+}
+:is(html.dark, [data-theme="dark"], .dark) :is(.bg-blue-50, .bg-blue-100, .bg-blue-50\/20, .bg-sky-50, .bg-sky-100) :is(.text-blue-800, .text-blue-900, .text-sky-800, .text-\[\#0369a1\], .text-\[\#005a9c\]) {
+  color: #38BDF8 !important;
+}
+
+/* 7. Preserve Crisp Black Text on Sovereign Gold / Bright Accent Buttons */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .btn-primary,
+  button.bg-\[\#E5C158\],
+  button.bg-\[\#DFB76C\],
+  button.bg-amber-400,
+  button.bg-yellow-400,
+  a.bg-\[\#E5C158\],
+  .bg-\[\#E5C158\]
+) {
+  color: #111113 !important;
+}
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .btn-primary,
+  button.bg-\[\#E5C158\],
+  button.bg-\[\#DFB76C\],
+  button.bg-amber-400,
+  button.bg-yellow-400,
+  a.bg-\[\#E5C158\],
+  .bg-\[\#E5C158\]
+) * {
+  color: #111113 !important;
+  -webkit-text-fill-color: #111113 !important;
+}
+
+/* Universal Border Contrast Overrides */
+:is(html.dark, [data-theme="dark"], .dark) :is(
+  .border-\[\#ded9d1\],
+  .border-\[\#ded9d1\]\/60,
+  .border-\[\#ded9d1\]\/70,
+  .border-\[\#DED9D1\],
+  .border-\[\#DED9D1\]\/60,
+  .border-\[\#DED9D1\]\/50,
+  .border-\[\#DED9D1\]\/40,
+  .border-\[\#ECE7DE\],
+  .border-\[\#D5D0C5\],
+  .border-\[\#E5ECE8\],
+  .border-\[\#e7e2d8\],
+  .border-\[\#eae8e4\],
+  .border-\[\#c4c7c7\],
+  .border-\[\#C4BCAD\],
+  .border-\[\#D6CFBF\],
+  .border-sand-neutral,
+  .border-outline,
+  .border-outline-variant,
+  .border-sand-neutral\/40,
+  .border-sand-neutral\/30,
+  .border-sand-neutral\/60,
+  .border-gray-200,
+  .border-gray-300
+) {
+  border-color: #282832 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) .divide-\[\#DED9D1\]\/60 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #282832 !important;
+}
+
+/* Form Inputs, Selects & Textareas across all views */
+:is(html.dark, [data-theme="dark"], .dark) input:not([type="checkbox"]):not([type="radio"]),
+:is(html.dark, [data-theme="dark"], .dark) textarea,
+:is(html.dark, [data-theme="dark"], .dark) select,
+:is(html.dark, [data-theme="dark"], .dark) :is(div:has(> aside), aside ~ div, .provider-dashboard-root) input[type="text"],
+:is(html.dark, [data-theme="dark"], .dark) :is(div:has(> aside), aside ~ div, .provider-dashboard-root) input[type="search"],
+:is(html.dark, [data-theme="dark"], .dark) :is(div:has(> aside), aside ~ div, .provider-dashboard-root) select {
+  background-color: #1A1A1E !important;
+  color: #FAF8F5 !important;
+  border-color: #383844 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) select option {
+  background-color: #1A1A1E !important;
+  color: #FAF8F5 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) input::placeholder,
+:is(html.dark, [data-theme="dark"], .dark) textarea::placeholder {
+  color: #71717A !important;
+}
+
+/* Custom Primary Buttons & Action Buttons in Dark Mode */
+:is(html.dark, [data-theme="dark"], .dark) .btn-primary,
+:is(html.dark, [data-theme="dark"], .dark) button.bg-onyx-black,
+:is(html.dark, [data-theme="dark"], .dark) a.bg-onyx-black:not(aside *),
+:is(html.dark, [data-theme="dark"], .dark) button.bg-\[\#1A1A1A\],
+:is(html.dark, [data-theme="dark"], .dark) button.bg-\[\#1a1a1a\],
+:is(html.dark, [data-theme="dark"], .dark) button.bg-\[\#18181B\],
+:is(html.dark, [data-theme="dark"], .dark) button.bg-\[\#18181b\] {
+  background-color: #E5C158 !important;
+  color: #111113 !important;
+  border-color: #E5C158 !important;
+  font-weight: 600 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) .btn-primary *,
+:is(html.dark, [data-theme="dark"], .dark) button.bg-onyx-black *,
+:is(html.dark, [data-theme="dark"], .dark) a.bg-onyx-black:not(aside *) *,
+:is(html.dark, [data-theme="dark"], .dark) button.bg-\[\#1A1A1A\] *,
+:is(html.dark, [data-theme="dark"], .dark) button.bg-\[\#18181B\] * {
+  color: #111113 !important;
+  -webkit-text-fill-color: #111113 !important;
+}
+
+:is(html.dark, [data-theme="dark"], .dark) .btn-primary:hover:not(:disabled),
+:is(html.dark, [data-theme="dark"], .dark) button.bg-onyx-black:hover,
+:is(html.dark, [data-theme="dark"], .dark) button.bg-\[\#1A1A1A\]:hover,
+:is(html.dark, [data-theme="dark"], .dark) button.bg-\[\#18181B\]:hover {
+  background-color: #DFB76C !important;
+  color: #111113 !important;
+  border-color: #DFB76C !important;
+}
+
+
+/* Provider dashboard buttons override */
+html.dark :is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.w-full.py-2\.5.bg-surface-container {
+  background-color: #1F1F24 !important;
+  border-color: #383844 !important;
+  color: #FAF8F5 !important;
+}
+html.dark :is(div:has(> aside), aside ~ div, .provider-dashboard-root) button.w-full.py-2\.5.bg-surface-container:hover {
+  background-color: #27272E !important;
+  border-color: #E5C158 !important;
+}
+
+/* Custom Scrollbars in Dark Mode */
+html.dark ::-webkit-scrollbar-track {
+  background: #111113 !important;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #2C2C34 !important;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3F3F46 !important;
+}
+
+/* Custom Cursor in Dark Mode */
+html.dark .custom-cursor {
+  background: #F4F4F6 !important;
+}
+html.dark .custom-cursor-follower {
+  border-color: rgba(244, 244, 246, 0.4) !important;
+}
+
+/* ===================================================
+   DARK MODE: TOGGLE SWITCHES & PILLS (HIGH CONTRAST)
+   =================================================== */
+
+/* 1. Active Switch Track: Sovereign Gold */
+html.dark input.peer:checked ~ div[class*="peer-checked:bg-onyx-black"],
+html.dark input.peer:checked + div[class*="peer-checked:bg-onyx-black"],
+html.dark input.peer:checked ~ div[class*="peer-checked:bg-"],
+html.dark input.peer:checked + div[class*="peer-checked:bg-"],
+html.dark input.peer:checked ~ div.peer-checked\:bg-onyx-black,
+html.dark input.peer:checked + div.peer-checked\:bg-onyx-black,
+html.dark div[class*="peer-checked:bg-onyx-black"]:has(input.peer:checked) {
+  background-color: #E5C158 !important;
+  border-color: #E5C158 !important;
+  box-shadow: 0 0 10px rgba(229, 193, 88, 0.35) !important;
+}
+
+/* 2. Inactive Switch Track: Deep Charcoal */
+html.dark input.peer:not(:checked) ~ div[class*="bg-sand-neutral"],
+html.dark input.peer:not(:checked) + div[class*="bg-sand-neutral"],
+html.dark input.peer:not(:checked) ~ div[class*="bg-surface-container"],
+html.dark input.peer:not(:checked) + div[class*="bg-surface-container"],
+html.dark input.peer:not(:checked) ~ div[class*="bg-surface-container-highest"],
+html.dark input.peer:not(:checked) + div[class*="bg-surface-container-highest"] {
+  background-color: #24242A !important;
+  border: 1px solid #3F3F46 !important;
+}
+
+/* 3. Active Switch Knob / Thumb: Dark Obsidian for crisp contrast on Gold Track */
+html.dark input.peer:checked ~ div[class*="after:bg-white"]::after,
+html.dark input.peer:checked + div[class*="after:bg-white"]::after {
+  background-color: #111113 !important;
+  border: 1px solid #111113 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* 4. Inactive Switch Knob / Thumb: Silver Knob for clean visibility on Dark Track */
+html.dark input.peer:not(:checked) ~ div[class*="after:bg-white"]::after,
+html.dark input.peer:not(:checked) + div[class*="after:bg-white"]::after {
+  background-color: #A1A1AA !important;
+  border: 1px solid #71717A !important;
+}
+
+/* 5. Inner div Switch Knobs (like in AppPreferencesView) */
+html.dark input.peer:checked ~ div > div.bg-white,
+html.dark input.peer:checked + div > div.bg-white {
+  background-color: #111113 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6) !important;
+}
+
+html.dark input.peer:not(:checked) ~ div > div.bg-white,
+html.dark input.peer:not(:checked) + div > div.bg-white {
+  background-color: #A1A1AA !important;
+}
+
+/* ===================================================
+   DARK MODE: ACTIVE SELECTION PILLS & TEXT BUTTONS
+   =================================================== */
+
+/* Active Text Buttons & Badges that use bg-onyx-black with text-white (buttons and badges only, NOT cards) */
+html.dark span[class*="bg-onyx-black"][class*="text-white"],
+html.dark span[class*="bg-onyx-black"] [class*="text-white"],
+html.dark label[class*="bg-onyx-black"][class*="text-white"],
+html.dark button[class*="bg-onyx-black"]:not(.btn-icon) {
+  background-color: #E5C158 !important;
+  color: #111113 !important;
+  border-color: #E5C158 !important;
+  font-weight: 700 !important;
+}
+
+html.dark span[class*="bg-onyx-black"][class*="text-white"] *,
+html.dark button[class*="bg-onyx-black"] * {
+  color: #111113 !important;
+  -webkit-text-fill-color: #111113 !important;
+}
+
+/* Form Radio Pill Buttons in Dark Mode (e.g. Priority Low/Med/High/SOS) */
+html.dark input[type="radio"].peer:checked + span,
+html.dark input[type="radio"].peer:checked ~ span:not([class*="bg-error"]) {
+  background-color: #E5C158 !important;
+  color: #111113 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.dark input[type="radio"].peer:not(:checked) + span,
+html.dark input[type="radio"].peer:not(:checked) ~ span {
+  background-color: #1A1A1E !important;
+  color: #DFB76C !important;
+  border: 1px solid #2C2C34 !important;
+}
+
+/* ===================================================
+   DARK MODE: HIGH-DEFINITION PROPER CARD & PANEL BORDERS
+   =================================================== */
+
+html.dark [class*="border-sand-neutral"],
+[data-theme="dark"] [class*="border-sand-neutral"],
+html.dark [class*="border-sand-neutral/"],
+[data-theme="dark"] [class*="border-sand-neutral/"],
+html.dark [class*="border-onyx-black"],
+[data-theme="dark"] [class*="border-onyx-black"],
+html.dark [class*="border-[#D5D0C5]"],
+[data-theme="dark"] [class*="border-[#D5D0C5]"],
+html.dark [class*="border-[#3F3F4A]"],
+[data-theme="dark"] [class*="border-[#3F3F4A]"] {
+  border-color: #3F3F4A !important;
+}
+
+html.dark [class*="divide-sand-neutral"] > :not([hidden]) ~ :not([hidden]),
+[data-theme="dark"] [class*="divide-sand-neutral"] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #2F2F38 !important;
+}
+
+/* Card & Panel surfaces in dark mode */
+html.dark .bg-surface-container-lowest,
+[data-theme="dark"] .bg-surface-container-lowest {
+  background-color: #16161A !important;
+  border-color: #3F3F4A !important;
+}
+
+html.dark .bg-surface-container-low,
+[data-theme="dark"] .bg-surface-container-low {
+  background-color: #1A1A1E !important;
+  border-color: #3F3F4A !important;
+}
+
+/* Interactive Card hovering in dark mode */
+html.dark [role="button"][class*="hover:border-onyx-black"]:hover,
+[data-theme="dark"] [role="button"][class*="hover:border-onyx-black"]:hover,
+html.dark [class*="hover:border-onyx-black"]:hover,
+[data-theme="dark"] [class*="hover:border-onyx-black"]:hover {
+  border-color: #DFB76C !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(223, 183, 108, 0.45) !important;
+}
+
+/* ===================================================
+   DARK MODE: DRIVER OPERATIONS PANEL & SIDEBAR BORDERS
+   =================================================== */
+
+html.dark aside,
+[data-theme="dark"] aside {
+  background-color: #121214 !important;
+  border-right: 1px solid #3F3F4A !important;
+}
+
+html.dark aside .border-b,
+html.dark aside .border-t,
+[data-theme="dark"] aside .border-b,
+[data-theme="dark"] aside .border-t {
+  border-color: #3F3F4A !important;
+  background-color: #151518 !important;
+}
+
+html.dark aside .border-l-2,
+[data-theme="dark"] aside .border-l-2 {
+  border-color: #3F3F4A !important;
+}
+
+html.dark aside nav a:not([class*="bg-[#1A1A1A]"]):not([class*="bg-red-600"]),
+[data-theme="dark"] aside nav a:not([class*="bg-[#1A1A1A]"]):not([class*="bg-red-600"]) {
+  color: #D4D0C8 !important;
+}
+
+html.dark aside nav a:hover:not([class*="bg-[#1A1A1A]"]):not([class*="bg-red-600"]),
+[data-theme="dark"] aside nav a:hover:not([class*="bg-[#1A1A1A]"]):not([class*="bg-red-600"]) {
+  background-color: #1E1E24 !important;
+  color: #FAF8F5 !important;
+}
+
+html.dark aside nav button,
+[data-theme="dark"] aside nav button {
+  color: #FAF8F5 !important;
+}
+
+html.dark aside nav button:hover,
+[data-theme="dark"] aside nav button:hover {
+  background-color: #1E1E24 !important;
+}
+
+html.dark aside span[class*="text-[#1A1A1A]"],
+[data-theme="dark"] aside span[class*="text-[#1A1A1A]"] {
+  color: #FAF8F5 !important;
+}
+
+html.dark aside span[class*="text-[#8C7A6B]"],
+[data-theme="dark"] aside span[class*="text-[#8C7A6B]"] {
+  color: #A1A1AA !important;
+}
+
+html.dark aside div[class*="bg-white"],
+[data-theme="dark"] aside div[class*="bg-white"] {
+  background-color: #1A1A1E !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
 }

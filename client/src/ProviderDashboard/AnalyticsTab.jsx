@@ -52,7 +52,7 @@ export default function AnalyticsTab({ currentUser }) {
         setData(json);
       }
     } catch (err) {
-      console.error('Error fetching real-time analytics:', err);
+      console.error('Error fetching analytics:', err);
     } finally {
       if (!isBackground) setLoading(false);
     }
@@ -81,14 +81,14 @@ export default function AnalyticsTab({ currentUser }) {
     link.click();
     document.body.removeChild(link);
 
-    showToast('✓ Exported Analytics Summary CSV!');
+    showToast('Exported Analytics Summary CSV');
   };
 
   if (loading && !data) {
     return (
-      <div className="bg-white rounded-2xl p-12 text-center border border-[#E5ECE8] space-y-3">
-        <div className="w-8 h-8 border-4 border-[#0A8B5F] border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-xs text-[#6B7280] font-bold">Computing real-time analytics...</p>
+      <div className="bg-surface-container-lowest rounded-2xl p-12 text-center border border-sand-neutral/40 space-y-3">
+        <span className="material-symbols-outlined text-[32px] text-onyx-black animate-spin">refresh</span>
+        <p className="font-body-md text-xs text-secondary font-medium">Computing analytics overview...</p>
       </div>
     );
   }
@@ -99,7 +99,9 @@ export default function AnalyticsTab({ currentUser }) {
   const custInsights = data?.customerInsights || { newCustomers: 0, returningCustomers: 0, repeatRate: 0 };
   const ratingAnalytics = data?.ratingAnalytics || { overallRating: '0.0', totalReviews: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
   const chartDataDays = data?.chartData || [];
-  const businessInsights = data?.businessInsights || [];  // Dynamic Chart Data Calculation based on chartRange (7D, 30D, 90D, 1Y)
+  const businessInsights = data?.businessInsights || [];
+
+  // Dynamic Chart Data Calculation based on chartRange (7D, 30D, 90D, 1Y)
   const getDynamicChartData = () => {
     if (chartRange === '30D') {
       return [
@@ -162,49 +164,42 @@ export default function AnalyticsTab({ currentUser }) {
   };
 
   return (
-    <div className="space-y-6 animate-slide-up relative text-xs font-bold text-[#111827]">
+    <div className="space-y-6 animate-slide-up relative">
       
       {/* Toast Notification Banner */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[9999] bg-[#0A8B5F] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
-          <CheckCircle size={17} />
-          <span className="font-extrabold">{toastMessage}</span>
+        <div className="fixed bottom-6 right-6 z-[9999] bg-onyx-black text-bone-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-2 border border-sand-neutral/30 font-button-text">
+          <CheckCircle size={17} className="text-emerald-500" />
+          <span className="font-bold">{toastMessage}</span>
         </div>
       )}
 
       {/* Page Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-xs border border-[#E5ECE8] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-xs border border-sand-neutral/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-[#6B7280] mb-1">
+          <div className="flex items-center gap-2 text-xs font-label-caps tracking-widest text-clay-earth uppercase font-bold mb-1">
             <span>Provider</span>
-            <span>/</span>
+            <span className="text-sand-neutral">/</span>
             <span>Business</span>
-            <span>/</span>
-            <span className="text-[#0A8B5F] font-extrabold">Analytics</span>
+            <span className="text-sand-neutral">/</span>
+            <span className="text-onyx-black font-extrabold">Analytics</span>
           </div>
-          <h1 className="text-2xl font-black text-[#111827] tracking-tight">Business Analytics</h1>
-          <p className="text-xs text-[#6B7280] font-medium mt-1">Understand your tiffin business performance in real time.</p>
+          <h1 className="font-headline-lg text-2xl md:text-3xl font-normal text-onyx-black tracking-tight">Business Analytics</h1>
+          <p className="font-body-md text-xs text-secondary mt-1">Understand your tiffin business performance and customer metrics.</p>
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          
-          {/* Live Sync Status Indicator */}
-          <span className="px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-black rounded-xl flex items-center gap-1.5 animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>LIVE (Auto-syncing)</span>
-          </span>
-
           <button 
-            onClick={() => { fetchAnalyticsData(); showToast('✓ Refreshed live analytics!'); }}
-            className="px-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] hover:bg-gray-100 text-[#111827] font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            onClick={() => { fetchAnalyticsData(); showToast('Analytics refreshed'); }}
+            className="px-3.5 py-2 bg-surface-container hover:bg-surface-container-highest transition-colors text-xs font-label-caps text-on-surface border border-sand-neutral/40 rounded-xl flex items-center gap-1.5 cursor-pointer"
           >
-            <RotateCw size={14} className="text-[#0A8B5F]" />
+            <RotateCw size={14} className="text-onyx-black" />
             <span>Refresh</span>
           </button>
 
           <button 
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="px-4 py-2 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text font-bold text-xs rounded-xl transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Download size={14} />
             <span>Export</span>
@@ -213,39 +208,37 @@ export default function AnalyticsTab({ currentUser }) {
       </div>
 
       {/* Filter Control Selector Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-[#E5ECE8] shadow-xs flex flex-wrap gap-4 items-center justify-between">
+      <div className="bg-surface-container-lowest p-4 rounded-2xl border border-sand-neutral/40 shadow-xs flex flex-wrap gap-4 items-center justify-between">
         <div className="flex items-center gap-2">
-          <Filter size={15} className="text-[#0A8B5F]" />
-          <span className="text-xs font-black text-[#111827] uppercase tracking-wider">Period:</span>
+          <Filter size={15} className="text-clay-earth" />
+          <span className="text-xs font-label-caps font-bold text-onyx-black uppercase tracking-wider">Period:</span>
           
           <select 
-            value={periodFilter}
-            onChange={e => {
+            value={periodFilter} 
+            onChange={(e) => {
               setPeriodFilter(e.target.value);
-              showToast(`✓ Applied filter: ${e.target.value}`);
+              showToast(`Filter applied: ${e.target.value}`);
             }}
-            className="px-3.5 py-2 bg-[#F9FBF9] border border-[#E5ECE8] text-xs font-extrabold text-[#111827] rounded-xl focus:outline-none focus:border-[#0A8B5F] cursor-pointer shadow-xs"
+            className="px-3.5 py-2 bg-surface-container border border-sand-neutral/40 text-xs font-label-caps font-bold text-onyx-black rounded-xl focus:outline-none focus:border-onyx-black cursor-pointer shadow-xs"
           >
             <option value="Today">Today</option>
-            <option value="Yesterday">Yesterday</option>
             <option value="This Week">This Week</option>
             <option value="This Month">This Month</option>
-            <option value="Last Month">Last Month</option>
-            <option value="Last 3 Months">Last 3 Months</option>
+            <option value="This Quarter">This Quarter</option>
             <option value="This Year">This Year</option>
           </select>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-black text-[#6B7280] uppercase tracking-wider">COMPARE:</span>
+          <span className="text-xs font-label-caps font-bold text-secondary uppercase tracking-wider">Compare to:</span>
           
           <select 
-            value={compareFilter}
-            onChange={e => {
+            value={compareFilter} 
+            onChange={(e) => {
               setCompareFilter(e.target.value);
-              showToast(`✓ Comparing with: ${e.target.value}`);
+              showToast(`Comparison mode: ${e.target.value}`);
             }}
-            className="px-3.5 py-2 bg-[#F9FBF9] border border-[#0A8B5F] text-xs font-extrabold text-[#111827] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0A8B5F]/30 cursor-pointer shadow-xs"
+            className="px-3.5 py-2 bg-surface-container border border-sand-neutral/40 text-xs font-label-caps font-bold text-onyx-black rounded-xl focus:outline-none focus:ring-1 focus:ring-onyx-black cursor-pointer shadow-xs"
           >
             <option value="Previous Period">Previous Period</option>
             <option value="Previous Week">Previous Week</option>
@@ -259,14 +252,14 @@ export default function AnalyticsTab({ currentUser }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Card 1: ORDERS */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
+        <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider">ORDERS</span>
-            <ShoppingBag size={17} className="text-[#0A8B5F]" />
+            <span className="font-label-caps text-xs font-bold text-secondary uppercase tracking-wider">ORDERS</span>
+            <ShoppingBag size={17} className="text-clay-earth" />
           </div>
-          <div className="text-3xl font-black text-[#111827]">{summary.ordersCount}</div>
+          <div className="text-3xl font-headline-lg font-normal text-onyx-black">{summary.ordersCount}</div>
           {getCompareText('orders') && (
-            <div className="text-[11px] text-[#0A8B5F] font-extrabold mt-1 flex items-center gap-1">
+            <div className="text-[11px] font-label-caps text-emerald-800 font-bold mt-1 flex items-center gap-1">
               <ArrowUpRight size={13} />
               <span>{getCompareText('orders')}</span>
             </div>
@@ -274,14 +267,14 @@ export default function AnalyticsTab({ currentUser }) {
         </div>
 
         {/* Card 2: REVENUE */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
+        <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider">REVENUE</span>
-            <DollarSign size={17} className="text-emerald-600" />
+            <span className="font-label-caps text-xs font-bold text-secondary uppercase tracking-wider">REVENUE</span>
+            <DollarSign size={17} className="text-clay-earth" />
           </div>
-          <div className="text-3xl font-black text-emerald-700">₹{summary.revenue.toLocaleString()}</div>
+          <div className="text-3xl font-headline-lg font-normal text-onyx-black">₹{summary.revenue.toLocaleString()}</div>
           {getCompareText('revenue') && (
-            <div className="text-[11px] text-emerald-700 font-extrabold mt-1 flex items-center gap-1">
+            <div className="text-[11px] font-label-caps text-emerald-800 font-bold mt-1 flex items-center gap-1">
               <ArrowUpRight size={13} />
               <span>{getCompareText('revenue')}</span>
             </div>
@@ -289,14 +282,14 @@ export default function AnalyticsTab({ currentUser }) {
         </div>
 
         {/* Card 3: CUSTOMERS */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
+        <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider">CUSTOMERS</span>
-            <Users size={17} className="text-indigo-600" />
+            <span className="font-label-caps text-xs font-bold text-secondary uppercase tracking-wider">CUSTOMERS</span>
+            <Users size={17} className="text-clay-earth" />
           </div>
-          <div className="text-3xl font-black text-[#111827]">{summary.customersCount}</div>
+          <div className="text-3xl font-headline-lg font-normal text-onyx-black">{summary.customersCount}</div>
           {getCompareText('customers') && (
-            <div className="text-[11px] text-indigo-700 font-extrabold mt-1 flex items-center gap-1">
+            <div className="text-[11px] font-label-caps text-emerald-800 font-bold mt-1 flex items-center gap-1">
               <ArrowUpRight size={13} />
               <span>{getCompareText('customers')}</span>
             </div>
@@ -304,14 +297,14 @@ export default function AnalyticsTab({ currentUser }) {
         </div>
 
         {/* Card 4: AVG RATING */}
-        <div className="bg-white p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
+        <div className="bg-surface-container-lowest p-5 rounded-2xl border border-sand-neutral/40 shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider">AVG RATING</span>
-            <Star size={17} className="text-amber-500 fill-amber-400" />
+            <span className="font-label-caps text-xs font-bold text-secondary uppercase tracking-wider">AVG RATING</span>
+            <Star size={17} className="text-amber-600 fill-amber-500" />
           </div>
-          <div className="text-3xl font-black text-[#111827]">{summary.avgRating} ★</div>
+          <div className="text-3xl font-headline-lg font-normal text-onyx-black">{summary.avgRating} ★</div>
           {getCompareText('rating') && (
-            <div className="text-[11px] text-amber-700 font-extrabold mt-1 flex items-center gap-1">
+            <div className="text-[11px] font-label-caps text-amber-800 font-bold mt-1 flex items-center gap-1">
               <ArrowUpRight size={13} />
               <span>{getCompareText('rating')}</span>
             </div>
@@ -320,29 +313,29 @@ export default function AnalyticsTab({ currentUser }) {
 
       </div>
 
-      {/* 📈 Business Performance Chart Box */}
-      <div className="bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5ECE8] pb-3">
+      {/* Business Performance Trend Chart Box */}
+      <div className="bg-surface-container-lowest p-6 rounded-2xl border border-sand-neutral/40 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-sand-neutral/30 pb-3">
           <div className="flex items-center gap-2">
-            <TrendingUp size={18} className="text-[#0A8B5F]" />
+            <TrendingUp size={18} className="text-onyx-black" />
             <div>
-              <h3 className="text-base font-black text-[#111827]">Business Performance Trend ({chartRange})</h3>
-              <p className="text-[11px] text-[#6B7280] font-medium">Revenue and fulfillment volume across {chartRange} timeframe.</p>
+              <h3 className="text-base font-bold font-label-caps text-onyx-black tracking-tight">Business Performance Trend ({chartRange})</h3>
+              <p className="text-[11px] text-secondary font-medium">Revenue and fulfillment volume across {chartRange} timeframe.</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 bg-[#F9FBF9] p-1 rounded-xl border border-[#E5ECE8]">
+          <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-xl border border-sand-neutral/40">
             {['7D', '30D', '90D', '1Y'].map((rng) => (
               <button 
                 key={rng}
                 onClick={() => {
                   setChartRange(rng);
-                  showToast(`✓ Switched chart to ${rng} timeframe`);
+                  showToast(`Switched chart to ${rng}`);
                 }}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-label-caps font-bold transition-all cursor-pointer ${
                   chartRange === rng 
-                    ? 'bg-[#0A8B5F] text-white shadow-xs scale-105' 
-                    : 'text-[#6B7280] hover:bg-white hover:text-[#111827]'
+                    ? 'bg-onyx-black text-bone-white shadow-xs' 
+                    : 'text-secondary hover:bg-surface-container hover:text-onyx-black'
                 }`}
               >
                 {rng}
@@ -352,17 +345,17 @@ export default function AnalyticsTab({ currentUser }) {
         </div>
 
         {/* Visual Bar Graph */}
-        <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8] space-y-4 relative">
+        <div className="bg-surface-container-low p-5 rounded-2xl border border-sand-neutral/40 space-y-4 relative">
           
           {/* Tooltip Display on Hover */}
           {hoveredDay ? (
-            <div className="bg-[#E8F0EC] border border-[#C5DDD2] text-[#111827] p-2.5 rounded-xl text-xs font-black shadow-xs flex items-center justify-between">
-              <span>{hoveredDay.day} Revenue: <strong className="text-[#0A8B5F] font-black text-sm">₹{hoveredDay.revenue}</strong></span>
-              <span>Orders: <strong className="text-amber-800 font-black text-sm">{hoveredDay.ordersCount}</strong></span>
+            <div className="bg-surface-container-lowest border border-sand-neutral/50 text-onyx-black p-2.5 rounded-xl text-xs font-bold shadow-xs flex items-center justify-between">
+              <span>{hoveredDay.day} Revenue: <strong className="text-onyx-black font-bold text-sm">₹{hoveredDay.revenue}</strong></span>
+              <span>Orders: <strong className="text-clay-earth font-bold text-sm">{hoveredDay.ordersCount}</strong></span>
             </div>
           ) : (
-            <div className="text-[11px] text-[#6B7280] font-semibold text-center py-0.5">
-              💡 Hover over any bar to inspect exact revenue & fulfilled order count for {chartRange}.
+            <div className="text-[11px] text-secondary font-medium text-center py-0.5">
+              Hover over any bar to inspect revenue & order volume for {chartRange}.
             </div>
           )}
 
@@ -377,22 +370,22 @@ export default function AnalyticsTab({ currentUser }) {
                   onMouseLeave={() => setHoveredDay(null)}
                   className="flex-1 h-full flex flex-col items-center justify-end gap-2 group cursor-pointer"
                 >
-                  <span className={`text-[10px] font-black transition-all ${isHovered ? 'text-[#0A8B5F] scale-110' : 'text-[#6B7280]'}`}>
+                  <span className={`text-[10px] font-bold font-label-caps transition-all ${isHovered ? 'text-onyx-black scale-105' : 'text-secondary'}`}>
                     ₹{item.revenue}
                   </span>
 
-                  <div className="w-full bg-[#E8F0EC] group-hover:bg-[#C5DDD2] rounded-t-xl flex-1 flex items-end overflow-hidden transition-all p-0.5">
+                  <div className="w-full bg-sand-neutral/30 group-hover:bg-sand-neutral/50 rounded-t-lg flex-1 flex items-end overflow-hidden transition-all p-0.5">
                     <div 
-                      className={`w-full rounded-t-lg transition-all duration-500 shadow-sm ${
+                      className={`w-full rounded-t-md transition-all duration-300 shadow-xs ${
                         isHovered 
-                          ? 'bg-[#08734E] ring-2 ring-[#0A8B5F]/40' 
-                          : 'bg-gradient-to-t from-[#0A8B5F] to-[#10B981]'
+                          ? 'bg-clay-earth ring-2 ring-clay-earth/40' 
+                          : 'bg-onyx-black'
                       }`}
                       style={{ height: `${heightPct}%` }}
                     />
                   </div>
 
-                  <span className={`text-[11px] font-black transition-colors ${isHovered ? 'text-[#0A8B5F]' : 'text-[#6B7280]'}`}>
+                  <span className={`text-[11px] font-label-caps font-bold transition-colors ${isHovered ? 'text-onyx-black font-extrabold' : 'text-secondary'}`}>
                     {item.day}
                   </span>
                 </div>
@@ -405,66 +398,66 @@ export default function AnalyticsTab({ currentUser }) {
       {/* Grid Row 2: Top Tiffins & Order Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* 🍱 TOP TIFFINS (7 Cols) */}
-        <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
+        {/* TOP TIFFINS (7 Cols) */}
+        <div className="lg:col-span-7 bg-surface-container-lowest p-6 rounded-2xl border border-sand-neutral/40 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-sand-neutral/30 pb-3">
             <div className="flex items-center gap-2">
-              <ChefHat size={18} className="text-[#0A8B5F]" />
-              <h3 className="text-base font-black text-[#111827]">TOP TIFFINS</h3>
+              <ChefHat size={18} className="text-onyx-black" />
+              <h3 className="text-base font-bold font-label-caps text-onyx-black tracking-wider">TOP TIFFINS</h3>
             </div>
-            <span className="text-[10px] font-black text-[#0A8B5F] bg-[#E8F0EC] px-2.5 py-1 rounded-md border border-[#C5DDD2]">
+            <span className="text-[10px] font-label-caps font-bold text-clay-earth bg-surface-container px-2.5 py-1 rounded-md border border-sand-neutral/40">
               Best Sellers
             </span>
           </div>
 
-          <div className="divide-y divide-[#E5ECE8]">
+          <div className="divide-y divide-sand-neutral/30">
             {topTiffins.map(tif => (
-              <div key={tif.rank} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between text-xs font-bold">
+              <div key={tif.rank} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 rounded-full bg-[#E8F0EC] text-[#0A8B5F] font-black text-[11px] flex items-center justify-center border border-[#C5DDD2]">
+                  <span className="w-6 h-6 rounded-full bg-surface-container text-onyx-black font-bold text-[11px] flex items-center justify-center border border-sand-neutral/40 font-label-caps">
                     #{tif.rank}
                   </span>
                   <div>
-                    <div className="text-sm font-black text-[#111827]">{tif.tiffinName}</div>
-                    <div className="text-[10px] text-[#6B7280]">{tif.category} • {tif.rating} ★</div>
+                    <div className="text-sm font-bold text-onyx-black">{tif.tiffinName}</div>
+                    <div className="text-[10px] text-secondary font-medium">{tif.category} • {tif.rating} ★</div>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="text-[#0A8B5F] font-black text-sm">{tif.ordersCount} orders</div>
-                  <div className="text-[11px] text-[#6B7280]">₹{tif.revenue}</div>
+                  <div className="text-onyx-black font-bold text-sm">{tif.ordersCount} orders</div>
+                  <div className="text-[11px] text-secondary">₹{tif.revenue}</div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* 📦 ORDER PERFORMANCE (5 Cols) */}
-        <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
+        {/* ORDER PERFORMANCE (5 Cols) */}
+        <div className="lg:col-span-5 bg-surface-container-lowest p-6 rounded-2xl border border-sand-neutral/40 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-sand-neutral/30 pb-3">
             <div className="flex items-center gap-2">
-              <Package size={18} className="text-indigo-600" />
-              <h3 className="text-base font-black text-[#111827]">ORDER PERFORMANCE</h3>
+              <Package size={18} className="text-onyx-black" />
+              <h3 className="text-base font-bold font-label-caps text-onyx-black tracking-wider">ORDER PERFORMANCE</h3>
             </div>
           </div>
 
-          <div className="space-y-3.5 text-xs font-bold text-[#111827]">
+          <div className="space-y-3.5 text-xs text-onyx-black">
             {Object.keys(orderPerf.percentages || {}).map(stg => {
               const pct = orderPerf.percentages[stg] || 0;
               const count = orderPerf.counts ? orderPerf.counts[stg] : 0;
               return (
                 <div key={stg} className="space-y-1">
                   <div className="flex justify-between items-center text-xs">
-                    <span>{stg}</span>
-                    <span className="text-[#0A8B5F] font-black">{pct}% ({count})</span>
+                    <span className="font-label-caps font-semibold">{stg}</span>
+                    <span className="text-onyx-black font-bold font-label-caps">{pct}% ({count})</span>
                   </div>
-                  <div className="w-full bg-[#F9FBF9] border border-[#E5ECE8] h-2.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-sand-neutral/30 border border-sand-neutral/40 h-2.5 rounded-full overflow-hidden">
                     <div 
                       className={`h-full rounded-full transition-all duration-500 ${
-                        stg === 'Completed' ? 'bg-[#0A8B5F]' :
-                        stg === 'Preparing' ? 'bg-indigo-600' :
-                        stg === 'Ready' ? 'bg-blue-600' :
-                        stg === 'Cancelled' ? 'bg-red-500' : 'bg-amber-500'
+                        stg === 'Completed' ? 'bg-onyx-black' :
+                        stg === 'Preparing' ? 'bg-clay-earth' :
+                        stg === 'Ready' ? 'bg-emerald-800' :
+                        stg === 'Cancelled' ? 'bg-error' : 'bg-sand-neutral'
                       }`}
                       style={{ width: `${pct}%` }}
                     />
@@ -480,39 +473,39 @@ export default function AnalyticsTab({ currentUser }) {
       {/* Grid Row 3: Customer Insights & Rating Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* 👥 CUSTOMER INSIGHTS (6 Cols) */}
-        <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-          <div className="flex items-center gap-2 border-b border-[#E5ECE8] pb-3">
-            <Users size={18} className="text-[#0A8B5F]" />
-            <h3 className="text-base font-black text-[#111827]">CUSTOMER INSIGHTS</h3>
+        {/* CUSTOMER INSIGHTS (6 Cols) */}
+        <div className="lg:col-span-6 bg-surface-container-lowest p-6 rounded-2xl border border-sand-neutral/40 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 border-b border-sand-neutral/30 pb-3">
+            <Users size={18} className="text-onyx-black" />
+            <h3 className="text-base font-bold font-label-caps text-onyx-black tracking-wider">CUSTOMER INSIGHTS</h3>
           </div>
 
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="bg-[#F9FBF9] p-3 rounded-xl border border-[#E5ECE8]">
-              <div className="text-[10px] font-extrabold text-[#6B7280] uppercase">New Diners</div>
-              <div className="text-2xl font-black text-[#111827] mt-1">{custInsights.newCustomers}</div>
+            <div className="bg-surface-container-low p-3.5 rounded-xl border border-sand-neutral/40">
+              <div className="text-[10px] font-label-caps font-bold text-secondary uppercase">New Diners</div>
+              <div className="text-2xl font-headline-lg font-normal text-onyx-black mt-1">{custInsights.newCustomers}</div>
             </div>
 
-            <div className="bg-[#F9FBF9] p-3 rounded-xl border border-[#E5ECE8]">
-              <div className="text-[10px] font-extrabold text-[#6B7280] uppercase">Returning Diners</div>
-              <div className="text-2xl font-black text-emerald-700 mt-1">{custInsights.returningCustomers}</div>
+            <div className="bg-surface-container-low p-3.5 rounded-xl border border-sand-neutral/40">
+              <div className="text-[10px] font-label-caps font-bold text-secondary uppercase">Returning Diners</div>
+              <div className="text-2xl font-headline-lg font-normal text-onyx-black mt-1">{custInsights.returningCustomers}</div>
             </div>
 
-            <div className="bg-[#F9FBF9] p-3 rounded-xl border border-[#E5ECE8]">
-              <div className="text-[10px] font-extrabold text-[#0A8B5F] uppercase">Repeat Rate</div>
-              <div className="text-2xl font-black text-[#0A8B5F] mt-1">{custInsights.repeatRate}%</div>
+            <div className="bg-surface-container-low p-3.5 rounded-xl border border-sand-neutral/40">
+              <div className="text-[10px] font-label-caps font-bold text-secondary uppercase">Repeat Rate</div>
+              <div className="text-2xl font-headline-lg font-normal text-onyx-black mt-1">{custInsights.repeatRate}%</div>
             </div>
           </div>
         </div>
 
-        {/* ⭐ CUSTOMER RATING ANALYTICS (6 Cols) */}
-        <div className="lg:col-span-6 bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-[#E5ECE8] pb-3">
+        {/* CUSTOMER RATING ANALYTICS (6 Cols) */}
+        <div className="lg:col-span-6 bg-surface-container-lowest p-6 rounded-2xl border border-sand-neutral/40 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-sand-neutral/30 pb-3">
             <div className="flex items-center gap-2">
               <Star size={18} className="text-amber-500 fill-amber-400" />
-              <h3 className="text-base font-black text-[#111827]">RATING ANALYTICS</h3>
+              <h3 className="text-base font-bold font-label-caps text-onyx-black tracking-wider">RATING ANALYTICS</h3>
             </div>
-            <span className="text-sm font-black text-[#111827]">{ratingAnalytics.overallRating} ★ Overall</span>
+            <span className="text-sm font-bold font-label-caps text-onyx-black">{ratingAnalytics.overallRating} ★ Overall</span>
           </div>
 
           <div className="space-y-2">
@@ -521,17 +514,17 @@ export default function AnalyticsTab({ currentUser }) {
               const total = ratingAnalytics.totalReviews || 1;
               const pct = Math.round((count / total) * 100);
               return (
-                <div key={star} className="flex items-center gap-3 text-xs font-bold">
-                  <span className="w-8 flex items-center gap-1">
+                <div key={star} className="flex items-center gap-3 text-xs font-semibold">
+                  <span className="w-8 flex items-center gap-1 font-label-caps">
                     <span>{star}</span>
                     <Star size={11} className="fill-amber-400 text-amber-500" />
                   </span>
                   
-                  <div className="flex-1 bg-[#F9FBF9] border border-[#E5ECE8] h-2.5 rounded-full overflow-hidden">
-                    <div className="bg-[#0A8B5F] h-full rounded-full" style={{ width: `${pct}%` }} />
+                  <div className="flex-1 bg-sand-neutral/30 border border-sand-neutral/40 h-2.5 rounded-full overflow-hidden">
+                    <div className="bg-onyx-black h-full rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                   </div>
 
-                  <span className="w-8 text-right text-[#6B7280] font-black">{count}</span>
+                  <span className="w-8 text-right text-secondary font-label-caps font-bold">{count}</span>
                 </div>
               );
             })}
@@ -540,18 +533,18 @@ export default function AnalyticsTab({ currentUser }) {
 
       </div>
 
-      {/* 🔥 BUSINESS INSIGHTS SECTION */}
-      <div className="bg-white p-6 rounded-2xl border border-[#E5ECE8] shadow-xs space-y-4">
-        <div className="flex items-center gap-2 border-b border-[#E5ECE8] pb-3">
+      {/* BUSINESS INSIGHTS SECTION */}
+      <div className="bg-surface-container-lowest p-6 rounded-2xl border border-sand-neutral/40 shadow-xs space-y-4">
+        <div className="flex items-center gap-2 border-b border-sand-neutral/30 pb-3">
           <Flame size={18} className="text-amber-600" />
-          <h3 className="text-base font-black text-[#111827]">BUSINESS INSIGHTS</h3>
+          <h3 className="text-base font-bold font-label-caps text-onyx-black tracking-wider">BUSINESS INSIGHTS</h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {businessInsights.map((insight, idx) => (
-            <div key={idx} className="bg-[#F9FBF9] p-3.5 rounded-xl border border-[#E5ECE8] flex items-start gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-[#0A8B5F] shrink-0 mt-1.5" />
-              <p className="text-xs text-[#111827] font-extrabold leading-relaxed">{insight}</p>
+            <div key={idx} className="bg-surface-container-low p-3.5 rounded-xl border border-sand-neutral/40 flex items-start gap-2.5">
+              <span className="w-2 h-2 rounded-full bg-onyx-black shrink-0 mt-1.5" />
+              <p className="text-xs text-onyx-black font-body-md leading-relaxed font-medium">{insight}</p>
             </div>
           ))}
         </div>

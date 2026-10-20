@@ -25,7 +25,9 @@ function ProviderHero({ onOpenBecomeProviderModal, handleConfettiTrigger }) {
           muted 
           playsInline 
           preload="auto"
-          className="w-full h-full object-cover"
+          disablePictureInPicture
+          controlsList="nodownload noplaybackrate nopictureinpicture"
+          className="w-full h-full object-cover pointer-events-none"
         >
           <source src="/make_one_video_of_indian_chef.mp4" type="video/mp4" />
           Your browser does not support the video tag.
@@ -398,6 +400,16 @@ function ProviderFeatures() {
 
 export default function ProviderLanding({ onOpenBecomeProviderModal }) {
   const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, []);
 
   useEffect(() => {
     // Reveal on scroll logic

@@ -90,7 +90,7 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
       }
     } catch (err) {
       console.error('Error fetching driver preferences:', err);
-      setErrorMessage('Failed to connect to backend preferences service.');
+      setErrorMessage('Unable to load delivery preferences. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -146,7 +146,7 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
       }
     } catch (err) {
       console.error('Error saving preferences:', err);
-      setErrorMessage('Network error. Unable to save delivery preferences.');
+      setErrorMessage('Unable to save delivery preferences. Please check your connection and try again.');
     } finally {
       setSaving(false);
     }
@@ -213,7 +213,7 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-[#F5F3EF] border border-[#DED9D1] ml-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#1A1A1A]" />
                   <span className="text-[10px] font-bold uppercase tracking-wider text-[#1A1A1A]">
-                    MongoDB Dispatch Profile Synced
+                    Dispatch Profile Active
                   </span>
                 </div>
               </div>
@@ -276,11 +276,11 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-[#1A1A1A] text-lg">verified</span>
               <span className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
-                Configuration saved &amp; broadcast to dispatch mesh nodes.
+                Delivery preferences updated successfully.
               </span>
             </div>
-            <span className="text-[11px] text-[#4A4238] uppercase tracking-widest font-mono">
-              OK #SYNC-9921
+            <span className="text-[11px] text-[#4A4238] uppercase tracking-widest font-semibold">
+              SAVED
             </span>
           </div>
         )}
@@ -849,9 +849,6 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
                     </span>
                     <h3 className="font-serif text-2xl text-white tracking-wide mt-1">Preference Matrix</h3>
                   </div>
-                  <span className="text-[10px] text-white/80 uppercase tracking-widest bg-white/10 px-2 py-0.5 font-mono">
-                    #{driverId}
-                  </span>
                 </div>
 
                 {/* Dynamic Key Metrics List */}
@@ -1021,13 +1018,9 @@ export default function DeliveryPreferencesView({ currentUser, onNavigateTab }) 
           </div>
         </div>
 
-        {/* Page Footer Scoped Meta */}
         <div className="mt-12 py-6 border-t border-[#DED9D1] flex flex-col md:flex-row items-center justify-between gap-4 text-[#4A4238] text-[11px] uppercase tracking-wider font-bold">
           <div>
-            Driver Dispatch Preferences scoped to JWT principal <span className="text-[#1A1A1A]">{driverName} (#{driverId})</span> • Asia/Kolkata (IST)
-          </div>
-          <div className="font-mono text-[11px] tracking-wide text-[#1A1A1A]">
-            Sync Protocol: Socket.io / MongoDB_Stream_v2
+            Courier Dispatch Preferences • <span className="text-[#1A1A1A]">{driverName}</span> • TiffinLink Logistics
           </div>
         </div>
 

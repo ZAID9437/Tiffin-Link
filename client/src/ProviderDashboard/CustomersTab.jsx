@@ -120,12 +120,12 @@ export default function CustomersTab() {
           <div className="flex items-center gap-2 text-xs font-bold text-[#6B7280] mb-1">
             <span>Provider</span>
             <span>/</span>
-            <span className="text-[#0A8B5F] font-extrabold">Customers</span>
+            <span className="text-onyx-black font-extrabold">Customers</span>
           </div>
 
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-black text-[#111827] tracking-tight">Customers</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-[#0A8B5F] border border-emerald-200 flex items-center gap-1">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               LIVE
             </span>
@@ -143,14 +143,14 @@ export default function CustomersTab() {
               placeholder="Search customers..." 
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-semibold text-[#111827] focus:outline-none focus:border-[#0A8B5F]"
+              className="w-full pl-9 pr-3 py-2 bg-[#F9FBF9] border border-[#E5ECE8] rounded-xl text-xs font-semibold text-[#111827] focus:outline-none focus:border-onyx-black"
             />
           </div>
 
           {/* Export Button */}
           <button 
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text font-bold text-xs rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer"
           >
             <Download size={14} />
             <span>Export</span>
@@ -170,7 +170,7 @@ export default function CustomersTab() {
         {/* Card 2: ACTIVE CUSTOMERS */}
         <div className="bg-[#F9FBF9] p-5 rounded-2xl border border-[#E5ECE8] shadow-xs food-card-hover">
           <div className="text-xs font-extrabold text-[#6B7280] uppercase tracking-wider mb-2">ACTIVE CUSTOMERS</div>
-          <div className="text-4xl font-black text-[#0A8B5F]">{metrics.activeCustomers || 94}</div>
+          <div className="text-4xl font-black text-onyx-black">{metrics.activeCustomers || 94}</div>
         </div>
 
         {/* Card 3: NEW TODAY */}
@@ -190,7 +190,7 @@ export default function CustomersTab() {
       {/* FILTER BAR */}
       <div className="bg-white p-4 rounded-2xl border border-[#E5ECE8] shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-extrabold text-[#6B7280]">
-          <Filter size={15} className="text-[#0A8B5F]" />
+          <Filter size={15} className="text-onyx-black" />
           <span>Filters:</span>
         </div>
 
@@ -249,8 +249,8 @@ export default function CustomersTab() {
 
         {loading ? (
           <div className="p-12 text-center">
-            <div className="w-8 h-8 border-4 border-[#0A8B5F] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-[#6B7280] font-bold mt-3">Fetching real customers from MongoDB database...</p>
+            <div className="w-8 h-8 border-4 border-onyx-black border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-xs text-[#6B7280] font-bold mt-3">Loading customer directory...</p>
           </div>
         ) : customers.length === 0 ? (
           <div className="p-12 text-center space-y-3">
@@ -283,7 +283,7 @@ export default function CustomersTab() {
                       {/* Customer Name & Photo/Avatar */}
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-[#E8F0EC] text-[#0A8B5F] border border-[#C5DDD2] font-black text-xs flex items-center justify-center shrink-0">
+                          <div className="w-9 h-9 rounded-full bg-surface-container text-onyx-black border border-sand-neutral/60 font-black text-xs flex items-center justify-center shrink-0">
                             {cust.name ? cust.name.slice(0, 2).toUpperCase() : 'CU'}
                           </div>
                           <div>
@@ -304,7 +304,7 @@ export default function CustomersTab() {
                       </td>
 
                       {/* Spent */}
-                      <td className="p-4 font-black text-[#0A8B5F] text-sm">
+                      <td className="p-4 font-black text-onyx-black text-sm">
                         ₹{Number(cust.totalSpent || 0).toLocaleString()}
                       </td>
 
@@ -324,7 +324,7 @@ export default function CustomersTab() {
                             e.stopPropagation();
                             setSelectedCustomer(cust);
                           }}
-                          className="px-3 py-1.5 bg-[#E8F0EC] text-[#0A8B5F] hover:bg-[#D2E4DC] text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 ml-auto"
+                          className="px-3 py-1.5 bg-surface-container text-onyx-black hover:bg-surface-container-high text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 ml-auto"
                         >
                           <Eye size={14} />
                           <span>View</span>
@@ -346,7 +346,7 @@ export default function CustomersTab() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-full bg-[#E8F0EC] text-[#0A8B5F] font-black text-xs flex items-center justify-center shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-surface-container text-onyx-black font-black text-xs flex items-center justify-center shrink-0">
                         {cust.name ? cust.name.slice(0, 2).toUpperCase() : 'CU'}
                       </div>
                       <div>
@@ -369,14 +369,14 @@ export default function CustomersTab() {
                     </div>
                     <div>
                       <span className="text-[#6B7280]">Spent: </span>
-                      <strong className="text-[#0A8B5F]">₹{Number(cust.totalSpent || 0).toLocaleString()}</strong>
+                      <strong className="text-onyx-black">₹{Number(cust.totalSpent || 0).toLocaleString()}</strong>
                     </div>
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedCustomer(cust);
                       }}
-                      className="px-2.5 py-1 bg-[#E8F0EC] text-[#0A8B5F] font-bold text-[11px] rounded-lg"
+                      className="px-2.5 py-1 bg-surface-container text-onyx-black font-bold text-[11px] rounded-lg"
                     >
                       View
                     </button>
@@ -407,8 +407,8 @@ export default function CustomersTab() {
               <button 
                 key={page}
                 onClick={() => setCurrentPage(page)}
-                className={`w-8 h-8 rounded-lg text-xs font-black cursor-pointer transition-colors ${
-                  currentPage === page ? 'bg-[#0A8B5F] text-white shadow-xs' : 'hover:bg-white text-[#6B7280]'
+                className={`w-8 h-8 rounded-lg text-xs font-label-caps font-bold cursor-pointer transition-colors ${
+                  currentPage === page ? 'bg-onyx-black text-bone-white shadow-xs' : 'hover:bg-white text-secondary'
                 }`}
               >
                 {page}
@@ -445,7 +445,7 @@ export default function CustomersTab() {
 
             {/* Profile Section */}
             <div className="text-center space-y-2 py-2">
-              <div className="w-20 h-20 rounded-full bg-[#0A8B5F] text-white font-black text-2xl flex items-center justify-center mx-auto shadow-lg border-4 border-[#E8F0EC]">
+              <div className="w-20 h-20 rounded-full bg-onyx-black text-bone-white font-bold text-2xl flex items-center justify-center mx-auto shadow-lg border-4 border-sand-neutral/30 font-label-caps">
                 {selectedCustomer.name ? selectedCustomer.name.slice(0, 2).toUpperCase() : 'CU'}
               </div>
               <h3 className="text-lg font-black text-[#111827]">{selectedCustomer.name}</h3>
@@ -463,7 +463,7 @@ export default function CustomersTab() {
 
               <div className="pt-2 border-t border-[#E5ECE8]">
                 <label className="text-[10px] text-[#6B7280] font-extrabold uppercase">Email</label>
-                <div className="text-xs font-black text-[#0A8B5F]">{selectedCustomer.email}</div>
+                <div className="text-xs font-black text-onyx-black">{selectedCustomer.email}</div>
               </div>
 
               <div className="pt-2 border-t border-[#E5ECE8]">
@@ -473,7 +473,7 @@ export default function CustomersTab() {
                     href={`https://maps.google.com/?q=${encodeURIComponent(selectedCustomer.address || 'Ahmedabad')}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[10px] text-[#0A8B5F] hover:underline font-extrabold flex items-center gap-1"
+                    className="text-[10px] text-onyx-black hover:underline font-extrabold flex items-center gap-1"
                   >
                     <span>View Location</span>
                     <ExternalLink size={11} />
@@ -510,7 +510,7 @@ export default function CustomersTab() {
 
                 <div className="flex justify-between pt-2 border-t border-[#E5ECE8]">
                   <span className="text-[#111827] font-black">Total Spent</span>
-                  <strong className="text-[#0A8B5F] text-sm">₹{Number(selectedCustomer.totalSpent || 0).toLocaleString()}</strong>
+                  <strong className="text-onyx-black text-sm">₹{Number(selectedCustomer.totalSpent || 0).toLocaleString()}</strong>
                 </div>
               </div>
             </div>
@@ -524,7 +524,7 @@ export default function CustomersTab() {
                   selectedCustomer.orders.slice(0, 3).map(ord => (
                     <div key={ord.id || ord.orderId} className="p-3 flex items-center justify-between text-xs font-bold">
                       <div>
-                        <div className="font-black text-[#0A8B5F]">{ord.orderId}</div>
+                        <div className="font-black text-onyx-black">{ord.orderId}</div>
                         <div className="text-[11px] text-[#6B7280]">{ord.tiffinName}</div>
                         <span className={`inline-block mt-0.5 px-2 py-0.2 text-[9px] font-black rounded border ${
                           ord.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'
@@ -533,7 +533,7 @@ export default function CustomersTab() {
                         </span>
                       </div>
 
-                      <div className="text-right font-black text-[#0A8B5F]">
+                      <div className="text-right font-black text-onyx-black">
                         ₹{ord.totalAmount}
                       </div>
                     </div>
@@ -548,7 +548,7 @@ export default function CustomersTab() {
             <div className="pt-3 border-t border-[#E5ECE8]">
               <button 
                 onClick={() => setSelectedCustomer(null)}
-                className="w-full py-2.5 bg-[#0A8B5F] hover:bg-[#08734E] text-white font-extrabold rounded-xl transition-colors cursor-pointer shadow-xs text-center"
+                className="w-full py-2.5 bg-onyx-black hover:bg-neutral-800 text-bone-white font-button-text font-bold rounded-xl transition-colors cursor-pointer shadow-xs text-center"
               >
                 Close Drawer
               </button>

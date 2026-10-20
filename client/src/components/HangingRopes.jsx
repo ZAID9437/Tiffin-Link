@@ -65,7 +65,7 @@ const HANGING_ITEMS = [
 ];
 
 export default function HangingRopes() {
-  const [inView, setInView] = useState(false);
+  const [inView, setInView] = useState(true);
   const [hoveredId, setHoveredId] = useState(null);
   const sectionRef = useRef(null);
 
@@ -76,14 +76,18 @@ export default function HangingRopes() {
           setInView(true);
         }
       },
-      { threshold: 0.2 }
+      { threshold: 0.05 }
     );
 
     if (sectionRef.current) {
       observer.observe(sectionRef.current);
     }
 
+    // Fallback in case of rapid scroll
+    const fallbackTimer = setTimeout(() => setInView(true), 1200);
+
     return () => {
+      clearTimeout(fallbackTimer);
       if (sectionRef.current) {
         observer.unobserve(sectionRef.current);
       }
@@ -93,27 +97,29 @@ export default function HangingRopes() {
   return (
     <section 
       ref={sectionRef} 
-      className="relative w-full h-[760px] bg-bone-white overflow-hidden border-b border-sand-neutral/30 flex flex-col pt-12 select-none"
+      className="relative w-full h-[720px] bg-bone-white overflow-hidden border-b border-sand-neutral/30 flex flex-col pt-10 pb-8 select-none"
     >
       {/* Editorial Header */}
       <div className="text-center px-margin-mobile z-10 max-w-3xl mx-auto mb-6">
-        <p className="font-label-caps text-label-caps text-secondary tracking-[0.2em] mb-3">ARTISANAL HARVEST</p>
-        <h2 className="font-headline-lg text-4xl md:text-5xl text-onyx-black mb-4">
+        <p className="font-label-caps text-[11px] text-[#8C6239] dark:text-[#D4AF37] font-bold tracking-[0.25em] mb-3 uppercase">
+          ARTISANAL HARVEST
+        </p>
+        <h2 className="font-headline-lg text-4xl sm:text-5xl md:text-6xl text-[#181512] dark:text-white font-serif font-bold tracking-tight mb-4">
           Generations of flavor, suspended in time.
         </h2>
-        <p className="font-body-md text-secondary max-w-xl mx-auto italic text-sm md:text-base">
+        <p className="font-body-md text-[#54483C] dark:text-[#DDD3C5] max-w-xl mx-auto italic text-sm md:text-base font-normal">
           Hover over each hanging parcel to uncover culinary traditions kept alive in home kitchens.
         </p>
       </div>
 
       {/* Ropes & Beam Area */}
-      <div className="relative flex-1 w-full max-w-[1200px] mx-auto px-4 mt-4">
+      <div className="relative flex-1 w-full max-w-[1240px] mx-auto px-4 mt-4">
         
-        {/* Supporting Beam / Brass Rod */}
-        <div className="absolute top-0 left-4 right-4 h-[3px] bg-gradient-to-r from-clay-earth via-sand-neutral to-clay-earth rounded z-20 shadow-sm" />
+        {/* Supporting Beam / Dark Brown Rod */}
+        <div className="absolute top-0 left-2 right-2 h-[2.5px] bg-[#4B3621] dark:bg-[#D4AF37] rounded-full z-20" />
 
         {/* Rope Elements */}
-        <div className="relative w-full h-full flex justify-around items-start pt-4">
+        <div className="relative w-full h-full flex justify-around items-start">
           {HANGING_ITEMS.map((item) => {
             const isHovered = hoveredId === item.id;
             
@@ -143,8 +149,8 @@ export default function HangingRopes() {
                   zIndex: isHovered ? 30 : 10
                 }}
               >
-                {/* Ring/Hook attachment at the beam */}
-                <div className="w-3.5 h-3.5 rounded-full border-2 border-clay-earth bg-bone-white -mt-[9px] z-20" />
+                {/* Ring/Hook attachment at the beam (centered on beam) */}
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-[#4B3621] dark:border-[#D4AF37] bg-[#DFD3C3] dark:bg-[#2A2016] -mt-[6px] z-20" />
 
                 {/* Swaying Rig */}
                 <div
@@ -159,21 +165,18 @@ export default function HangingRopes() {
                   onMouseEnter={() => setHoveredId(item.id)}
                   onMouseLeave={() => setHoveredId(null)}
                 >
-                  {/* Rope Line */}
+                  {/* Clean Solid Rope Cord (matching screenshot) */}
                   <div 
-                    className="w-[2px] bg-gradient-to-b from-clay-earth via-secondary/70 to-clay-earth relative transition-all duration-[1200ms] cubic-bezier(0.175, 0.885, 0.32, 1.275)"
+                    className="w-[2px] bg-[#4B3621] dark:bg-[#D4AF37] relative rounded-full transition-all duration-[1200ms] cubic-bezier(0.175, 0.885, 0.32, 1.275)"
                     style={{
                       height: inView ? `${item.length}px` : '0px',
                       transitionDelay: `${item.swayDelay}s`
                     }}
-                  >
-                    {/* Rope texture effect using dashed border overlay */}
-                    <div className="absolute inset-0 border-l border-dashed border-sand-neutral/40" />
-                  </div>
+                  />
 
                   {/* Knot / Loop right above the hook */}
                   <div 
-                    className="w-2.5 h-2.5 rounded-full bg-clay-earth -mb-0.5 transition-opacity duration-500" 
+                    className="w-2.5 h-2.5 rounded-full bg-[#4B3621] dark:bg-[#D4AF37] -mb-0.5 transition-opacity duration-500" 
                     style={{ opacity: inView ? 1 : 0 }}
                   />
 

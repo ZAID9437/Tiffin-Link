@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../context/ThemeContext';
 
 /**
  * AppPreferencesView Component - Driver Panel App Preferences Settings
@@ -8,6 +9,15 @@ import React, { useState, useEffect } from 'react';
  *  - POST /api/driver/app-preferences/reset
  */
 export default function AppPreferencesView({ currentUser, onNavigateTab, onShowToast }) {
+  const { 
+    theme: globalTheme, 
+    setTheme: setGlobalTheme, 
+    compactMode: globalCompact, 
+    setCompactMode: setGlobalCompact, 
+    reduceMotion: globalReduceMotion, 
+    setReduceMotion: setGlobalReduceMotion 
+  } = useTheme();
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [clearingCache, setClearingCache] = useState(false);
@@ -15,17 +25,17 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
   
   // Flash banner state
   const [banner, setBanner] = useState({
-    visible: true,
-    message: 'App preferences updated successfully. All runtime flags synchronized across mobile terminal and dispatch workstation.',
-    ack: '#TL-99214'
+    visible: false,
+    message: '',
+    ack: ''
   });
 
-  // Default initial preferences matching schema
+  // Default initial preferences matching schema, initialized from global ThemeContext
   const defaultPreferences = {
     appearance: {
-      theme: 'light',
-      compactMode: true,
-      reduceMotion: false
+      theme: globalTheme || (typeof window !== 'undefined' ? localStorage.getItem('tiffinlink_theme') || 'light' : 'light'),
+      compactMode: globalCompact !== undefined ? globalCompact : (typeof window !== 'undefined' ? localStorage.getItem('tiffinlink_compact') === 'true' : false),
+      reduceMotion: globalReduceMotion !== undefined ? globalReduceMotion : (typeof window !== 'undefined' ? localStorage.getItem('tiffinlink_reduce_motion') === 'true' : false)
     },
     mapRouting: {
       mapCartography: 'vector',
@@ -62,6 +72,19 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
   const [preferences, setPreferences] = useState(defaultPreferences);
   const [initialPreferences, setInitialPreferences] = useState(null);
 
+  // Sync preference appearance if global theme changes externally
+  useEffect(() => {
+    setPreferences(prev => ({
+      ...prev,
+      appearance: {
+        ...prev.appearance,
+        theme: globalTheme,
+        compactMode: globalCompact,
+        reduceMotion: globalReduceMotion
+      }
+    }));
+  }, [globalTheme, globalCompact, globalReduceMotion]);
+
   const activeToken = typeof window !== 'undefined'
     ? (localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || '')
     : '';
@@ -97,9 +120,19 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
 
       const json = await res.json();
       if (res.ok && json.success && json.appPreferences) {
-        setPreferences(json.appPreferences);
-        setInitialPreferences(json.appPreferences);
-        if (isManual && onShowToast) onShowToast('✓ App preferences reloaded from MongoDB.');
+        // Keep active client theme preference as the authority
+        const currentActiveTheme = globalTheme || (typeof window !== 'undefined' ? localStorage.getItem('tiffinlink_theme') || 'light' : 'light');
+        const serverAppearance = json.appPreferences.appearance || {};
+        const mergedPreferences = {
+          ...json.appPreferences,
+          appearance: {
+            ...serverAppearance,
+            theme: isManual && serverAppearance.theme ? serverAppearance.theme : currentActiveTheme
+          }
+        };
+        setPreferences(mergedPreferences);
+        setInitialPreferences(mergedPreferences);
+        if (isManual && onShowToast) onShowToast('✓ App preferences updated.');
       } else {
         if (!initialPreferences) {
           console.warn('App preferences fetch warning:', json.message);
@@ -108,7 +141,7 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
     } catch (err) {
       console.error('Error fetching app preferences:', err);
       if (!initialPreferences) {
-        setErrorMessage('Failed to connect to MongoDB server to fetch preferences. Using local fallbacks.');
+        setErrorMessage('Unable to load preferences right now. Using default settings.');
       }
     } finally {
       setLoading(false);
@@ -118,48 +151,6 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
   useEffect(() => {
     fetchPreferences();
   }, []);
-
-  // Live theme & appearance engine effect
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const currentTheme = preferences.appearance?.theme || 'light';
-    const root = document.documentElement;
-
-    let shouldBeDark = false;
-    if (currentTheme === 'dark') {
-      shouldBeDark = true;
-    } else if (currentTheme === 'system') {
-      shouldBeDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    } else {
-      shouldBeDark = false;
-    }
-
-    if (shouldBeDark) {
-      root.classList.add('dark');
-      root.setAttribute('data-theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      root.setAttribute('data-theme', 'light');
-    }
-
-    // Handle compact density mode
-    if (preferences.appearance?.compactMode) {
-      root.classList.add('compact-density');
-    } else {
-      root.classList.remove('compact-density');
-    }
-
-    // Handle reduce motion mode
-    if (preferences.appearance?.reduceMotion) {
-      root.classList.add('reduce-motion');
-    } else {
-      root.classList.remove('reduce-motion');
-    }
-
-    try {
-      localStorage.setItem('tiffinlink_theme', currentTheme);
-    } catch (e) {}
-  }, [preferences.appearance]);
 
   const triggerFlash = (message, ackCode) => {
     const randomAck = ackCode || `#TL-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -172,16 +163,28 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
 
   // Nested preference handler helpers
   const handleNestedToggle = (category, field) => {
-    setPreferences(prev => ({
-      ...prev,
-      [category]: {
-        ...prev[category],
-        [field]: !prev[category]?.[field]
+    setPreferences(prev => {
+      const nextVal = !prev[category]?.[field];
+      if (category === 'appearance' && field === 'compactMode') {
+        setGlobalCompact(nextVal);
       }
-    }));
+      if (category === 'appearance' && field === 'reduceMotion') {
+        setGlobalReduceMotion(nextVal);
+      }
+      return {
+        ...prev,
+        [category]: {
+          ...prev[category],
+          [field]: nextVal
+        }
+      };
+    });
   };
 
   const handleNestedSelect = (category, field, value) => {
+    if (category === 'appearance' && field === 'theme') {
+      setGlobalTheme(value);
+    }
     setPreferences(prev => ({
       ...prev,
       [category]: {
@@ -213,16 +216,16 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
       const json = await res.json();
       if (res.ok && json.success) {
         setInitialPreferences(preferences);
-        triggerFlash('✓ App preferences updated successfully. All runtime flags synchronized across mobile terminal and dispatch workstation.');
-        if (onShowToast) onShowToast('✓ App preferences saved successfully to MongoDB.');
+        triggerFlash('✓ App preferences updated successfully.');
+        if (onShowToast) onShowToast('✓ App preferences saved successfully.');
       } else {
         setErrorMessage(json.message || 'Failed to save app preferences.');
-        if (onShowToast) onShowToast(`❌ Error: ${json.message || 'Save failed'}`);
+        if (onShowToast) onShowToast(`⚠️ ${json.message || 'Unable to save preferences'}`);
       }
     } catch (err) {
       console.error('Error saving app preferences:', err);
-      setErrorMessage('Network error while persisting settings to server.');
-      if (onShowToast) onShowToast('❌ Network error saving preferences');
+      setErrorMessage('Unable to save settings. Please check your connection.');
+      if (onShowToast) onShowToast('⚠️ Unable to save preferences. Please check your connection.');
     } finally {
       setSaving(false);
     }
@@ -250,16 +253,16 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
       if (res.ok && json.success && json.appPreferences) {
         setPreferences(json.appPreferences);
         setInitialPreferences(json.appPreferences);
-        triggerFlash('↺ Configuration flags rolled back to System Defaults. Dispatch engine primed.');
-        if (onShowToast) onShowToast('↺ App preferences reset to defaults in MongoDB.');
+        triggerFlash('↺ Preferences reset to system defaults.');
+        if (onShowToast) onShowToast('↺ App preferences reset to defaults.');
       } else {
         setPreferences(defaultPreferences);
-        triggerFlash('↺ Configuration flags rolled back to System Defaults.');
+        triggerFlash('↺ Preferences reset to system defaults.');
       }
     } catch (err) {
       console.error('Error resetting preferences:', err);
       setPreferences(defaultPreferences);
-      triggerFlash('↺ Configuration flags rolled back to System Defaults.');
+      triggerFlash('↺ Preferences reset to system defaults.');
     } finally {
       setLoading(false);
     }
@@ -272,7 +275,7 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
     } else {
       setPreferences(defaultPreferences);
     }
-    triggerFlash('Changes discarded. Restored current active runtime state.');
+    triggerFlash('Changes discarded.');
     if (onShowToast) onShowToast('ℹ️ Unsaved changes discarded.');
   };
 
@@ -281,8 +284,8 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
     setClearingCache(true);
     setTimeout(() => {
       setClearingCache(false);
-      triggerFlash('⚡ Telemetry cache flushed (42.8 MB freed). WebSocket pipe verified healthy.');
-      if (onShowToast) onShowToast('⚡ Telemetry cache flushed successfully.');
+      triggerFlash('⚡ App cache cleared successfully.');
+      if (onShowToast) onShowToast('⚡ App cache cleared.');
     }, 500);
   };
 
@@ -309,7 +312,7 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
           Loading Driver App Preferences...
         </div>
         <p className="font-label-caps text-xs text-clay-earth">
-          Syncing MongoDB driver_preferences collection
+          Synchronizing app preferences...
         </p>
       </div>
     );
@@ -330,9 +333,6 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
             </span>
           </div>
           <div className="flex items-center gap-4 shrink-0">
-            <span className="font-label-caps text-[10px] uppercase tracking-widest text-sand-neutral/70">
-              SYNC ACK: {banner.ack}
-            </span>
             <button 
               aria-label="Dismiss banner"
               className="text-sand-neutral hover:text-white transition-colors"
@@ -369,26 +369,26 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
             </span>
             <span className="text-clay-earth/40 text-xs">•</span>
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-clay-earth">
-              MongoDB SYSTEM_PREFERENCES Synced
+              PREFERENCES ACTIVE
             </span>
             <span className="text-clay-earth/40 text-xs">•</span>
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-clay-earth">
-              Client Runtime v4.2
+              v4.2
             </span>
           </div>
           <div className="inline-flex items-center gap-2 bg-sand-neutral/50 px-3 py-1">
             <span className="w-1.5 h-1.5 rounded-full bg-onyx-black animate-pulse"></span>
             <span className="font-label-caps text-label-caps uppercase text-onyx-black tracking-wider">
-              Scoped Principal: {driverName} ({driverCode}) • {driverHub}
+              Driver Partner: {driverName} • {driverHub}
             </span>
           </div>
         </div>
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-2">
           <div>
-            <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight leading-none">
+            <h1 className="font-headline-lg text-headline-lg text-onyx-black dark:text-[#E5C158] tracking-tight leading-none">
               App Preferences
             </h1>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-2 max-w-2xl">
+            <p className="font-body-md text-body-md text-on-surface-variant dark:text-[#D4D0C8] mt-2 max-w-2xl">
               Customize your workstation visual tone, regional formats, navigation telemetry engine, and bandwidth usage for active field couriers.
             </p>
           </div>
@@ -443,28 +443,28 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
                   onClick={() => handleNestedSelect('appearance', 'theme', 'system')}
                   className={`p-4 transition-all flex flex-col justify-between h-36 border-2 text-left relative cursor-pointer ${
                     preferences.appearance?.theme === 'system'
-                      ? 'border-onyx-black bg-surface-container-high ring-2 ring-onyx-black/20 shadow-md'
-                      : 'border-sand-neutral/60 bg-surface hover:border-sand-neutral'
+                      ? 'border-[#E5C158] dark:border-[#E5C158] bg-sand-neutral/30 dark:bg-[#24242A] ring-2 ring-[#E5C158]/30 shadow-md'
+                      : 'border-sand-neutral/60 dark:border-[#2C2C34] bg-surface dark:bg-[#1A1A1E] hover:border-sand-neutral dark:hover:border-[#383844]'
                   }`}
                 >
                   <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-xl text-onyx-black">devices</span>
+                    <span className="material-symbols-outlined text-xl text-onyx-black dark:text-[#E5C158]">devices</span>
                     <span className={`font-label-caps text-[10px] uppercase tracking-widest px-2 py-0.5 font-bold ${
                       preferences.appearance?.theme === 'system'
-                        ? 'bg-onyx-black text-white'
-                        : 'bg-sand-neutral/40 text-clay-earth'
+                        ? 'bg-[#18181B] dark:bg-[#E5C158] text-white dark:text-[#111113]'
+                        : 'bg-sand-neutral/50 dark:bg-[#2C2C34] text-clay-earth dark:text-[#DFB76C]'
                     }`}>
                       {preferences.appearance?.theme === 'system' ? 'ACTIVE' : 'OS SYNC'}
                     </span>
                   </div>
                   <div>
-                    <div className="font-button-text text-button-text font-bold text-onyx-black flex items-center justify-between">
+                    <div className="font-button-text text-button-text font-bold text-onyx-black dark:text-[#FAF8F5] flex items-center justify-between">
                       <span>System Default</span>
                       {preferences.appearance?.theme === 'system' && (
-                        <span className="material-symbols-outlined text-base text-emerald-600 font-bold">check_circle</span>
+                        <span className="material-symbols-outlined text-base text-emerald-500 font-bold">check_circle</span>
                       )}
                     </div>
-                    <div className="font-label-caps text-[11px] text-clay-earth mt-1">Auto-detect from host OS</div>
+                    <div className="font-label-caps text-[11px] text-clay-earth dark:text-[#DFB76C] mt-1">Auto-detect from host OS</div>
                   </div>
                 </button>
 
@@ -472,30 +472,30 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
                 <button
                   type="button"
                   onClick={() => handleNestedSelect('appearance', 'theme', 'light')}
-                  className={`p-4 transition-all flex flex-col justify-between h-36 border-2 text-left relative cursor-pointer bg-[#F8F6F2] text-onyx-black ${
+                  className={`p-4 transition-all flex flex-col justify-between h-36 border-2 text-left relative cursor-pointer bg-[#F8F6F2] ${
                     preferences.appearance?.theme === 'light'
-                      ? 'border-onyx-black ring-2 ring-onyx-black/30 shadow-md'
-                      : 'border-sand-neutral/60 hover:border-sand-neutral'
+                      ? 'border-[#18181B] dark:border-[#E5C158] ring-2 ring-[#18181B]/30 dark:ring-[#E5C158]/30 shadow-md'
+                      : 'border-[#DED9D1] hover:border-[#B5AFA4]'
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <span className="material-symbols-outlined text-xl text-amber-600">light_mode</span>
                     <span className={`font-label-caps text-[10px] uppercase tracking-widest px-2 py-0.5 font-bold ${
                       preferences.appearance?.theme === 'light'
-                        ? 'bg-onyx-black text-white'
-                        : 'bg-sand-neutral/50 text-clay-earth'
+                        ? 'bg-[#18181B] text-white'
+                        : 'bg-[#ECE7DE] text-[#4A4238]'
                     }`}>
                       {preferences.appearance?.theme === 'light' ? 'ACTIVE' : 'LIGHT'}
                     </span>
                   </div>
                   <div>
-                    <div className="font-button-text text-button-text font-bold text-onyx-black flex items-center justify-between">
+                    <div className="font-button-text text-button-text font-bold text-[#18181B] flex items-center justify-between">
                       <span>Light Mode</span>
                       {preferences.appearance?.theme === 'light' && (
                         <span className="material-symbols-outlined text-base text-emerald-600 font-bold">check_circle</span>
                       )}
                     </div>
-                    <div className="font-label-caps text-[11px] text-clay-earth mt-1">Sand &amp; Bone White</div>
+                    <div className="font-label-caps text-[11px] text-[#4A4238] mt-1">Sand &amp; Bone White</div>
                   </div>
                 </button>
 
@@ -503,30 +503,30 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
                 <button
                   type="button"
                   onClick={() => handleNestedSelect('appearance', 'theme', 'dark')}
-                  className={`p-4 transition-all flex flex-col justify-between h-36 border-2 text-left relative cursor-pointer bg-[#1A1A1A] text-bone-white ${
+                  className={`p-4 transition-all flex flex-col justify-between h-36 border-2 text-left relative cursor-pointer bg-[#141416] ${
                     preferences.appearance?.theme === 'dark'
-                      ? 'border-white ring-2 ring-white/40 shadow-md'
-                      : 'border-stone-800 hover:border-stone-700'
+                      ? 'border-[#E5C158] ring-2 ring-[#E5C158]/40 shadow-md'
+                      : 'border-[#2C2C34] hover:border-[#3E3E4A]'
                   }`}
                 >
                   <div className="flex justify-between items-start">
-                    <span className="material-symbols-outlined text-xl text-indigo-300">dark_mode</span>
+                    <span className="material-symbols-outlined text-xl text-[#E5C158]">dark_mode</span>
                     <span className={`font-label-caps text-[10px] uppercase tracking-widest px-2 py-0.5 font-bold ${
                       preferences.appearance?.theme === 'dark'
-                        ? 'bg-white text-onyx-black'
-                        : 'bg-stone-800 text-stone-300'
+                        ? 'bg-[#E5C158] text-[#111113]'
+                        : 'bg-[#222228] text-[#D4D0C8]'
                     }`}>
                       {preferences.appearance?.theme === 'dark' ? 'ACTIVE' : 'NIGHT SHIFT'}
                     </span>
                   </div>
                   <div>
-                    <div className="font-button-text text-button-text font-bold text-bone-white flex items-center justify-between">
-                      <span>Dark Mode</span>
+                    <div className="font-button-text text-button-text font-bold text-[#FAF8F5] flex items-center justify-between">
+                      <span className={preferences.appearance?.theme === 'dark' ? 'text-[#E5C158]' : 'text-[#FAF8F5]'}>Dark Mode</span>
                       {preferences.appearance?.theme === 'dark' && (
-                        <span className="material-symbols-outlined text-base text-emerald-400 font-bold">check_circle</span>
+                        <span className="material-symbols-outlined text-base text-[#E5C158] font-bold">check_circle</span>
                       )}
                     </div>
-                    <div className="font-label-caps text-[11px] text-stone-400 mt-1">Obsidian &amp; Charcoal</div>
+                    <div className="font-label-caps text-[11px] text-[#D4D0C8] mt-1">Obsidian &amp; Charcoal</div>
                   </div>
                 </button>
               </div>
@@ -601,15 +601,15 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
                     onChange={() => handleNestedSelect('mapRouting', 'mapCartography', 'vector')}
                     className="peer sr-only"
                   />
-                  <div className="p-4 bg-surface peer-checked:bg-onyx-black peer-checked:text-white transition-all flex flex-col justify-between gap-4 border border-sand-neutral/40 h-full">
+                  <div className="p-4 bg-surface dark:bg-[#1A1A1E] peer-checked:bg-onyx-black dark:peer-checked:bg-[#24242A] peer-checked:text-white dark:peer-checked:border-[#E5C158] transition-all flex flex-col justify-between gap-4 border border-sand-neutral/40 dark:border-[#2C2C34] h-full">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-lg">map</span>
-                        <span className="font-button-text text-button-text font-semibold">Standard Vector</span>
+                        <span className="material-symbols-outlined text-lg text-onyx-black dark:text-[#E5C158] peer-checked:text-white dark:peer-checked:text-[#E5C158]">map</span>
+                        <span className="font-button-text text-button-text font-semibold text-onyx-black dark:text-[#FAF8F5] peer-checked:text-white dark:peer-checked:text-[#E5C158]">Standard Vector</span>
                       </div>
-                      <span className="font-label-caps text-[10px] uppercase bg-sand-neutral/30 px-2 py-0.5 peer-checked:bg-sand-neutral peer-checked:text-onyx-black">Optimal Daytime</span>
+                      <span className="font-label-caps text-[10px] uppercase bg-sand-neutral/30 dark:bg-[#2C2C34] px-2 py-0.5 peer-checked:bg-sand-neutral dark:peer-checked:bg-[#E5C158] peer-checked:text-onyx-black dark:peer-checked:text-[#111113] text-clay-earth dark:text-[#DFB76C]">Optimal Daytime</span>
                     </div>
-                    <p className="font-label-caps text-[11px] text-on-surface-variant peer-checked:text-sand-neutral leading-relaxed">
+                    <p className="font-label-caps text-[11px] text-on-surface-variant dark:text-[#D4D0C8] peer-checked:text-sand-neutral dark:peer-checked:text-[#D4D0C8] leading-relaxed">
                       High-contrast minimal vector rendering. Zero extraneous textures, engineered for instant glanceability under bright sunlight.
                     </p>
                   </div>
@@ -624,15 +624,15 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
                     onChange={() => handleNestedSelect('mapRouting', 'mapCartography', 'satellite')}
                     className="peer sr-only"
                   />
-                  <div className="p-4 bg-surface peer-checked:bg-onyx-black peer-checked:text-white transition-all flex flex-col justify-between gap-4 border border-sand-neutral/40 h-full">
+                  <div className="p-4 bg-surface dark:bg-[#1A1A1E] peer-checked:bg-onyx-black dark:peer-checked:bg-[#24242A] peer-checked:text-white dark:peer-checked:border-[#E5C158] transition-all flex flex-col justify-between gap-4 border border-sand-neutral/40 dark:border-[#2C2C34] h-full">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-lg">satellite_alt</span>
-                        <span className="font-button-text text-button-text font-semibold">Satellite Hybrid</span>
+                        <span className="material-symbols-outlined text-lg text-onyx-black dark:text-[#E5C158] peer-checked:text-white dark:peer-checked:text-[#E5C158]">satellite_alt</span>
+                        <span className="font-button-text text-button-text font-semibold text-onyx-black dark:text-[#FAF8F5] peer-checked:text-white dark:peer-checked:text-[#E5C158]">Satellite Hybrid</span>
                       </div>
-                      <span className="font-label-caps text-[10px] uppercase bg-sand-neutral/30 px-2 py-0.5 peer-checked:bg-sand-neutral peer-checked:text-onyx-black">Complex Hubs</span>
+                      <span className="font-label-caps text-[10px] uppercase bg-sand-neutral/30 dark:bg-[#2C2C34] px-2 py-0.5 peer-checked:bg-sand-neutral dark:peer-checked:bg-[#E5C158] peer-checked:text-onyx-black dark:peer-checked:text-[#111113] text-clay-earth dark:text-[#DFB76C]">Complex Hubs</span>
                     </div>
-                    <p className="font-label-caps text-[11px] text-on-surface-variant peer-checked:text-sand-neutral leading-relaxed">
+                    <p className="font-label-caps text-[11px] text-on-surface-variant dark:text-[#D4D0C8] peer-checked:text-sand-neutral dark:peer-checked:text-[#D4D0C8] leading-relaxed">
                       High-resolution photographic imagery highlighting residential gates, compound alleyways, and kitchen loading docks.
                     </p>
                   </div>
@@ -757,7 +757,7 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
               {/* Auto-refresh */}
               <div className="p-4 bg-surface flex items-center justify-between border border-sand-neutral/40">
                 <div className="flex flex-col pr-4">
-                  <span className="font-button-text text-button-text text-onyx-black">Auto-refresh Delivery Requests (WebSocket Queue)</span>
+                  <span className="font-button-text text-button-text text-onyx-black">Auto-refresh Delivery Requests (Live Real-Time Queue)</span>
                   <span className="font-label-caps text-[11px] text-on-surface-variant mt-0.5">Polls active kitchen dispatch pool every 5 seconds without manual pull-to-refresh</span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -902,7 +902,7 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
                   <div className="font-button-text text-button-text">{preferences.localization?.systemTimezone || 'Asia/Kolkata'} (IST - UTC+05:30)</div>
                   <div className="flex items-center gap-1.5 text-clay-earth">
                     <span className="w-1.5 h-1.5 rounded-full bg-onyx-black"></span>
-                    <span className="font-label-caps text-[10px] uppercase tracking-wider">Database Synced</span>
+                    <span className="font-label-caps text-[10px] uppercase tracking-wider">Synchronized</span>
                   </div>
                 </div>
               </div>
@@ -1133,7 +1133,7 @@ export default function AppPreferencesView({ currentUser, onNavigateTab, onShowT
           </button>
           <span className="text-sand-neutral dark:text-stone-700">|</span>
           <span className="font-label-caps text-[11px] text-clay-earth dark:text-stone-400 hidden lg:inline-block">
-            Saved changes immediately serialize to <code className="bg-surface dark:bg-stone-800 px-1.5 py-0.5 text-onyx-black dark:text-stone-200 font-mono">driver_preferences</code> collection via WebSocket TLS 1.3.
+            Preferences are securely synchronized across your delivery workstation.
           </span>
         </div>
         <div className="flex items-center gap-3">

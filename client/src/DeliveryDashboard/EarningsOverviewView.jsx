@@ -65,7 +65,7 @@ export default function EarningsOverviewView({ currentUser, onNavigateTab }) {
       const json = await res.json();
 
       if (!res.ok || !json.success) {
-        throw new Error(json.message || 'Failed to retrieve earnings overview telemetry');
+        throw new Error(json.message || 'Unable to load earnings overview right now.');
       }
 
       setEarningsData(json.data);
@@ -73,11 +73,11 @@ export default function EarningsOverviewView({ currentUser, onNavigateTab }) {
         setPayoutAmountInput(String(json.data.breakdown.availableBalance));
       }
       if (isRefresh) {
-        showToast('✓ Earnings telemetry successfully resynced with MongoDB!');
+        showToast('✓ Earnings overview updated successfully.');
       }
     } catch (err) {
       console.error('Error fetching earnings overview:', err);
-      setError(err.message || 'Unable to load earnings overview from server');
+      setError('Unable to load earnings details right now. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -280,10 +280,6 @@ export default function EarningsOverviewView({ currentUser, onNavigateTab }) {
             <span className="font-label-caps text-label-caps uppercase text-secondary tracking-widest text-[11px]">Earnings &amp; Payments</span>
             <span className="text-secondary text-sm">/</span>
             <span className="font-label-caps text-label-caps uppercase text-onyx-black tracking-widest font-semibold text-[11px]">Earnings Overview</span>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-surface-container-high rounded-full ml-2">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-              <span className="font-label-caps text-[10px] text-onyx-black uppercase tracking-wider font-bold">SOCKET.IO SYNCED • LIVE LEDGER</span>
-            </div>
           </div>
           <h1 className="font-headline-lg text-headline-lg text-onyx-black tracking-tight mt-2 font-serif text-3xl sm:text-4xl">Earnings Overview</h1>
           <p className="font-body-md text-body-md text-on-surface-variant max-w-2xl mt-1 text-sm sm:text-base">
@@ -666,11 +662,11 @@ export default function EarningsOverviewView({ currentUser, onNavigateTab }) {
           </svg>
         </div>
 
-        {/* Live Socket Notification Pill Below Chart */}
+        {/* Real-time Notice Pill Below Chart */}
         <div className="mt-4 pt-3 border-t border-sand-neutral flex items-center gap-2 text-on-surface-variant font-label-caps text-[11px]">
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-          <span className="text-onyx-black font-semibold">Real-time recalculation:</span>
-          <span>Order total ≠ Driver earning. MongoDB settlement triggers instantly upon customer OTP verification.</span>
+          <span className="text-onyx-black font-semibold">Instant Credit:</span>
+          <span>Order total represents meal cost. Guaranteed courier compensation is credited directly upon delivery confirmation.</span>
         </div>
       </section>
 
@@ -907,17 +903,9 @@ export default function EarningsOverviewView({ currentUser, onNavigateTab }) {
           onClick={() => setForceEmptyStatePreview(!forceEmptyStatePreview)}
           className="font-label-caps text-[11px] text-onyx-black underline uppercase tracking-wider hover:text-secondary cursor-pointer font-bold"
         >
-          {forceEmptyStatePreview ? 'Restore Live Telemetry' : 'View Empty State'}
+          {forceEmptyStatePreview ? 'Restore View' : 'View Empty State'}
         </button>
       </div>
-
-      {/* Security & Isolation Banner */}
-      <footer className="p-4 bg-surface-container-high/60 border border-sand-neutral flex items-center gap-3 text-secondary text-xs leading-relaxed">
-        <span className="material-symbols-outlined text-[18px] text-onyx-black shrink-0">lock</span>
-        <span>
-          <strong className="text-onyx-black font-medium">Driver Telemetry Verified:</strong> Authenticated Session for {driver.name || 'Courier'} (ID: {driver.driverId ? `#${driver.driverId}` : ''}). Data cryptographically scoped via JWT claims to MongoDB driver records. Instant settlement guaranteed via TiffinLink escrow contract.
-        </span>
-      </footer>
 
       {/* Custom Date Range Modal */}
       {isCustomDateModalOpen && (

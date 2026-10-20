@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Clock, ChevronRight, ChevronLeft, Star, MapPin, Phone, ShieldCheck, X, Utensils } from 'lucide-react';
 import use3DTilt from '../components/use3DTilt';
+import { apiRequest } from '../services/api';
 
 function ProviderCard({ provider, onSelect, onOrder }) {
   const tiltRef = use3DTilt(8, 1.01);
@@ -11,32 +12,19 @@ function ProviderCard({ provider, onSelect, onOrder }) {
       onClick={() => onSelect && onSelect(provider)}
       className="min-w-[290px] md:min-w-[310px] bg-surface-bright rounded-2xl border border-clay-earth/20 p-5 flex flex-col justify-between cursor-pointer relative overflow-hidden group/card transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_45px_rgba(74,66,56,0.14)] hover:border-clay-earth/40"
     >
-      {/* Luxury Inset Border */}
-      <div className="absolute inset-2.5 border border-clay-earth/10 pointer-events-none rounded-xl z-0" />
-
-      {/* Glare Sheen Layer */}
-      <div className="tilt-glare absolute inset-0 pointer-events-none z-10 transition-opacity duration-300 opacity-0 group-hover/card:opacity-100" />
-      
       <div className="z-10">
         {/* Image & Rating */}
         <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-sand-neutral/10 border border-clay-earth/10 shadow-sm">
           <img 
-            src={provider.image || '/assets/provider_1.png'} 
+            src={provider.kitchenPhoto || provider.kitchenPhotos || provider.image || '/assets/provider_1.png'} 
             alt={provider.name}
             className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
           />
 
-          {/* Glass Rating Badge */}
+          {/* Rating Badge */}
           <span className="absolute top-3 right-3 bg-black/85 backdrop-blur-md text-white text-[11px] font-extrabold tracking-wider px-2.5 py-1 rounded-full flex items-center gap-1 shadow-lg border border-white/20 z-20">
             ★ {provider.rating ? Number(provider.rating).toFixed(1) : '4.8'}
           </span>
-
-          {/* Luxury Circular VIEW Badge on Hover (matching user screenshot) */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 pointer-events-none z-20">
-            <span className="w-16 h-16 rounded-full bg-black/80 backdrop-blur-md text-white font-label-caps text-xs tracking-widest uppercase flex items-center justify-center border border-white/20 shadow-2xl scale-90 group-hover/card:scale-100 transition-transform duration-300">
-              VIEW
-            </span>
-          </div>
         </div>
 
         {/* Info */}
@@ -121,15 +109,9 @@ export default function TopProviders({ onExplore, onSelectProvider }) {
 
   const fetchProviders = async () => {
     try {
-      let response;
-      try {
-        response = await fetch('/api/providers');
-        if (!response.ok) throw new Error('Vite proxy failed');
-      } catch {
-        response = await fetch('http://localhost:5000/api/providers');
-      }
-      const data = await response.json();
-      if (data.success && Array.isArray(data.data)) {
+      const res = await apiRequest('/providers');
+      const data = typeof res?.json === 'function' ? await res.json() : res;
+      if (data && data.success && Array.isArray(data.data)) {
         setProviders(data.data);
       }
     } catch (error) {
@@ -170,18 +152,23 @@ export default function TopProviders({ onExplore, onSelectProvider }) {
     <section className="pt-12 md:pt-section-gap pb-8 px-4 sm:px-6 md:px-margin-desktop bg-bone-white" id="kitchens">
       <div className="max-w-[1440px] mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-8 md:mb-12">
-          <h2 className="font-bold text-2xl sm:text-3xl tracking-tight text-onyx-black">
-            Top Tiffin Providers Near You
-          </h2>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 mb-8 md:mb-12">
+          <div>
+            <p className="font-label-caps text-[11px] text-[#8C6239] dark:text-[#D4AF37] font-bold tracking-[0.25em] mb-2 uppercase">
+              CURATED KITCHENS
+            </p>
+            <h2 className="font-headline-lg font-serif font-bold text-3xl sm:text-4xl md:text-5xl tracking-tight text-[#181512] dark:text-white">
+              Top Tiffin Providers Near You
+            </h2>
+          </div>
           <button 
             onClick={() => {
               if (onExplore) onExplore();
               else window.location.hash = '#find-tiffin';
             }}
-            className="font-semibold text-onyx-black hover:opacity-50 flex items-center gap-1 transition-colors text-sm cursor-pointer"
+            className="font-semibold text-[#8C6239] dark:text-[#D4AF37] hover:text-[#4B3621] flex items-center gap-1.5 transition-colors text-sm cursor-pointer mb-1"
           >
-            View all providers <span className="text-base">→</span>
+            View all providers <span className="text-base font-bold">→</span>
           </button>
         </div>
 
@@ -256,7 +243,7 @@ export default function TopProviders({ onExplore, onSelectProvider }) {
             {/* Modal Image Header */}
             <div className="relative aspect-[16/9] w-full overflow-hidden bg-sand-neutral/20">
               <img 
-                src={selectedModalProvider.image || '/assets/provider_1.png'} 
+                src={selectedModalProvider.kitchenPhoto || selectedModalProvider.kitchenPhotos || selectedModalProvider.image || '/assets/provider_1.png'} 
                 alt={selectedModalProvider.name}
                 className="w-full h-full object-cover"
               />

@@ -7,7 +7,13 @@ const {
   createReview
 } = require('../controllers/reviewController');
 
-router.get('/', protect, requireProvider, getReviews);
+// Allow public fetching of reviews if providerId is supplied in query (e.g. diner viewing kitchen profile)
+router.get('/', (req, res, next) => {
+  if (req.query.providerId) {
+    return getReviews(req, res, next);
+  }
+  return protect(req, res, () => requireProvider(req, res, next));
+});
 router.post('/', protect, createReview);
 router.put('/:id/reply', protect, requireProvider, replyToReview);
 

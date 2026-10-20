@@ -108,7 +108,7 @@ export default function ActivePartnersTab({ onNavigate, onOpenDriver360 }) {
     showToast('Polling RTK-GPS telemetry mesh across active couriers...');
     try {
       await fetchRegistryData();
-      showToast('Telemetry refreshed successfully from MongoDB database.');
+      showToast('Active courier telemetry refreshed successfully.');
     } catch (err) {
       showToast('Telemetry sync failed');
     } finally {
@@ -317,7 +317,7 @@ export default function ActivePartnersTab({ onNavigate, onOpenDriver360 }) {
                 {stats.totalActiveFleet ? ((stats.onlineTelemetry / stats.totalActiveFleet) * 100).toFixed(1) : 0}% Fleet
               </span>
             </div>
-            <p className="text-xs text-[#665d52] pt-2">Active WebSocket heartbeats streaming</p>
+            <p className="text-xs text-[#665d52] pt-2">Active courier signals reporting</p>
           </div>
 
           <div className="bg-white p-6 border border-[#ded9d1] shadow-sm flex flex-col justify-between">
@@ -516,7 +516,7 @@ export default function ActivePartnersTab({ onNavigate, onOpenDriver360 }) {
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-[#665d52]">
                         <span className="material-symbols-outlined text-4xl text-[#ded9d1] mb-2 block">badge</span>
-                        <p className="font-serif text-lg text-[#1a1a1a]">No Active Couriers In Database</p>
+                        <p className="font-serif text-lg text-[#1a1a1a]">No Active Couriers Found</p>
                         <p className="text-xs text-[#665d52] font-mono mt-1">Currently no active couriers match this criteria.</p>
                       </td>
                     </tr>

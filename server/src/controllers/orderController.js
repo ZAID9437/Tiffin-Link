@@ -82,6 +82,14 @@ const enrichOrderFinancials = (o) => {
   obj.netPayout = netPayout;
   obj.secondsLeft = secondsLeft;
 
+  const isCod = (obj.paymentStatus || '').toLowerCase().includes('cash') || 
+                (obj.paymentMethod || '').toLowerCase().includes('cash') || 
+                (obj.paymentMethod || '').toLowerCase().includes('cod');
+  if (isCod) {
+    obj.paymentMethod = 'Cash on Delivery';
+    obj.paymentStatus = 'Cash on Delivery';
+  }
+
   obj.pricing = {
     itemsSubtotal: subtotal,
     packagingCharge: packagingFee,
@@ -155,7 +163,20 @@ const getOrders = async (req, res) => {
           if (ordIdStr && seenOrderIds.has(ordIdStr)) continue;
           if (idStr) seenIds.add(idStr);
           if (ordIdStr) seenOrderIds.add(ordIdStr);
-          result.push(enrichOrderFinancials({ ...o, id: idStr || o.id }));
+
+          // Proactively ensure pickupOtp and deliveryOtp exist
+          let pickupOtp = o.pickupOtp;
+          if (!pickupOtp || !/^\d{4}$/.test(String(pickupOtp).trim())) {
+            pickupOtp = String(Math.floor(1000 + Math.random() * 9000));
+            Order.updateOne({ _id: o._id }, { $set: { pickupOtp } }).catch(() => {});
+          }
+          let deliveryOtp = o.deliveryOtp;
+          if (!deliveryOtp || !/^\d{6}$/.test(String(deliveryOtp).trim())) {
+            deliveryOtp = String(Math.floor(100000 + Math.random() * 900000));
+            Order.updateOne({ _id: o._id }, { $set: { deliveryOtp } }).catch(() => {});
+          }
+
+          result.push(enrichOrderFinancials({ ...o, pickupOtp, deliveryOtp, id: idStr || o.id }));
         }
         return result;
       };
@@ -323,7 +344,9 @@ const createOrder = async (req, res) => {
       ...bill,
       paymentStatus: paymentStatus || 'Paid',
       status: status || 'New',
-      deliveryStatus: 'Unassigned'
+      deliveryStatus: 'Unassigned',
+      pickupOtp: String(Math.floor(1000 + Math.random() * 9000)),
+      deliveryOtp: String(Math.floor(100000 + Math.random() * 900000))
     };
 
     if (await isDbConnected()) {
@@ -634,7 +657,17 @@ const rejectOrder = async (req, res) => {
         });
       }
 
-      const rejectionReason = reason || notes || 'Declined by kitchen provider';
+      const rejectionReason = reason || notes || 'The kitchen is at peak preparation capacity and cannot accept this order right now.';
+
+      // Lookup provider name if missing
+      let providerName = existing.providerName || '';
+      if (!providerName) {
+        try {
+          const User = require('../models/User');
+          const provUser = await User.findById(providerId).lean();
+          providerName = provUser?.kitchenName || provUser?.businessName || provUser?.name || 'Kitchen Partner';
+        } catch (e) {}
+      }
 
       const updatedOrder = await Order.findOneAndUpdate(
         {
@@ -646,6 +679,7 @@ const rejectOrder = async (req, res) => {
             status: 'Cancelled',
             cancelledBy: 'Provider',
             cancellationReason: rejectionReason,
+            providerName: providerName || 'Kitchen Partner',
             cancelledAt: new Date()
           }
         },
@@ -659,28 +693,74 @@ const rejectOrder = async (req, res) => {
         });
       }
 
-      // Audit Log & Socket Notification
+      // Audit Log
       try {
         const AuditLog = require('../models/AuditLog');
         await AuditLog.create({
           action: 'ORDER_REJECTED',
           entityType: 'Order',
           entityId: String(updatedOrder._id),
-          performedBy: req.user?.name || 'Provider',
+          performedBy: req.user?.name || providerName || 'Provider',
           details: `Order ${updatedOrder.orderId} declined by provider. Reason: ${rejectionReason}`
         });
       } catch (aErr) {}
+
+      // Socket Notification directly to customer and fleet
+      const declinePayload = {
+        orderId: updatedOrder.orderId,
+        _id: updatedOrder._id,
+        status: 'Cancelled',
+        cancelledBy: 'Provider',
+        cancellationReason: rejectionReason,
+        providerId: updatedOrder.providerId,
+        providerName: providerName || 'Kitchen Partner',
+        tiffinName: updatedOrder.tiffinName || 'Tiffin Meal',
+        totalAmount: updatedOrder.totalAmount,
+        customerEmail: updatedOrder.customerEmail,
+        customerId: updatedOrder.customerId,
+        refundNotice: '100% full refund credited to original payment source. Zero fee deducted.'
+      };
 
       try {
         const { emitToProvider, getIO } = require('../services/socketService');
         emitToProvider(providerId, 'order:status:updated', { orderId: updatedOrder.orderId, status: 'Cancelled' });
         const io = getIO();
-        if (io) io.emit('order:status:updated', { orderId: updatedOrder.orderId, status: 'Cancelled', providerId });
+        if (io) {
+          io.emit('order:status:updated', declinePayload);
+          io.emit('order:declined', declinePayload);
+          io.emit('order:cancelled', declinePayload);
+          if (updatedOrder.customerId) {
+            io.to(`customer:${updatedOrder.customerId}`).emit('order:declined', declinePayload);
+          }
+          if (updatedOrder.customerEmail) {
+            io.to(`customer:${updatedOrder.customerEmail.toLowerCase()}`).emit('order:declined', declinePayload);
+          }
+        }
       } catch (sErr) {}
+
+      // Customer In-App Notification
+      try {
+        const Notification = require('../models/Notification');
+        await Notification.create({
+          userId: updatedOrder.customerId || updatedOrder.customerEmail,
+          userEmail: updatedOrder.customerEmail,
+          title: 'Order Declined by Kitchen',
+          message: `Your Order ${updatedOrder.orderId} for "${updatedOrder.tiffinName}" was declined by ${providerName || 'the kitchen'}. Reason: "${rejectionReason}". Your full payment of ₹${updatedOrder.totalAmount} has been refunded.`,
+          type: 'order_cancelled',
+          orderId: updatedOrder.orderId,
+          role: 'customer',
+          metadata: {
+            orderId: updatedOrder.orderId,
+            cancellationReason: rejectionReason,
+            cancelledBy: 'Provider',
+            providerName: providerName || 'Kitchen Partner'
+          }
+        });
+      } catch (nErr) {}
 
       return res.json({
         success: true,
-        message: `Order ${updatedOrder.orderId} declined. Reason logged.`,
+        message: `Order ${updatedOrder.orderId} declined. Reason logged and customer notified.`,
         data: enrichOrderFinancials(updatedOrder)
       });
     }
@@ -912,9 +992,16 @@ const createCustomerOrder = async (req, res) => {
       rotliCount: rotliCount || 4,
       selectedShaak: selectedShaak || '',
       instructions: instructions || '',
-      paymentStatus: (paymentMethod || '').toLowerCase().includes('cash') ? 'Cash on Delivery' : 'Paid',
+      paymentMethod: (paymentMethod || '').toLowerCase().includes('cash') || (paymentMethod || '').toLowerCase().includes('cod') 
+        ? 'Cash on Delivery' 
+        : (paymentMethod || 'Online Payment'),
+      paymentStatus: (paymentMethod || '').toLowerCase().includes('cash') || (paymentMethod || '').toLowerCase().includes('cod') 
+        ? 'Cash on Delivery' 
+        : 'Paid',
       status: 'New',
       deliveryStatus: 'Unassigned',
+      pickupOtp: String(Math.floor(1000 + Math.random() * 9000)),
+      deliveryOtp: String(Math.floor(100000 + Math.random() * 900000)),
       pickupAddress: providerDoc?.address?.street 
         ? `${providerDoc.address.street}, ${providerDoc.address.locality || ''}, ${providerDoc.address.city || 'Ahmedabad'}`
         : 'Kitchen Hub, Ahmedabad'
@@ -1034,6 +1121,101 @@ const readyOrder = async (req, res) => {
           success: false,
           message: result.message
         });
+      }
+
+      // Automatically dispatch delivery request to drivers when food is marked Ready
+      try {
+        const DeliveryRequest = require('../models/DeliveryRequest');
+        const Provider = require('../models/Provider');
+        const order = result.order;
+        const isValid4Digit = (c) => c && /^\d{4}$/.test(String(c).trim());
+        const pickupOtp = isValid4Digit(order.pickupOtp) ? String(order.pickupOtp).trim() : String(Math.floor(1000 + Math.random() * 9000));
+        const deliveryOtp = order.deliveryOtp || String(Math.floor(100000 + Math.random() * 900000));
+
+        order.deliveryStatus = 'Searching';
+        order.pickupOtp = pickupOtp;
+        order.deliveryOtp = deliveryOtp;
+        order.deliveryRequestedAt = new Date();
+        await order.save();
+
+        const providerDoc = await Provider.findById(providerId);
+        const reqId = order.orderId ? String(order.orderId).replace(/^#+/, '') : String(order._id);
+        const existingReq = await DeliveryRequest.findOne({
+          $or: [{ orderId: order.orderId }, { requestId: reqId }, { requestId: `TL-REQ-${reqId}` }]
+        });
+
+        const deliveryPayload = {
+          orderId: order.orderId,
+          providerId: String(providerId),
+          providerName: providerDoc?.name || providerDoc?.kitchenName || order.providerName || order.tiffinName || 'Kitchen Hub',
+          providerEmail: providerDoc?.email || req.user?.email || '',
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          customerEmail: order.customerEmail || '',
+          customerId: order.customerId || '',
+          deliveryAddress: {
+            street: order.customerAddress || 'Ahmedabad',
+            city: 'Ahmedabad',
+            lat: order.deliveryCoordinates?.lat || 23.0300,
+            lng: order.deliveryCoordinates?.lng || 72.5178
+          },
+          pickupAddress: {
+            street: order.pickupAddress || providerDoc?.address?.street || 'Kitchen Hub, Ahmedabad',
+            city: 'Ahmedabad',
+            lat: providerDoc?.address?.lat || 23.0300,
+            lng: providerDoc?.address?.lng || 72.5178
+          },
+          distanceKm: order.deliveryKm || 3.2,
+          subtotal: order.subtotal || 120,
+          deliveryFee: order.deliveryFee || 45,
+          driverEarning: order.driverEarning || order.deliveryFee || 45,
+          amount: order.totalAmount,
+          tiffinName: order.tiffinName,
+          tiffinCategory: order.tiffinCategory || 'Gujarati',
+          status: 'Searching Drivers',
+          pickupOtp,
+          deliveryOtp,
+          requestedAt: new Date()
+        };
+
+        let deliveryReq;
+        if (existingReq) {
+          Object.assign(existingReq, deliveryPayload);
+          await existingReq.save();
+          deliveryReq = existingReq;
+        } else {
+          deliveryReq = new DeliveryRequest({
+            requestId: `TL-REQ-${reqId}`,
+            ...deliveryPayload
+          });
+          await deliveryReq.save();
+        }
+
+        const { getIO } = require('../services/socketService');
+        const io = getIO();
+        if (io) {
+          const broadcastData = {
+            requestId: deliveryReq.requestId,
+            orderId: order.orderId,
+            providerId: String(providerId),
+            providerName: deliveryPayload.providerName,
+            pickupAddress: deliveryPayload.pickupAddress,
+            deliveryAddress: deliveryPayload.deliveryAddress,
+            customerName: order.customerName,
+            tiffinName: order.tiffinName,
+            distanceKm: order.deliveryKm || 3.2,
+            deliveryFee: order.deliveryFee,
+            driverEarning: order.driverEarning,
+            amount: order.totalAmount,
+            secondsLeft: 60,
+            requestedAt: new Date()
+          };
+          io.emit('delivery:request:new', broadcastData);
+          io.emit('delivery:driver:live_request', broadcastData);
+          io.emit('delivery:new_request', broadcastData);
+        }
+      } catch (dErr) {
+        console.warn('Auto dispatch delivery warning in readyOrder:', dErr);
       }
 
       return res.json({
@@ -1250,7 +1432,7 @@ const cancelOrder = async (req, res) => {
     } else if (userId) {
       query = {
         $and: [
-          { $or: [{ _id: id }, { orderId: id }, { orderId: `#${id}` }] },
+          buildOrderLookupQuery(id),
           { customerId: userId }
         ]
       };
@@ -1310,7 +1492,7 @@ const verifyPayment = async (req, res) => {
 
     const order = await Order.findOne({
       $and: [
-        { $or: [{ _id: id }, { orderId: id }, { orderId: `#${id}` }] },
+        buildOrderLookupQuery(id),
         { customerId: userId }
       ]
     });

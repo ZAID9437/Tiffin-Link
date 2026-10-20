@@ -1,9 +1,32 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Driver = require('../models/Driver');
 const Provider = require('../models/Provider');
 const DeliveryRequest = require('../models/DeliveryRequest');
+
+const buildDeliveryQuery = (rawId) => {
+  if (!rawId) return null;
+  const strId = String(rawId).trim();
+  const cleanId = strId.replace(/^#+/, '');
+  const hashedId = `#${cleanId}`;
+
+  const queryList = [
+    { requestId: strId },
+    { requestId: cleanId },
+    { requestId: hashedId },
+    { orderId: strId },
+    { orderId: cleanId },
+    { orderId: hashedId }
+  ];
+
+  if (mongoose.Types.ObjectId.isValid(strId)) {
+    queryList.push({ _id: strId });
+  }
+
+  return { $or: queryList };
+};
 
 let io = null;
 
@@ -119,16 +142,61 @@ const initSocket = (server) => {
       }
     });
 
+    // Join Customer Room explicitly
+    socket.on('join:customer', ({ customerId, email }) => {
+      if (customerId) {
+        const roomName = `customer:${customerId}`;
+        socket.join(roomName);
+        console.log(`📡 Socket ${socket.id} explicitly joined room: ${roomName}`);
+      }
+      if (email) {
+        const emailRoom = `customer:${email.toLowerCase()}`;
+        socket.join(emailRoom);
+        console.log(`📡 Socket ${socket.id} joined email room: ${emailRoom}`);
+      }
+    });
+
     // Join Delivery Tracking Room with Security Verification
     socket.on('join:delivery', async ({ deliveryId }) => {
       try {
         if (!deliveryId) return;
 
-        const delivery = await DeliveryRequest.findOne({
-          $or: [{ requestId: deliveryId }, { orderId: deliveryId }, { _id: deliveryId }]
-        });
+        const deliveryQuery = buildDeliveryQuery(deliveryId);
+        if (!deliveryQuery) return;
+
+        const delivery = await DeliveryRequest.findOne(deliveryQuery);
 
         if (!delivery) {
+          // If no DeliveryRequest exists yet, check if an Order exists so socket can safely join delivery/order rooms
+          const Order = require('../models/Order');
+          const cleanId = String(deliveryId).trim().replace(/^#+/, '');
+          const ordQueryList = [
+            { orderId: deliveryId },
+            { orderId: cleanId },
+            { orderId: `#${cleanId}` }
+          ];
+          if (mongoose.Types.ObjectId.isValid(cleanId)) {
+            ordQueryList.push({ _id: cleanId });
+          }
+          const ord = await Order.findOne({ $or: ordQueryList });
+
+          if (ord) {
+            const roomsToJoin = new Set([
+              `delivery:${cleanId}`,
+              `delivery:#${cleanId}`,
+              `delivery:${ord.orderId}`
+            ]);
+            roomsToJoin.forEach(r => socket.join(r));
+            console.log(`📡 Socket ${socket.id} joined early order rooms:`, Array.from(roomsToJoin).join(', '));
+            socket.emit('joined:delivery', { 
+              success: true, 
+              rooms: Array.from(roomsToJoin),
+              deliveryId: cleanId,
+              currentLocation: null
+            });
+            return;
+          }
+
           socket.emit('error', { message: 'Delivery not found.' });
           return;
         }
@@ -178,8 +246,12 @@ const initSocket = (server) => {
     socket.on('driver:presence', async ({ isOnline }) => {
       try {
         if (socket.driverId) {
+          const driverQueryList = [{ driverId: socket.driverId }];
+          if (mongoose.Types.ObjectId.isValid(socket.driverId)) {
+            driverQueryList.push({ _id: socket.driverId });
+          }
           await Driver.updateOne(
-            { $or: [{ driverId: socket.driverId }, { _id: socket.driverId }] },
+            { $or: driverQueryList },
             { $set: { status: isOnline ? 'AVAILABLE' : 'OFFLINE' } }
           );
           console.log(`📡 Driver ${socket.driverId} status updated in DB: ${isOnline ? 'AVAILABLE' : 'OFFLINE'}`);
@@ -198,9 +270,12 @@ const initSocket = (server) => {
           return socket.emit('error', { message: 'Invalid coordinates provided.' });
         }
 
-        const delivery = await DeliveryRequest.findOne({
-          $or: [{ requestId: deliveryId }, { orderId: deliveryId }, { _id: deliveryId }]
-        });
+        const deliveryQuery = buildDeliveryQuery(deliveryId);
+        if (!deliveryQuery) {
+          return socket.emit('error', { message: 'Invalid delivery identifier provided.' });
+        }
+
+        const delivery = await DeliveryRequest.findOne(deliveryQuery);
 
         if (!delivery) {
           return socket.emit('error', { message: 'Delivery not found for location update.' });
@@ -245,8 +320,18 @@ const initSocket = (server) => {
 
           if (delivery.orderId) {
             const Order = require('../models/Order');
+            const ordRaw = String(delivery.orderId).trim();
+            const ordClean = ordRaw.replace(/^#+/, '');
+            const ordQueryList = [
+              { orderId: ordRaw },
+              { orderId: ordClean },
+              { orderId: `#${ordClean}` }
+            ];
+            if (mongoose.Types.ObjectId.isValid(ordRaw)) {
+              ordQueryList.push({ _id: ordRaw });
+            }
             Order.updateOne(
-              { $or: [{ orderId: delivery.orderId }, { _id: delivery.orderId }] },
+              { $or: ordQueryList },
               { $set: { estimatedTime: `${calc.etaMinutes} mins`, deliveryDistance: `${calc.distanceKm} km` } }
             ).catch(() => {});
           }

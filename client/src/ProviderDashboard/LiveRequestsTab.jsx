@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiRequest } from '../services/api';
+import { getSocket } from '../services/socket';
+import { stopKitchenAlertSound } from '../services/soundNotifier';
 
 export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRequest }) {
   const [requests, setRequests] = useState([]);
@@ -7,8 +9,14 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
   const [toastMsg, setToastMsg] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('ALL');
-  const [acceptedTodayCount, setAcceptedTodayCount] = useState(1);
+  const [acceptedTodayCount, setAcceptedTodayCount] = useState(0);
   const [selectedModalRequest, setSelectedModalRequest] = useState(null);
+  const [offerModalRequest, setOfferModalRequest] = useState(null);
+  const [offerPrice, setOfferPrice] = useState('');
+  const [offerPrepTime, setOfferPrepTime] = useState(25);
+  const [offerMessage, setOfferMessage] = useState('');
+  const [submittingOffer, setSubmittingOffer] = useState(false);
+  const [sentOffers, setSentOffers] = useState(new Set());
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [isKitchenOnline, setIsKitchenOnline] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState(null);
@@ -19,7 +27,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
     requestsRef.current = requests;
   }, [requests]);
 
-  // Initial fetch and 4s background sync interval
+  // Initial fetch, background polling, and real-time Socket.IO subscription
   useEffect(() => {
     if (currentUser) {
       fetchLiveRequests(true);
@@ -29,6 +37,52 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
         fetchLiveRequests(false);
       }
     }, 4000);
+
+    let socket;
+    try {
+      socket = getSocket();
+      if (socket && currentUser) {
+        const pId = currentUser?.providerId || currentUser?.id || currentUser?._id;
+        if (pId) {
+          socket.emit('join:provider', { providerId: String(pId) });
+        }
+
+        const handleIncomingRequest = () => {
+          fetchLiveRequests(false);
+          playNotificationChime();
+        };
+
+        const handleRequestChange = () => {
+          fetchLiveRequests(false);
+        };
+
+        const handleWindowNewOrder = () => {
+          fetchLiveRequests(false);
+        };
+        window.addEventListener('tiffinlink:new-order', handleWindowNewOrder);
+
+        socket.on('request:new', handleIncomingRequest);
+        socket.on('order:new', handleIncomingRequest);
+        socket.on('order:created', handleIncomingRequest);
+        socket.on('request:accepted', handleRequestChange);
+        socket.on('request:declined', handleRequestChange);
+        socket.on('request:cancelled', handleRequestChange);
+
+        return () => {
+          clearInterval(interval);
+          window.removeEventListener('tiffinlink:new-order', handleWindowNewOrder);
+          socket.off('request:new', handleIncomingRequest);
+          socket.off('order:new', handleIncomingRequest);
+          socket.off('order:created', handleIncomingRequest);
+          socket.off('request:accepted', handleRequestChange);
+          socket.off('request:declined', handleRequestChange);
+          socket.off('request:cancelled', handleRequestChange);
+        };
+      }
+    } catch (e) {
+      console.warn('Socket setup error in LiveRequestsTab:', e);
+    }
+
     return () => clearInterval(interval);
   }, [currentUser]);
 
@@ -62,8 +116,20 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
   const fetchLiveRequests = async (isInitial = false) => {
     try {
       if (isInitial) setLoading(true);
-      const res = await apiRequest('/requests');
-      const json = typeof res?.json === 'function' ? await res.json() : res;
+      const [res, dashRes] = await Promise.allSettled([
+        apiRequest('/requests'),
+        apiRequest('/providers/dashboard')
+      ]);
+
+      if (dashRes?.status === 'fulfilled' && dashRes.value) {
+        const dJson = typeof dashRes.value.json === 'function' ? await dashRes.value.json() : dashRes.value;
+        if (dJson && dJson.success && dJson.data && typeof dJson.data.todaysOrdersCount === 'number') {
+          setAcceptedTodayCount(dJson.data.todaysOrdersCount);
+        }
+      }
+
+      const rawRes = res?.status === 'fulfilled' ? res.value : null;
+      const json = typeof rawRes?.json === 'function' ? await rawRes.json() : rawRes;
 
       if (json && json.success && Array.isArray(json.data)) {
         const now = Date.now();
@@ -197,7 +263,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
   const handleAcceptRequest = async (reqItem) => {
     const targetId = reqItem.dbId || reqItem.id;
     setActionLoadingId(reqItem.id);
-    showToast(`⚡ Accepting #${reqItem.id}... Verifying availability in MongoDB`);
+    showToast(`⚡ Accepting #${reqItem.id}... Confirming order`);
 
     try {
       const json = await apiRequest(`/requests/${targetId}/accept`, {
@@ -205,6 +271,8 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
       });
 
       if (json.success) {
+        stopKitchenAlertSound();
+        window.dispatchEvent(new CustomEvent('tiffinlink:order-accepted', { detail: { id: targetId } }));
         setRequests(prev => prev.filter(r => r.id !== reqItem.id && r.dbId !== targetId));
         setAcceptedTodayCount(prev => prev + 1);
         showToast(`✓ ${reqItem.id} Accepted! Created Order & Assigned to Kitchen Prep Queue.`);
@@ -228,6 +296,8 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
 
   const handleDeclineRequest = async (reqItem) => {
     const targetId = reqItem.dbId || reqItem.id;
+    stopKitchenAlertSound();
+    window.dispatchEvent(new CustomEvent('tiffinlink:request-declined', { detail: { id: targetId } }));
     setRequests(prev => prev.filter(r => r.id !== reqItem.id && r.dbId !== targetId));
     showToast(`Request ${reqItem.id} passed. Updated live stream.`);
 
@@ -242,6 +312,43 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
     navigator.clipboard.writeText(text).then(() => {
       showToast(`Copied ${text} to clipboard!`);
     }).catch(() => {});
+  };
+
+  const openOfferModal = (reqItem) => {
+    setOfferModalRequest(reqItem);
+    setOfferPrice(reqItem.totalAmount || (reqItem.quantity * reqItem.budget) || 140);
+    setOfferPrepTime(25);
+    setOfferMessage('');
+  };
+
+  const handleSendOffer = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!offerModalRequest) return;
+    const targetId = offerModalRequest.dbId || offerModalRequest.id;
+    setSubmittingOffer(true);
+    try {
+      const res = await apiRequest(`/requests/${targetId}/offers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          price: Number(offerPrice),
+          readyTimeMinutes: Number(offerPrepTime),
+          message: offerMessage,
+          quantity: offerModalRequest.quantity || 1
+        })
+      });
+      if (res && res.success) {
+        setSentOffers(prev => new Set(prev).add(targetId));
+        showToast(`✓ Offer of ₹${offerPrice} sent to ${offerModalRequest.customerName}!`);
+        setOfferModalRequest(null);
+      } else {
+        showToast(`❌ ${res?.message || 'Failed to submit offer'}`);
+      }
+    } catch (err) {
+      showToast('❌ Error submitting offer');
+    } finally {
+      setSubmittingOffer(false);
+    }
   };
 
   // Filtering & Search
@@ -277,7 +384,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 z-[9999] bg-onyx-black text-bone-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 font-button-text text-button-text animate-bounce border border-sand-neutral/40">
-          <span className="material-symbols-outlined text-[18px] text-[#0A8B5F]">check_circle</span>
+          <span className="material-symbols-outlined text-[18px] text-bone-white">check_circle</span>
           <span className="font-bold">{toastMsg}</span>
         </div>
       )}
@@ -288,25 +395,14 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
           <span onClick={() => onNavigateTab && onNavigateTab('dashboard')} className="hover:text-on-surface transition-colors cursor-pointer">Provider</span>
           <span className="text-sand-neutral font-bold">•</span>
           <span className="text-on-surface font-semibold">Live Requests</span>
-          <span className="text-sand-neutral font-bold">•</span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-surface-container-low text-clay-earth border border-sand-neutral/30 font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-onyx-black animate-ping"></span>
-            Socket.IO Gateway Connected (WebSocket v4.7)
-          </span>
-          <span className="text-sand-neutral font-bold">•</span>
-          <span className="text-secondary font-mono">Latency: 18ms</span>
         </div>
 
-        {/* Auto-sync & Manual Refresh Control */}
+        {/* Refresh Control */}
         <div className="flex items-center gap-3 self-start md:self-auto">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-surface-container-low border border-sand-neutral/30">
-            <span className="w-2 h-2 rounded-full bg-onyx-black animate-pulse"></span>
-            <span className="font-label-caps text-[11px] text-secondary tracking-widest uppercase">Auto-sync: 4s</span>
-          </div>
           <button
             type="button"
             onClick={() => {
-              showToast('Synchronizing live requests with MongoDB node...');
+              showToast('Refreshed live requests feed');
               fetchLiveRequests(false);
             }}
             className="flex items-center gap-2 px-3.5 py-1.5 rounded bg-surface-container hover:bg-surface-container-highest transition-colors font-button-text text-button-text text-on-surface cursor-pointer border border-sand-neutral/30"
@@ -323,7 +419,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
           <div className="inline-flex items-center gap-2 font-label-caps text-[11px] uppercase tracking-[0.2em] text-secondary font-bold">
             <span>Real-time Order Dispatch</span>
             <span className="w-1 h-1 rounded-full bg-secondary"></span>
-            <span>Bodakdev Kitchen Rail</span>
+            <span>{currentUser?.kitchenName ? `${currentUser.kitchenName} Dispatch Rail` : 'Kitchen Dispatch Rail'}</span>
           </div>
           <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight font-normal">
             Live Delivery Requests
@@ -511,7 +607,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
           {loading ? (
             <div className="bg-surface-container-lowest rounded-2xl p-12 text-center border border-sand-neutral/40 shadow-xs space-y-3">
               <span className="material-symbols-outlined text-[32px] text-onyx-black animate-spin">refresh</span>
-              <h3 className="font-headline-md text-lg text-on-surface">Connecting to MongoDB Live Requests Feed...</h3>
+              <h3 className="font-headline-md text-lg text-on-surface">Connecting to Live Requests Feed...</h3>
               <p className="font-body-md text-xs text-secondary">Fetching active customer meal orders scoped to your kitchen.</p>
             </div>
           ) : filteredRequests.length === 0 ? (
@@ -522,7 +618,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
               <div className="space-y-1">
                 <h3 className="font-headline-md text-xl text-on-surface font-normal">No Live Requests</h3>
                 <p className="font-body-md text-xs text-secondary max-w-md mx-auto">
-                  All caught up! New delivery requests from nearby customer patrons will appear here automatically via WebSockets.
+                  All caught up! New delivery requests from nearby customer patrons will appear here automatically in real time.
                 </p>
               </div>
               <button
@@ -693,27 +789,43 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
                       Pass / Decline Request
                     </button>
 
-                    <div className="flex items-center gap-3 w-full sm:w-auto order-1 sm:order-2">
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto order-1 sm:order-2 flex-wrap">
                       <button
                         type="button"
                         onClick={() => setSelectedModalRequest(reqItem)}
-                        className="flex-1 sm:flex-initial px-5 py-2.5 rounded-lg bg-surface-container hover:bg-surface-container-highest transition-colors font-button-text text-button-text text-on-surface text-center cursor-pointer border border-sand-neutral/30 font-semibold"
+                        className="px-4 py-2.5 rounded-lg bg-surface-container hover:bg-surface-container-highest transition-colors font-button-text text-button-text text-on-surface text-center cursor-pointer border border-sand-neutral/30 font-semibold text-xs"
                       >
-                        View Details
+                        Details
                       </button>
+
+                      {sentOffers.has(reqItem.dbId || reqItem.id) ? (
+                        <span className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-surface-container text-onyx-black font-button-text text-xs font-bold border border-sand-neutral/40">
+                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                          Quote Sent
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openOfferModal(reqItem)}
+                          className="px-4 py-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container border border-sand-neutral/40 transition-colors font-button-text text-button-text text-on-surface text-center flex items-center justify-center gap-1.5 cursor-pointer text-xs font-semibold"
+                        >
+                          <span className="material-symbols-outlined text-[16px] text-clay-earth">local_offer</span>
+                          <span>Send Quote</span>
+                        </button>
+                      )}
 
                       <button
                         type="button"
                         disabled={actionLoadingId === reqItem.id}
                         onClick={() => handleAcceptRequest(reqItem)}
-                        className="flex-1 sm:flex-initial px-6 py-2.5 rounded-lg bg-onyx-black hover:bg-stone-800 transition-colors font-button-text text-button-text text-bone-white text-center flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+                        className="px-5 py-2.5 rounded-lg bg-onyx-black hover:bg-stone-800 transition-colors font-button-text text-button-text text-bone-white text-center flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50 text-xs"
                       >
                         {actionLoadingId === reqItem.id ? (
-                          <span className="material-symbols-outlined text-[18px] animate-spin">refresh</span>
+                          <span className="material-symbols-outlined text-[16px] animate-spin">refresh</span>
                         ) : (
-                          <span className="material-symbols-outlined text-[18px]">check</span>
+                          <span className="material-symbols-outlined text-[16px]">check</span>
                         )}
-                        <span>Accept Request</span>
+                        <span>Instant Accept</span>
                       </button>
                     </div>
                   </div>
@@ -803,7 +915,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
                   1
                 </div>
                 <p className="leading-relaxed">
-                  <strong className="text-on-surface font-semibold">Real-time Broadcast:</strong> When a customer orders nearby, requests stream directly via MongoDB & WebSockets.
+                  <strong className="text-on-surface font-semibold">Real-time Broadcast:</strong> When a customer orders nearby, requests appear instantly on your kitchen feed.
                 </p>
               </div>
 
@@ -890,7 +1002,7 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
                 <div className="flex justify-between"><span>Platform Fee & Transit</span><span className="text-on-surface font-semibold">- ₹{selectedModalRequest.platformFee}</span></div>
                 <div className="flex justify-between border-t border-sand-neutral/40 pt-2 font-bold text-on-surface text-sm">
                   <span>Estimated Kitchen Earnings</span>
-                  <span className="text-[#0A8B5F]">₹{selectedModalRequest.estimatedPayout}</span>
+                  <span className="text-onyx-black">₹{selectedModalRequest.estimatedPayout}</span>
                 </div>
               </div>
 
@@ -920,6 +1032,107 @@ export default function LiveRequestsTab({ currentUser, onNavigateTab, onAcceptRe
                 <span>Accept Request</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Quote / Custom Offer Modal */}
+      {offerModalRequest && (
+        <div className="fixed inset-0 bg-onyx-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest max-w-md w-full rounded-2xl border border-sand-neutral/50 shadow-2xl p-6 space-y-5 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-sand-neutral/40">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-clay-earth">local_offer</span>
+                <span className="font-label-caps text-label-caps font-bold uppercase text-on-surface">
+                  Send Kitchen Quote • #{offerModalRequest.id}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOfferModalRequest(null)}
+                className="p-1 text-secondary hover:text-on-surface rounded cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSendOffer} className="space-y-4">
+              <div className="p-3.5 bg-surface-container-low rounded-xl border border-sand-neutral/30 space-y-1">
+                <div className="font-bold text-on-surface text-sm">{offerModalRequest.mealType} ({offerModalRequest.quantity} {offerModalRequest.quantity === 1 ? 'Meal' : 'Meals'})</div>
+                <div className="text-secondary text-xs">Customer: {offerModalRequest.customerName} • Budget: ₹{offerModalRequest.totalAmount || offerModalRequest.budget}</div>
+                <div className="text-secondary text-xs">Delivery to: {offerModalRequest.customerAddress}</div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-label-caps text-[11px] uppercase tracking-wider text-secondary font-bold">
+                  Your Quoted Price (₹)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-on-surface">₹</span>
+                  <input
+                    type="number"
+                    min="50"
+                    max="10000"
+                    required
+                    value={offerPrice}
+                    onChange={(e) => setOfferPrice(e.target.value)}
+                    className="w-full pl-8 pr-4 py-2.5 bg-surface-container-low border border-sand-neutral/40 rounded-xl font-bold text-on-surface text-sm focus:outline-none focus:border-onyx-black"
+                    placeholder="Enter quoted price"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-label-caps text-[11px] uppercase tracking-wider text-secondary font-bold">
+                  Preparation Ready Time (Minutes)
+                </label>
+                <input
+                  type="number"
+                  min="10"
+                  max="120"
+                  required
+                  value={offerPrepTime}
+                  onChange={(e) => setOfferPrepTime(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-surface-container-low border border-sand-neutral/40 rounded-xl text-on-surface text-sm focus:outline-none focus:border-onyx-black"
+                  placeholder="Estimated minutes to prepare"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-label-caps text-[11px] uppercase tracking-wider text-secondary font-bold">
+                  Kitchen Message / Notes to Customer
+                </label>
+                <textarea
+                  rows="2"
+                  value={offerMessage}
+                  onChange={(e) => setOfferMessage(e.target.value)}
+                  placeholder="e.g. Freshly prepared with desi ghee and homemade pickle..."
+                  className="w-full px-4 py-2.5 bg-surface-container-low border border-sand-neutral/40 rounded-xl text-on-surface text-xs focus:outline-none focus:border-onyx-black resize-none"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-sand-neutral/40 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setOfferModalRequest(null)}
+                  className="px-4 py-2 rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-highest font-button-text text-button-text cursor-pointer text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingOffer}
+                  className="px-5 py-2.5 rounded-lg bg-onyx-black text-bone-white font-button-text text-button-text hover:bg-stone-800 transition-colors inline-flex items-center gap-2 cursor-pointer shadow-sm text-xs font-bold disabled:opacity-50"
+                >
+                  {submittingOffer ? (
+                    <span className="material-symbols-outlined text-[16px] animate-spin">refresh</span>
+                  ) : (
+                    <span className="material-symbols-outlined text-[16px]">send</span>
+                  )}
+                  <span>Submit Quote to Customer</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

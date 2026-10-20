@@ -82,13 +82,6 @@ const IncentivesBonusesView = () => {
             <span className="text-secondary text-xs">/</span>
             <span className="font-label-caps text-label-caps uppercase text-onyx-black tracking-wider">Incentives &amp; Bonuses</span>
           </div>
-          <div className="flex items-center gap-3 pt-1">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-surface-container-high text-onyx-black font-label-caps text-[11px] tracking-widest uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-              Socket.io Synced • Live Targets
-            </span>
-            <span className="font-label-caps text-[11px] text-secondary tracking-widest uppercase">Telemetry Port: :8443</span>
-          </div>
         </div>
 
         {/* Header Actions */}
@@ -100,7 +93,7 @@ const IncentivesBonusesView = () => {
             type="button"
           >
             <span className={`material-symbols-outlined text-[18px] ${refreshing ? 'animate-spin' : ''}`}>sync</span>
-            <span>{refreshing ? 'Syncing...' : 'Refresh Telemetry'}</span>
+            <span>{refreshing ? 'Refreshing...' : 'Refresh Incentives'}</span>
           </button>
           <button
             onClick={() => setShowRulesModal(true)}
@@ -186,7 +179,7 @@ const IncentivesBonusesView = () => {
             <div className="font-headline-md text-headline-md text-onyx-black tracking-tight mb-1">
               {formatCurrency(data.summary?.verifiedSettlements ?? 0)}
             </div>
-            <p className="font-label-caps text-[11px] text-emerald-800 uppercase tracking-wider font-semibold">100% Cryptographic Cleared</p>
+            <p className="font-label-caps text-[11px] text-emerald-800 uppercase tracking-wider font-semibold">Settled</p>
           </div>
           <div className="w-full bg-sand-neutral h-1">
             <div className="bg-emerald-700 h-1" style={{ width: `${(data.summary?.verifiedSettlements ?? 0) > 0 ? '100%' : '0%'}` }}></div>
@@ -270,7 +263,7 @@ const IncentivesBonusesView = () => {
       {loading ? (
         <div className="p-12 text-center bg-surface-container-lowest border border-sand-neutral mb-12">
           <span className="material-symbols-outlined text-[36px] text-secondary animate-spin mb-2 block">sync</span>
-          <p className="font-button-text text-onyx-black">Loading telemetry &amp; incentive rules...</p>
+          <p className="font-button-text text-onyx-black">Loading incentives &amp; bonus programs...</p>
         </div>
       ) : !data.hasData || (data.incentives || []).length === 0 ? (
         /* Empty State */
@@ -389,10 +382,10 @@ const IncentivesBonusesView = () => {
               <span className="material-symbols-outlined text-secondary text-[24px] flex-shrink-0 mt-0.5">info</span>
               <div>
                 <h4 className="font-button-text text-[14px] text-onyx-black font-semibold uppercase tracking-wider mb-1">
-                  Program Auto-Allocation
+                  Automatic Reward Allocation
                 </h4>
                 <p className="font-body-md text-[13px] text-on-surface-variant leading-relaxed">
-                  Eligible localized incentives and regional micro-surges automatically activate based on your GPS telemetry and live route density. No manual opt-in required for Tier 1 couriers.
+                  Eligible zone bonuses and peak hour rewards automatically activate based on your active delivery hub and trip milestones. No manual opt-in required for verified couriers.
                 </p>
               </div>
             </div>
@@ -532,8 +525,8 @@ const IncentivesBonusesView = () => {
                     <span className="text-onyx-black font-medium">{selectedIncentive.validUntil}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="font-label-caps text-[11px] uppercase">Trigger Engine:</span>
-                    <span className="text-onyx-black font-medium">Socket.IO Ledger Pipeline v2.4</span>
+                    <span className="font-label-caps text-[11px] uppercase">Verification Status:</span>
+                    <span className="text-onyx-black font-medium">Automated Order Verification</span>
                   </div>
                 </div>
 
@@ -573,23 +566,23 @@ const IncentivesBonusesView = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-button-text text-[13px] text-onyx-black font-semibold uppercase tracking-wider">Driver Telemetry Authenticated</span>
+              <span className="font-button-text text-[13px] text-onyx-black font-semibold uppercase tracking-wider">Verified Courier Partner</span>
               <span className="px-1.5 py-0.2 bg-surface-container-high text-onyx-black font-label-caps text-[10px]">
                 {data.driver?.id ? `#${data.driver.id}` : ''}
               </span>
             </div>
             <p className="font-body-md text-[12px] text-secondary">
-              Scoped directly to {data.driver?.name || 'Courier Partner'} ({data.driver?.tier || 'Tier 1 Courier'}). Progress calculations derived strictly from authenticated MongoDB delivery receipts &amp; GPS logs.
+              Assigned to {data.driver?.name || 'Courier Partner'} ({data.driver?.tier || 'Tier 1 Courier'}). Progress is calculated automatically from verified delivery completions.
             </p>
           </div>
         </div>
         <div className="flex items-center gap-4 text-secondary font-label-caps text-[11px] uppercase tracking-wider flex-shrink-0">
           <span className="flex items-center gap-1">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-600"></span>
-            GPS High Accuracy • 4m
+            Location Active
           </span>
           <span>•</span>
-          <span>Sync Latency: 42ms</span>
+          <span className="text-emerald-700 font-semibold">Dispatch Synced</span>
         </div>
       </div>
 

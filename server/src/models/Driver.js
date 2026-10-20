@@ -21,7 +21,15 @@ const driverSchema = new mongoose.Schema({
   },
   rating: {
     type: Number,
-    default: 4.8
+    default: null
+  },
+  ratingCount: {
+    type: Number,
+    default: 0
+  },
+  totalRatings: {
+    type: Number,
+    default: 0
   },
   vehicleNo: {
     type: String,

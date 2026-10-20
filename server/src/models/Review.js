@@ -74,7 +74,24 @@ const reviewSchema = new mongoose.Schema({
     type: Number,
     min: 1,
     max: 5,
-    default: 4
+    default: 5
+  },
+  driverId: {
+    type: String,
+    default: '',
+    index: true
+  },
+  driverName: {
+    type: String,
+    default: ''
+  },
+  driverEmail: {
+    type: String,
+    default: ''
+  },
+  deliveryComment: {
+    type: String,
+    default: ''
   },
   orderAmount: {
     type: Number,
@@ -86,7 +103,7 @@ const reviewSchema = new mongoose.Schema({
   },
   comment: {
     type: String,
-    required: true
+    default: ''
   },
   providerReply: {
     type: String,
@@ -108,5 +125,6 @@ const reviewSchema = new mongoose.Schema({
 reviewSchema.index({ providerId: 1, createdAt: -1 });
 reviewSchema.index({ providerId: 1, rating: -1 });
 reviewSchema.index({ providerId: 1, tiffinName: 1 });
+reviewSchema.index({ driverId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Review', reviewSchema);

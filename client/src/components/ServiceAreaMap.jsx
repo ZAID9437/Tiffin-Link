@@ -82,14 +82,14 @@ export default function ServiceAreaMap({
       }).addTo(map);
     }
 
-    // Kitchen Marker (Green Pulse)
+    // Kitchen Marker (Onyx Black Kitchen Hub)
     const kitchenIcon = L.divIcon({
       className: 'custom-kitchen-marker',
       html: `
         <div style="
           width: 32px; 
           height: 32px; 
-          background: #0A8B5F; 
+          background: #18181B; 
           color: white; 
           border-radius: 50%; 
           display: flex; 
@@ -97,7 +97,7 @@ export default function ServiceAreaMap({
           justify-content: center; 
           font-weight: 900; 
           font-size: 14px; 
-          box-shadow: 0 4px 14px rgba(10, 139, 95, 0.5); 
+          box-shadow: 0 4px 14px rgba(24, 24, 27, 0.4); 
           border: 3px solid white;
         ">🍱</div>
       `,
@@ -107,7 +107,7 @@ export default function ServiceAreaMap({
 
     L.marker([kitchenLat, kitchenLng], { icon: kitchenIcon })
       .addTo(map)
-      .bindPopup(`<b>🟢 ${kitchenName}</b><br/>Kitchen Delivery Hub`);
+      .bindPopup(`<b>${kitchenName}</b><br/>Kitchen Delivery Hub`);
 
     // Remove existing main circle
     if (circleRef.current) {
@@ -117,10 +117,10 @@ export default function ServiceAreaMap({
     // Main Service Radius Circle
     const radiusMeters = (radiusKm || 5) * 1000;
     const mainCircle = L.circle([kitchenLat, kitchenLng], {
-      color: '#0A8B5F',
-      fillColor: '#10B981',
-      fillOpacity: 0.2,
-      weight: 3,
+      color: '#18181B',
+      fillColor: '#18181B',
+      fillOpacity: 0.12,
+      weight: 2.5,
       dashArray: deliveryMode === 'Area Based' ? '6, 6' : null
     }).addTo(map);
 
@@ -160,7 +160,7 @@ export default function ServiceAreaMap({
           type="button"
           onClick={() => setMapLayer('roadmap')}
           className={`px-3 py-1 rounded-lg text-[11px] font-black cursor-pointer transition-all ${
-            mapLayer === 'roadmap' ? 'bg-[#0A8B5F] text-white shadow-xs' : 'text-[#6B7280] hover:bg-white'
+            mapLayer === 'roadmap' ? 'bg-onyx-black text-white shadow-xs' : 'text-[#6B7280] hover:bg-white'
           }`}
         >
           Roadmap
@@ -169,7 +169,7 @@ export default function ServiceAreaMap({
           type="button"
           onClick={() => setMapLayer('satellite')}
           className={`px-3 py-1 rounded-lg text-[11px] font-black cursor-pointer transition-all ${
-            mapLayer === 'satellite' ? 'bg-[#0A8B5F] text-white shadow-xs' : 'text-[#6B7280] hover:bg-white'
+            mapLayer === 'satellite' ? 'bg-onyx-black text-white shadow-xs' : 'text-[#6B7280] hover:bg-white'
           }`}
         >
           Satellite
@@ -179,7 +179,7 @@ export default function ServiceAreaMap({
       {/* Map Information Badge Overlay */}
       <div className="absolute bottom-3 left-3 z-20 bg-white/90 backdrop-blur-md px-3.5 py-2 rounded-xl border border-[#E5ECE8] shadow-md flex items-center gap-2 text-xs font-black">
         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-        <span className="text-[#111827]">Active Radius: <strong className="text-[#0A8B5F]">{radiusKm} KM Zone</strong></span>
+        <span className="text-[#111827]">Active Radius: <strong className="text-onyx-black">{radiusKm} KM Zone</strong></span>
       </div>
     </div>
   );

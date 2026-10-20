@@ -42,11 +42,20 @@ import LoginModal from './components/LoginModal';
 import DemoModal from './components/DemoModal';
 import CookieConsentModal from './components/CookieConsentModal';
 import CustomerDeliveryTrackingModal from './components/CustomerDeliveryTrackingModal';
+import RestaurantDeclineModal from './components/RestaurantDeclineModal';
 import CartDrawer from './components/CartDrawer';
+import { getSocket, joinCustomerRoom } from './services/socket';
 
 import { useAuth } from './context/AuthContext';
 import { clearAuthTokens, getCookie, setCookie, saveUserSession } from './services/api';
 import { CheckCircle2 } from 'lucide-react';
+
+// Themed Error Pages & Status Views (Matching exact TiffinLink landing page aesthetic)
+import ThemedErrorPage from './components/common/ThemedErrorPage';
+import OfflineBanner from './components/common/OfflineBanner';
+import ThemedAccountStatePage from './components/account/ThemedAccountStatePage';
+import ThemedPaymentResultView from './components/checkout/ThemedPaymentResultView';
+import ThemedLegalModal from './components/legal/ThemedLegalModal';
 
 export default function App() {
   const { currentUser, loading: authLoading, loginUser, logoutUser, updateUser } = useAuth();
@@ -81,51 +90,139 @@ export default function App() {
   const [isBecomeDeliveryPartnerModalOpen, setIsBecomeDeliveryPartnerModalOpen] = useState(false);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const [isCookieConsentModalOpen, setIsCookieConsentModalOpen] = useState(false);
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
+  const [legalModalDocId, setLegalModalDocId] = useState('privacy-policy');
   const [isCustomerTrackingModalOpen, setIsCustomerTrackingModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState('profile');
   const [hasActiveOrder, setHasActiveOrder] = useState(false);
   const [activeCustomerOrderId, setActiveCustomerOrderId] = useState('');
+  const [restaurantDeclineData, setRestaurantDeclineData] = useState(null);
+  const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false);
+  const prevActiveOrderRef = useRef('');
   const [preloaderFinished, setPreloaderFinished] = useState(false);
 
   const [searchFilters, setSearchFilters] = useState({});
 
+  const openLegalModal = useCallback((docId = 'privacy-policy') => {
+    setLegalModalDocId(docId);
+    setIsLegalModalOpen(true);
+  }, []);
+
   const openLoginModal = useCallback((mode = 'login', role = 'customer') => {
+    if (mode === 'signup' && role === 'provider') {
+      setIsBecomeProviderModalOpen(true);
+      return;
+    }
+    if (mode === 'signup' && role === 'delivery') {
+      setIsBecomeDeliveryPartnerModalOpen(true);
+      return;
+    }
     setLoginModalMode(mode);
     setLoginModalRole(role);
     setIsLoginModalOpen(true);
   }, []);
 
-  // Centralized Route Resolution & Route Protection Guard (Requirement 1, 5 & 6)
+  // Centralized Route Resolution & Route Protection Guard (Section 4 & 12 Specification)
   const resolveRoute = useCallback((hash, user, isAuthRestoring = false) => {
     const rawRole = (user?.role || '').toLowerCase();
     const cleanHash = (hash || (typeof window !== 'undefined' ? window.location.hash : '') || '').toLowerCase();
+    const [baseHash] = cleanHash.split('?');
+
+    // Legal & Policy Direct Route Mapping (Checklist Section 6 & 1)
+    const legalHashMapping = {
+      '#privacy': 'privacy-policy',
+      '#privacy-policy': 'privacy-policy',
+      '#/privacy': 'privacy-policy',
+      '#terms': 'terms',
+      '#terms-and-conditions': 'terms',
+      '#/terms': 'terms',
+      '#cookie-policy': 'cookie-policy',
+      '#cookies': 'cookie-policy',
+      '#cancellation-refund-policy': 'cancellation-refund-policy',
+      '#refund-policy': 'cancellation-refund-policy',
+      '#delivery-policy': 'delivery-policy',
+      '#pricing-policy': 'pricing-commission-policy',
+      '#pricing-commission-policy': 'pricing-commission-policy',
+      '#food-safety-disclaimer': 'food-safety-disclaimer',
+      '#community-guidelines': 'community-guidelines',
+      '#customer-terms': 'customer-terms',
+      '#provider-agreement': 'provider-agreement',
+      '#delivery-partner-agreement': 'delivery-partner-agreement',
+      '#driver-agreement': 'delivery-partner-agreement',
+      '#corporate-terms': 'corporate-terms',
+      '#group-hostel-terms': 'group-hostel-terms',
+      '#provider-subscription-terms': 'provider-subscription-terms'
+    };
+
+    if (legalHashMapping[baseHash]) {
+      openLegalModal(legalHashMapping[baseHash]);
+      return 'home';
+    }
+
+    // 0. EXPLICIT ERROR HASHES CANNOT BE ACCESSED VIA URL (Requirement: Error pages only appear on real system/network failure)
+    const blockedErrorHashes = [
+      '#404', '#/404', '#not-found', '#/not-found',
+      '#401', '#/401', '#session-expired', '#/session-expired',
+      '#403', '#/403', '#access-denied', '#/access-denied',
+      '#500', '#/500', '#server-error', '#/server-error',
+      '#503', '#/503', '#maintenance', '#/maintenance',
+      '#offline', '#/offline'
+    ];
+    if (blockedErrorHashes.includes(baseHash)) {
+      if (typeof window !== 'undefined' && window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+      return 'home';
+    }
+
+    if (baseHash.startsWith('#payment-result') || baseHash.startsWith('#/payment-result') || baseHash.startsWith('#order-result') || baseHash.startsWith('#/order-result') || baseHash.startsWith('#order-confirmation')) return 'payment-result';
+
+    const validHomeAnchors = [
+      '',
+      '#',
+      '#home',
+      '#/home',
+      '#hero',
+      '#meal-request',
+      '#stats',
+      '#why-choose',
+      '#food-safety',
+      '#story',
+      '#contact',
+      '#pricing',
+      '#top-providers',
+      '#categories',
+      '#spices',
+      '#about'
+    ];
 
     // 1. BEFORE LOGIN (Logged Out State - Requirement 1)
     if (!user) {
       // If auth session is still restoring from MongoDB/JWT, PRESERVE hash and avoid wiping history or opening modals
       if (isAuthRestoring) {
-        if (cleanHash.startsWith('#orders') || cleanHash.startsWith('#my-orders') || cleanHash.startsWith('#active-orders') || cleanHash.startsWith('#track-order')) return 'orders';
-        if (cleanHash.startsWith('#/provider') || cleanHash.startsWith('#provider')) return 'provider';
-        if (cleanHash.startsWith('#/delivery') || cleanHash.startsWith('#delivery')) return 'delivery';
-        if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin')) return 'admin';
-        if (cleanHash.startsWith('#find-tiffin') || cleanHash.startsWith('#order-tiffin')) return 'find-tiffin';
+        if (baseHash.startsWith('#orders') || baseHash.startsWith('#my-orders') || baseHash.startsWith('#active-orders') || baseHash.startsWith('#track-order') || baseHash.startsWith('#custom-quotes') || baseHash.startsWith('#meal-quotes') || baseHash.startsWith('#upcoming-tiffins') || baseHash.startsWith('#order-history') || baseHash.startsWith('#cancelled-orders')) return 'orders';
+        if (baseHash.startsWith('#/provider') || baseHash.startsWith('#provider')) return 'provider';
+        if (baseHash.startsWith('#/delivery') || baseHash.startsWith('#delivery')) return 'delivery';
+        if (baseHash.startsWith('#/admin') || baseHash.startsWith('#admin')) return 'admin';
+        if (baseHash.startsWith('#find-tiffin') || baseHash.startsWith('#order-tiffin')) return 'find-tiffin';
+        if (validHomeAnchors.includes(baseHash)) return 'home';
         return 'home';
       }
 
       // Guard Protected URLs: Directly entering protected URLs must NOT expose private panels
-      if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin')) {
+      if (baseHash.startsWith('#/admin') || baseHash.startsWith('#admin')) {
         if (typeof window !== 'undefined') window.history.replaceState(null, '', window.location.pathname);
         openLoginModal('login', 'admin');
         showToastNotification('Administrator authentication required to access Super Admin dashboard.');
         return 'home';
       }
       if (
-        cleanHash.startsWith('#/provider') || 
-        cleanHash.startsWith('#provider') || 
-        cleanHash.startsWith('#my-tiffins') || 
-        cleanHash.startsWith('#provider-orders') || 
-        cleanHash.startsWith('#provider-earnings')
+        baseHash.startsWith('#/provider') || 
+        baseHash.startsWith('#provider') || 
+        baseHash.startsWith('#my-tiffins') || 
+        baseHash.startsWith('#provider-orders') || 
+        baseHash.startsWith('#provider-earnings')
       ) {
         if (typeof window !== 'undefined') window.history.replaceState(null, '', '#for-providers');
         openLoginModal('login', 'provider');
@@ -133,10 +230,10 @@ export default function App() {
         return 'provider'; // Renders ProviderLanding (public)
       }
       if (
-        cleanHash.startsWith('#/delivery') || 
-        cleanHash.startsWith('#delivery') || 
-        cleanHash.startsWith('#my-deliveries') || 
-        cleanHash.startsWith('#delivery-earnings')
+        baseHash.startsWith('#/delivery') || 
+        baseHash.startsWith('#delivery') || 
+        baseHash.startsWith('#my-deliveries') || 
+        baseHash.startsWith('#delivery-earnings')
       ) {
         if (typeof window !== 'undefined') window.history.replaceState(null, '', '#for-deliverers');
         openLoginModal('login', 'delivery');
@@ -144,13 +241,15 @@ export default function App() {
         return 'delivery'; // Renders DeliveryLanding (public)
       }
       if (
-        cleanHash.startsWith('#orders') || 
-        cleanHash.startsWith('#my-orders') || 
-        cleanHash.startsWith('#active-orders') || 
-        cleanHash.startsWith('#track-order') || 
-        cleanHash.startsWith('#upcoming-tiffins') || 
-        cleanHash.startsWith('#order-history') || 
-        cleanHash.startsWith('#cancelled-orders')
+        baseHash.startsWith('#orders') || 
+        baseHash.startsWith('#my-orders') || 
+        baseHash.startsWith('#active-orders') || 
+        baseHash.startsWith('#track-order') || 
+        baseHash.startsWith('#custom-quotes') || 
+        baseHash.startsWith('#meal-quotes') || 
+        baseHash.startsWith('#upcoming-tiffins') || 
+        baseHash.startsWith('#order-history') || 
+        baseHash.startsWith('#cancelled-orders')
       ) {
         if (typeof window !== 'undefined') window.history.replaceState(null, '', '#find-tiffin');
         openLoginModal('login', 'customer');
@@ -159,9 +258,19 @@ export default function App() {
       }
 
       // Allowed Public Routes
-      if (cleanHash.startsWith('#for-providers') || cleanHash.startsWith('#provider-landing')) return 'provider';
-      if (cleanHash.startsWith('#for-deliverers') || cleanHash.startsWith('#delivery-landing')) return 'delivery';
-      if (cleanHash.startsWith('#find-tiffin') || cleanHash.startsWith('#order-tiffin') || cleanHash.startsWith('#for-diners')) return 'find-tiffin';
+      if (baseHash.startsWith('#for-providers') || baseHash.startsWith('#provider-landing')) return 'provider';
+      if (baseHash.startsWith('#for-deliverers') || baseHash.startsWith('#delivery-landing')) return 'delivery';
+      if (baseHash.startsWith('#find-tiffin') || baseHash.startsWith('#order-tiffin') || baseHash.startsWith('#for-diners')) return 'find-tiffin';
+      if (validHomeAnchors.includes(baseHash)) return 'home';
+
+      // Unrecognized path in URL safely defaults to home rather than exposing error pages
+      if (baseHash.startsWith('#')) {
+        if (typeof window !== 'undefined' && window.location.hash) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        return 'home';
+      }
+
       return 'home';
     }
 
@@ -172,7 +281,7 @@ export default function App() {
 
     // 3. PROVIDER ROLE (Requirement 3 & 5)
     if (rawRole === 'provider') {
-      if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin') || cleanHash.startsWith('#delivery') || cleanHash.startsWith('#orders')) {
+      if (baseHash.startsWith('#/admin') || baseHash.startsWith('#admin') || baseHash.startsWith('#delivery') || baseHash.startsWith('#orders')) {
         if (typeof window !== 'undefined') window.history.replaceState(null, '', '#provider');
         showToastNotification('Access restricted: Your account is authorized as a Kitchen Provider.');
       }
@@ -181,7 +290,7 @@ export default function App() {
 
     // 4. DELIVERY PARTNER / DRIVER ROLE (Requirement 3 & 5)
     if (rawRole === 'delivery' || rawRole === 'driver' || rawRole === 'deliverer' || rawRole === 'delivery_partner') {
-      if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin') || cleanHash.startsWith('#provider') || cleanHash.startsWith('#orders')) {
+      if (baseHash.startsWith('#/admin') || baseHash.startsWith('#admin') || baseHash.startsWith('#provider') || baseHash.startsWith('#orders')) {
         if (typeof window !== 'undefined') window.history.replaceState(null, '', '#delivery');
         showToastNotification('Access restricted: Your account is authorized as a Delivery Partner.');
       }
@@ -189,36 +298,48 @@ export default function App() {
     }
 
     // 5. CUSTOMER / DINER ROLE (Requirement 3 & 5)
-    if (cleanHash.startsWith('#/admin') || cleanHash.startsWith('#admin')) {
+    if (baseHash.startsWith('#/admin') || baseHash.startsWith('#admin')) {
       if (typeof window !== 'undefined') window.history.replaceState(null, '', '#find-tiffin');
       showToastNotification('Access denied: Administrator privileges required.');
       return 'find-tiffin';
     }
-    if (cleanHash.startsWith('#/provider') || cleanHash.startsWith('#provider')) {
+    if (baseHash.startsWith('#/provider') || baseHash.startsWith('#provider')) {
       if (typeof window !== 'undefined') window.history.replaceState(null, '', '#find-tiffin');
       showToastNotification('Access denied: Kitchen Provider account required.');
       return 'find-tiffin';
     }
-    if (cleanHash.startsWith('#/delivery') || cleanHash.startsWith('#delivery')) {
+    if (baseHash.startsWith('#/delivery') || baseHash.startsWith('#delivery')) {
       if (typeof window !== 'undefined') window.history.replaceState(null, '', '#find-tiffin');
       showToastNotification('Access denied: Delivery Partner account required.');
       return 'find-tiffin';
     }
 
     if (
-      cleanHash.startsWith('#orders') || 
-      cleanHash.startsWith('#my-orders') || 
-      cleanHash.startsWith('#active-orders') || 
-      cleanHash.startsWith('#track-order') || 
-      cleanHash.startsWith('#upcoming-tiffins') || 
-      cleanHash.startsWith('#order-history') || 
-      cleanHash.startsWith('#cancelled-orders')
+      baseHash.startsWith('#orders') || 
+      baseHash.startsWith('#my-orders') || 
+      baseHash.startsWith('#active-orders') || 
+      baseHash.startsWith('#track-order') || 
+      baseHash.startsWith('#custom-quotes') || 
+      baseHash.startsWith('#meal-quotes') || 
+      baseHash.startsWith('#upcoming-tiffins') || 
+      baseHash.startsWith('#order-history') || 
+      baseHash.startsWith('#cancelled-orders')
     ) {
       return 'orders';
     }
 
-    if (cleanHash.startsWith('#find-tiffin') || cleanHash.startsWith('#order-tiffin') || cleanHash.startsWith('#for-diners')) {
+    if (baseHash.startsWith('#find-tiffin') || baseHash.startsWith('#order-tiffin') || baseHash.startsWith('#for-diners')) {
       return 'find-tiffin';
+    }
+
+    if (validHomeAnchors.includes(baseHash)) return 'home';
+
+    // Unrecognized hash in URL safely defaults to home rather than exposing error pages
+    if (baseHash.startsWith('#')) {
+      if (typeof window !== 'undefined' && window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+      return 'home';
     }
 
     return 'home';
@@ -234,10 +355,76 @@ export default function App() {
     return resolveRoute(typeof window !== 'undefined' ? window.location.hash : '', initialUser, true);
   });
 
-  // Reset scroll position to starting point whenever view changes
+  // Active runtime system/network error state (ONLY displayed when a real error occurs)
+  const [activeError, setActiveError] = useState(null);
+
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [view]);
+    const handleAppError = (event) => {
+      if (event && event.detail) {
+        setActiveError(event.detail);
+      }
+    };
+    const handleClearAppError = () => {
+      setActiveError(null);
+    };
+    const handleSessionExpired = () => {
+      setActiveError({ status: 401 });
+    };
+
+    window.addEventListener('tiffinlink:app-error', handleAppError);
+    window.addEventListener('tiffinlink:clear-app-error', handleClearAppError);
+    window.addEventListener('tiffinlink:session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('tiffinlink:app-error', handleAppError);
+      window.removeEventListener('tiffinlink:clear-app-error', handleClearAppError);
+      window.removeEventListener('tiffinlink:session-expired', handleSessionExpired);
+    };
+  }, []);
+
+  // Bulletproof Scroll-to-Top helper for instant top alignment
+  const scrollToTop = useCallback(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+
+    // Subsequent animation frame tick to handle post-render DOM height changes
+    requestAnimationFrame(() => {
+      try {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      } catch {
+        window.scrollTo(0, 0);
+      }
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    });
+
+    setTimeout(() => {
+      try {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      } catch {
+        window.scrollTo(0, 0);
+      }
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    }, 40);
+  }, []);
+
+  // Prevent browser from restoring bottom/footer scroll position
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    scrollToTop();
+  }, [scrollToTop]);
+
+  // Reset scroll position to top whenever view changes
+  useEffect(() => {
+    scrollToTop();
+  }, [view, scrollToTop]);
 
   // Sync route whenever user session or hash changes
   useEffect(() => {
@@ -252,11 +439,12 @@ export default function App() {
       if (!authLoading) {
         const targetView = resolveRoute(window.location.hash, currentUser);
         setView(targetView);
+        scrollToTop();
       }
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [currentUser, authLoading, resolveRoute]);
+  }, [currentUser, authLoading, resolveRoute, scrollToTop]);
 
   // Handle Login Success: Authoritative Database Role Redirection (Requirement 2 & 3)
   const handleLoginSuccess = async (userObj, accessToken, refreshToken) => {
@@ -301,19 +489,76 @@ export default function App() {
     showToastNotification('You have been signed out.');
   };
 
+  // Centralized Session Expiry listener (Section 4.2 Specification)
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      openLoginModal('login', 'customer');
+      showToastNotification('Your session has expired. Please sign in again.');
+    };
+    window.addEventListener('tiffinlink:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('tiffinlink:session-expired', handleSessionExpired);
+  }, [openLoginModal, showToastNotification]);
 
-  // Sync active order for logged-in Diner/Customer from MongoDB
+  // Sync active order and real-time decline events for logged-in Diner/Customer
   useEffect(() => {
     if (!currentUser || currentUser.role === 'provider' || currentUser.role === 'delivery') {
       setHasActiveOrder(false);
       setActiveCustomerOrderId('');
+      prevActiveOrderRef.current = '';
       return;
     }
+
+    const customerId = currentUser.id || currentUser._id;
+    const email = currentUser.email || '';
+
+    // Join Customer-specific Socket room for real-time order & request updates
+    joinCustomerRoom(customerId, email);
+
+    const handleOrderDeclined = (data) => {
+      if (!data) return;
+      setRestaurantDeclineData({
+        orderId: data.orderId || prevActiveOrderRef.current || 'TL-ORDER',
+        providerName: data.providerName || 'Kitchen Partner',
+        tiffinName: data.tiffinName || 'Tiffin Meal',
+        cancellationReason: data.cancellationReason || 'The kitchen is at peak preparation capacity and cannot accept this order right now.',
+        totalAmount: data.totalAmount || 0,
+        refundNotice: data.refundNotice || '100% Escrow Refund Recredited to Source Account'
+      });
+      setIsDeclineModalOpen(true);
+      setHasActiveOrder(false);
+      setActiveCustomerOrderId('');
+      prevActiveOrderRef.current = '';
+      showToastNotification(`⚠️ ${data.providerName || 'Kitchen'} was unable to accept your order. 100% refunded.`);
+    };
+
+    const handleRequestDeclined = (data) => {
+      if (!data) return;
+      setRestaurantDeclineData({
+        orderId: data.requestId || 'REQ-CUSTOM',
+        providerName: data.providerName || 'Kitchen Partner',
+        tiffinName: data.mealType ? `${data.mealType} Meal Request` : 'Custom Meal Request',
+        cancellationReason: data.reason || 'The kitchen was unable to fulfill your custom meal request at this time.',
+        totalAmount: 0,
+        refundNotice: 'No payment deducted for unaccepted requests.'
+      });
+      setIsDeclineModalOpen(true);
+      showToastNotification(`⚠️ Custom request declined by kitchen.`);
+    };
+
+    const handleStatusUpdated = (data) => {
+      if (data && (String(data.status).toLowerCase() === 'cancelled' || String(data.status).toLowerCase() === 'rejected') && data.cancelledBy === 'Provider') {
+        handleOrderDeclined(data);
+      }
+    };
+
+    const socket = getSocket();
+    socket.on('order:declined', handleOrderDeclined);
+    socket.on('order:status:updated', handleStatusUpdated);
+    socket.on('request:declined', handleRequestDeclined);
 
     const checkActiveOrder = async () => {
       try {
         const token = localStorage.getItem('tiffinlink_access_token') || localStorage.getItem('token') || localStorage.getItem('tiffinlink_token') || '';
-        const email = currentUser?.email || '';
         const headers = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -322,12 +567,35 @@ export default function App() {
         if (json.success && Array.isArray(json.data)) {
           const terminal = ['delivered', 'completed', 'cancelled', 'rejected', 'failed', 'payment_failed', 'delivery_failed'];
           const active = json.data.find(o => !terminal.includes(String(o.status || '').toLowerCase().trim()));
+
+          // Check if previously tracked active order was declined while diner was on another view or disconnected
+          if (prevActiveOrderRef.current && !active) {
+            const declinedOrder = json.data.find(o => 
+              (o.orderId === prevActiveOrderRef.current || o._id === prevActiveOrderRef.current) &&
+              (String(o.status || '').toLowerCase() === 'cancelled' || String(o.status || '').toLowerCase() === 'rejected') &&
+              (o.cancelledBy === 'Provider' || o.cancellationReason)
+            );
+            if (declinedOrder && !isDeclineModalOpen) {
+              handleOrderDeclined({
+                orderId: declinedOrder.orderId || prevActiveOrderRef.current,
+                providerName: declinedOrder.providerName || 'Kitchen Partner',
+                tiffinName: declinedOrder.tiffinName || 'Tiffin Meal',
+                cancellationReason: declinedOrder.cancellationReason || 'The kitchen is at peak preparation capacity and cannot accept this order right now.',
+                totalAmount: declinedOrder.totalAmount || 0,
+                refundNotice: '100% Escrow Refund Recredited to Source Account'
+              });
+            }
+          }
+
           if (active) {
             setHasActiveOrder(true);
-            setActiveCustomerOrderId(active.orderId || active._id);
+            const activeId = active.orderId || active._id;
+            setActiveCustomerOrderId(activeId);
+            prevActiveOrderRef.current = activeId;
           } else {
             setHasActiveOrder(false);
             setActiveCustomerOrderId('');
+            prevActiveOrderRef.current = '';
           }
         }
       } catch (err) {
@@ -337,8 +605,13 @@ export default function App() {
 
     checkActiveOrder();
     const interval = setInterval(checkActiveOrder, 4000);
-    return () => clearInterval(interval);
-  }, [currentUser]);
+    return () => {
+      clearInterval(interval);
+      socket.off('order:declined', handleOrderDeclined);
+      socket.off('order:status:updated', handleStatusUpdated);
+      socket.off('request:declined', handleRequestDeclined);
+    };
+  }, [currentUser, isDeclineModalOpen]);
 
 
 
@@ -388,11 +661,21 @@ export default function App() {
   // Setup Custom Cursor, Reveal on Scroll, Magnetic pull, and Parallax effects
   useEffect(() => {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isDashboard = !!(currentUser && (currentUser.role === 'provider' || currentUser.role === 'admin' || currentUser.role === 'delivery'));
 
     // 1. Spring-Physics Custom Cursor
     const cursor = document.getElementById('cursor');
     const follower = document.getElementById('cursor-follower');
     const cursorText = document.getElementById('cursor-text');
+
+    if (isDashboard) {
+      if (cursor) cursor.style.display = 'none';
+      if (follower) follower.style.display = 'none';
+      return;
+    } else {
+      if (cursor && !isMobile) cursor.style.display = '';
+      if (follower && !isMobile) follower.style.display = '';
+    }
 
     let mouseX = 0;
     let mouseY = 0;
@@ -605,7 +888,7 @@ export default function App() {
       scrollElements.forEach(el => observer.unobserve(el));
       textRevealElements.forEach(el => observer.unobserve(el));
     };
-  }, [view]);
+  }, [view, currentUser]);
 
 
 
@@ -625,6 +908,7 @@ export default function App() {
   if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'superadmin' || currentUser.role === 'super_admin')) {
     return (
       <div className="app-layout">
+        <OfflineBanner />
         <AdminDashboard currentUser={currentUser} onLogout={handleLogout} />
         <CookieConsentModal 
           isOpenOverride={isCookieConsentModalOpen}
@@ -641,8 +925,51 @@ export default function App() {
 
   // Only authenticated Provider can access Provider Kitchen Portal Dashboard
   if (currentUser && currentUser.role === 'provider') {
+    // Check if Provider Account is pending verification or audit
+    if (currentUser.status === 'pending' || currentUser.verificationStatus === 'pending') {
+      return (
+        <div className="app-layout">
+          <OfflineBanner />
+          <ThemedAccountStatePage 
+            stateKey="provider_pending"
+            user={currentUser}
+            onNavigateHome={handleLogout}
+            onOpenSupport={() => { window.location.hash = '#contact'; }}
+          />
+          {toast.show && (
+            <div className="fixed bottom-6 right-6 z-[9999] bg-[#1A1A1A] text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3 border border-[#333333]">
+              <CheckCircle2 className="text-emerald-400 shrink-0" size={20} />
+              <span className="text-sm font-medium">{toast.message}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Check if Provider Account is suspended or inactive
+    if (currentUser.status === 'suspended' || currentUser.isActive === false) {
+      return (
+        <div className="app-layout">
+          <OfflineBanner />
+          <ThemedAccountStatePage 
+            stateKey="suspended"
+            user={currentUser}
+            onNavigateHome={handleLogout}
+            onOpenSupport={() => { window.location.hash = '#contact'; }}
+          />
+          {toast.show && (
+            <div className="fixed bottom-6 right-6 z-[9999] bg-[#1A1A1A] text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3 border border-[#333333]">
+              <CheckCircle2 className="text-emerald-400 shrink-0" size={20} />
+              <span className="text-sm font-medium">{toast.message}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="app-layout">
+        <OfflineBanner />
         <ProviderDashboard 
           currentUser={currentUser} 
           onLogout={handleLogout} 
@@ -663,8 +990,51 @@ export default function App() {
 
   // Only authenticated Delivery Partner can access Delivery Dashboard
   if (currentUser && (currentUser.role === 'delivery' || currentUser.role === 'driver' || currentUser.role === 'deliverer' || currentUser.role === 'delivery_partner')) {
+    // Check if Delivery Partner is pending verification
+    if (currentUser.status === 'pending' || currentUser.verificationStatus === 'pending') {
+      return (
+        <div className="app-layout">
+          <OfflineBanner />
+          <ThemedAccountStatePage 
+            stateKey="delivery_pending"
+            user={currentUser}
+            onNavigateHome={handleLogout}
+            onOpenSupport={() => { window.location.hash = '#contact'; }}
+          />
+          {toast.show && (
+            <div className="fixed bottom-6 right-6 z-[9999] bg-[#1A1A1A] text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3 border border-[#333333]">
+              <CheckCircle2 className="text-emerald-400 shrink-0" size={20} />
+              <span className="text-sm font-medium">{toast.message}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Check if Delivery Partner is suspended
+    if (currentUser.status === 'suspended' || currentUser.isActive === false) {
+      return (
+        <div className="app-layout">
+          <OfflineBanner />
+          <ThemedAccountStatePage 
+            stateKey="suspended"
+            user={currentUser}
+            onNavigateHome={handleLogout}
+            onOpenSupport={() => { window.location.hash = '#contact'; }}
+          />
+          {toast.show && (
+            <div className="fixed bottom-6 right-6 z-[9999] bg-[#1A1A1A] text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3 border border-[#333333]">
+              <CheckCircle2 className="text-emerald-400 shrink-0" size={20} />
+              <span className="text-sm font-medium">{toast.message}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="app-layout">
+        <OfflineBanner />
         <DeliveryDashboard currentUser={currentUser} onLogout={handleLogout} />
         <CookieConsentModal 
           isOpenOverride={isCookieConsentModalOpen}
@@ -681,6 +1051,8 @@ export default function App() {
 
   return (
     <div className="app-layout">
+      {/* Global Real-Time Offline & Reconnection Banner */}
+      <OfflineBanner />
 
       {/* Original TiffinLink Cinematic Preloader Animation */}
       <Preloader onComplete={handlePreloaderComplete} />
@@ -696,6 +1068,14 @@ export default function App() {
         onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)} 
         onOpenBecomeDeliveryPartnerModal={() => setIsBecomeDeliveryPartnerModalOpen(true)}
         onOpenLogin={(mode, role) => {
+          if (mode === 'signup' && (role === 'provider' || (!role && view === 'provider'))) {
+            setIsBecomeProviderModalOpen(true);
+            return;
+          }
+          if (mode === 'signup' && (role === 'delivery' || (!role && view === 'delivery'))) {
+            setIsBecomeDeliveryPartnerModalOpen(true);
+            return;
+          }
           openLoginModal(mode || 'login', role || 'customer');
         }}
         onOpenTrackingModal={() => setIsCustomerTrackingModalOpen(true)}
@@ -704,14 +1084,46 @@ export default function App() {
           setIsProfileModalOpen(true);
         }}
         hasActiveOrder={hasActiveOrder}
-        currentView={view}
+        currentView={activeError ? String(activeError.status) : view}
         currentUser={currentUser}
         onLogout={handleLogout}
       />
 
-      {/* Main Sections */}
-      <main>
-        {view === 'provider' ? (
+      {/* Main Sections: If an actual runtime/system error occurred, render ThemedErrorPage */}
+      {activeError ? (
+        <ThemedErrorPage 
+          status={activeError.status || 500} 
+          errorId={activeError.errorId}
+          customTitle={activeError.title}
+          customDescription={activeError.message}
+          onNavigateHome={() => {
+            setActiveError(null);
+            setView('home');
+            window.location.hash = '#home';
+          }}
+          onOpenLogin={() => {
+            setActiveError(null);
+            openLoginModal('login', 'customer');
+          }}
+          onOpenContact={() => {
+            setActiveError(null);
+            setView('home');
+            window.location.hash = '#contact';
+          }}
+        />
+      ) : (
+        <main>
+          {view === 'payment-result' ? (
+          <ThemedPaymentResultView 
+            orderId={activeCustomerOrderId || (typeof window !== 'undefined' ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('orderId') : '')}
+            onViewOrder={(oId) => {
+              setActiveCustomerOrderId(oId);
+              setIsCustomerTrackingModalOpen(true);
+            }}
+            onNavigateHome={() => { setView('home'); window.location.hash = '#home'; }}
+            onExploreFood={() => { setView('find-tiffin'); window.location.hash = '#find-tiffin'; }}
+          />
+        ) : view === 'provider' ? (
           <ProviderLanding 
             onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)} 
             onOpenDemoModal={() => setIsDemoModalOpen(true)}
@@ -784,22 +1196,27 @@ export default function App() {
           </>
         )}
       </main>
+      )}
 
-      {/* Footer */}
-      <Footer 
-        onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)}
-        onOpenCookieConsentModal={() => setIsCookieConsentModalOpen(true)}
-      />
+      {/* Footer (Hidden on Error 500 Server Unreachable & Error 503 Maintenance views) */}
+      {(!activeError || (activeError.status !== 500 && activeError.status !== 503)) && (
+        <Footer 
+          onOpenBecomeProviderModal={() => setIsBecomeProviderModalOpen(true)}
+          onOpenCookieConsentModal={() => setIsCookieConsentModalOpen(true)}
+          onOpenLegalModal={openLegalModal}
+        />
+      )}
 
       {/* Interactive Modals */}
       <LoginModal 
         isOpen={isLoginModalOpen} 
         onClose={() => setIsLoginModalOpen(false)}
-        initialRole={loginModalRole || (view === 'provider' ? 'provider' : (view === 'delivery' ? 'delivery' : 'customer'))}
+        initialRole={loginModalRole || (loginModalMode === 'signup' ? 'customer' : (view === 'provider' ? 'provider' : (view === 'delivery' ? 'delivery' : 'customer')))}
         initialMode={loginModalMode}
         onOpenBecomeProviderModal={() => { setIsLoginModalOpen(false); setIsBecomeProviderModalOpen(true); }}
         onOpenBecomeDeliveryPartnerModal={() => { setIsLoginModalOpen(false); setIsBecomeDeliveryPartnerModalOpen(true); }}
         onLoginSuccess={handleLoginSuccess}
+        onOpenLegalModal={openLegalModal}
       />
 
       {/* Persistent Customer Cart Drawer */}
@@ -808,18 +1225,21 @@ export default function App() {
           setView('find-tiffin');
           window.location.hash = '#find-tiffin?checkout=true';
         }}
+        onOpenLegalModal={openLegalModal}
       />
 
       <BecomeProviderModal 
         isOpen={isBecomeProviderModalOpen} 
         onClose={() => setIsBecomeProviderModalOpen(false)}
         onSubmitSuccess={handleBecomeProviderSuccess}
+        onOpenLegalModal={openLegalModal}
       />
 
       <BecomeDeliveryPartnerModal 
         isOpen={isBecomeDeliveryPartnerModalOpen} 
         onClose={() => setIsBecomeDeliveryPartnerModalOpen(false)}
         onSubmitSuccess={handleBecomeDeliveryPartnerSuccess}
+        onOpenLegalModal={openLegalModal}
       />
 
       <DemoModal 
@@ -832,10 +1252,31 @@ export default function App() {
         onCloseOverride={() => setIsCookieConsentModalOpen(false)}
       />
 
+      {/* Comprehensive Legal, Policies & Agreements Viewer Modal */}
+      <ThemedLegalModal 
+        isOpen={isLegalModalOpen}
+        onClose={() => setIsLegalModalOpen(false)}
+        initialDocId={legalModalDocId}
+      />
+
       <CustomerDeliveryTrackingModal 
         isOpen={isCustomerTrackingModalOpen}
         onClose={() => setIsCustomerTrackingModalOpen(false)}
         initialOrderId={activeCustomerOrderId}
+      />
+
+      <RestaurantDeclineModal
+        isOpen={isDeclineModalOpen}
+        onClose={() => setIsDeclineModalOpen(false)}
+        declineData={restaurantDeclineData}
+        onFindAlternative={() => {
+          setView('find-tiffin');
+          window.location.hash = '#find-tiffin';
+        }}
+        onViewCancelledOrders={() => {
+          setView('orders');
+          window.location.hash = '#cancelled-orders';
+        }}
       />
 
       <UserProfileModal 
@@ -845,13 +1286,16 @@ export default function App() {
         currentUser={currentUser}
         onUpdateUser={updateUser}
         onLogout={handleLogout}
+        onOpenLegalModal={openLegalModal}
       />
 
       {/* Toast Alerts */}
-      <div className={`toast toast-success ${toast.show ? 'show' : ''}`}>
-        <CheckCircle2 className="text-emerald" size={20} />
-        <span>{toast.message}</span>
-      </div>
+      {toast.show && (
+        <div className="fixed bottom-6 right-6 z-[9999] bg-[#1A1A1A] text-white px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3 border border-[#333333]">
+          <CheckCircle2 className="text-emerald-400 shrink-0" size={20} />
+          <span className="text-sm font-medium">{toast.message}</span>
+        </div>
+      )}
     </div>
   );
 }

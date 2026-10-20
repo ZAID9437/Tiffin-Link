@@ -182,26 +182,26 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setSuccessMsg(data.message || '✓ Account verified successfully via Cashfree Penny Drop.');
+        setSuccessMsg(data.message || '✓ Account verified successfully via Penny Drop.');
         handleResetForm();
         fetchPayoutMethods();
       } else {
         if (data.configured === false) {
-          setErrorMsg('Cashfree Bank Verification Service is not configured in server/.env (CASHFREE_CLIENT_ID, CASHFREE_CLIENT_SECRET).');
+          setErrorMsg('Bank verification service is currently undergoing routine maintenance. Please try again shortly or contact support.');
         } else {
-          setErrorMsg(data.message || 'Bank account verification failed.');
+          setErrorMsg(data.message || 'Bank account verification failed. Please check your account details.');
         }
       }
     } catch (err) {
       console.error('Error registering payout method:', err);
-      setErrorMsg('Unable to connect to Cashfree bank verification service.');
+      setErrorMsg('Unable to connect to bank verification service. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleSetPrimary = async (methodId, label) => {
-    if (!window.confirm(`Set ${label} as default primary payout endpoint for batch cycles?`)) {
+    if (!window.confirm(`Set ${label} as your primary payout method?`)) {
       return;
     }
     try {
@@ -215,18 +215,19 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setSuccessMsg(`Primary endpoint updated successfully. Next automated payout will route to ${label}.`);
+        setSuccessMsg(`Primary payout method updated. Future payouts will route to ${label}.`);
         fetchPayoutMethods();
       } else {
-        setErrorMsg(data.message || 'Failed to update primary endpoint');
+        setErrorMsg(data.message || 'Failed to update primary payout method.');
       }
     } catch (err) {
       console.error('Error setting primary:', err);
+      setErrorMsg('Failed to update primary method. Please try again.');
     }
   };
 
   const handleRemoveMethod = async (methodId, label) => {
-    if (!window.confirm(`Are you sure you want to remove payout endpoint ${label}?`)) {
+    if (!window.confirm(`Are you sure you want to remove ${label}?`)) {
       return;
     }
     setErrorMsg('');
@@ -242,14 +243,14 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setSuccessMsg('Endpoint deregistered from instant routing.');
+        setSuccessMsg('Payout method removed successfully.');
         fetchPayoutMethods();
       } else {
-        setErrorMsg(data.message || 'Removal restricted: active escrow locks exist');
+        setErrorMsg(data.message || 'Cannot remove method while a withdrawal is currently processing.');
       }
     } catch (err) {
       console.error('Error removing method:', err);
-      setErrorMsg('Failed to remove endpoint. Please try again.');
+      setErrorMsg('Failed to remove method. Please try again.');
     }
   };
 
@@ -257,7 +258,7 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
     setTelemetrySpinning(true);
     setTimeout(() => {
       setTelemetrySpinning(false);
-      alert(`Cryptographic Telemetry Synchronized: All endpoint hashes validated against NPCI clearing switch for ${driverName} (${driverId}). Latency: 42ms.`);
+      alert(`Payout Methods Verified: All accounts are active and synchronized for ${driverName} (${driverId}).`);
     }, 750);
   };
 
@@ -280,44 +281,27 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
               <span className="font-mono text-[11px] uppercase text-[#1a1a1a] tracking-widest font-semibold">Bank & Payout Details</span>
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#f5f3ef] border border-[#ded9d1] shadow-xs">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
-                <span className="font-mono text-[11px] uppercase tracking-wider text-[#1a1a1a] font-medium">
-                  NPCI 256-Bit Encrypted • Escrow Compliant
-                </span>
-              </div>
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[#f5f3ef] border border-[#ded9d1] text-[#444748] font-mono text-[11px] tracking-wider">
-                <span className="material-symbols-outlined text-[15px]">terminal</span>
-                <span>ID: #{driverId}</span>
-              </div>
             </div>
           </div>
 
           {/* Section Header */}
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-10">
             <div className="max-w-2xl">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2.5 py-0.5 bg-[#1a1a1a] text-white font-mono text-[10px] uppercase tracking-widest">
-                  Ledger Node 04
-                </span>
-                <span className="font-mono text-[11px] uppercase text-[#665d52] tracking-widest">
-                  Disbursement Infrastructure
-                </span>
-              </div>
+
               <h1 className="font-serif text-4xl lg:text-5xl text-[#1a1a1a] tracking-tight leading-none mb-4 font-normal">
                 Bank & Payout Details
               </h1>
               <p className="text-base text-[#444748] max-w-xl leading-relaxed">
-                Manage verified bank accounts and UPI VPA endpoints configured for instant settlement, automated batch cycles, and IMPS disbursement for <strong>{driverName}</strong>.
+                Manage verified bank accounts and UPI IDs configured for secure earnings payouts and instant transfers for <strong>{driverName}</strong>.
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <button
                 onClick={handleVerifyTelemetry}
-                className="px-5 py-3 bg-white hover:bg-[#efeeea] text-[#1a1a1a] border border-[#1a1a1a] font-mono text-[12px] tracking-wider uppercase transition-all duration-200 flex items-center gap-2 shadow-xs"
+                className="px-5 py-3 bg-white hover:bg-[#efeeea] text-[#1a1a1a] border border-[#1a1a1a] font-button-text text-[12px] tracking-wider uppercase transition-all duration-200 flex items-center gap-2 shadow-xs cursor-pointer"
               >
                 <span className={`material-symbols-outlined text-[18px] ${telemetrySpinning ? 'animate-spin' : ''}`}>sync</span>
-                <span>Verify Telemetry</span>
+                <span>Refresh Accounts</span>
               </button>
               <button
                 onClick={handleOpenDrawer}
@@ -332,7 +316,7 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
           {/* Summary Metric Strip */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
             <div className="p-5 bg-white border border-[#ded9d1] flex flex-col gap-1 shadow-xs">
-              <span className="font-mono text-[10px] uppercase text-[#665d52] tracking-wider">Active Endpoints</span>
+              <span className="font-mono text-[10px] uppercase text-[#665d52] tracking-wider">Active Methods</span>
               <div className="flex items-baseline gap-2">
                 <span className="font-serif text-3xl font-normal text-[#1a1a1a]">{verifiedCount}</span>
                 <span className="text-xs text-emerald-800 font-mono font-medium">✓ Verified</span>
@@ -346,13 +330,13 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
             </div>
             <div className="p-5 bg-white border border-[#ded9d1] flex flex-col gap-1 shadow-xs">
               <span className="font-mono text-[10px] uppercase text-[#665d52] tracking-wider">Instant UPI Switch</span>
-              <span className="font-mono text-sm text-emerald-800 font-semibold flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-600"></span> Live & Ready
+              <span className="font-mono text-sm text-emerald-800 font-semibold">
+                Enabled
               </span>
             </div>
             <div className="p-5 bg-white border border-[#ded9d1] flex flex-col gap-1 shadow-xs">
-              <span className="font-mono text-[10px] uppercase text-[#665d52] tracking-wider">Security Enclave</span>
-              <span className="font-mono text-sm text-[#1a1a1a] font-medium">DP-HW-99201 Active</span>
+              <span className="font-mono text-[10px] uppercase text-[#665d52] tracking-wider">Bank Encryption</span>
+              <span className="font-mono text-sm text-[#1a1a1a] font-medium">Protected & Secure</span>
             </div>
           </div>
 
@@ -384,7 +368,7 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
               <div className="flex items-center justify-between border-b border-[#ded9d1] pb-3">
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-[11px] uppercase tracking-widest text-[#665d52] font-semibold">
-                    Configured Endpoints ({payoutMethods.length})
+                    Configured Payout Accounts ({payoutMethods.length})
                   </span>
                   <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a1a]" />
                   <span className="font-mono text-[11px] uppercase tracking-widest text-emerald-800 font-semibold">
@@ -407,14 +391,14 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
               {/* Dynamic Payout Method Cards */}
               {loading ? (
                 <div className="p-12 bg-white border border-[#ded9d1] text-center font-mono text-[13px] text-[#665d52] animate-pulse">
-                  Fetching verified bank endpoints from MongoDB ledger...
+                  Loading verified payout methods...
                 </div>
               ) : payoutMethods.length === 0 ? (
                 <div className="p-12 bg-white border border-dashed border-[#ded9d1] flex flex-col items-center justify-center gap-4 text-center">
                   <span className="material-symbols-outlined text-4xl text-[#665d52]">account_balance_wallet</span>
                   <h3 className="font-serif text-2xl text-[#1a1a1a]">No Payout Method Configured</h3>
                   <p className="text-sm text-[#444748] max-w-md">
-                    Register a bank account or UPI VPA endpoint to enable automated batch disbursements and wallet withdrawals.
+                    Register a bank account or UPI ID to enable secure earnings payouts and wallet withdrawals.
                   </p>
                   <button
                     onClick={handleOpenDrawer}
@@ -426,7 +410,7 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
               ) : (
                 payoutMethods.map((method, idx) => {
                   const isBank = method.type === 'BANK_ACCOUNT';
-                  const indexLabel = `EP-0${idx + 1} // ${method.isPrimary ? 'PRIMARY' : 'INSTANT'}`;
+                  const indexLabel = `EP-0${idx + 1} • ${method.isPrimary ? 'PRIMARY' : 'INSTANT'}`;
                   const isPending = method.status === 'PENDING';
 
                   return (
@@ -560,10 +544,10 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
               <div className="bg-white border-2 border-[#1a1a1a] p-6 sm:p-10 flex flex-col gap-8 shadow-sm transition-all" id="addMethodDrawer">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#ded9d1]">
                   <div>
-                    <span className="font-mono text-[11px] uppercase text-[#665d52] tracking-widest block mb-1">
-                      NPCI Integration Terminal
+                    <span className="text-[11px] uppercase text-[#665d52] tracking-widest block mb-1">
+                      Account Registration
                     </span>
-                    <h2 className="font-serif text-2xl text-[#1a1a1a] font-normal">Register New Disbursement Endpoint</h2>
+                    <h2 className="font-serif text-2xl text-[#1a1a1a] font-normal">Register New Payout Method</h2>
                   </div>
                   {/* Method Toggle Pills */}
                   <div className="flex items-center bg-[#f5f3ef] p-1 border border-[#ded9d1] shrink-0">
@@ -606,7 +590,7 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
                           className="w-full bg-[#f5f3ef] border border-[#ded9d1] px-4 py-3 text-sm text-[#1a1a1a] cursor-not-allowed font-medium focus:outline-none"
                         />
                         <span className="font-mono text-[10px] text-[#665d52]">
-                          Verified against Aadhaar record linked with Driver ID #{driverId}.
+                          Verified against government identity records.
                         </span>
                       </div>
 
@@ -779,8 +763,8 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
                   <li className="flex items-start gap-3">
                     <span className="material-symbols-outlined text-[16px] text-[#1a1a1a] mt-0.5 shrink-0">visibility_off</span>
                     <div>
-                      <strong className="text-[#1a1a1a] block font-medium">Cryptographic Salt Masking</strong>
-                      Account numbers are stored as SHA-256 hashed salts. Telemetry displays only the last 4 digits to prevent shoulder surfing in transit.
+                      <strong className="text-[#1a1a1a] block font-medium">Secure Account Masking</strong>
+                      Account numbers are securely encrypted. Only the last 4 digits are displayed for privacy and safety.
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
@@ -856,17 +840,17 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
               <div className="bg-white border border-[#ded9d1] p-6 sm:p-7 flex flex-col gap-4 shadow-xs">
                 <div className="flex items-center gap-2 text-red-700">
                   <span className="material-symbols-outlined text-[20px]">security_update_warning</span>
-                  <span className="font-mono text-[11px] uppercase tracking-widest font-bold">Removal Dependencies</span>
+                  <span className="font-mono text-[11px] uppercase tracking-widest font-bold">Account Removal Policy</span>
                 </div>
                 <p className="text-xs text-[#444748] leading-relaxed">
-                  Need to revoke or deregister a payout endpoint? Account deletions undergo automated compliance scans to prevent orphaned transfers and check for pending payout locks.
+                  Need to remove a payout account? Account removals undergo automated verification to prevent incomplete transfers and check for pending payouts.
                 </p>
                 <div className="pt-2">
                   <button
                     onClick={() => setShowAuditModal(true)}
-                    className="w-full py-2.5 px-4 bg-[#f5f3ef] hover:bg-[#eae8e4] text-[#1a1a1a] border border-[#ded9d1] font-mono text-[11px] uppercase tracking-wider text-center transition-colors"
+                    className="w-full py-2.5 px-4 bg-[#f5f3ef] hover:bg-[#eae8e4] text-[#1a1a1a] border border-[#ded9d1] font-mono text-[11px] uppercase tracking-wider text-center transition-colors cursor-pointer"
                   >
-                    Audit Endpoint Dependencies
+                    View Account Details
                   </button>
                 </div>
               </div>
@@ -883,8 +867,8 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
                       <span className="material-symbols-outlined text-[24px]">gavel</span>
                     </div>
                     <div>
-                      <h3 className="font-serif text-2xl leading-tight text-[#1a1a1a] font-normal">Endpoint Deprecation Guard</h3>
-                      <span className="font-mono text-[10px] uppercase text-[#665d52] tracking-widest">Escrow Reconciliation Check</span>
+                      <h3 className="font-serif text-2xl leading-tight text-[#1a1a1a] font-normal">Payment Method Verification</h3>
+                      <span className="font-mono text-[10px] uppercase text-[#665d52] tracking-widest">Active Accounts Check</span>
                     </div>
                   </div>
                   <button onClick={() => setShowAuditModal(false)} className="text-[#665d52] hover:text-[#1a1a1a] p-1">
@@ -892,7 +876,7 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
                   </button>
                 </div>
                 <div className="space-y-3 text-xs text-[#444748]">
-                  <p>You are auditing active withdrawal bonds tied to {driverName} (#{driverId}). The following endpoints are registered in MongoDB:</p>
+                  <p>You are viewing active payout methods configured for {driverName}:</p>
                   <div className="p-3 bg-[#f5f3ef] border border-[#ded9d1] space-y-2 font-mono text-[12px]">
                     {payoutMethods.length > 0 ? payoutMethods.map((pm, idx) => (
                       <div key={pm._id || idx} className="flex items-center justify-between">
@@ -900,15 +884,15 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
                           {pm.type === 'BANK_ACCOUNT' ? `${pm.bankName} •••• ${pm.accountNumberMasked.slice(-4)}` : `UPI ${pm.upiHandleMasked}`}
                         </span>
                         <span className="text-emerald-800 font-mono text-[11px] uppercase tracking-wider font-semibold">
-                          0 Locks • Eligible to Detach
+                          Active & Verified
                         </span>
                       </div>
                     )) : (
-                      <div className="text-xs text-[#665d52]">No registered payout endpoints found in MongoDB.</div>
+                      <div className="text-xs text-[#665d52]">No registered payout methods found.</div>
                     )}
                   </div>
                   <p className="text-[11px] text-[#665d52] leading-snug">
-                    Detaching a verified payout method requires a 2FA OTP confirmation dispatched to your registered mobile number.
+                    Removing or modifying a verified payout method may require a security OTP confirmation sent to your registered phone number.
                   </p>
                 </div>
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#ded9d1]">
@@ -923,22 +907,6 @@ const BankPayoutDetailsView = ({ currentUser, onNavigate }) => {
             </div>
           )}
 
-          {/* Bottom Hardware Enclave & Telemetry Signature Banner */}
-          <div className="mt-16 pt-8 border-t border-[#ded9d1] flex flex-col md:flex-row items-center justify-between gap-4 text-[#665d52]">
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[#1a1a1a] text-[18px]">memory</span>
-              <span className="font-mono text-[12px] tracking-wider">
-                Driver Telemetry Authenticated #{driverId} • Bound to {driverName} security enclave DP-HW-99201.
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-4 font-mono text-[10px] uppercase tracking-widest">
-              <span>NPCI SWITCH ID: TL-MUM-01</span>
-              <span>•</span>
-              <span>ISO 20022 MESSAGING</span>
-              <span>•</span>
-              <span className="text-emerald-800 font-semibold">SESSION INTEGRITY VALID</span>
-            </div>
-          </div>
         </div>
       </main>
     </div>

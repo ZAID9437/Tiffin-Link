@@ -140,7 +140,7 @@ const SPICE_ITEMS = [
 
 export default function HangingSpices() {
   const sectionRef = useRef(null);
-  const [hasStarted, setHasStarted] = useState(false);
+  const [hasStarted, setHasStarted] = useState(true);
   const [hoveredId, setHoveredId] = useState(null);
 
   useEffect(() => {
@@ -168,14 +168,14 @@ export default function HangingSpices() {
   return (
     <section 
       ref={sectionRef}
-      className="relative w-full h-[520px] bg-bone-white overflow-hidden border-y border-sand-neutral/30 flex flex-col pt-10 select-none"
+      className="relative w-full h-[520px] bg-bone-white overflow-hidden border-y border-sand-neutral/30 flex flex-col pt-8 select-none"
     >
-      {/* Decorative brass supporting beam */}
-      <div className="absolute top-0 left-8 right-8 h-[3px] bg-gradient-to-r from-clay-earth/20 via-clay-earth/65 to-clay-earth/20 rounded shadow-sm z-20" />
+      {/* Grid container holding the ropes & beam */}
+      <div className="relative flex-1 w-full max-w-[1100px] mx-auto px-4 mt-6">
+        {/* Solid Dark Brown Supporting Beam passing directly through rings */}
+        <div className="absolute top-0 left-2 right-2 h-[2.5px] bg-[#4B3621] dark:bg-[#D4AF37] rounded-full z-20" />
 
-      {/* Grid container holding the ropes */}
-      <div className="relative flex-1 w-full max-w-[1100px] mx-auto px-4 mt-2">
-        <div className="relative w-full h-full flex justify-around items-start pt-3">
+        <div className="relative w-full h-full flex justify-around items-start">
           {SPICE_ITEMS.map((item) => {
             const isHovered = hoveredId === item.id;
             const isHiddenClass = `${item.mobileHidden ? 'hidden' : 'flex'} ${item.tabletHidden ? 'md:hidden' : 'md:flex'} lg:flex`;
@@ -189,8 +189,8 @@ export default function HangingSpices() {
                   zIndex: isHovered ? 40 : 10
                 }}
               >
-                {/* Brass hook attachment ring */}
-                <div className="absolute top-0 -mt-[8px] w-2 h-2 rounded-full border border-clay-earth bg-bone-white z-20" />
+                {/* Ring hooked directly onto the beam */}
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-[#4B3621] dark:border-[#D4AF37] bg-[#DFD3C3] dark:bg-[#2A2016] -mt-[6px] z-20" />
 
                 {/* Swaying Rig */}
                 <div
@@ -204,30 +204,27 @@ export default function HangingSpices() {
                   onMouseEnter={() => setHoveredId(item.id)}
                   onMouseLeave={() => setHoveredId(null)}
                 >
-                  {/* Rope Line */}
+                  {/* Clean Solid Rope Cord (matching screenshot) */}
                   <div
-                    className="w-[1.2px] bg-gradient-to-b from-clay-earth to-[#5C4D3C] transition-all duration-[1400ms] cubic-bezier(0.19, 1, 0.22, 1) relative"
+                    className="w-[2px] bg-[#4B3621] dark:bg-[#D4AF37] transition-all duration-[1400ms] cubic-bezier(0.19, 1, 0.22, 1) relative rounded-full"
                     style={{
                       height: hasStarted ? `${item.length}px` : '0px',
                       transitionDelay: `${item.swayDelay}s`
                     }}
-                  >
-                    {/* Fiber twist shadow */}
-                    <div className="absolute inset-y-0 left-0 w-full border-l border-dashed border-sand-neutral/30" />
-                  </div>
+                  />
 
-                  {/* Knot connector */}
+                  {/* Knot connector directly touching rope */}
                   <div 
-                    className="w-2.5 h-2.5 rounded-full bg-clay-earth border border-[#5C4D3C] -mt-[3px] transition-all duration-300 relative"
+                    className="w-2.5 h-2.5 rounded-full bg-[#4B3621] dark:bg-[#D4AF37] -mt-[1px] transition-all duration-300 relative z-20"
                     style={{
                       opacity: hasStarted ? 1 : 0,
                       transform: isHovered ? 'scale(1.2)' : 'scale(1)'
                     }}
                   />
 
-                  {/* Spices container with transparent background */}
+                  {/* Spices container seamlessly attached to the knot */}
                   <div 
-                    className="w-20 h-20 sm:w-22 sm:h-22 md:w-24 md:h-24 flex items-center justify-center p-1 cursor-pointer transition-all duration-[1000ms] relative mt-2 z-10"
+                    className="w-20 h-20 sm:w-22 sm:h-22 md:w-24 md:h-24 flex items-center justify-center p-0 cursor-pointer transition-all duration-[1000ms] relative -mt-3 z-10"
                     style={{
                       transform: isHovered ? 'scale(1.15) rotate(8deg)' : 'scale(1) rotate(0deg)',
                       opacity: hasStarted ? 1 : 0

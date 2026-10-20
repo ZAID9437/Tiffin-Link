@@ -1,17 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiRequest } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { getSocket } from '../services/socket';
 
 export default function ProviderDossier({
   provider,
   onBack,
-  onSelectTiffin
+  onSelectTiffin,
+  customerCoordinates,
+  customerAddress,
+  onOpenLogin,
+  currentUser
 }) {
+  const { currentUser: authUser } = useAuth();
+  const user = currentUser || authUser;
   const [dbProvider, setDbProvider] = useState(provider || null);
   const [tiffins, setTiffins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDetailsTiffin, setSelectedDetailsTiffin] = useState(null);
 
+  // Real-Time Reviews & Rating State
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewFilter, setReviewFilter] = useState('all');
+  const [reviewsStats, setReviewsStats] = useState(null);
+  const [liveRating, setLiveRating] = useState(provider?.rating || 0);
+  const [liveReviewCount, setLiveReviewCount] = useState(provider?.reviewCount || 0);
+
   const providerId = provider?._id || provider?.id;
+
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, []);
 
   useEffect(() => {
     const fetchDossierData = async () => {
@@ -19,9 +45,11 @@ export default function ProviderDossier({
         setLoading(true);
         if (!providerId) return;
 
-        // 1. Fetch live provider details
+        // 1. Fetch live provider details with real customer coordinates
         try {
-          const pRes = await apiRequest(`/providers/${providerId}`);
+          const uLat = customerCoordinates?.lat || 23.0300;
+          const uLng = customerCoordinates?.lng || 72.5178;
+          const pRes = await apiRequest(`/providers/${providerId}?lat=${uLat}&lng=${uLng}`);
           if (pRes?.success && pRes.data) {
             setDbProvider(pRes.data);
           }
@@ -46,20 +74,217 @@ export default function ProviderDossier({
     };
 
     fetchDossierData();
-  }, [providerId]);
+  }, [providerId, customerCoordinates?.lat, customerCoordinates?.lng]);
 
   const p = dbProvider || provider || {};
   const providerName = p.name || 'Kitchen Partner';
   const providerDesc = p.description || 'Authentic home-cooked meals prepared with care and fresh ingredients.';
-  const providerImg = p.image && p.image.startsWith('http') ? p.image : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
+  const dynamicKitchenPhoto = p.kitchenPhoto || p.kitchenPhotos || p.image;
+  const providerImg = dynamicKitchenPhoto || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
   const fssai = p.fssaiNumber || '—';
   const rating = p.rating || 0;
   const reviewCount = p.reviewCount || 0;
-  const distanceKm = p.distanceKm || 0;
+
+  // Sync initial live rating from provider object
+  useEffect(() => {
+    if (p.rating !== undefined && p.rating !== null) {
+      setLiveRating(Number(p.rating));
+    }
+    if (p.reviewCount !== undefined && p.reviewCount !== null) {
+      setLiveReviewCount(Number(p.reviewCount));
+    }
+  }, [p.rating, p.reviewCount]);
+
+  // Fetch real reviews with ratings and owner replies from MongoDB
+  const fetchReviews = useCallback(async () => {
+    if (!providerId) return;
+    try {
+      setReviewsLoading(true);
+      const res = await apiRequest(`/reviews?providerId=${providerId}&limit=50`);
+      if (res?.success && res.data) {
+        setReviews(res.data.reviews || []);
+        if (res.data.stats) {
+          setReviewsStats(res.data.stats);
+          if (res.data.stats.overallRating !== undefined) {
+            setLiveRating(Number(res.data.stats.overallRating));
+          }
+          if (res.data.stats.totalReviews !== undefined) {
+            setLiveReviewCount(Number(res.data.stats.totalReviews));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch reviews for provider:', err);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, [providerId]);
+
+  useEffect(() => {
+    fetchReviews();
+  }, [fetchReviews]);
+
+  // Real-time live synchronization for new reviews and owner replies
+  useEffect(() => {
+    if (!providerId) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const pIdStr = String(providerId);
+    socket.emit('join:provider', { providerId: pIdStr });
+
+    const handleNewReview = (payload) => {
+      if (!payload) return;
+      const targetPId = String(payload.providerId || payload.review?.providerId || '');
+      if (targetPId && targetPId !== pIdStr) return;
+
+      if (payload.providerRating !== undefined) {
+        setLiveRating(Number(payload.providerRating));
+      } else if (payload.rating !== undefined) {
+        setLiveRating(Number(payload.rating));
+      }
+
+      if (payload.providerReviewCount !== undefined) {
+        setLiveReviewCount(Number(payload.providerReviewCount));
+      } else if (payload.reviewCount !== undefined) {
+        setLiveReviewCount(Number(payload.reviewCount));
+      } else {
+        setLiveReviewCount(prev => prev + 1);
+      }
+
+      if (payload.review) {
+        setReviews(prev => {
+          if (prev.some(r => String(r._id) === String(payload.review._id))) return prev;
+          return [payload.review, ...prev];
+        });
+      } else {
+        fetchReviews();
+      }
+    };
+
+    const handleReviewReplied = (payload) => {
+      if (!payload) return;
+      const targetPId = String(payload.providerId || '');
+      if (targetPId && targetPId !== pIdStr) return;
+
+      const reviewId = String(payload.reviewId || payload.review?._id || '');
+      setReviews(prev => prev.map(r => {
+        if (String(r._id) === reviewId) {
+          return {
+            ...r,
+            providerReply: payload.providerReply || payload.review?.providerReply || r.providerReply,
+            repliedAt: payload.repliedAt || payload.review?.repliedAt || new Date(),
+            repliedBy: payload.repliedBy || payload.review?.repliedBy || r.repliedBy || providerName
+          };
+        }
+        return r;
+      }));
+    };
+
+    const handleRatingUpdated = (payload) => {
+      if (!payload) return;
+      const targetPId = String(payload.providerId || '');
+      if (targetPId && targetPId !== pIdStr) return;
+      if (payload.rating !== undefined) setLiveRating(Number(payload.rating));
+      if (payload.reviewCount !== undefined) setLiveReviewCount(Number(payload.reviewCount));
+    };
+
+    socket.on('review:new', handleNewReview);
+    socket.on('review:replied', handleReviewReplied);
+    socket.on('review:updated', handleReviewReplied);
+    socket.on('provider:rating:updated', handleRatingUpdated);
+
+    return () => {
+      socket.off('review:new', handleNewReview);
+      socket.off('review:replied', handleReviewReplied);
+      socket.off('review:updated', handleReviewReplied);
+      socket.off('provider:rating:updated', handleRatingUpdated);
+    };
+  }, [providerId, providerName, fetchReviews]);
+
+  // Review filtering for diner inspection
+  const filteredReviews = useMemo(() => {
+    if (reviewFilter === 'with_replies') {
+      return reviews.filter(r => r.providerReply && String(r.providerReply).trim() !== '');
+    }
+    if (reviewFilter === '5_star') {
+      return reviews.filter(r => Number(r.rating) === 5);
+    }
+    if (reviewFilter === '4_star') {
+      return reviews.filter(r => Number(r.rating) === 4);
+    }
+    return reviews;
+  }, [reviews, reviewFilter]);
+
+  // Dynamic Real-Time Sub-Metrics calculated from actual reviews
+  const subMetrics = useMemo(() => {
+    if (!reviews || reviews.length === 0) {
+      const fallback = liveRating && Number(liveRating) > 0 ? Number(liveRating).toFixed(1) : '0.0';
+      return {
+        foodQuality: fallback,
+        packaging: fallback,
+        delivery: fallback
+      };
+    }
+
+    const validFood = reviews.filter(r => r.foodQualityRating !== undefined || r.tasteRating !== undefined || r.rating !== undefined);
+    const validPack = reviews.filter(r => r.packagingRating !== undefined || r.rating !== undefined);
+    const validDeliv = reviews.filter(r => r.deliveryRating !== undefined || r.rating !== undefined);
+
+    const foodSum = validFood.reduce((acc, r) => acc + (Number(r.foodQualityRating || r.tasteRating || r.rating) || 5), 0);
+    const packSum = validPack.reduce((acc, r) => acc + (Number(r.packagingRating || r.rating) || 5), 0);
+    const delivSum = validDeliv.reduce((acc, r) => acc + (Number(r.deliveryRating || r.rating) || 5), 0);
+
+    return {
+      foodQuality: validFood.length > 0 ? (foodSum / validFood.length).toFixed(1) : (liveRating ? Number(liveRating).toFixed(1) : '0.0'),
+      packaging: validPack.length > 0 ? (packSum / validPack.length).toFixed(1) : (liveRating ? Number(liveRating).toFixed(1) : '0.0'),
+      delivery: validDeliv.length > 0 ? (delivSum / validDeliv.length).toFixed(1) : (liveRating ? Number(liveRating).toFixed(1) : '0.0')
+    };
+  }, [reviews, liveRating]);
+
+  // Dynamic Distance & Corridor Calculation
+  const distanceKm = useMemo(() => {
+    if (p.distanceKm && Number(p.distanceKm) > 0) {
+      return Number(p.distanceKm);
+    }
+    if (provider?.distanceKm && Number(provider.distanceKm) > 0) {
+      return Number(provider.distanceKm);
+    }
+    const pLat = p.address?.lat || p.location?.lat;
+    const pLng = p.address?.lng || p.location?.lng;
+    const uLat = customerCoordinates?.lat || 23.0300;
+    const uLng = customerCoordinates?.lng || 72.5178;
+    if (pLat && pLng && uLat && uLng) {
+      const R = 6371;
+      const dLat = (pLat - uLat) * (Math.PI / 180);
+      const dLon = (pLng - uLng) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(uLat * (Math.PI / 180)) * Math.cos(pLat * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const calculated = Number((R * c).toFixed(1));
+      if (calculated >= 0.8) return calculated;
+    }
+    return 1.8;
+  }, [p, provider, customerCoordinates]);
+
+  const etaMinutes = p.etaMinutes || Math.max(20, Math.round(15 + distanceKm * 5));
+  const etaText = p.eta || `${etaMinutes}–${etaMinutes + 10} MIN DELIVERY`;
+
+  // Dynamic Meal Type Detection
+  const isNonVeg = 
+    (p.businessType && /non-?veg/i.test(p.businessType)) ||
+    (p.cuisines && /non-?veg/i.test(p.cuisines)) ||
+    (p.cuisine && /non-?veg/i.test(p.cuisine)) ||
+    (p.tags && p.tags.some(t => /non-?veg/i.test(t)));
+  const mealTypeHeading = isNonVeg ? "VEG & NON-VEG" : "100%";
+  const mealTypeSub = isNonVeg ? "FRESH HOMESTYLE MEALS" : "PURE VEG HOME COOKED";
+
   const locality = p.address?.locality || p.city || 'Local Area';
   const street = p.address?.street || (typeof p.address === 'string' ? p.address : '') || 'Kitchen Address';
   const phone = p.mobile || p.phone || '—';
-  const cuisines = (p.tags && p.tags.length > 0) ? p.tags.join(' / ') : (p.cuisine || p.category || 'Home Food');
+  const cuisines = (p.tags && p.tags.length > 0) ? p.tags.join(' / ') : (p.cuisines || p.cuisine || p.businessType || p.category || 'Home Food');
 
   const scrollToCatalog = () => {
     const el = document.getElementById('tiffin-catalog');
@@ -67,6 +292,16 @@ export default function ProviderDossier({
   };
 
   const featuredTiffin = tiffins.length > 0 ? tiffins[0] : null;
+
+  const handleCustomize = (tif) => {
+    if (!user) {
+      if (typeof onOpenLogin === 'function') {
+        onOpenLogin('login');
+      }
+      return;
+    }
+    if (tif) onSelectTiffin(tif);
+  };
 
   return (
     <div className="flex flex-col w-full bg-[#fbf9f5] min-h-screen text-[#1b1c1a] pt-20 sm:pt-24">
@@ -95,12 +330,12 @@ export default function ProviderDossier({
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-white px-3 py-1.5 shadow-xs border border-[#ded9d1]">
-              <span className="w-2 h-2 rounded-full bg-[#1a1a1a] animate-pulse"></span>
-              <span className="font-label-caps text-[11px] text-[#1a1a1a] tracking-widest uppercase font-semibold">DISPATCH ENGINE ACTIVE</span>
+            <div className="flex items-center gap-2 bg-white px-3 py-1.5 shadow-xs border border-[#ded9d1] rounded-lg">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+              <span className="font-label-caps text-[11px] text-[#1a1a1a] tracking-widest uppercase font-semibold">ACCEPTING ORDERS</span>
             </div>
-            <span className="font-label-caps text-xs text-[#665d52] font-mono uppercase">
-              SLOT #{locality.slice(0, 3).toUpperCase()}-{providerName.slice(0, 2).toUpperCase()}-04
+            <span className="font-label-caps text-xs text-[#665d52] uppercase font-semibold">
+              DELIVERING IN {locality.toUpperCase()}
             </span>
           </div>
         </div>
@@ -122,9 +357,9 @@ export default function ProviderDossier({
                 <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a1a]/70 via-transparent to-transparent"></div>
                 <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
                   <div className="bg-[#fbf9f5]/95 backdrop-blur-sm p-4 max-w-xs shadow-sm border border-[#ded9d1]">
-                    <span className="font-label-caps text-[10px] text-[#665d52] block uppercase tracking-wider font-semibold">ARCHITECTURAL REGISTER</span>
+                    <span className="font-label-caps text-[10px] text-[#665d52] block uppercase tracking-wider font-semibold">VERIFIED HOME KITCHEN</span>
                     <p style={{ fontFamily: "'EB Garamond', serif" }} className="text-[20px] leading-tight text-[#1a1a1a] mt-1 font-semibold">
-                      Dabba Curation Lab 01
+                      Authentic Home Kitchen
                     </p>
                     <p className="font-body-md text-xs text-[#665d52] mt-0.5">
                       {street}
@@ -140,35 +375,35 @@ export default function ProviderDossier({
               {/* Secondary Metric Strip */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-[#f5f3ef] p-4 flex flex-col justify-between border border-[#ded9d1]">
-                  <span className="font-label-caps text-xs text-[#665d52] uppercase font-semibold">METRIC 01</span>
+                  <span className="font-label-caps text-xs text-[#665d52] uppercase font-semibold">RATING</span>
                   <div className="mt-4">
                     <p style={{ fontFamily: "'EB Garamond', serif" }} className="text-3xl text-[#1a1a1a] leading-none">
-                      {rating}
+                      {liveRating !== undefined && liveRating !== null && !isNaN(Number(liveRating)) ? Number(liveRating).toFixed(1) : (rating ? Number(rating).toFixed(1) : '0.0')}
                     </p>
                     <div className="flex items-center gap-1 mt-1 text-[#1a1a1a]">
-                      <span className="material-symbols-outlined text-[14px]">star</span>
-                      <span className="font-label-caps text-[10px] uppercase font-bold">{reviewCount} AUDITED REVIEWS</span>
+                      <span className="material-symbols-outlined text-[14px] text-[#b45309]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                      <span className="font-label-caps text-[10px] uppercase font-bold">{liveReviewCount !== undefined ? liveReviewCount : reviewCount} CUSTOMER REVIEWS</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-[#f5f3ef] p-4 flex flex-col justify-between border border-[#ded9d1]">
-                  <span className="font-label-caps text-xs text-[#665d52] uppercase font-semibold">RANGE &amp; PROXIMITY</span>
+                  <span className="font-label-caps text-xs text-[#665d52] uppercase font-semibold">DISTANCE &amp; TIME</span>
                   <div className="mt-4">
                     <p style={{ fontFamily: "'EB Garamond', serif" }} className="text-3xl text-[#1a1a1a] leading-none">
                       {distanceKm}<span className="text-[16px] font-sans">km</span>
                     </p>
-                    <p className="font-label-caps text-[10px] text-[#665d52] mt-1 uppercase font-semibold">25–35 MIN DISPATCH</p>
+                    <p className="font-label-caps text-[10px] text-[#665d52] mt-1 uppercase font-semibold">{etaText}</p>
                   </div>
                 </div>
 
                 <div className="bg-[#1a1a1a] text-[#fbf9f5] p-4 flex flex-col justify-between">
-                  <span className="font-label-caps text-xs text-[#ded9d1] uppercase font-semibold">COMPLIANCE</span>
+                  <span className="font-label-caps text-xs text-[#ded9d1] uppercase font-semibold">MEAL TYPE</span>
                   <div className="mt-4">
                     <p style={{ fontFamily: "'EB Garamond', serif" }} className="text-3xl text-white leading-none">
-                      100%
+                      {mealTypeHeading}
                     </p>
-                    <p className="font-label-caps text-[10px] text-[#ded9d1] mt-1 uppercase font-bold">SATVIK PURE VEG</p>
+                    <p className="font-label-caps text-[10px] text-[#ded9d1] mt-1 uppercase font-bold">{mealTypeSub}</p>
                   </div>
                 </div>
               </div>
@@ -186,9 +421,9 @@ export default function ProviderDossier({
                     <span className="material-symbols-outlined text-[15px] transition-transform group-hover:-translate-x-1">arrow_back</span>
                     <span>Back to Providers</span>
                   </button>
-                  <span className="font-label-caps text-xs bg-[#efeeea] px-2.5 py-1 text-[#1a1a1a] uppercase tracking-wider font-semibold border border-[#ded9d1]">PROVIDER DOSSIER</span>
+                  <span className="font-label-caps text-xs bg-[#efeeea] px-2.5 py-1 text-[#1a1a1a] uppercase tracking-wider font-semibold border border-[#ded9d1]">KITCHEN PROFILE</span>
                   <span className="text-[#665d52]">•</span>
-                  <span className="font-label-caps text-xs text-[#665d52] uppercase font-semibold">AHMEDABAD RESIDENTIAL DIVISION</span>
+                  <span className="font-label-caps text-xs text-[#665d52] uppercase font-semibold">AHMEDABAD</span>
                 </div>
 
                 <h1 style={{ fontFamily: "'EB Garamond', serif" }} className="text-4xl sm:text-5xl lg:text-6xl text-[#1a1a1a] tracking-tight leading-[1.05]">
@@ -204,7 +439,7 @@ export default function ProviderDossier({
               <div className="space-y-3 bg-[#f5f3ef] p-5 shadow-sm border border-[#ded9d1]">
                 <div className="flex justify-between items-start bg-white p-3.5 border border-[#ded9d1]/60">
                   <div>
-                    <span className="font-label-caps text-[11px] text-[#665d52] uppercase block font-semibold">Cuisine Typologies</span>
+                    <span className="font-label-caps text-[11px] text-[#665d52] uppercase block font-semibold">Cuisines &amp; Specialties</span>
                     <span className="font-body-md text-xs sm:text-sm text-[#1a1a1a] font-medium mt-0.5 block">{cuisines}</span>
                   </div>
                   <span className="material-symbols-outlined text-[#665d52] text-[20px]">restaurant_menu</span>
@@ -212,18 +447,18 @@ export default function ProviderDossier({
 
                 <div className="flex justify-between items-start bg-white p-3.5 border border-[#ded9d1]/60">
                   <div>
-                    <span className="font-label-caps text-[11px] text-[#665d52] uppercase block font-semibold">Kitchen Registry &amp; Atelier</span>
+                    <span className="font-label-caps text-[11px] text-[#665d52] uppercase block font-semibold">Kitchen Location</span>
                     <span className="font-body-md text-xs sm:text-sm text-[#1a1a1a] font-medium mt-0.5 block">{street}</span>
-                    <span className="font-label-caps text-[#665d52] text-[10px] uppercase">Zone: {locality} Core Corridor</span>
+                    <span className="font-label-caps text-[#665d52] text-[10px] uppercase">Area: {locality}</span>
                   </div>
                   <span className="material-symbols-outlined text-[#665d52] text-[20px]">pin_drop</span>
                 </div>
 
                 <div className="flex justify-between items-start bg-white p-3.5 border border-[#ded9d1]/60">
                   <div>
-                    <span className="font-label-caps text-[11px] text-[#665d52] uppercase block font-semibold">Verified Concierge Line</span>
+                    <span className="font-label-caps text-[11px] text-[#665d52] uppercase block font-semibold">Customer Care &amp; Inquiries</span>
                     <span className="font-body-md text-xs sm:text-sm text-[#1a1a1a] font-medium mt-0.5 block font-mono">{phone}</span>
-                    <span className="font-label-caps text-[#665d52] text-[10px] uppercase">Direct Dispatch Desk (07:00 – 21:00)</span>
+                    <span className="font-label-caps text-[#665d52] text-[10px] uppercase">Service Hours: 07:00 AM – 09:00 PM</span>
                   </div>
                   <span className="material-symbols-outlined text-[#665d52] text-[20px]">call</span>
                 </div>
@@ -243,7 +478,7 @@ export default function ProviderDossier({
                 <button
                   type="button"
                   disabled={!featuredTiffin}
-                  onClick={() => featuredTiffin && onSelectTiffin(featuredTiffin)}
+                  onClick={() => handleCustomize(featuredTiffin)}
                   className={`flex-1 ${featuredTiffin ? 'bg-[#efeeea] hover:bg-[#e4e2de] text-[#1a1a1a] cursor-pointer' : 'bg-[#f5f3ef] text-[#a0988c] cursor-not-allowed'} font-button-text text-xs uppercase tracking-widest text-center py-4 px-6 transition-colors flex items-center justify-center gap-2 font-bold border border-[#ded9d1]`}
                 >
                   <span>Customize Featured</span>
@@ -256,21 +491,21 @@ export default function ProviderDossier({
         </div>
       </section>
 
-      {/* Strict Isolation Ledger Banner */}
-      <section className="w-full bg-[#ded9d1]/40 py-5 px-4 sm:px-6 lg:px-20 border-y border-[#ded9d1]">
+      {/* Quality & Hygiene Guarantee Banner */}
+      <section className="w-full bg-[#ded9d1]/30 py-5 px-4 sm:px-6 lg:px-20 border-y border-[#ded9d1]">
         <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-[#1a1a1a] text-[22px]">database</span>
+            <span className="material-symbols-outlined text-[#1b5e20] text-[24px]">verified</span>
             <div>
-              <span className="font-label-caps text-xs text-[#1a1a1a] uppercase tracking-wider block font-bold">Partitioned Database Record Isolation</span>
+              <span className="font-label-caps text-xs text-[#1a1a1a] uppercase tracking-wider block font-bold">100% Homestyle Hygiene &amp; Quality</span>
               <p className="font-body-md text-xs text-[#665d52]">
-                Catalog scoped solely to <code className="bg-white/80 px-1 py-0.5 rounded text-[#1a1a1a]">tenant_id: {providerId}</code>. Cross-kitchen data leakage strictly prohibited by core query governance.
+                Cooked with care in clean, family-run kitchens using fresh farm vegetables and pure ingredients.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 self-start md:self-auto bg-white px-3 py-1.5 shadow-xs border border-[#ded9d1]">
-            <span className="material-symbols-outlined text-[16px] text-[#665d52]">lock</span>
-            <span className="font-label-caps text-[11px] text-[#1a1a1a] tracking-widest uppercase font-semibold">TENANT_KEY: {providerName.slice(0, 7).toUpperCase()}-AHM-01</span>
+            <span className="material-symbols-outlined text-[16px] text-[#1b5e20]">check_circle</span>
+            <span className="font-label-caps text-[11px] text-[#1a1a1a] tracking-widest uppercase font-semibold">FSSAI VERIFIED KITCHEN</span>
           </div>
         </div>
       </section>
@@ -299,7 +534,7 @@ export default function ProviderDossier({
           {loading ? (
             <div className="py-20 text-center space-y-3 bg-white border border-[#ded9d1]">
               <div className="w-8 h-8 border-3 border-[#1a1a1a] border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="font-label-caps text-xs uppercase text-[#665d52]">Fetching provider's isolated tiffins...</p>
+              <p className="font-label-caps text-xs uppercase text-[#665d52]">Loading fresh tiffins...</p>
             </div>
           ) : tiffins.length === 0 ? (
             <div className="p-12 text-center bg-white border border-[#ded9d1] space-y-3">
@@ -335,10 +570,10 @@ export default function ProviderDossier({
                           alt={tif.name}
                         />
                         <div className="absolute top-4 left-4 bg-[#1a1a1a] text-[#fbf9f5] px-3 py-1 font-label-caps text-[10px] uppercase tracking-wider font-bold">
-                          {tif.category || 'FEATURED ATELIER'}
+                          {tif.category || 'POPULAR TIFFIN'}
                         </div>
                         <div className="absolute bottom-4 right-4 bg-white/95 px-3 py-1 shadow-xs font-label-caps text-[10px] text-[#1a1a1a] font-bold">
-                          {tif.available !== undefined ? tif.available : (tif.capacity || 0)} SLOTS REMAINING
+                          {tif.available !== undefined ? tif.available : (tif.capacity || 0)} MEALS REMAINING
                         </div>
                       </div>
 
@@ -367,7 +602,7 @@ export default function ProviderDossier({
                             {tif.mealType || 'Lunch'}
                           </span>
                           <span className="bg-[#ded9d1] px-2.5 py-0.5 font-label-caps text-[10px] text-[#1a1a1a] uppercase font-bold">
-                            Today's Cycle
+                            Today's Fresh Batch
                           </span>
                         </div>
 
@@ -381,9 +616,9 @@ export default function ProviderDossier({
                           </p>
                         </div>
 
-                        {/* Composition Ledger Box */}
+                        {/* Composition Box */}
                         <div className="bg-[#f5f3ef] p-4 space-y-2 border border-[#ded9d1]/60">
-                          <span className="font-label-caps text-[11px] text-[#665d52] block uppercase font-bold">Composition Ledger</span>
+                          <span className="font-label-caps text-[11px] text-[#665d52] block uppercase font-bold">Tiffin Includes</span>
                           <ul className="font-body-md text-xs text-[#1a1a1a] space-y-1.5 list-none">
                             {compositionList.slice(0, 4).map((cItem, cIdx) => (
                               <li key={cIdx} className="flex items-center gap-2">
@@ -400,7 +635,7 @@ export default function ProviderDossier({
                     <div className="p-6 sm:p-7 pt-0 flex flex-col gap-2">
                       <button
                         type="button"
-                        onClick={() => onSelectTiffin(tif)}
+                        onClick={() => handleCustomize(tif)}
                         className="w-full bg-[#1a1a1a] hover:bg-[#4a4238] text-white py-3.5 px-4 font-button-text text-xs uppercase tracking-widest text-center transition-colors flex items-center justify-center gap-2 cursor-pointer font-bold"
                       >
                         <span>CUSTOMIZE MEAL</span>
@@ -423,17 +658,327 @@ export default function ProviderDossier({
         </div>
       </section>
 
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          SECTION 03: REAL-TIME VERIFIED CUSTOMER REVIEWS & OWNER REPLIES
+          ───────────────────────────────────────────────────────────────────────────── */}
+      <section className="w-full bg-[#fbf9f5] px-4 sm:px-6 lg:px-20 py-16 border-t border-[#ded9d1]" id="customer-reviews">
+        <div className="max-w-[1440px] mx-auto">
+          {/* Section Editorial Header */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 pb-6 border-b border-[#ded9d1] gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="font-label-caps text-xs text-[#a0522d] uppercase tracking-widest font-bold">DINER EXPERIENCES</span>
+              </div>
+              <h2 style={{ fontFamily: "'EB Garamond', serif" }} className="text-3xl sm:text-4xl text-[#1a1a1a] tracking-tight">
+                Customer Reviews &amp; Kitchen Ratings
+              </h2>
+            </div>
+            <p className="font-body-md text-xs sm:text-sm text-[#665d52] max-w-md leading-relaxed">
+              Transparent, unedited feedback from diners across Ahmedabad. Every review is linked to an authentic fulfilled order.
+            </p>
+          </div>
+
+          {/* Rating Summary Scorecard Grid */}
+          <div className="bg-white p-6 sm:p-8 border border-[#ded9d1] shadow-xs mb-10">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+              
+              {/* Primary Score Pillar */}
+              <div className="md:col-span-4 flex flex-col items-center sm:items-start text-center sm:text-left border-b md:border-b-0 md:border-r border-[#ded9d1] pb-6 md:pb-0 md:pr-8">
+                <span className="font-label-caps text-xs text-[#665d52] uppercase tracking-wider font-semibold">
+                  OVERALL DINING RATING
+                </span>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span style={{ fontFamily: "'EB Garamond', serif" }} className="text-6xl text-[#1a1a1a] leading-none font-semibold">
+                    {liveRating !== undefined && liveRating !== null && !isNaN(Number(liveRating)) ? Number(liveRating).toFixed(1) : '0.0'}
+                  </span>
+                  <span className="text-xl text-[#665d52] font-sans font-light">/ 5.0</span>
+                </div>
+                
+                {/* 5-Star Visual Meter */}
+                <div className="flex items-center gap-1 mt-3">
+                  {[1, 2, 3, 4, 5].map((starIdx) => (
+                    <span
+                      key={starIdx}
+                      className={`material-symbols-outlined text-[22px] ${
+                        starIdx <= Math.round(Number(liveRating) || 0) ? 'text-[#b45309]' : 'text-[#ded9d1]'
+                      }`}
+                      style={{ fontVariationSettings: starIdx <= Math.round(Number(liveRating) || 0) ? "'FILL' 1" : "'FILL' 0" }}
+                    >
+                      star
+                    </span>
+                  ))}
+                </div>
+
+                <p className="font-label-caps text-xs text-[#1a1a1a] font-bold uppercase mt-2 tracking-wide">
+                  Based on {liveReviewCount} verified customer review{liveReviewCount === 1 ? '' : 's'}
+                </p>
+
+                <div className="mt-4 inline-flex items-center gap-2 bg-[#fcf6ee] border border-[#eedcc8] px-3 py-1.5 rounded-sm">
+                  <span className="material-symbols-outlined text-[#a0522d] text-[16px]">thumb_up</span>
+                  <span className="font-label-caps text-[11px] text-[#8c531b] font-bold uppercase">
+                    {reviewsStats?.positivePercent !== undefined ? reviewsStats.positivePercent : (liveReviewCount > 0 ? 100 : 0)}% Positive Experience
+                  </span>
+                </div>
+              </div>
+
+              {/* Star Rating Breakdown Distribution */}
+              <div className="md:col-span-8 flex flex-col justify-center space-y-2.5">
+                {[5, 4, 3, 2, 1].map((s) => {
+                  const count = reviews.filter(r => Number(r.rating) === s).length;
+                  const total = reviews.length;
+                  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                  return (
+                    <div key={s} className="flex items-center gap-3 text-xs">
+                      <div className="flex items-center gap-1 w-14 shrink-0 font-label-caps text-[11px] font-bold text-[#1a1a1a]">
+                        <span>{s}</span>
+                        <span className="material-symbols-outlined text-[13px] text-[#b45309]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                      </div>
+                      <div className="flex-1 bg-[#efeeea] h-2.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-[#b45309] h-full rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        ></div>
+                      </div>
+                      <span className="w-16 text-right font-mono text-[11px] text-[#665d52]">
+                        {count} ({pct}%)
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {/* Sub-Metric badges (Dynamic & Real-Time) */}
+                <div className="pt-4 mt-2 border-t border-[#ded9d1]/60 flex flex-wrap items-center gap-4 text-xs text-[#665d52]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-700">soup_kitchen</span>
+                    <span className="font-semibold text-[#1a1a1a]">Food Authenticity:</span>
+                    <span className="font-bold text-[#b45309]">{subMetrics.foodQuality}★</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-700">inventory_2</span>
+                    <span className="font-semibold text-[#1a1a1a]">Packaging &amp; Warmth:</span>
+                    <span className="font-bold text-[#b45309]">{subMetrics.packaging}★</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-700">schedule</span>
+                    <span className="font-semibold text-[#1a1a1a]">Punctuality:</span>
+                    <span className="font-bold text-[#b45309]">{subMetrics.delivery}★</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Review Filter Navigation Tabs */}
+          <div className="flex items-center justify-between gap-4 mb-6 flex-wrap pb-3 border-b border-[#ded9d1]">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setReviewFilter('all')}
+                className={`px-3.5 py-1.5 text-xs uppercase font-label-caps font-bold transition-all cursor-pointer ${
+                  reviewFilter === 'all'
+                    ? 'bg-[#1a1a1a] text-white shadow-xs'
+                    : 'bg-[#efeeea] hover:bg-[#ded9d1] text-[#1a1a1a] border border-[#ded9d1]'
+                }`}
+              >
+                All Reviews ({reviews.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewFilter('with_replies')}
+                className={`px-3.5 py-1.5 text-xs uppercase font-label-caps font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  reviewFilter === 'with_replies'
+                    ? 'bg-[#1a1a1a] text-white shadow-xs'
+                    : 'bg-[#efeeea] hover:bg-[#ded9d1] text-[#1a1a1a] border border-[#ded9d1]'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[14px]">reply</span>
+                <span>With Owner Replies ({reviews.filter(r => r.providerReply && String(r.providerReply).trim() !== '').length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewFilter('5_star')}
+                className={`px-3.5 py-1.5 text-xs uppercase font-label-caps font-bold transition-all cursor-pointer ${
+                  reviewFilter === '5_star'
+                    ? 'bg-[#1a1a1a] text-white shadow-xs'
+                    : 'bg-[#efeeea] hover:bg-[#ded9d1] text-[#1a1a1a] border border-[#ded9d1]'
+                }`}
+              >
+                5 Star ({reviews.filter(r => Number(r.rating) === 5).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewFilter('4_star')}
+                className={`px-3.5 py-1.5 text-xs uppercase font-label-caps font-bold transition-all cursor-pointer ${
+                  reviewFilter === '4_star'
+                    ? 'bg-[#1a1a1a] text-white shadow-xs'
+                    : 'bg-[#efeeea] hover:bg-[#ded9d1] text-[#1a1a1a] border border-[#ded9d1]'
+                }`}
+              >
+                4 Star ({reviews.filter(r => Number(r.rating) === 4).length})
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={fetchReviews}
+                className="inline-flex items-center gap-1 text-xs text-[#665d52] hover:text-[#1a1a1a] cursor-pointer font-semibold"
+                title="Refresh reviews"
+              >
+                <span className={`material-symbols-outlined text-[16px] ${reviewsLoading ? 'animate-spin' : ''}`}>refresh</span>
+                <span>Live Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Reviews List */}
+          {reviewsLoading && reviews.length === 0 ? (
+            <div className="py-16 text-center space-y-3 bg-white border border-[#ded9d1]">
+              <div className="w-8 h-8 border-3 border-[#1a1a1a] border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="font-label-caps text-xs uppercase text-[#665d52]">Loading diner reviews...</p>
+            </div>
+          ) : filteredReviews.length === 0 ? (
+            <div className="p-12 text-center bg-white border border-[#ded9d1] space-y-3">
+              <span className="material-symbols-outlined text-4xl text-[#665d52]">rate_review</span>
+              <p className="text-base text-[#1a1a1a] font-medium">No reviews match the selected filter.</p>
+              <button
+                type="button"
+                onClick={() => setReviewFilter('all')}
+                className="px-4 py-2 bg-[#1a1a1a] text-white text-xs uppercase font-bold cursor-pointer"
+              >
+                Show All Reviews
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredReviews.map((rev) => {
+                const formattedDate = rev.createdAt
+                  ? new Date(rev.createdAt).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric'
+                    })
+                  : 'Recent order';
+                const initial = (rev.customerName || 'V').trim().charAt(0).toUpperCase();
+
+                return (
+                  <article
+                    key={rev._id}
+                    className="bg-white p-6 border border-[#ded9d1] shadow-xs transition-shadow hover:shadow-sm"
+                  >
+                    {/* Top Row: Customer Info & Rating */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#f0eeea]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#efeeea] border border-[#ded9d1] flex items-center justify-center font-bold text-[#1a1a1a] text-sm shrink-0">
+                          {initial}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-[#1a1a1a] text-sm capitalize">
+                              {rev.customerName || 'Verified Diner'}
+                            </span>
+                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                              <span className="material-symbols-outlined text-[12px] text-emerald-700">verified</span>
+                              <span>Verified Order</span>
+                            </span>
+                          </div>
+                          <span className="text-xs text-[#8c8275] block mt-0.5">
+                            {formattedDate}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Star Rating Badge */}
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <div className="flex items-center gap-0.5 bg-[#fbf9f5] px-2.5 py-1 border border-[#ded9d1] rounded-sm">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <span
+                              key={s}
+                              className={`material-symbols-outlined text-[16px] ${
+                                s <= Number(rev.rating) ? 'text-[#b45309]' : 'text-[#ded9d1]'
+                              }`}
+                              style={{ fontVariationSettings: s <= Number(rev.rating) ? "'FILL' 1" : "'FILL' 0" }}
+                            >
+                              star
+                            </span>
+                          ))}
+                          <span className="ml-1 text-xs font-bold text-[#1a1a1a]">
+                            {Number(rev.rating).toFixed(1)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Meal / Order Badge */}
+                    <div className="pt-3 flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1.5 bg-[#f5f3ef] text-[#4a4238] border border-[#ded9d1] px-2.5 py-1 rounded-sm text-xs font-medium">
+                        <span className="material-symbols-outlined text-[14px] text-[#a0522d]">lunch_dining</span>
+                        <span>{rev.tiffinName || 'Artisanal Homestyle Tiffin'}</span>
+                      </span>
+                    </div>
+
+                    {/* Customer Review Description / Remarks */}
+                    <div className="pt-3">
+                      {rev.comment && rev.comment.trim() ? (
+                        <p className="text-sm text-[#1a1a1a] leading-relaxed font-body-md whitespace-pre-line">
+                          "{rev.comment.trim()}"
+                        </p>
+                      ) : (
+                        <p className="text-xs text-[#8c8275] italic flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[14px]">star_outline</span>
+                          <span>Diner provided a {rev.rating}-star rating without a written description.</span>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Kitchen Owner Reply Box */}
+                    {rev.providerReply && rev.providerReply.trim() && (
+                      <div className="mt-4 bg-[#f5f3ef] border-l-4 border-[#a0522d] p-4 rounded-r-lg shadow-2xs">
+                        <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[16px] text-[#a0522d]">storefront</span>
+                            <span className="font-label-caps text-xs text-[#1a1a1a] font-bold">
+                              Response from {rev.repliedBy || providerName}
+                            </span>
+                            <span className="bg-[#1a1a1a] text-white text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider rounded-xs">
+                              KITCHEN OWNER
+                            </span>
+                          </div>
+                          {rev.repliedAt && (
+                            <span className="text-[11px] text-[#8c8275]">
+                              {new Date(rev.repliedAt).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs sm:text-sm text-[#2d2b27] leading-relaxed whitespace-pre-line pl-6">
+                          {rev.providerReply.trim()}
+                        </p>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Hygiene, Material Protocols & Logistics Architecture */}
       <section className="w-full bg-[#f5f3ef] px-4 sm:px-6 lg:px-20 py-16 border-t border-[#ded9d1]">
         <div className="max-w-[1440px] mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
             <div>
-              <span className="font-label-caps text-xs text-[#665d52] uppercase tracking-widest block mb-1 font-semibold">OPERATIONAL RIGOR</span>
+              <span className="font-label-caps text-xs text-[#665d52] uppercase tracking-widest block mb-1 font-semibold">OUR PROMISE</span>
               <h2 style={{ fontFamily: "'EB Garamond', serif" }} className="text-3xl sm:text-4xl text-[#1a1a1a] tracking-tight">
-                Hygiene &amp; Operational Commitments
+                Hygiene &amp; Quality Commitments
               </h2>
             </div>
-            <span className="font-label-caps text-xs text-[#665d52] uppercase">ZERO-LEAK INTEGRATION SPECIFICATIONS</span>
+            <span className="font-label-caps text-xs text-[#665d52] uppercase">FRESH &amp; HYGIENIC DELIVERIES</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

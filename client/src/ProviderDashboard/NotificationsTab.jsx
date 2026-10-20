@@ -53,8 +53,8 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   // Station Information
-  const kitchenName = currentUser?.businessName || currentUser?.name || 'Mansuri Kitchen';
-  const stationNode = currentUser?._id ? `msr-node-${String(currentUser._id).slice(-4)}` : 'msr-node-04';
+  const kitchenName = currentUser?.kitchenName || currentUser?.businessName || currentUser?.name || 'Kitchen Partner';
+  const stationNode = currentUser?._id ? `node-${String(currentUser._id).slice(-4)}` : 'node-01';
 
   // Show Toast Helper
   const showToast = (msg) => {
@@ -109,7 +109,7 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
       console.error('Error fetching notifications:', err);
       if (!isBackground) {
         setHasError(true);
-        setErrorMessage(err.message || 'Unable to connect to database');
+        setErrorMessage(err.message || 'Unable to load notifications. Please check your connection.');
       }
     } finally {
       setLoading(false);
@@ -329,14 +329,14 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
         body: JSON.stringify(preferences)
       });
       if (res && res.success) {
-        showToast('Notification preferences updated and synced to MongoDB.');
+        showToast('Notification preferences updated successfully.');
         setIsPreferencesOpen(false);
       } else {
         throw new Error(res?.message || 'Failed to save');
       }
     } catch (err) {
       console.error('Error saving preferences:', err);
-      showToast('⚠️ Could not save preferences to database');
+      showToast('⚠️ Could not save preferences. Please retry.');
     } finally {
       setIsSavingPrefs(false);
     }
@@ -420,7 +420,7 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
         return {
           icon: 'local_shipping',
           iconBg: 'bg-surface-container text-onyx-black',
-          badgeText: 'TRANSIT TELEMETRY',
+          badgeText: 'IN TRANSIT',
           actionText: 'Track Order'
         };
       case 'Reviews':
@@ -457,15 +457,15 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 text-clay-earth font-label-caps text-label-caps tracking-widest uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-onyx-black inline-block"></span>
-              <span>COMMUNICATION CENTER // REAL-TIME ALERT PROTOCOL</span>
+              <span>COMMUNICATION CENTER • REAL-TIME ALERT PROTOCOL</span>
               <span className="text-sand-neutral">•</span>
-              <span className="font-normal lowercase tracking-normal text-on-surface-variant text-xs">node: {stationNode}</span>
+              <span className="font-normal lowercase tracking-normal text-on-surface-variant text-xs">station: {stationNode}</span>
             </div>
             <h1 className="font-headline-lg text-3xl lg:text-5xl text-onyx-black tracking-tight font-normal">
               Notifications
             </h1>
             <p className="font-body-md text-body-md text-on-surface-variant max-w-2xl">
-              Stay updated with your kitchen's orders, dispatch transit telemetry, and customer activities across Satellite Hub.
+              Stay updated with your kitchen's orders, dispatch updates, and customer activities.
             </p>
           </div>
 
@@ -523,7 +523,7 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
               </div>
             </div>
             <div className="mt-6 pt-3 border-t border-sand-neutral/50 flex items-center justify-between text-xs text-on-surface-variant">
-              <span className="truncate">MongoDB synced • Scoped to {kitchenName}</span>
+              <span className="truncate">Up to date • Scoped to {kitchenName}</span>
               <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
             </div>
           </div>
@@ -767,7 +767,7 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
               progress_activity
             </span>
             <div className="font-button-text text-sm text-secondary">
-              Synchronizing real-time provider telemetry...
+              Loading notifications...
             </div>
           </div>
         )}
@@ -780,7 +780,7 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
               <span>Failed to fetch provider notifications</span>
             </div>
             <p className="text-sm text-on-surface-variant">
-              {errorMessage || 'There was a connection glitch fetching MongoDB alerts.'}
+              {errorMessage || 'There was a connection issue loading alerts. Please try again.'}
             </p>
             <button
               type="button"
@@ -1004,13 +1004,13 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
             <div className="p-6 md:p-8 bg-surface-container-low flex items-start justify-between border-b border-sand-neutral/60">
               <div>
                 <div className="font-label-caps text-label-caps text-clay-earth uppercase tracking-widest mb-1">
-                  PROVIDER TELEMETRY SETTINGS
+                  ALERT NOTIFICATION SETTINGS
                 </div>
                 <h2 className="font-headline-md text-2xl md:text-3xl text-onyx-black font-normal">
                   Notification Preferences
                 </h2>
                 <p className="font-body-md text-sm text-on-surface-variant mt-1">
-                  Configure alerts, communication channels, and dispatch telemetry triggers.
+                  Configure alerts, communication channels, and dispatch notification triggers.
                 </p>
               </div>
               <button
@@ -1207,7 +1207,7 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
             <div className="p-6 md:p-8 bg-surface-container-low border-t border-sand-neutral/60 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-2 text-xs text-on-surface-variant font-label-caps">
                 <span className="w-2 h-2 rounded-full bg-clay-earth"></span>
-                <span>Synced to MongoDB provider_settings</span>
+                <span>Saved to Provider Settings</span>
               </div>
               <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                 <button
@@ -1278,7 +1278,7 @@ export default function NotificationsTab({ currentUser, onNavigateTab, onUnreadC
               {selectedNotification.metadata && Object.keys(selectedNotification.metadata).length > 0 && (
                 <div className="bg-surface-container-low p-4 rounded flex flex-col gap-2.5">
                   <span className="font-label-caps text-[11px] text-clay-earth uppercase tracking-widest font-bold">
-                    Database Telemetry Metadata
+                    Notification Details
                   </span>
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     {Object.entries(selectedNotification.metadata).map(([key, val]) => (

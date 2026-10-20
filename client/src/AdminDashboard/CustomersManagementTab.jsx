@@ -414,7 +414,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#fbf9f5] text-[#1b1c1a] antialiased flex flex-col font-sans select-text">
+    <div className="w-full min-h-screen bg-[#fbf9f5] text-[#1b1c1a] antialiased flex flex-col font-sans select-none">
 
       {/* Floating Notification Toast */}
       {toastMessage && (
@@ -558,7 +558,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 px-3 py-2 bg-[#efeeea] font-mono text-[11px] text-[#1b1c1a]">
                 <span className="w-2 h-2 rounded-full bg-[#1a1a1a] animate-pulse"></span>
-                <span>WebSocket Active (TLS 1.3)</span>
+                <span>Live Security Active (TLS 1.3)</span>
               </div>
               <button
                 onClick={handleExportOrdersCsv}
@@ -755,7 +755,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                   <tbody className="divide-y divide-[#ded9d1]/60">
                     {ordersLoading ? (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center text-[#665d52]">Loading real orders from MongoDB...</td>
+                        <td colSpan={8} className="py-12 text-center text-[#665d52]">Loading customer orders...</td>
                       </tr>
                     ) : filteredCustomerOrders.length === 0 ? (
                       <tr>
@@ -902,7 +902,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                     </svg>
                     <div className="absolute top-3 left-3 z-20 bg-white/90 backdrop-blur-md px-2.5 py-1 font-mono text-[10px] text-[#1a1a1a] uppercase tracking-wider flex items-center gap-1.5 border border-[#ded9d1]">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a1a] animate-pulse"></span>
-                      GPS Stream Active: Bodakdev Cluster
+                      Live Tracking Active: Bodakdev Cluster
                     </div>
                     <div className="absolute bottom-3 right-3 z-20 bg-[#1a1a1a] text-white px-3 py-1 font-mono text-[11px]">
                       ETA: 6 MINS
@@ -1481,7 +1481,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                 <div className="font-serif text-3xl text-[#1a1a1a] font-normal leading-none tracking-tight">
                   {activityStats.activeNow || dbCustomerStats.active}
                 </div>
-                <div className="mt-2 text-xs text-[#665d52]">WebSocket sessions alive</div>
+                <div className="mt-2 text-xs text-[#665d52]">Active customer sessions</div>
               </div>
               <div className="h-0.5 w-full bg-[#ded9d1]">
                 <div className="h-0.5 bg-[#1a1a1a] w-2/3"></div>
@@ -1766,7 +1766,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 px-3 py-1 bg-[#efeeea] font-mono text-[11px] text-[#1b1c1a]">
                 <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
-                <span>WebSocket Stream: Synced (TLS 1.3)</span>
+                <span>Live Security: Secure (TLS 1.3)</span>
                 <span className="text-[#665d52]">•</span>
                 <span className="text-[#665d52]">Merkle Root Verified</span>
               </div>
@@ -2928,11 +2928,11 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
             </div>
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#f5f3ef] font-mono text-[11px] text-[#665d52] uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#1a1a1a]"></span>
-                LIVE DATABASE STREAM
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                ACTIVE DIRECTORY
               </span>
               <span className="inline-flex items-center px-2 py-1 bg-[#efeeea] font-mono text-[11px] text-[#444748]">
-                MONGODB CONNECTED
+                STATUS: ONLINE
               </span>
             </div>
           </div>
@@ -2941,7 +2941,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-2">
             <div className="max-w-3xl">
               <span className="font-mono text-xs uppercase text-[#665d52] tracking-widest block mb-2">
-                Live Database Registry
+                Customer Registry
               </span>
               <h1 className="font-serif text-4xl text-[#1a1a1a] tracking-tight leading-none mb-3">
                 {currentView === 'suspended'
@@ -2955,7 +2955,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                   ? 'Review suspended diner profiles, KYC hold reasons, and execute instant account reactivations.'
                   : currentView === 'active'
                   ? 'Active ordering diners with valid credentials and zero security flags across all delivery clusters.'
-                  : 'Displaying real customer accounts fetched strictly from your active MongoDB database.'}
+                  : 'Displaying registered customer accounts across all delivery clusters.'}
               </p>
             </div>
 
@@ -2965,12 +2965,12 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                 className="px-4 py-2.5 bg-[#f5f3ef] hover:bg-[#eae8e4] text-[#1a1a1a] font-medium text-xs transition-colors flex items-center gap-2 border border-[#ded9d1]"
               >
                 <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} />
-                <span>Refresh Live DB</span>
+                <span>Refresh Directory</span>
               </button>
             </div>
           </div>
 
-          {/* Real Database KPI Cards */}
+          {/* Real Customer KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <div className="bg-[#f5f3ef] p-5 flex flex-col justify-between h-36 border border-[#ded9d1]">
               <div className="flex items-center justify-between">
@@ -2981,7 +2981,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                 <div className="font-serif text-3xl text-[#1a1a1a] leading-none tracking-tight">
                   {dbCustomerStats.total}
                 </div>
-                <div className="font-mono text-[11px] text-[#444748] mt-2">In MongoDB `users`</div>
+                <div className="font-mono text-[11px] text-[#444748] mt-2">Verified Accounts</div>
               </div>
             </div>
 
@@ -3092,7 +3092,7 @@ export default function CustomersManagementTab({ subTab = 'customers-all', onNav
                   .length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-[#665d52]">
-                      No customers found in database matching criteria.
+                      No customers found matching criteria.
                     </td>
                   </tr>
                 ) : (

@@ -29,6 +29,14 @@ const userSchema = new mongoose.Schema(
       enum: ['admin', 'provider', 'customer', 'delivery'],
       default: 'customer'
     },
+    image: {
+      type: String,
+      default: ''
+    },
+    kitchenPhoto: {
+      type: String,
+      default: ''
+    },
     isActive: {
       type: Boolean,
       default: true

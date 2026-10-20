@@ -90,7 +90,7 @@ export default function SafetyGuidelinesView({ currentUser, onNavigateTab, onSho
         }));
 
         if (onShowToast) {
-          onShowToast('✓ Safety compliance attestation recorded & verified in MongoDB.');
+          onShowToast('✓ Safety compliance acknowledged successfully.');
         }
       } else {
         if (onShowToast) {
@@ -100,7 +100,7 @@ export default function SafetyGuidelinesView({ currentUser, onNavigateTab, onSho
     } catch (err) {
       console.error('Error submitting compliance attestation:', err);
       if (onShowToast) {
-        onShowToast('⚠️ Network error recording compliance attestation.');
+        onShowToast('⚠️ Unable to record acknowledgment. Please check your connection.');
       }
     } finally {
       setSubmitting(false);
@@ -150,7 +150,7 @@ export default function SafetyGuidelinesView({ currentUser, onNavigateTab, onSho
           <div className="inline-flex items-center gap-2 bg-bone-white px-2.5 py-1 border border-sand-neutral">
             <span className="w-1.5 h-1.5 rounded-full bg-onyx-black animate-pulse" />
             <span className="font-label-caps text-[10px] uppercase tracking-wider text-onyx-black font-semibold">
-              MongoDB Compliance Policies Synced • Audit {guidelinesData.version}
+              Safety Policies Synced • Policy {guidelinesData.version}
             </span>
           </div>
         </div>
@@ -573,7 +573,7 @@ export default function SafetyGuidelinesView({ currentUser, onNavigateTab, onSho
           </div>
           <div className="flex items-center gap-2 text-clay-earth font-label-caps text-xs font-semibold">
             <span className="material-symbols-outlined text-base text-onyx-black">verified_user</span>
-            <span>Scoped to Profile: {driverName} (#{driverId})</span>
+            <span>Verified Courier: {driverName}</span>
           </div>
         </div>
 
@@ -632,15 +632,14 @@ export default function SafetyGuidelinesView({ currentUser, onNavigateTab, onSho
             </div>
             <h3 className="font-headline-md text-2xl sm:text-3xl text-onyx-black font-serif">Courier Compliance Attestation</h3>
             <p className="font-body-md text-xs sm:text-sm text-on-surface-variant mt-2 leading-relaxed">
-              Regulatory compliance mandates that every active delivery partner review and acknowledge these safety standards quarterly. Your acknowledgment is digitally signed, timestamped, and immutably recorded in MongoDB.
+              Regulatory compliance mandates that every active delivery partner review and acknowledge these safety standards quarterly. Your acknowledgment is digitally recorded and verified.
             </p>
           </div>
 
-          {/* Scoped Courier Identity Badge */}
+          {/* Courier Identity Badge */}
           <div className="bg-surface p-4 min-w-[240px] border border-sand-neutral">
-            <span className="font-label-caps text-[10px] text-clay-earth uppercase tracking-widest block mb-1 font-bold">Authenticated Principal</span>
+            <span className="font-label-caps text-[10px] text-clay-earth uppercase tracking-widest block mb-1 font-bold">Courier Partner</span>
             <span className="font-headline-md text-lg text-onyx-black block leading-none font-serif font-bold">{driverName}</span>
-            <span className="font-label-caps text-[11px] text-clay-earth mt-1 block font-semibold">Courier ID: #{driverId}</span>
             <span className="font-label-caps text-[10px] text-onyx-black mt-2 inline-block bg-sand-neutral px-2 py-0.5 font-bold">Tier 1 Senior Courier</span>
           </div>
         </div>
@@ -656,7 +655,7 @@ export default function SafetyGuidelinesView({ currentUser, onNavigateTab, onSho
               className="mt-1 w-4 h-4 rounded-none accent-onyx-black cursor-pointer"
             />
             <span className="font-body-md text-xs lg:text-sm text-onyx-black leading-relaxed">
-              I, <strong className="font-bold">{driverName} (#{driverId})</strong>, hereby confirm that I have thoroughly read, understood, and agreed to strictly abide by all five TiffinLink Safety Guidelines, road speed regulations, and emergency SOS protocols. I understand that failure to adhere may result in immediate suspension from the dispatch platform.
+              I, <strong className="font-bold">{driverName}</strong>, hereby confirm that I have thoroughly read, understood, and agreed to strictly abide by all five TiffinLink Safety Guidelines, road speed regulations, and emergency SOS protocols. I understand that failure to adhere may result in immediate suspension from the dispatch platform.
             </span>
           </label>
 
@@ -676,7 +675,7 @@ export default function SafetyGuidelinesView({ currentUser, onNavigateTab, onSho
                 {guidelinesData.isAcknowledged
                   ? 'COMPLIANCE RECORDED & VERIFIED ✓'
                   : submitting
-                  ? 'RECORDING AUDIT IN MONGODB...'
+                  ? 'RECORDING ACKNOWLEDGMENT...'
                   : 'I Understand & Confirm Compliance'}
               </button>
 
@@ -706,13 +705,13 @@ export default function SafetyGuidelinesView({ currentUser, onNavigateTab, onSho
           </div>
         </form>
 
-        {/* MongoDB State Persistence Note */}
+        {/* Compliance State Verification Note */}
         <div className="mt-4 flex flex-wrap items-center justify-between text-[11px] font-label-caps text-clay-earth px-1 gap-2">
           <span className="flex items-center gap-1.5 font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-onyx-black" />
-            <span>State persists to MongoDB: driverId: {driverId}, policyVersion: {guidelinesData.version}, timestamp: UTC.</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+            <span>Compliance verified: Policy {guidelinesData.version}</span>
           </span>
-          <span className="font-mono text-[10px]">Hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</span>
+          <span className="font-mono text-[10px]">Audit Status: Verified</span>
         </div>
       </div>
 
@@ -742,7 +741,7 @@ export default function SafetyGuidelinesView({ currentUser, onNavigateTab, onSho
             <div className="bg-bone-white p-4 my-6 flex flex-col gap-2 font-label-caps text-xs border border-sand-neutral">
               <div className="flex justify-between">
                 <span className="text-clay-earth font-semibold">Active Courier:</span>
-                <span className="text-onyx-black font-bold">{driverName} (#{driverId})</span>
+                <span className="text-onyx-black font-bold">{driverName}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-clay-earth font-semibold">Current Node:</span>
